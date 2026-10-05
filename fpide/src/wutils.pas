@@ -62,6 +62,9 @@ type
 
   TUnsortedStringCollection = class;
   PUnsortedStringCollection = TUnsortedStringCollection;
+  { Abbreviation used by whtml/html helpers. }
+  PUnsortedStrCollection = PUnsortedStringCollection;
+  TUnsortedStrCollection = TUnsortedStringCollection;
   TUnsortedStringCollection = class(TCollection)
     constructor CreateFrom(ALines: TUnsortedStringCollection);
     procedure   Assign(ALines: TUnsortedStringCollection);

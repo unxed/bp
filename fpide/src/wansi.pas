@@ -15,6 +15,9 @@
 {.$DEFINE DEBUG}
 unit WANSI;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,Drivers,
@@ -71,8 +74,9 @@ type
      PHookProc = ^THookProc;
      THookProc = procedure (S: string);
 
-     PConsoleObject = ^TConsoleObject;
-     TConsoleObject = object(TObject)
+     TConsoleObject = class;
+     PConsoleObject = TConsoleObject;
+     TConsoleObject = class(TObject)
        CurPos   : TPoint;
        Size     : TPoint;
        TextAttr : byte;
@@ -83,7 +87,7 @@ type
        ReplyHook   : PHookProc;
        KeyHook     : PHookProc;
        WriteHook   : PHookProc;
-       constructor Init(AReplyHook, AKeyHook, AWriteHook: PHookProc);
+       constructor Create(AReplyHook, AKeyHook, AWriteHook: PHookProc);
        procedure   Home; virtual;
        procedure   ClrScr; virtual;
        procedure   FillScreen(B: byte); virtual;
@@ -110,18 +114,19 @@ type
        { --- Hook procedures --- }
        procedure   Reply(S: string); virtual;
        procedure   PutKey(S: string); virtual;
-       destructor  Done; virtual;
+       destructor Destroy; virtual;
        private
        procedure   ProcessChar(C: char); virtual;
      end;
 
-     PANSIConsole = ^TANSIConsole;
-     TANSIConsole = object(TConsoleObject)
+     TANSIConsole = class;
+     PANSIConsole = TANSIConsole;
+     TANSIConsole = class(TConsoleObject)
        ANSIParam          : TANSIParam;
        ANSILevel          : byte;
        ANSICurPosStack    : array[1..ANSICurPosStackSize] of TPoint;
        ANSICurPosStackPtr : byte;
-       constructor Init(AReplyHook, AKeyHook, AWriteHook: PHookProc);
+       constructor Create(AReplyHook, AKeyHook, AWriteHook: PHookProc);
        procedure   ProcessChar(C: char); virtual;
        function    GetANSIParam: integer; virtual;
        { --- ANSI functions --- }
@@ -135,9 +140,10 @@ type
      end;
 
 {$ifdef WITH_CRT}
-     PCrtConsole = ^TCrtConsole;
-     TCrtConsole = object(TANSIConsole)
-       constructor Init(AReplyHook, AKeyHook, AWriteHook: PHookProc);
+     TCrtConsole = class;
+     PCrtConsole = TCrtConsole;
+     TCrtConsole = class(TANSIConsole)
+       constructor Create(AReplyHook, AKeyHook, AWriteHook: PHookProc);
        procedure   CursorOn; virtual;
        procedure   CursorOff; virtual;
        procedure   ClrScr; virtual;
@@ -158,12 +164,14 @@ type
      TAnsiBuffer = array[0..MaxViewWidth*MaxVideoLine] of word;
      PAnsiBuffer = ^TAnsiBuffer;
 
-     PANSIView = ^TANSIView;
+     TANSIView = class;
+     PANSIView = TANSIView;
 
-     PANSIViewConsole = ^TANSIViewConsole;
-     TANSIViewConsole = object(TANSIConsole)
+     TANSIViewConsole = class;
+     PANSIViewConsole = TANSIViewConsole;
+     TANSIViewConsole = class(TANSIConsole)
        Owner : PANSIView;
-       constructor Init(AOwner: PANSIView);
+       constructor Create(AOwner: PANSIView);
        procedure   CursorOn; virtual;
        procedure   CursorOff; virtual;
        procedure   ClrScr; virtual;
@@ -176,14 +184,14 @@ type
        procedure   GotoXY(X,Y: integer); virtual;
      end;
 
-     TANSIView = object(TScroller)
+     TANSIView = class(TScroller)
        Console : PANSIViewConsole;
        Buffer  : PAnsiBuffer;
        LockCount : word;
-       constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar:PScrollBar);
+       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:PScrollBar);
        function    LoadFile(const FileName: string): boolean;
        procedure   Draw; virtual;
-       destructor  Done; virtual;
+       destructor Destroy; virtual;
        procedure   Write(Const S: string); virtual;
        procedure   WriteLn(Const S: string); virtual;
        procedure   Lock; virtual;
@@ -193,12 +201,14 @@ type
        private
      end;
 
-     PANSIBackground = ^TANSIBackground;
+     TANSIBackground = class;
+     PANSIBackground = TANSIBackground;
 
-     PANSIBackgroundConsole = ^TANSIBackgroundConsole;
-     TANSIBackgroundConsole = object(TANSIConsole)
+     TANSIBackgroundConsole = class;
+     PANSIBackgroundConsole = TANSIBackgroundConsole;
+     TANSIBackgroundConsole = class(TANSIConsole)
        Owner : PANSIBackground;
-       constructor Init(AOwner: PANSIBackground);
+       constructor Create(AOwner: PANSIBackground);
        procedure   CursorOn; virtual;
        procedure   CursorOff; virtual;
        procedure   ClrScr; virtual;
@@ -210,14 +220,14 @@ type
        procedure   GotoXY(X,Y: integer); virtual;
      end;
 
-     TANSIBackground = object(TBackground)
+     TANSIBackground = class(TBackground)
        Console : PANSIBackgroundConsole;
        Buffer  : TAnsiBuffer;
        LockCount : word;
-       constructor Init(var Bounds: TRect);
+       constructor Create(var Bounds: TRect);
        function    LoadFile(const FileName: string): boolean;
        procedure   Draw; virtual;
-       destructor  Done; virtual;
+       destructor Destroy; virtual;
        procedure   Write(Const S: string); virtual;
        procedure   WriteLn(Const S: string); virtual;
        procedure   Lock; virtual;
@@ -231,9 +241,9 @@ implementation
 
 uses WUtils;
 
-constructor TConsoleObject.Init(AReplyHook, AKeyHook, AWriteHook: PHookProc);
+constructor TConsoleObject.Create(AReplyHook, AKeyHook, AWriteHook: PHookProc);
 begin
-  inherited Init;
+  inherited Create;
   ReplyHook:=AReplyHook; KeyHook:=AKeyHook; WriteHook:=AWriteHook;
   BoundChecks:=bc_All; LineWrapping:=true;
   TextColor(LightGray); TextBackground(Black);
@@ -420,15 +430,15 @@ begin
   if KeyHook<>nil then KeyHook^(S);
 end;
 
-destructor TConsoleObject.Done;
+destructor TConsoleObject.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
 end;
 
 {$ifdef WITH_CRT}
-constructor TCrtConsole.Init(AReplyHook, AKeyHook, AWriteHook: PHookProc);
+constructor TCrtConsole.Create(AReplyHook, AKeyHook, AWriteHook: PHookProc);
 begin
-  inherited Init(AReplyHook, AKeyHook, AWriteHook);
+  inherited Create(AReplyHook, AKeyHook, AWriteHook);
   Size.X:=Lo(Crt.WindMax); Size.Y:=Hi(Crt.WindMax);
 end;
 
@@ -494,9 +504,9 @@ begin
 end;
 {$endif WITH_CRT}
 
-constructor TANSIConsole.Init(AReplyHook, AKeyHook, AWriteHook: PHookProc);
+constructor TANSIConsole.Create(AReplyHook, AKeyHook, AWriteHook: PHookProc);
 begin
-  inherited Init(AReplyHook, AKeyHook, AWriteHook);
+  inherited Create(AReplyHook, AKeyHook, AWriteHook);
   BoundChecks:=bc_MaxX;
   ANSIParam:=''; ANSILevel:=0; ANSICurPosStackPtr:=0;
 end;
@@ -666,22 +676,22 @@ begin
   end;
 end;
 
-constructor TANSIViewConsole.Init(AOwner: PANSIView);
+constructor TANSIViewConsole.Create(AOwner: PANSIView);
 begin
   if AOwner=nil then Fail;
-  inherited Init(nil,nil,nil);
+  inherited Create(nil,nil,nil);
   Owner:=AOwner;
-  Size:=Owner^.Size;
+  Size:=Owner.Size;
 end;
 
 procedure TANSIViewConsole.CursorOn;
 begin
-  Owner^.ShowCursor;
+  Owner.ShowCursor;
 end;
 
 procedure TANSIViewConsole.CursorOff;
 begin
-  Owner^.HideCursor;
+  Owner.HideCursor;
 end;
 
 procedure TANSIViewConsole.ClrScr;
@@ -692,8 +702,8 @@ begin
   if Owner<>nil then
   for X:=0 to MaxViewWidth-1 do for Y:=0 to Size.Y-1 do
       begin
-        Pos:=(Owner^.Delta.Y+Y)*MaxViewWidth+X;
-        Owner^.Buffer^[Pos]:=32+256*word(TextAttr);
+        Pos:=(Owner.Delta.Y+Y)*MaxViewWidth+X;
+        Owner.Buffer^[Pos]:=32+256*word(TextAttr);
       end;
 end;
 
@@ -706,8 +716,8 @@ begin
     Y:=CurPos.Y;
     for X:=CurPos.X to MaxViewWidth-1 do
         begin
-          Pos:=(Owner^.Delta.Y*MaxViewWidth)+X+Y*MaxViewWidth;
-          Owner^.Buffer^[Pos]:=32+256*word(TextAttr);
+          Pos:=(Owner.Delta.Y*MaxViewWidth)+X+Y*MaxViewWidth;
+          Owner.Buffer^[Pos]:=32+256*word(TextAttr);
         end;
   end;
 end;
@@ -719,7 +729,7 @@ begin
        #8 : begin
               CursorBack(1);
               Pos:=(CurPos.Y-1)*MaxViewWidth+(WhereX-1);
-              Owner^.Buffer^[Pos]:=ord(' ')+256*word(TextAttr);
+              Owner.Buffer^[Pos]:=ord(' ')+256*word(TextAttr);
             end;
        #0..#7,#9,
        #11..#12,
@@ -727,7 +737,7 @@ begin
        #32..#255
             : begin
                 Pos:=(CurPos.Y-1)*MaxViewWidth+(WhereX-1);
-                Owner^.Buffer^[Pos]:=ord(C)+256*word(TextAttr);
+                Owner.Buffer^[Pos]:=ord(C)+256*word(TextAttr);
                 GotoXY(WhereX+1,WhereY);
               end;
        #10  :
@@ -742,7 +752,7 @@ procedure TANSIViewConsole.WriteCharRaw(C: char);
 var Pos: longint;
 begin
   Pos:=(CurPos.Y-1)*MaxViewWidth+(WhereX-1);
-  Owner^.Buffer^[Pos]:=ord(C)+256*word(TextAttr);
+  Owner.Buffer^[Pos]:=ord(C)+256*word(TextAttr);
   GotoXY(WhereX+1,WhereY);
 end;
 
@@ -759,7 +769,7 @@ end;
 procedure TANSIViewConsole.UpdateCursor;
 begin
   if Owner<>nil then
-  if Owner^.LockCount=0 then Owner^.SetCursor(WhereX-1,WhereY-1);
+  if Owner.LockCount=0 then Owner.SetCursor(WhereX-1,WhereY-1);
 end;
 
 procedure TANSIViewConsole.GotoXY(X,Y: integer);
@@ -768,26 +778,26 @@ begin
   if Owner<>nil then
   while Y>MaxVideoLine do
   begin
-    Move(Owner^.Buffer^[MaxViewWidth],Owner^.Buffer,SizeOf(Owner^.Buffer^)-(MaxViewWidth*2));
+    Move(Owner.Buffer^[MaxViewWidth],Owner.Buffer,SizeOf(Owner.Buffer^)-(MaxViewWidth*2));
     W:=(MaxViewWidth*MaxVideoLine)-1-(MaxViewWidth);
-    FillChar(Owner^.Buffer^[W],MaxViewWidth*2,0);
+    FillChar(Owner.Buffer^[W],MaxViewWidth*2,0);
     Dec(Y);
   end;
   inherited GotoXY(X,Y);
 end;
 
-constructor TANSIView.Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+constructor TANSIView.Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
     PScrollBar);
 begin
-  inherited Init(Bounds,AHScrollBar,AVScrollBar);
+  inherited Create(Bounds,AHScrollBar,AVScrollBar);
   LockCount:=0; Options:=Options or ofTopSelect;
   GrowMode:=gfGrowHiX or gfGrowHiY;
   New(Buffer);
   SetLimit({MaxViewWidth}80,MaxVideoLine);
-  New(Console, Init(@Self));
-  Console^.Size.X:=80; Console^.Size.Y:=25;
-  Console^.ClrScr;
-  Console^.CursorOn;
+  Console := TANSIViewConsole.Create(Self);
+  Console.Size.X:=80; Console.Size.Y:=25;
+  Console.ClrScr;
+  Console.CursorOn;
 end;
 
 function TANSIView.LoadFile(const FileName: string): boolean;
@@ -797,21 +807,21 @@ var S: PBufStream;
     I,FragSize: integer;
 begin
 {$I-}
-  New(S, Init(FileName, stOpenRead, 4096));
+  S := TBufStream.Create(FileName, stOpenRead, 4096);
   OK:=Assigned(S);
   Lock;
-  while OK and (S^.Status=stOK) do
+  while OK and (S.Status=stOK) do
   begin
-    FragSize:=Min(Sizeof(B),S^.GetSize-S^.GetPos);
+    FragSize:=Min(Sizeof(B),S.GetSize-S.GetPos);
     if FragSize=0 then Break;
-    S^.Read(B,FragSize);
-    OK:=(S^.Status=stOK);
+    S.Read(B,FragSize);
+    OK:=(S.Status=stOK);
     if OK then
       for I:=0 to FragSize-1 do
         self.Write(B[I]);
   end;
   Unlock;
-  if Assigned(S) then Dispose(S, Done); S:=nil;
+  if Assigned(S) then S.Free; S:=nil;
 {$I+}
   LoadFile:=OK;
 end;
@@ -825,10 +835,10 @@ begin
   for I:=0 to Size.Y-1 do
   begin
     Pos:=Delta.X+(Delta.Y+I)*MaxViewWidth;
-    WriteLine(0,I,Size.X,1,Buffer^[Pos]);
+    WriteLineW(0,I,Size.X,1,Buffer^[Pos]);
   end;
   if Console=nil then Exit;
-  X:=Console^.WhereX-Delta.X; Y:=Console^.WhereY-Delta.Y;
+  X:=Console.WhereX-Delta.X; Y:=Console.WhereY-Delta.Y;
   if (X<0) or (Y<0) or (X>Size.X-1) or (Y>Size.X-1)
      then HideCursor
      else begin
@@ -839,13 +849,13 @@ end;
 
 procedure TANSIView.Write(Const S: string);
 begin
-  Console^.Write(S);
+  Console.Write(S);
   DrawView;
 end;
 
 procedure TANSIView.WriteLn(Const S: string);
 begin
-  Console^.WriteLn(S);
+  Console.WriteLn(S);
   DrawView;
 end;
 
@@ -863,7 +873,7 @@ end;
 procedure TANSIView.ChangeBounds(var Bounds: TRect);
 begin
   inherited ChangeBounds(Bounds);
-{  Console^.Size.X:=Size.X; Console^.Size.Y:=Size.Y;}
+{  Console.Size.X:=Size.X; Console.Size.Y:=Size.Y;}
 end;
 
 procedure TANSIView.HandleEvent(var Event: TEvent);
@@ -871,34 +881,34 @@ begin
   inherited HandleEvent(Event);
 {  if Event.What=evKeyDown then
      begin
-       if VScrollBar<>nil then VScrollBar^.HandleEvent(Event);
-       if HScrollBar<>nil then HScrollBar^.HandleEvent(Event);
+       if VScrollBar<>nil then VScrollBar.HandleEvent(Event);
+       if HScrollBar<>nil then HScrollBar.HandleEvent(Event);
      end;}
 end;
 
-destructor TANSIView.Done;
+destructor TANSIView.Destroy;
 begin
-  Dispose(Console, Done);
+  Console.Free;
   Dispose(Buffer);
-  inherited Done;
+  inherited Destroy;
 end;
 
-constructor TANSIBackgroundConsole.Init(AOwner: PANSIBackground);
+constructor TANSIBackgroundConsole.Create(AOwner: PANSIBackground);
 begin
   if AOwner=nil then Fail;
-  inherited Init(nil,nil,nil);
+  inherited Create(nil,nil,nil);
   Owner:=AOwner;
-  Size:=Owner^.Size;
+  Size:=Owner.Size;
 end;
 
 procedure TANSIBackgroundConsole.CursorOn;
 begin
-  Owner^.ShowCursor;
+  Owner.ShowCursor;
 end;
 
 procedure TANSIBackgroundConsole.CursorOff;
 begin
-  Owner^.HideCursor;
+  Owner.HideCursor;
 end;
 
 procedure TANSIBackgroundConsole.ClrScr;
@@ -911,7 +921,7 @@ begin
     for Y:=0 to Size.Y-1 do
       begin
         Pos:=X+Y*MaxViewWidth;
-        Owner^.Buffer[Pos]:=32+256*word(TextAttr);
+        Owner.Buffer[Pos]:=32+256*word(TextAttr);
       end;
 end;
 
@@ -925,7 +935,7 @@ begin
     for X:=CurPos.X to MaxViewWidth-1 do
         begin
           Pos:=X+Y*MaxViewWidth;
-          Owner^.Buffer[Pos]:=32+256*word(TextAttr);
+          Owner.Buffer[Pos]:=32+256*word(TextAttr);
         end;
   end;
 end;
@@ -937,7 +947,7 @@ begin
        #8 : begin
               CursorBack(1);
               Pos:=(CurPos.Y-1)*MaxViewWidth+(WhereX-1);
-              Owner^.Buffer[Pos]:=ord(' ')+256*word(TextAttr);
+              Owner.Buffer[Pos]:=ord(' ')+256*word(TextAttr);
             end;
        #0..#7,#9,
        #11..#12,
@@ -945,7 +955,7 @@ begin
        #32..#255
             : begin
                 Pos:=(CurPos.Y-1)*MaxViewWidth+(WhereX-1);
-                Owner^.Buffer[Pos]:=ord(C)+256*word(TextAttr);
+                Owner.Buffer[Pos]:=ord(C)+256*word(TextAttr);
                 GotoXY(WhereX+1,WhereY);
               end;
        #10  :
@@ -969,7 +979,7 @@ end;
 procedure TANSIBackgroundConsole.UpdateCursor;
 begin
   if Owner<>nil then
-  if Owner^.LockCount=0 then Owner^.SetCursor(WhereX-1,WhereY-1);
+  if Owner.LockCount=0 then Owner.SetCursor(WhereX-1,WhereY-1);
 end;
 
 procedure TANSIBackgroundConsole.GotoXY(X,Y: integer);
@@ -978,23 +988,23 @@ begin
   if Owner<>nil then
   while Y>MaxVideoLine do
   begin
-    Move(Owner^.Buffer[MaxViewWidth],Owner^.Buffer,SizeOf(Owner^.Buffer)-(MaxViewWidth*2));
+    Move(Owner.Buffer[MaxViewWidth],Owner.Buffer,SizeOf(Owner.Buffer)-(MaxViewWidth*2));
     W:=(MaxViewWidth*MaxVideoLine)-1-(MaxViewWidth);
-    FillChar(Owner^.Buffer[W],MaxViewWidth*2,0);
+    FillChar(Owner.Buffer[W],MaxViewWidth*2,0);
     Dec(Y);
   end;
   inherited GotoXY(X,Y);
 end;
 
-constructor TANSIBackground.Init(var Bounds: TRect);
+constructor TANSIBackground.Create(var Bounds: TRect);
 begin
-  inherited Init(Bounds,' ');
+  inherited Create(Bounds, Byte(' '));
   LockCount:=0;
   GrowMode:=gfGrowHiX or gfGrowHiY;
-  New(Console, Init(@Self));
-  Console^.Size.X:=Bounds.B.X+1; Console^.Size.Y:=Bounds.B.Y+1;
-  Console^.ClrScr;
-  Console^.CursorOn;
+  Console := TANSIBackgroundConsole.Create(Self);
+  Console.Size.X:=Bounds.B.X+1; Console.Size.Y:=Bounds.B.Y+1;
+  Console.ClrScr;
+  Console.CursorOn;
 end;
 
 function TANSIBackground.LoadFile(const FileName: string): boolean;
@@ -1004,19 +1014,19 @@ var S: PBufStream;
     I,FragSize: integer;
 begin
 {$I-}
-  New(S, Init(FileName, stOpenRead, 4096));
+  S := TBufStream.Create(FileName, stOpenRead, 4096);
   OK:=Assigned(S);
-  while OK and (S^.Status=stOK) do
+  while OK and (S.Status=stOK) do
   begin
-    FragSize:=Min(Sizeof(B),S^.GetSize-S^.GetPos);
+    FragSize:=Min(Sizeof(B),S.GetSize-S.GetPos);
     if FragSize=0 then Break;
-    S^.Read(B,FragSize);
-    OK:=(S^.Status=stOK);
+    S.Read(B,FragSize);
+    OK:=(S.Status=stOK);
     if OK then
       for I:=0 to FragSize-1 do
         self.Write(B[I]);
   end;
-  if Assigned(S) then Dispose(S, Done); S:=nil;
+  if Assigned(S) then S.Free; S:=nil;
 {$I+}
   LoadFile:=OK;
 end;
@@ -1030,10 +1040,10 @@ begin
   for I:=0 to Size.Y-1 do
   begin
     Pos:=I*MaxViewWidth;
-    WriteLine(0,I,Size.X,1,Buffer[Pos]);
+    WriteLineW(0,I,Size.X,1,Buffer[Pos]);
   end;
   if Console=nil then Exit;
-  X:=Console^.WhereX; Y:=Console^.WhereY;
+  X:=Console.WhereX; Y:=Console.WhereY;
   if (X<0) or (Y<0) or (X>Size.X-1) or (Y>Size.X-1)
      then HideCursor
      else begin
@@ -1044,13 +1054,13 @@ end;
 
 procedure TANSIBackground.Write(Const S: string);
 begin
-  Console^.Write(S);
+  Console.Write(S);
   DrawView;
 end;
 
 procedure TANSIBackground.WriteLn(Const S: string);
 begin
-  Console^.WriteLn(S);
+  Console.WriteLn(S);
   DrawView;
 end;
 
@@ -1068,7 +1078,7 @@ end;
 procedure TANSIBackground.ChangeBounds(var Bounds: TRect);
 begin
   inherited ChangeBounds(Bounds);
-{  Console^.Size.X:=Size.X; Console^.Size.Y:=Size.Y;}
+{  Console.Size.X:=Size.X; Console.Size.Y:=Size.Y;}
 end;
 
 procedure TANSIBackground.HandleEvent(var Event: TEvent);
@@ -1076,15 +1086,15 @@ begin
   inherited HandleEvent(Event);
 {  if Event.What=evKeyDown then
      begin
-       if VScrollBar<>nil then VScrollBar^.HandleEvent(Event);
-       if HScrollBar<>nil then HScrollBar^.HandleEvent(Event);
+       if VScrollBar<>nil then VScrollBar.HandleEvent(Event);
+       if HScrollBar<>nil then HScrollBar.HandleEvent(Event);
      end;}
 end;
 
-destructor TANSIBackground.Done;
+destructor TANSIBackground.Destroy;
 begin
-  Dispose(Console, Done);
-  inherited Done;
+  Console.Free;
+  inherited Destroy;
 end;
 
 END.

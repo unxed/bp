@@ -4,6 +4,9 @@
 
  **********************************************************************}
 unit GDBInt;
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 type
@@ -20,33 +23,33 @@ type
     funcname : pchar;
   end;
 
-  tframeentry = object
+  tframeentry = class
     file_name : pchar;
     function_name : pchar;
     args : pchar;
     line_number : longint;
     address : longint;
-    constructor init;
-    destructor done;
+    constructor Create;
+    destructor Destroy;
     procedure reset;
     procedure clear;
   end;
   pframeentry=^tframeentry;
   ppframeentry=^pframeentry;
 
-  tgdbbuffer=object
+  tgdbbuffer= class
     buf   : pchar;
     size,
     idx   : longint;
-    constructor Init;
-    destructor  Done;
+    constructor Create;
+    destructor Destroy;
     procedure Reset;
     procedure Resize(nsize : longint);
     procedure Append(p:pchar);
   end;
 
   PGDBInterface=^TGDBInterface;
-  TGDBInterface=object
+  TGDBInterface= class
     gdberrorbuf,
     gdboutputbuf  : tgdbbuffer;
     command_level,
@@ -87,8 +90,8 @@ type
     { Highlevel }
     user_screen_shown,
     switch_to_user     : boolean;
-    constructor Init;
-    destructor  Done;
+    constructor Create;
+    destructor Destroy;
     procedure clear_frames;
     { functions }
     function  error:boolean;
@@ -124,12 +127,12 @@ uses
   strings;
 
 
-constructor TGDBInterface.Init;
+constructor TGDBInterface.Create;
 begin
 end;
 
 
-destructor TGDBInterface.Done;
+destructor TGDBInterface.Destroy;
 begin
 end;
 
@@ -212,12 +215,12 @@ end;
                                TFrameEntry
 *****************************************************************************}
 
-constructor tframeentry.init;
+constructor tframeentry.Create;
 begin
   Reset;
 end;
 
-destructor tframeentry.done;
+destructor tframeentry.Destroy;
 begin
   Clear;
 end;
@@ -250,7 +253,7 @@ end;
 const
   blocksize=2048;
 
-constructor tgdbbuffer.init;
+constructor tgdbbuffer.Create;
 begin
   Buf:=nil;
   Size:=0;
@@ -259,7 +262,7 @@ begin
 end;
 
 
-destructor tgdbbuffer.done;
+destructor tgdbbuffer.Destroy;
 begin
   if assigned(buf) then
     freemem(buf,size);

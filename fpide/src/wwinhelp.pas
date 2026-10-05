@@ -15,6 +15,9 @@
 {$R-}
 unit WWinHelp;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,
@@ -155,7 +158,7 @@ type
         RecordType       : byte;
       end;
 
-      TTopicBlock = object
+      TTopicBlock = class
         Header       : TWinHelpTopicBlockHeader;
         DataSize     : longint;
         DataPtr      : PByteArray;
@@ -180,10 +183,11 @@ type
         LinkData2: PByteArray;
       end;
 
-      PWinHelpFile = ^TWinHelpFile;
-      TWinHelpFile = object(THelpFile)
-        constructor Init(AFileName: string; AID: word);
-        destructor  Done; virtual;
+      TWinHelpFile = class;
+      PWinHelpFile = TWinHelpFile;
+      TWinHelpFile = class(THelpFile)
+        constructor Create(AFileName: string; AID: word);
+        destructor Destroy; virtual;
       public
         function    LoadIndex: boolean; virtual;
         function    ReadTopic(T: PTopic): boolean; virtual;
@@ -243,10 +247,10 @@ begin
   S:='';
   if Assigned(F) then
   repeat
-    F^.Read(C,sizeof(C));
-    if (F^.Status=stOK) and (C<>#0) then
+    F.Read(C,sizeof(C));
+    if (F.Status=stOK) and (C<>#0) then
       S:=S+C;
-  until (C=#0) or (F^.Status<>stOK);
+  until (C=#0) or (F.Status<>stOK);
   ReadString:=S;
 end;
 
@@ -276,14 +280,14 @@ begin
   Inc(CurOfs,Count);
 end;
 
-constructor TWinHelpFile.Init(AFileName: string; AID: word);
+constructor TWinHelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
-  if inherited Init(AID)=false then Fail;
-  New(Phrases, Init(1000,1000));
-  F:=New(PFastBufStream, Init(AFileName, stOpenRead, HelpStreamBufSize));
+  if inherited Create(AID)=false then Fail;
+  Thrases.Create(1000,1000);
+  F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
-  if OK then OK:=(F^.Status=stOK);
+  if OK then OK:=(F.Status=stOK);
   if OK then
     begin
       OK:=ReadHeader;
@@ -298,13 +302,13 @@ end;
 function TWinHelpFile.ReadHeader: boolean;
 var OK: boolean;
 begin
-  F^.Read(Header,sizeof(Header));
-  OK:=(F^.Status=stOK);
+  F.Read(Header,sizeof(Header));
+  OK:=(F.Status=stOK);
   OK:=OK and (Header.MagicNo=WinHelpMagicNo);
   if OK then
   begin
-    F^.Seek(Header.DirectoryStart);
-    OK:=(F^.Status=stOK);
+    F.Seek(Header.DirectoryStart);
+    OK:=(F.Status=stOK);
   end;
   if OK then
     OK:=ReadInternalDirectory;
@@ -339,34 +343,34 @@ var OK: boolean;
     RH: TWinHelpRecordHeader;
     StartOfs,RecStartOfs: longint;
 begin
-  F^.Read(FH,sizeof(FH));
-  OK:=(F^.Status=stOK);
-  StartOfs:=F^.GetPos;
-  F^.Read(SysHeader,sizeof(SysHeader));
-  OK:=OK and (F^.Status=stOK);
+  F.Read(FH,sizeof(FH));
+  OK:=(F.Status=stOK);
+  StartOfs:=F.GetPos;
+  F.Read(SysHeader,sizeof(SysHeader));
+  OK:=OK and (F.Status=stOK);
   OK:=OK and (SysHeader.Magic=WinHelpSystemHeaderMagicNo);
   if OK then
   if SysHeader.Version>16 then
   begin
     repeat
-      F^.Read(RH,sizeof(RH));
-      OK:=(F^.Status=stOK);
-      RecStartOfs:=F^.GetPos;
+      F.Read(RH,sizeof(RH));
+      OK:=(F.Status=stOK);
+      RecStartOfs:=F.GetPos;
       if OK then
       begin
         case RH.RecordType of
           wh_srt_Title   : Title:=ReadString(F);
           wh_srt_Content : CNTFileName:=ReadString(F);
         end;
-        if F^.GetPos<>RecStartOfs+RH.DataSize then
-          F^.Seek(RecStartOfs+RH.DataSize);
-        OK:=(F^.Status=stOK);
+        if F.GetPos<>RecStartOfs+RH.DataSize then
+          F.Seek(RecStartOfs+RH.DataSize);
+        OK:=(F.Status=stOK);
       end;
-    until (OK=false) or (F^.GetPos>=StartOfs+FH.UsedSpace);
+    until (OK=false) or (F.GetPos>=StartOfs+FH.UsedSpace);
   end
  else
   Title:=ReadString(F);
-  OK:=OK and (F^.Status=stOK);
+  OK:=OK and (F.Status=stOK);
   ReadSystemFile:=OK;
 end;
 
@@ -434,39 +438,39 @@ var OK: boolean;
     I,PhraseBufSize,PhraseOfs,PhraseSize: longint;
     S: string;
 begin
-  F^.Read(FH,sizeof(FH));
-  OK:=(F^.Status=stOK);
-  F^.Read(NumPhrases,sizeof(NumPhrases));
-  F^.Read(W,sizeof(W));
-  OK:=(F^.Status=stOK) and (W=$0100);
+  F.Read(FH,sizeof(FH));
+  OK:=(F.Status=stOK);
+  F.Read(NumPhrases,sizeof(NumPhrases));
+  F.Read(W,sizeof(W));
+  OK:=(F.Status=stOK) and (W=$0100);
   if OK then
   begin
     PhraseOfssSize:=(NumPhrases+1)*sizeof(word);
     GetMem(PhraseOfss,PhraseOfssSize);
-    F^.Read(W,sizeof(W));
+    F.Read(W,sizeof(W));
     if W=2*(NumPhrases+1) then
       begin
         { uncompressed data }
         PhraseOfss^[0]:=W;
-        F^.Read(PhraseOfss^[1],PhraseOfssSize-sizeof(word)*1);
+        F.Read(PhraseOfss^[1],PhraseOfssSize-sizeof(word)*1);
         DecompSize:=FH.UsedSpace-(PhraseOfssSize+2+2+2);
         PhraseBufSize:=DecompSize;
         GetMem(PhraseBuf,PhraseBufSize);
-        F^.Read(PhraseBuf^,DecompSize);
+        F.Read(PhraseBuf^,DecompSize);
       end
     else
       begin
         DecompSize:=W;
-        F^.Read(W,sizeof(W));
+        F.Read(W,sizeof(W));
         DecompSize:=DecompSize+longint(W) shl 16;
         Inc(DecompSize);
         PhraseOfss^[0]:=DecompSize;
-        F^.Read(PhraseOfss^[1],PhraseOfssSize);
+        F.Read(PhraseOfss^[1],PhraseOfssSize);
         PhraseBufSize:=DecompSize+10;
         GetMem(PhraseBuf,PhraseBufSize); FillChar(PhraseBuf^,DecompSize,0);
         TempSize:=FH.UsedSpace-(PhraseOfssSize+2+2+2);
         GetMem(TempBuf,TempSize);
-        F^.Read(TempBuf^,TempSize);
+        F.Read(TempBuf^,TempSize);
         LZ77Decompress(TempBuf,TempSize,PhraseBuf,DecompSize);
         FreeMem(TempBuf,TempSize);
       end;
@@ -478,7 +482,7 @@ begin
       else
         PhraseSize:=PhraseOfss^[I+1]-PhraseOfss^[I];
       S:=MemToStr(PhraseBuf^[PhraseOfs],PhraseSize);
-      Phrases^.InsertStr(S);
+      Phrases.InsertStr(S);
     end;
     FreeMem(PhraseOfss,PhraseOfssSize);
     FreeMem(PhraseBuf,PhraseBufSize);
@@ -497,25 +501,25 @@ begin
   CurPage:=PageNo;
   repeat
     PageOfs:=PagesBase+longint(PageSize)*CurPage;
-    F^.Seek(PageOfs);
-    OK:=(F^.Status=stOK);
+    F.Seek(PageOfs);
+    OK:=(F.Status=stOK);
     if OK then
     begin
-      F^.Read(BNH,sizeof(BNH));
-      OK:=(F^.Status=stOK);
+      F.Read(BNH,sizeof(BNH));
+      OK:=(F.Status=stOK);
     end;
     if OK then
-    if (ScannedPages<>nil) and ScannedPages^.Contains(CurPage) then
+    if (ScannedPages<>nil) and ScannedPages.Contains(CurPage) then
       Break
     else
     begin
-      if Assigned(ScannedPages) then ScannedPages^.Add(CurPage);
+      if Assigned(ScannedPages) then ScannedPages.Add(CurPage);
       Count:=0;
       repeat
-        TreeDone:=not (longint(CallPointerMethod(ReadLeafEntryMethod,@Self,nil))<>0);
+        TreeDone:=not (longint(CallPointerMethod(ReadLeafEntryMethod,Self,nil))<>0);
         Inc(Count);
-      until (OK=false) or (F^.Status<>stOK) or TreeDone or (Count>=BNH.NumEntries){ or
-            (F^.GetPos>=PageOfs+PageSize-BNH.NumEntries)};
+      until (OK=false) or (F.Status<>stOK) or TreeDone or (Count>=BNH.NumEntries){ or
+            (F.GetPos>=PageOfs+PageSize-BNH.NumEntries)};
     end;
 
     if (BNH.PrevPage<>-1) and (TreeDone=false) then
@@ -535,46 +539,46 @@ var BIH: TWinHelpBTreeIndexHeader;
 begin
   CurPage:=PageNo;
   repeat
-    F^.Seek(PagesBase+longint(PageSize)*CurPage);
-    OK:=(F^.Status=stOK);
+    F.Seek(PagesBase+longint(PageSize)*CurPage);
+    OK:=(F.Status=stOK);
     if OK then
     begin
-      F^.Read(BIH,sizeof(BIH));
-      OK:=(F^.Status=stOK);
+      F.Read(BIH,sizeof(BIH));
+      OK:=(F.Status=stOK);
     end;
     if OK then
-    if (ScannedPages<>nil) and ScannedPages^.Contains(CurPage) then
+    if (ScannedPages<>nil) and ScannedPages.Contains(CurPage) then
       Break
     else
     begin
-      if Assigned(ScannedPages) then ScannedPages^.Add(CurPage);
+      if Assigned(ScannedPages) then ScannedPages.Add(CurPage);
       for I:=1 to BIH.NumEntries do
       begin
         SubPageNo:=-1;
-        OK:=(longint(CallPointerMethod(ReadIndexEntryMethod,@Self,@SubPageNo))<>0);
-        OK:=OK and (F^.Status=stOK);
+        OK:=(longint(CallPointerMethod(ReadIndexEntryMethod,Self,@SubPageNo))<>0);
+        OK:=OK and (F.Status=stOK);
         if OK then
           if CurLevel<MaxLevel-1 then
             begin
               if (0<=SubPageNo) then
-               if (ScannedPages=nil) or (ScannedPages^.Contains(SubPageNo)=false) then
+               if (ScannedPages=nil) or (ScannedPages.Contains(SubPageNo)=false) then
               begin
-                OldPos:=F^.GetPos;
+                OldPos:=F.GetPos;
                 OK:=ProcessIndexPage(CurLevel+1,MaxLevel,PagesBase,PageSize,SubPageNo,TotalPages,
                   ReadIndexEntryMethod,ReadLeafEntryMethod,ScannedPages);
-                if F^.GetPos<>OldPos then
-                  F^.Seek(OldPos);
+                if F.GetPos<>OldPos then
+                  F.Seek(OldPos);
               end
             end
           else
             { process leaf page }
             if (0<=SubPageNo) then
-             if (ScannedPages=nil) or (ScannedPages^.Contains(SubPageNo)=false) then
+             if (ScannedPages=nil) or (ScannedPages.Contains(SubPageNo)=false) then
               begin
-                OldPos:=F^.GetPos;
+                OldPos:=F.GetPos;
                 OK:=ProcessLeafPage(PagesBase,PageSize,SubPageNo,TotalPages,ReadLeafEntryMethod,ScannedPages);
-                if F^.GetPos<>OldPos then
-                  F^.Seek(OldPos);
+                if F.GetPos<>OldPos then
+                  F.Seek(OldPos);
               end;
         if TreeDone then
           Break;
@@ -597,9 +601,9 @@ var BTH: TWinHelpBTreeHeader;
 begin
   ScannedPages:=nil;
   TreeDone:=false;
-  F^.Read(BTH,sizeof(BTH));
-  OK:=(F^.Status=stOK);
-  PagesBase:=F^.GetPos;
+  F.Read(BTH,sizeof(BTH));
+  OK:=(F.Status=stOK);
+  PagesBase:=F.GetPos;
   if OK then
   begin
     OK:=(BTH.Magic=WinHelpBTreeHeaderMagicNo) and
@@ -609,7 +613,7 @@ begin
   if OK then
   begin
     if NoDuplicates then
-      New(ScannedPages, Init(500,100));
+      ScannedPages := TIntCollection.Create(500,100);
     if BTH.NumLevels>1 then
       begin
         OK:=ProcessIndexPage(1,BTH.NumLevels,PagesBase,BTH.PageSize,BTH.RootPage,BTH.TotalPages,
@@ -618,7 +622,7 @@ begin
     else
       OK:=ProcessLeafPage(PagesBase,BTH.PageSize,BTH.RootPage,BTH.TotalPages,ReadLeafEntryMethod,ScannedPAges);
     if Assigned(ScannedPages) then
-      Dispose(ScannedPages, Done);
+      ScannedPages.Free;
   end;
   ProcessTree:=OK;
 end;
@@ -629,7 +633,7 @@ begin
   OK:=true;
   if FileName='|SYSTEM' then
     begin
-      F^.Seek(FileOfs); OK:=(F^.Status=stOK);
+      F.Seek(FileOfs); OK:=(F.Status=stOK);
       if OK then OK:=ReadSystemFile;
     end else
   if (FileName='|Phrases') then
@@ -649,36 +653,36 @@ var OK: boolean;
     CurOfs,PageOfs,OldPos: longint;
 begin
   PageOfs:=PagesBase+PageSize*PageNo;
-  F^.Seek(PageOfs);
-  OK:=(F^.Status=stOK);
+  F.Seek(PageOfs);
+  OK:=(F.Status=stOK);
   repeat
     if OK then
     begin
-      F^.Read(BNH,sizeof(BNH));
-      OK:=(F^.Status=stOK);
+      F.Read(BNH,sizeof(BNH));
+      OK:=(F.Status=stOK);
     end;
     if OK then
     begin
       Count:=0;
       repeat
         S:=ReadString(F);
-        F^.Read(FileOfs,sizeof(FileOfs)); { longint }
-        OK:=OK and (F^.Status=stOK);
+        F.Read(FileOfs,sizeof(FileOfs)); { longint }
+        OK:=OK and (F.Status=stOK);
         if OK then
         begin
-          OldPos:=F^.GetPos;
+          OldPos:=F.GetPos;
           OK:=IDIRProcessFile(S,FileOfs);
-          if F^.GetPos<>OldPos then
-            F^.Seek(OldPos);
+          if F.GetPos<>OldPos then
+            F.Seek(OldPos);
         end;
         Inc(Count);
-      until (OK=false) or (Count=BNH.NumEntries){ or (F^.GetPos>=PageOfs+PageSize-BNH.NumEntries)};
+      until (OK=false) or (Count=BNH.NumEntries){ or (F.GetPos>=PageOfs+PageSize-BNH.NumEntries)};
     end;
 
     if BNH.PrevPage<>-1 then
       begin
-        F^.Seek(PagesBase+PageSize*BNH.PrevPage);
-        OK:=(F^.Status=stOK);
+        F.Seek(PagesBase+PageSize*BNH.PrevPage);
+        OK:=(F.Status=stOK);
       end;
   until (OK=false) or (BNH.PrevPage=-1);
   IDIRProcessLeafPage:=OK;
@@ -693,29 +697,29 @@ var BIH: TWinHelpBTreeIndexHeader;
     S: string;
     OldPos: longint;
 begin
-  F^.Seek(PagesBase+PageSize*PageNo);
-  OK:=(F^.Status=stOK);
+  F.Seek(PagesBase+PageSize*PageNo);
+  OK:=(F.Status=stOK);
   repeat
     if OK then
     begin
-      F^.Read(BIH,sizeof(BIH));
-      OK:=(F^.Status=stOK);
+      F.Read(BIH,sizeof(BIH));
+      OK:=(F.Status=stOK);
     end;
     if OK then
     for I:=1 to BIH.NumEntries do
     begin
       S:=ReadString(F);
-      F^.Read(SubPageNo,sizeof(SubPageNo)); { word }
-      OK:=OK and (F^.Status=stOK);
+      F.Read(SubPageNo,sizeof(SubPageNo)); { word }
+      OK:=OK and (F.Status=stOK);
       if OK then
         if CurLevel<MaxLevel-1 then
           begin
             if (0<=SubPageNo) then
             begin
-              OldPos:=F^.GetPos;
+              OldPos:=F.GetPos;
               OK:=IDIRProcessIndexPage(CurLevel+1,MaxLevel,PagesBase,PageSize,SubPageNo,TotalPages);
-              if F^.GetPos<>OldPos then
-                F^.Seek(OldPos);
+              if F.GetPos<>OldPos then
+                F.Seek(OldPos);
             end
           end
         else
@@ -726,8 +730,8 @@ begin
 
     if (BIH.PrevPage>0) then
       begin
-        F^.Seek(PagesBase+PageSize*BIH.PrevPage);
-        OK:=(F^.Status=stOK);
+        F.Seek(PagesBase+PageSize*BIH.PrevPage);
+        OK:=(F.Status=stOK);
       end
     else
       Break;
@@ -740,9 +744,9 @@ var BTH: TWinHelpBTreeHeader;
     OK: boolean;
     PagesBase: longint;
 begin
-  F^.Read(BTH,sizeof(BTH));
-  OK:=(F^.Status=stOK);
-  PagesBase:=F^.GetPos;
+  F.Read(BTH,sizeof(BTH));
+  OK:=(F.Status=stOK);
+  PagesBase:=F.GetPos;
   if OK then
   begin
     OK:=(BTH.Magic=WinHelpBTreeHeaderMagicNo) and
@@ -762,7 +766,7 @@ begin
   OK:=true;
   if FileName='|SYSTEM' then
     begin
-      F^.Seek(FileOfs); OK:=(F^.Status=stOK);
+      F.Seek(FileOfs); OK:=(F.Status=stOK);
       if OK then OK:=ReadSystemFile;
     end else
   if (FileName='|Phrases') then begin PhrasesStart:=FileOfs; end else
@@ -779,8 +783,8 @@ var {S: string;}
     OK: boolean;
 begin
   {S:=}ReadString(F);
-  F^.Read(SubPageNo^,sizeof(SubPageNo^));
-  OK:=(F^.Status=stOK);
+  F.Read(SubPageNo^,sizeof(SubPageNo^));
+  OK:=(F.Status=stOK);
   IDIRReadIndexEntry:=OK;
 end;
 
@@ -790,15 +794,15 @@ var OK: boolean;
     FileOfs,OldPos: longint;
 begin
   S:=ReadString(F);
-  F^.Read(FileOfs,sizeof(FileOfs)); { longint }
-  OK:=(F^.Status=stOK);
+  F.Read(FileOfs,sizeof(FileOfs)); { longint }
+  OK:=(F.Status=stOK);
   if OK then
   begin
-    OldPos:=F^.GetPos;
+    OldPos:=F.GetPos;
     OK:=IDIRProcessFile(S,FileOfs);
-    if F^.GetPos<>OldPos then
-      F^.Seek(OldPos);
-    OK:=OK and (F^.Status=stOK);
+    if F.GetPos<>OldPos then
+      F.Seek(OldPos);
+    OK:=OK and (F.Status=stOK);
   end;
   IDIRReadLeafEntry:=OK;
 end;
@@ -807,8 +811,8 @@ function TWinHelpFile.ReadInternalDirectory: boolean;
 var OK: boolean;
     FH: TWinHelpFileEntryHeader;
 begin
-  F^.Read(FH,sizeof(FH));
-  OK:=(F^.Status=stOK);
+  F.Read(FH,sizeof(FH));
+  OK:=(F.Status=stOK);
   if OK then
     OK:=ProcessTree(@TWinHelpFile.IDIRReadIndexEntry,@TWinHelpFile.IDIRReadLeafEntry,true);
   ReadInternalDirectory:=OK;
@@ -818,9 +822,9 @@ function TWinHelpFile.TTLBReadIndexEntry(SubPageNo: PInteger): boolean;
 var TopicOffset: longint;
     OK: boolean;
 begin
-  F^.Read(TopicOffset,sizeof(TopicOffset));
-  F^.Read(SubPageNo^,sizeof(SubPageNo^));
-  OK:=(F^.Status=stOK);
+  F.Read(TopicOffset,sizeof(TopicOffset));
+  F.Read(SubPageNo^,sizeof(SubPageNo^));
+  OK:=(F.Status=stOK);
   TTLBReadIndexEntry:=OK;
 end;
 
@@ -829,16 +833,16 @@ var OK: boolean;
     S: string;
     TopicOfs,OldPos: longint;
 begin
-  F^.Read(TopicOfs,sizeof(TopicOfs)); { longint }
+  F.Read(TopicOfs,sizeof(TopicOfs)); { longint }
   S:=ReadString(F);
-  OK:=(F^.Status=stOK);
+  OK:=(F.Status=stOK);
   if OK then
   begin
-    OldPos:=F^.GetPos;
+    OldPos:=F.GetPos;
     OK:=TTLBProcessTopicEntry(S,TopicOfs);
-    if F^.GetPos<>OldPos then
-      F^.Seek(OldPos);
-    OK:=OK and (F^.Status=stOK);
+    if F.GetPos<>OldPos then
+      F.Seek(OldPos);
+    OK:=OK and (F.Status=stOK);
   end;
   TTLBReadLeafEntry:=OK;
 end;
@@ -850,9 +854,9 @@ begin
 {  Inc(Count);
   if (Count mod 100)=1 then
   begin
-    gotoxy(1,1); write(Count,' - ',IndexEntries^.Count,' - ',Topics^.Count);
+    gotoxy(1,1); write(Count,' - ',IndexEntries.Count,' - ',Topics.Count);
   end;}
-  OK:=(IndexEntries^.Count<MaxCollectionSize-10);
+  OK:=(IndexEntries.Count<MaxCollectionSize-10);
   if OK then
   begin
     if (TopicTitle<>'') and (FileOfs>=0) then
@@ -868,8 +872,8 @@ function TWinHelpFile.ReadTTLBTree: boolean;
 var OK: boolean;
     FH: TWinHelpFileEntryHeader;
 begin
-  F^.Read(FH,sizeof(FH));
-  OK:=(F^.Status=stOK);
+  F.Read(FH,sizeof(FH));
+  OK:=(F.Status=stOK);
   if OK then
     OK:=ProcessTree(@TWinHelpFile.TTLBReadIndexEntry,@TWinHelpFile.TTLBReadLeafEntry,true);
   ReadTTLBTree:=OK;
@@ -887,8 +891,8 @@ begin
   if (BufBitPos=0) then
   begin
     CurFrag:=Min(sizeof(BitBuf),FH.UsedSpace-(TotalBitPos div 8));
-    F^.Read(BitBuf,CurFrag);
-    OK:=OK and (F^.Status=stOK);
+    F.Read(BitBuf,CurFrag);
+    OK:=OK and (F.Status=stOK);
   end;
   if (BitBuf[Low(BitBuf)+BufBitPos div 8] and (1 shl (BufBitPos mod 8)))<>0 then
     GetBit:=1
@@ -900,16 +904,16 @@ var Delta: longint;
     I,J,LastOfs: longint;
     BitCount: integer;
 begin
-  F^.Read(FH,sizeof(FH));
-  OK:=(F^.Status=stOK);
+  F.Read(FH,sizeof(FH));
+  OK:=(F.Status=stOK);
   if OK then
   begin
-    F^.Read(IH,sizeof(IH));
-    OK:=(F^.Status=stOK) and (IH.Magic=1);
+    F.Read(IH,sizeof(IH));
+    OK:=(F.Status=stOK) and (IH.Magic=1);
   end;
   if OK then
   begin
-    PhraseOfs^.Add(0);
+    PhraseOfs.Add(0);
     TotalBitPos:=0; LastOfs:=0; BitCount:=(IH.BitCount_Unk and $0f);
     for I:=1 to IH.NumEntries do
     begin
@@ -919,7 +923,7 @@ begin
       for J:=0 to BitCount-1 do
         Delta:=Delta+(1 shl J)*GetBit;
       Inc(LastOfs,Delta);
-      PhraseOfs^.Add(LastOfs);
+      PhraseOfs.Add(LastOfs);
     end;
   end;
   ReadPhrIndexFile:=OK;
@@ -935,8 +939,8 @@ var OK: boolean;
     CurOfs,NextOfs: longint;
     I: longint;
 begin
-  F^.Read(FH,sizeof(FH));
-  OK:=(F^.Status=stOK);
+  F.Read(FH,sizeof(FH));
+  OK:=(F.Status=stOK);
   OK:=OK and (IH.PhrImageCompressedSize=FH.UsedSpace);
   if OK then
   begin
@@ -944,14 +948,14 @@ begin
     GetMem(PhraseBuf,PhraseBufSize);
     if IH.PhrImageSize=IH.PhrImageCompressedSize then
       begin
-        F^.Read(PhraseBuf^,PhraseBufSize);
+        F.Read(PhraseBuf^,PhraseBufSize);
       end
     else
       begin
         TempBufSize:=IH.PhrImageCompressedSize;
         GetMem(TempBuf,TempBufSize);
-        F^.Read(TempBuf^,TempBufSize);
-        OK:=(F^.Status=stOK);
+        F.Read(TempBuf^,TempBufSize);
+        OK:=(F.Status=stOK);
         if OK then LZ77Decompress(TempBuf,TempBufSize,PhraseBuf,PhraseBufSize);
         FreeMem(TempBuf,TempBufSize);
       end;
@@ -959,9 +963,9 @@ begin
     begin
       for I:=1 to IH.NumEntries do
       begin
-        CurOfs:=PhraseOfs^.AtInt(I-1);
-        NextOfs:=PhraseOfs^.AtInt(I);
-        Phrases^.InsertStr(MemToStr(PhraseBuf^[CurOfs],NextOfs-CurOfs));
+        CurOfs:=PhraseOfs.AtInt(I-1);
+        NextOfs:=PhraseOfs.AtInt(I);
+        Phrases.InsertStr(MemToStr(PhraseBuf^[CurOfs],NextOfs-CurOfs));
       end;
     end;
     FreeMem(PhraseBuf,PhraseBufSize);
@@ -978,21 +982,21 @@ begin
   begin
     if PhrasesStart<>0 then
     begin
-      F^.Seek(PhrasesStart); OK:=(F^.Status=stOK);
+      F.Seek(PhrasesStart); OK:=(F.Status=stOK);
       if OK then OK:=ReadPhraseFile;
     end else
     if (PhrIndexStart<>0) and (PhrImageStart<>0) then
     begin
-      New(PO, Init(1000,1000));
-      F^.Seek(PhrIndexStart); OK:=(F^.Status=stOK);
+      TO.Create(1000,1000);
+      F.Seek(PhrIndexStart); OK:=(F.Status=stOK);
       if OK then OK:=ReadPhrIndexFile(PO,IH);
-      if OK then begin F^.Seek(PhrImageStart); OK:=(F^.Status=stOK); end;
+      if OK then begin F.Seek(PhrImageStart); OK:=(F.Status=stOK); end;
       if OK then OK:=ReadPhrImageFile(PO,IH);
-      Dispose(PO, Done);
+      PO.Free;
     end;
     if TTLBTreeStart<>0 then
     begin
-      F^.Seek(TTLBTreeStart); OK:=(F^.Status=stOK);
+      F.Seek(TTLBTreeStart); OK:=(F.Status=stOK);
       if OK then OK:=ReadTTLBTree;
     end;
     IndexLoaded:=OK;
@@ -1029,28 +1033,28 @@ var TempBuf: pointer;
     RS,DecompSize: longint;
 const TempBufSize = 16384;
 begin
-  F^.Reset;
+  F.Reset;
   FillChar(T,sizeof(T),0);
-  F^.Seek(TopicFileStart+sizeof(TWinHelpFileEntryHeader)+longint(BlockNo)*TopicBlockSize);
-  OK:=(F^.Status=stOK);
+  F.Seek(TopicFileStart+sizeof(TWinHelpFileEntryHeader)+longint(BlockNo)*TopicBlockSize);
+  OK:=(F.Status=stOK);
   if OK then
  if ReadData=false then
   begin
-    F^.Read(T.Header,sizeof(T.Header));
-    OK:=(F^.Status=stOK);
+    F.Read(T.Header,sizeof(T.Header));
+    OK:=(F.Status=stOK);
   end
  else
   begin
     GetMem(BlockBuf, TopicBlockSize);
-    F^.Read(BlockBuf^,TopicBlockSize);
-    OK:=(F^.Status=stOK);
+    F.Read(BlockBuf^,TopicBlockSize);
+    OK:=(F.Status=stOK);
     if OK then
     begin
-      Move(BlockBuf^.Header,T.Header,sizeof(T.Header));
+      Move(BlockBuf.Header,T.Header,sizeof(T.Header));
       if LZ77Compressed then
         begin
           GetMem(TempBuf,TempBufSize);
-          DecompSize:=LZ77Decompress(@BlockBuf^.Data,TopicBlockSize-sizeof(BlockBuf^.Header),TempBuf,TempBufSize);
+          DecompSize:=LZ77Decompress(@BlockBuf.Data,TopicBlockSize-sizeof(BlockBuf.Header),TempBuf,TempBufSize);
           T.DataSize:=DecompSize;
           GetMem(T.DataPtr,T.DataSize);
           Move(TempBuf^,T.DataPtr^,T.DataSize);
@@ -1058,9 +1062,9 @@ begin
         end
       else
         begin
-          T.DataSize:=TopicBlockSize-sizeof(BlockBuf^.Header);
+          T.DataSize:=TopicBlockSize-sizeof(BlockBuf.Header);
           GetMem(T.DataPtr,T.DataSize);
-          Move(BlockBuf^.Data,T.DataPtr^,T.DataSize);
+          Move(BlockBuf.Data,T.DataPtr^,T.DataSize);
         end;
     end;
     FreeMem(BlockBuf,TopicBlockSize);
@@ -1106,7 +1110,7 @@ begin
     else
       begin
         Index:=longint(B)*256-256+GetByte;
-        S:=GetStr(Phrases^.At(Index div 2));
+        S:=GetStr(Phrases.At(Index div 2));
         if (Index mod 2)=1 then S:=S+' ';
         for I:=1 to length(S) do
           PutByte(ord(S[I]));
@@ -1138,7 +1142,7 @@ begin
 end;
 procedure EmitStrIndex(Index: longint);
 begin
-  EmitStr(GetStr(Phrases^.At(Index)));
+  EmitStr(GetStr(Phrases.At(Index)));
 end;
 var B: longint;
     I,Index: longint;
@@ -1257,7 +1261,7 @@ var OK: boolean;
     LastEmittedChar: integer;
 procedure FlushLine;
 begin
-  Lines^.InsertStr(CurLine); CurLine:='';
+  Lines.InsertStr(CurLine); CurLine:='';
 end;
 procedure EmitText(const S: string);
 begin
@@ -1285,10 +1289,10 @@ begin
 end;
 function SearchTopicStart(P: PTopicEnumData): boolean;
 begin
-  case P^.TL.RecordType of
-    $02 : TopicStartPos:=P^.TopicPos;
+  case P.TL.RecordType of
+    $02 : TopicStartPos:=P.TopicPos;
   end;
-  GotIt:=(P^.TL.RecordType in [$20,$23]) and (P^.TopicOfs<=BlockOfs) and (BlockOfs<P^.TopicOfs+P^.LinkData2Size);
+  GotIt:=(P.TL.RecordType in [$20,$23]) and (P.TopicOfs<=BlockOfs) and (BlockOfs<P.TopicOfs+P.LinkData2Size);
   SearchTopicStart:=not GotIt;
 end;
 function RenderTopicProc(P: PTopicEnumData): boolean;
@@ -1296,7 +1300,7 @@ var LinkData1Ofs: longint;
     LinkData2Ofs: longint;
 function ReadUCHAR: byte;
 begin
-  ReadUCHAR:=P^.LinkData1^[LinkData1Ofs];
+  ReadUCHAR:=P.LinkData1^[LinkData1Ofs];
   Inc(LinkData1Ofs);
 end;
 function ReadCHAR: shortint;
@@ -1399,14 +1403,14 @@ var Finished: boolean;
     PictureSize,PictureStartOfs: longint;
     FontNumber: integer;
 begin
-  Finished:=((P^.TopicPos>TopicStartPos) or (P^.BlockNo>BlockNo)) and
-            (P^.TL.RecordType=$02); { next topic header found }
-  if (Finished=false) and (P^.TopicPos>=TopicStartPos) then
-  case P^.TL.RecordType of
+  Finished:=((P.TopicPos>TopicStartPos) or (P.BlockNo>BlockNo)) and
+            (P.TL.RecordType=$02); { next topic header found }
+  if (Finished=false) and (P.TopicPos>=TopicStartPos) then
+  case P.TL.RecordType of
     $02 :
       begin
-        S[0]:=chr(Min(StrLen(pointer(P^.LinkData2)),P^.LinkData2Size));
-        Move(P^.LinkData2^,S[1],ord(S[0]));
+        S[0]:=chr(Min(StrLen(pointer(P.LinkData2)),P.LinkData2Size));
+        Move(P.LinkData2^,S[1],ord(S[0]));
         if S<>'' then
         begin
           EmitText('  '+S+' Ü'+hscLineBreak);
@@ -1420,9 +1424,9 @@ begin
         { ---- }
         MinTableWidth:=0;
         TopicSize:=ReadComprULONG;
-        if P^.TL.RecordType in[$20,$23] then
+        if P.TL.RecordType in[$20,$23] then
           {TopicLen:=}ReadComprUSHORT;
-        if P^.TL.RecordType=$23 then
+        if P.TL.RecordType=$23 then
         begin
           NumberOfCols:=ReadUCHAR; TableType:=ReadUCHAR;
           if TableType in[0,2] then
@@ -1434,7 +1438,7 @@ begin
           end;
         end;
 
-        if P^.TL.RecordType=$23 then
+        if P.TL.RecordType=$23 then
         begin
           {Column:=}ReadSHORT; {-1 = end of topic}
           {Unknown:=}ReadSHORT; {Always0:=}ReadCHAR;
@@ -1476,17 +1480,17 @@ begin
             ReadUCHAR;
 {
         if (TH.NonScrollRgnOfs<>-1) then
-          if (P^.TopicPos=(TH.ScrollRgnOfs and $3fff)) then
+          if (P.TopicPos=(TH.ScrollRgnOfs and $3fff)) then
             begin
               EmitText(hscLineBreak);
               EmitText(CharStr('Ä',80));
               EmitText(hscLineBreak);
             end;
 }
-        while (LinkData2Ofs<P^.LinkData2Size) do
+        while (LinkData2Ofs<P.LinkData2Size) do
         begin
           LinkOfs:=-1;
-          SPtr:=@(P^.LinkData2^[LinkData2Ofs]);
+          SPtr:=@(P.LinkData2^[LinkData2Ofs]);
           SLen:=StrLen(SPtr);
           if SLen>0 then
             SBuf:=SPtr
@@ -1495,7 +1499,7 @@ begin
           Inc(LinkData2Ofs,SLen+1);
 
           Cmd:=-1;
-          if (LinkData1Ofs<P^.LinkData1Size) then
+          if (LinkData1Ofs<P.LinkData1Size) then
           begin
             Cmd:=ReadUCHAR;
             case Cmd of
@@ -1544,7 +1548,7 @@ begin
                       if PType=$22 then
                         {NumberOfHotSpots:=}ReadComprSHORT;
                       PictureStartOfs:=LinkData1Ofs;
-                      PictureSize:=Min(PictureSize,P^.LinkData1Size-LinkData1Ofs);
+                      PictureSize:=Min(PictureSize,P.LinkData1Size-LinkData1Ofs);
                       if PType in[$03,$22] then
                       begin
                         {PictureIsEmbedded:=}ReadSHORT;
@@ -1637,38 +1641,38 @@ begin
   RenderTopicProc:=not Finished;
 end;
 begin
-  F^.Reset;
+  F.Reset;
   OK:=(TopicFileStart<>0) and (T<>nil);
   if OK then
   begin
-    ExtractTopicOffset(T^.FileOfs,BlockNo,BlockOfs);
+    ExtractTopicOffset(T.FileOfs,BlockNo,BlockOfs);
     TopicStartPos:=-1; GotIt:=false;
     OK:=ProcessTopicBlock(BlockNo,@SearchTopicStart);
     OK:=OK and GotIt and (TopicStartPos<>-1);
     if OK then
     begin
       CurLine:='';
-      New(Lines, Init(1000,1000));
+      Lines := TUnsortedStringCollection.Create(1000,1000);
       LastEmittedChar:=-1;
       OK:=ProcessTopicBlock(BlockNo,@RenderTopicProc);
       FlushLine;
       BuildTopic(Lines,T);
-      Dispose(Lines, Done);
+      Lines.Free;
     end;
   end;
   ReadTopic:=OK;
 end;
 
-destructor TWinHelpFile.Done;
+destructor TWinHelpFile.Destroy;
 begin
-  if Assigned(F) then Dispose(F, Done); F:=nil;
-  if Assigned(Phrases) then Dispose(Phrases, Done); Phrases:=nil;
-  inherited Done;
+  if Assigned(F) then F.Free; F:=nil;
+  if Assigned(Phrases) then Phrases.Free; Phrases:=nil;
+  inherited Destroy;
 end;
 
 function CreateProc(const FileName,Param: string;Index : longint): PHelpFile;
 begin
-  CreateProc:=New(PWinHelpFile, Init(FileName,Index));
+  CreateProc := TWinHelpFile.Create(FileName,Index);
 end;
 
 procedure RegisterHelpType;

@@ -13,14 +13,22 @@ type
   Sw_Word    = Cardinal;
   Sw_Integer = LongInt;
   FNameStr   = string;
-  { Explicit ShortString: ^String follows $H and can become AnsiString. }
+  { Explicit ShortString: ^String follows $H and can become AnsiString.
+    Heap helpers stay ShortString until editor/file/search paths are UTF-8. }
   PString = ^ShortString;
+  { FV Objects.TObject was the streamable root; tv3 uses TStreamable. }
+  TObject = TStreamable;
   PObject = TObject;
   PCollection = TCollection;
   PStream = TStream;
   PBufStream = TBufStream;
   PSortedCollection = TSortedCollection;
   PStringCollection = TStringCollection;
+
+{ ShortString heap helpers (FV). PString stays ^ShortString until the IDE
+  buffer/file/search path is fully UTF-8; do not switch these to AnsiString. }
+function NewStr(const S: ShortString): PString;
+procedure DisposeStr(P: PString);
 
 { FV Objects.Abstract — call from methods that must be overridden. }
 procedure Abstract;

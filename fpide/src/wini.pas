@@ -14,23 +14,27 @@
  **********************************************************************}
 unit WINI;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects;
 
 type
 
-    PINIEntry = ^TINIEntry;
-    TINIEntry = object(TObject)
-      constructor Init(const ALine: string);
-      constructor Init(const ATag,AValue,AComment: string);
+    TINIEntry = class;
+    PINIEntry = TINIEntry;
+    TINIEntry = class(TObject)
+      constructor Create(const ALine: string);
+      constructor Create(const ATag,AValue,AComment: string);
       function    GetText: string;
       function    GetTag: string;
       function    GetComment: string;
       function    GetValue: string;
       procedure   SetValue(const S: string);
       procedure   SetComment(const S: string);
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     private
       TagHash  : Cardinal;
       Tag      : PString;
@@ -41,34 +45,38 @@ type
       procedure Split;
     end;
 
-    PINISection = ^TINISection;
-    TINISection = object(TObject)
-      constructor Init(const AName: string);
+    TINISection = class;
+    PINISection = TINISection;
+    TINISectionEnumProc = procedure(P: PINISection) is nested;
+    TINIEntryEnumProc = procedure(P: PINIEntry) is nested;
+    TINISection = class(TObject)
+      constructor Create(const AName: string);
       function    GetName: string;
       function    AddEntry(const S: string): PINIEntry;
       function    AddEntry(const Tag,Value,Comment: string): PINIEntry;
       function    SearchEntry(Tag: string): PINIEntry; virtual;
       procedure   DeleteEntry(Tag: string);
-      procedure   ForEachEntry(EnumProc: pointer); virtual;
-      destructor  Done; virtual;
+      procedure   ForEachEntry(EnumProc: TINIEntryEnumProc); virtual;
+      destructor Destroy; virtual;
     private
       NameHash : Cardinal;
       Name     : PString;
       Entries  : PCollection;
     end;
 
-    PINIFile = ^TINIFile;
-    TINIFile = object(TObject)
+    TINIFile = class;
+    PINIFile = TINIFile;
+    TINIFile = class(TObject)
       MakeNullEntries: boolean;
-      constructor Init(const AFileName: string);
+      constructor Create(const AFileName: string);
       function    GetFileName: string;
       function    Read: boolean; virtual;
       function    Update: boolean; virtual;
       function    IsModified: boolean; virtual;
       function    SearchSection(Section: string): PINISection; virtual;
       function    SearchEntry(const Section, Tag: string): PINIEntry; virtual;
-      procedure   ForEachSection(EnumProc: pointer); virtual;
-      procedure   ForEachEntry(const Section: string; EnumProc: pointer); virtual;
+      procedure   ForEachSection(EnumProc: TINISectionEnumProc); virtual;
+      procedure   ForEachEntry(const Section: string; EnumProc: TINIEntryEnumProc); virtual;
       function    GetEntry(const Section, Tag, Default: string): string; virtual;
       procedure   SetEntry(const Section, Tag, Value: string); virtual;
       procedure   SetEntry(const Section, Tag, Value,Comment: string); virtual;
@@ -76,7 +84,7 @@ type
       procedure   SetIntEntry(const Section, Tag: string; Value: longint); virtual;
       procedure   DeleteSection(const Section: string); virtual;
       procedure   DeleteEntry(const Section, Tag: string);
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     private
 {      ReadOnly: boolean;}
       Sections: PCollection;
@@ -144,16 +152,16 @@ end;
   {$R+}
 {$ENDIF}
 
-constructor TINIEntry.Init(const ALine: string);
+constructor TINIEntry.Create(const ALine: string);
 begin
-  inherited Init;
+  inherited Create;
   Text:=NewStr(ALine);
   Split;
 end;
 
-constructor TINIEntry.Init(const ATag,AValue,AComment: string);
+constructor TINIEntry.Create(const ATag,AValue,AComment: string);
 begin
-  inherited Init;
+  inherited Create;
   Tag:=NewStr(ATag);
   Value:=NewStr(AValue);
   Comment:=NewStr(AComment);
@@ -285,9 +293,9 @@ begin
 end;
 
 
-destructor TINIEntry.Done;
+destructor TINIEntry.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if Text<>nil then DisposeStr(Text);
   if Tag<>nil then DisposeStr(Tag);
   if Value<>nil then DisposeStr(Value);
@@ -295,12 +303,12 @@ begin
 end;
 
 
-constructor TINISection.Init(const AName: string);
+constructor TINISection.Create(const AName: string);
 begin
-  inherited Init;
+  inherited Create;
   Name:=NewStr(AName);
   NameHash:=CalcHash(UpcaseStr(AName));
-  New(Entries, Init(50,500));
+  Entries := TCollection.Create(50,500);
 end;
 
 
@@ -323,15 +331,15 @@ begin
     E:=nil;
   if not assigned(E) then
     begin
-      New(E, Init(S));
-      Entries^.Insert(E);
+      E := TINIEntry.Create(S);
+      Entries.Insert(E);
     end
   else
     begin
-      if assigned(E^.Text) then
-         DisposeStr(E^.Text);
-      E^.Text:=NewStr(S);
-      E^.Split;
+      if assigned(E.Text) then
+         DisposeStr(E.Text);
+      E.Text:=NewStr(S);
+      E.Split;
     end;
   AddEntry:=E;
 end;
@@ -342,37 +350,37 @@ begin
   E:=SearchEntry(Tag);
   if not assigned(E) then
     begin
-      New(E, Init(Tag,Value,Comment));
-      Entries^.Insert(E);
+      E := TINIEntry.Create(Tag,Value,Comment);
+      Entries.Insert(E);
     end
   else
     begin
-      E^.SetValue(Value);
+      E.SetValue(Value);
       if Comment<>'' then
-        E^.SetComment(Comment);
+        E.SetComment(Comment);
     end;
   AddEntry:=E;
 end;
 
-procedure TINIFile.ForEachSection(EnumProc: pointer);
+procedure TINIFile.ForEachSection(EnumProc: TINISectionEnumProc);
 var I: Sw_integer;
    S: PINISection;
 begin
-  for I:=0 to Sections^.Count-1 do
+  for I:=0 to Sections.Count-1 do
     begin
-      S:=Sections^.At(I);
-      CallPointerLocal(EnumProc,get_caller_frame(get_frame,get_pc_addr),S);
+      S:=PINISection(Sections.At(I));
+      EnumProc(S);
     end;
 end;
 
-procedure TINISection.ForEachEntry(EnumProc: pointer);
+procedure TINISection.ForEachEntry(EnumProc: TINIEntryEnumProc);
 var I: integer;
     E: PINIEntry;
 begin
-  for I:=0 to Entries^.Count-1 do
+  for I:=0 to Entries.Count-1 do
     begin
-      E:=Entries^.At(I);
-      CallPointerLocal(EnumProc,get_caller_frame(get_frame,get_pc_addr),E);
+      E:=PINIEntry(Entries.At(I));
+      EnumProc(E);
     end;
 end;
 
@@ -385,10 +393,10 @@ begin
   SearchEntry:=nil;
   Tag:=UpcaseStr(Tag);
   Hash:=CalcHash(Tag);
-  for I:=0 to Entries^.Count-1 do
+  for I:=0 to Entries.Count-1 do
     begin
-      P:=Entries^.At(I);
-      if (P^.TagHash=Hash) and (UpcaseStr(P^.GetTag)=Tag) then
+      P:=PINIEntry(Entries.At(I));
+      if (P.TagHash=Hash) and (UpcaseStr(P.GetTag)=Tag) then
         begin
           SearchEntry:=P;
           break;
@@ -402,22 +410,22 @@ var
 begin
   P:=SearchEntry(Tag);
   if assigned(P) then
-    Entries^.Free(P);
+    Entries.Free(P);
 end;
 
-destructor TINISection.Done;
+destructor TINISection.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if Name<>nil then DisposeStr(Name);
-  Dispose(Entries, Done);
+  Entries.Free;
 end;
 
 
-constructor TINIFile.Init(const AFileName: string);
+constructor TINIFile.Create(const AFileName: string);
 begin
-  inherited Init;
+  inherited Create;
   FileName:=NewStr(AFileName);
-  New(Sections, Init(50,50));
+  Sections := TCollection.Create(50,50);
   Read;
 end;
 
@@ -433,8 +441,8 @@ var f: text;
     P: PINISection;
     I: integer;
 begin
-  New(P, Init(MainSectionName));
-  Sections^.Insert(P);
+  P := TINISection.Create(MainSectionName);
+  Sections.Insert(P);
   Assign(f,FileName^);
 {$I-}
   Reset(f);
@@ -449,11 +457,11 @@ begin
       if copy(TS,1,1)='[' then
       begin
         I:=Pos(']',TS); if I=0 then I:=length(TS)+1;
-        New(P, Init(copy(TS,2,I-2)));
-        Sections^.Insert(P);
+        P := TINISection.Create(copy(TS,2,I-2));
+        Sections.Insert(P);
       end else
       begin
-        P^.AddEntry(S);
+        P.AddEntry(S);
       end;
     end;
   Close(f);
@@ -464,19 +472,19 @@ end;
 
 function TINIFile.IsModified: boolean;
 
-  function SectionModified(P: PINISection): boolean;
-
-    function EntryModified(E: PINIEntry): boolean;
+  function SectionModified(Item: Pointer): boolean;
+  var P: PINISection;
+    function EntryModified(Item2: Pointer): boolean;
     begin
-      EntryModified:=E^.Modified;
+      EntryModified:=PINIEntry(Item2).Modified;
     end;
-
   begin
-    SectionModified:=(P^.Entries^.FirstThat(@EntryModified)<>nil);
+    P:=PINISection(Item);
+    SectionModified:=(P.Entries.FirstThat(@EntryModified)<>nil);
   end;
 
 begin
-  IsModified:=(Sections^.FirstThat(@SectionModified)<>nil);
+  IsModified:=(Sections.FirstThat(@SectionModified)<>nil);
 end;
 
 
@@ -492,18 +500,18 @@ begin
   Rewrite(f);
   OK:=EatIO=0;
   if OK then
-  for I:=0 to Sections^.Count-1 do
+  for I:=0 to Sections.Count-1 do
     begin
-      P:=Sections^.At(I);
-      if I<>0 then writeln(f,'['+P^.GetName+']');
-      for J:=0 to P^.Entries^.Count-1 do
+      P:=PINISection(Sections.At(I));
+      if I<>0 then writeln(f,'['+P.GetName+']');
+      for J:=0 to P.Entries.Count-1 do
         begin
-          E:=P^.Entries^.At(J);
-          writeln(f,E^.GetText);
+          E:=PINIEntry(P.Entries.At(J));
+          writeln(f,E.GetText);
           OK:=EatIO=0;
           if OK=false then Break;
         end;
-      if OK and ((I>0) or (P^.Entries^.Count>0)) and (I<Sections^.Count-1) then
+      if OK and ((I>0) or (P.Entries.Count>0)) and (I<Sections.Count-1) then
         writeln(f,'');
       OK:=OK and (EatIO=0);
       if OK=false then Break;
@@ -512,13 +520,13 @@ begin
   EatIO;
 {$I+}
   if OK then
-    for I:=0 to Sections^.Count-1 do
+    for I:=0 to Sections.Count-1 do
       begin
-        P:=Sections^.At(I);
-        for J:=0 to P^.Entries^.Count-1 do
+        P:=PINISection(Sections.At(I));
+        for J:=0 to P.Entries.Count-1 do
           begin
-            E:=P^.Entries^.At(J);
-            E^.Modified:=false;
+            E:=PINIEntry(P.Entries.At(J));
+            E.Modified:=false;
           end;
       end;
   Update:=OK;
@@ -533,10 +541,10 @@ begin
   SearchSection:=nil;
   Section:=UpcaseStr(Section);
   Hash:=CalcHash(Section);
-  for I:=0 to Sections^.Count-1 do
+  for I:=0 to Sections.Count-1 do
     begin
-      P:=Sections^.At(I);
-      if (P^.NameHash=Hash) and (UpcaseStr(P^.GetName)=Section) then
+      P:=PINISection(Sections.At(I));
+      if (P.NameHash=Hash) and (UpcaseStr(P.GetName)=Section) then
         begin
           SearchSection:=P;
           break;
@@ -550,21 +558,21 @@ var P: PINISection;
 begin
   P:=SearchSection(Section);
   if P=nil then E:=nil else
-    E:=P^.SearchEntry(Tag);
+    E:=P.SearchEntry(Tag);
   SearchEntry:=E;
 end;
 
-procedure TINIFile.ForEachEntry(const Section: string; EnumProc: pointer);
+procedure TINIFile.ForEachEntry(const Section: string; EnumProc: TINIEntryEnumProc);
 var P: PINISection;
     E: PINIEntry;
     I: integer;
 begin
   P:=SearchSection(Section);
   if P<>nil then
-    for I:=0 to P^.Entries^.Count-1 do
+    for I:=0 to P.Entries.Count-1 do
       begin
-        E:=P^.Entries^.At(I);
-        CallPointerMethodLocal(EnumProc,get_frame,@Self,E);
+        E:=PINIEntry(P.Entries.At(I));
+        EnumProc(E);
       end;
 end;
 
@@ -574,7 +582,7 @@ var E: PINIEntry;
 begin
   E:=SearchEntry(Section,Tag);
   if E=nil then S:=Default else
-    S:=E^.GetValue;
+    S:=E.GetValue;
   GetEntry:=S;
 end;
 
@@ -589,14 +597,14 @@ begin
       P:=SearchSection(Section);
       if P=nil then
         begin
-          New(P, Init(Section));
-          Sections^.Insert(P);
+          P := TINISection.Create(Section);
+          Sections.Insert(P);
         end;
-      E:=P^.AddEntry(Tag,Value,Comment);
-      E^.Modified:=true;
+      E:=P.AddEntry(Tag,Value,Comment);
+      E.Modified:=true;
     end;
   if E<>nil then
-    E^.SetValue(Value);
+    E.SetValue(Value);
 end;
 
 procedure TINIFile.SetEntry(const Section, Tag, Value: string);
@@ -622,7 +630,7 @@ var P: PINISection;
 begin
   P:=SearchSection(Section);
   if P<>nil then
-    Sections^.Free(P);
+    Sections.Free(P);
 end;
 
 procedure TINIFile.DeleteEntry(const Section, Tag: string);
@@ -630,17 +638,17 @@ var P: PINISection;
 begin
   P:=SearchSection(Section);
   if P<>nil then
-    P^.DeleteEntry(Tag);
+    P.DeleteEntry(Tag);
 end;
 
-destructor TINIFile.Done;
+destructor TINIFile.Destroy;
 begin
   if IsModified then
     Update;
-  inherited Done;
+  inherited Destroy;
   if FileName<>nil then
     DisposeStr(FileName);
-  Dispose(Sections, Done);
+  Sections.Free;
 end;
 
 

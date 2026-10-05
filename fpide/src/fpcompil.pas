@@ -48,21 +48,21 @@ type
 
 type
     PCompilerMessage = ^TCompilerMessage;
-    TCompilerMessage = object(TMessageItem)
+    TCompilerMessage = class(TMessageItem)
       function GetText(MaxLen: Sw_Integer): String; virtual;
     end;
 
     PCompilerMessageListBox = ^TCompilerMessageListBox;
-    TCompilerMessageListBox = object(TMessageListBox)
-      function  GetPalette: PPalette; virtual;
+    TCompilerMessageListBox = class(TMessageListBox)
+      function  GetPalette: TPalette; virtual;
       procedure SelectFirstError;
     end;
 
     PCompilerMessageWindow = ^TCompilerMessageWindow;
-    TCompilerMessageWindow = object(TFPWindow)
+    TCompilerMessageWindow = class(TFPWindow)
       constructor Init;
       procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       procedure   Close;virtual;
       destructor  Done; virtual;
       procedure   SizeLimits(var Min, Max: TPoint); virtual;
@@ -81,7 +81,7 @@ type
     end;
 
     PCompilerStatusDialog = ^TCompilerStatusDialog;
-    TCompilerStatusDialog = object(TCenterDialog)
+    TCompilerStatusDialog = class(TCenterDialog)
       ST    : PAdvancedStaticText;
       KeyST : PColorStaticText;
       starttime : real;
@@ -151,19 +151,23 @@ uses
   FPCodCmp,FPIntf,FPSwitch;
 
 {$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
 const
   RCompilerMessageListBox: TStreamRec = (
      ObjType: 1211;
-     VmtLink: Ofs(TypeOf(TCompilerMessageListBox)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TCompilerMessageListBox)) at runtime };
      Load:    @TCompilerMessageListBox.Load;
      Store:   @TCompilerMessageListBox.Store
   );
   RCompilerMessageWindow: TStreamRec = (
      ObjType: 1212;
-     VmtLink: Ofs(TypeOf(TCompilerMessageWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TCompilerMessageWindow)) at runtime };
      Load:    @TCompilerMessageWindow.Load;
      Store:   @TCompilerMessageWindow.Store
   );
+{$endif}
+{$endif}
 {$endif}
 {$ifdef useresstrings}
 resourcestring
@@ -375,7 +379,7 @@ end;
                              TCompilerMessageListBox
 *****************************************************************************}
 
-function TCompilerMessageListBox.GetPalette: PPalette;
+function TCompilerMessageListBox.GetPalette: TPalette;
 const
   P: string[length(CBrowserListBox)] = CBrowserListBox;
 begin
@@ -500,7 +504,7 @@ begin
 end;
 
 
-function TCompilerMessageWindow.GetPalette: PPalette;
+function TCompilerMessageWindow.GetPalette: TPalette;
 const
   S : string[length(CBrowserWindow)] = CBrowserWindow;
 begin

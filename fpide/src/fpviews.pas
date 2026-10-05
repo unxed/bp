@@ -40,32 +40,37 @@ type
     TEditor = TCodeEditor;
     PEditor = PCodeEditor;
 
-    PStoreCollection = ^TStoreCollection;
-    TStoreCollection = object(TStringCollection)
+    TStoreCollection = class;
+    PStoreCollection = TStoreCollection;
+    TStoreCollection = class(TStringCollection)
       function Add(const S: string): PString;
     end;
 
-    PIntegerLine = ^TIntegerLine;
-    TIntegerLine = object(TInputLine)
-      constructor Init(var Bounds: TRect; AMin, AMax: longint);
+    TIntegerLine = class;
+    PIntegerLine = TIntegerLine;
+    TIntegerLine = class(TInputLine)
+      constructor Create(var Bounds: TRect; AMin, AMax: longint);
     end;
 
-    PFPHeapView = ^TFPHeapView;
-    TFPHeapView = object(THeapView)
-      constructor Init(var Bounds: TRect);
+    TFPHeapView = class;
+    PFPHeapView = TFPHeapView;
+    TFPHeapView = class(THeapView)
+      constructor Create(var Bounds: TRect);
       constructor InitKb(var Bounds: TRect);
       procedure   HandleEvent(var Event: TEvent); virtual;
     end;
 
-    PFPClockView = ^TFPClockView;
-    TFPClockView = object(TClockView)
-      constructor Init(var Bounds: TRect);
+    TFPClockView = class;
+    PFPClockView = TFPClockView;
+    TFPClockView = class(TClockView)
+      constructor Create(var Bounds: TRect);
       procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
     end;
 
-    PFPWindow = ^TFPWindow;
-    TFPWindow = object(TWindow)
+    TFPWindow = class;
+    PFPWindow = TFPWindow;
+    TFPWindow = class(TWindow)
       AutoNumber: boolean;
       procedure   HandleEvent(var Event: TEvent); virtual;
       procedure   SetState(AState: Word; Enable: Boolean); virtual;
@@ -76,31 +81,34 @@ type
       procedure   SelectInDebugSession;
     end;
 
-    PFPHelpViewer = ^TFPHelpViewer;
-    TFPHelpViewer = object(THelpViewer)
+    TFPHelpViewer = class;
+    PFPHelpViewer = TFPHelpViewer;
+    TFPHelpViewer = class(THelpViewer)
       function    GetLocalMenu: PMenu; virtual;
       function    GetCommandTarget: PView; virtual;
     end;
 
-    PFPHelpWindow = ^TFPHelpWindow;
-    TFPHelpWindow = object(THelpWindow)
-      constructor Init(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
+    TFPHelpWindow = class;
+    PFPHelpWindow = TFPHelpWindow;
+    TFPHelpWindow = class(THelpWindow)
+      constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
       destructor  Done;virtual;
       procedure   InitHelpView; virtual;
       procedure   Show; {virtual;}
       procedure   Hide; {virtual;}
       procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
     end;
 
-    PTextScroller = ^TTextScroller;
-    TTextScroller = object(TStaticText)
+    TTextScroller = class;
+    PTextScroller = TTextScroller;
+    TTextScroller = class(TStaticText)
       TopLine: integer;
       Speed  : integer;
       Lines  : PUnsortedStringCollection;
-      constructor Init(var Bounds: TRect; ASpeed: integer; AText: PUnsortedStringCollection);
+      constructor Create(var Bounds: TRect; ASpeed: integer; AText: PUnsortedStringCollection);
       function    GetLineCount: integer; virtual;
       function    GetLine(I: integer): string; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
@@ -115,26 +123,28 @@ type
 
     TAlign = (alLeft,alCenter,alRight);
 
-    PFPToolTip = ^TFPToolTip;
-    TFPToolTip = object(TView)
-      constructor Init(var Bounds: TRect; const AText: string; AAlign: TAlign);
+    TFPToolTip = class;
+    PFPToolTip = TFPToolTip;
+    TFPToolTip = class(TView)
+      constructor Create(var Bounds: TRect; const AText: string; AAlign: TAlign);
       procedure   Draw; virtual;
       function    GetText: string;
       procedure   SetText(const AText: string);
       function    GetAlign: TAlign;
       procedure   SetAlign(AAlign: TAlign);
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       destructor  Done; virtual;
     private
       Text: PString;
       Align: TAlign;
     end;
 
-    PSourceEditor = ^TSourceEditor;
-    TSourceEditor = object(TFileEditor)
+    TSourceEditor = class;
+    PSourceEditor = TSourceEditor;
+    TSourceEditor = class(TFileEditor)
       CompileStamp : longint;
       CodeCompleteTip: PFPToolTip;
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator;const AFileName: string);
 {$ifndef NODEBUG}
     private
@@ -177,19 +187,20 @@ type
       procedure   AddLine(const S: string); virtual;
     end;
 
-    PSourceWindow = ^TSourceWindow;
-    TSourceWindow = object(TFPWindow)
+    TSourceWindow = class;
+    PSourceWindow = TSourceWindow;
+    TSourceWindow = class(TFPWindow)
       Editor    : PSourceEditor;
       Indicator : PIndicator;
       NoNameCount : longint;
-      constructor Init(var Bounds: TRect; AFileName: string);
+      constructor Create(var Bounds: TRect; AFileName: string);
       function    GetTitle(MaxSize: sw_Integer): TTitleStr; virtual;
       procedure   SetTitle(ATitle: string); virtual;
       procedure   UpdateTitle; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
       procedure   Update; virtual;
       procedure   UpdateCommands; virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   Close; virtual;
@@ -197,8 +208,9 @@ type
     end;
 
 {$ifndef NODEBUG}
-    PGDBSourceEditor = ^TGDBSourceEditor;
-    TGDBSourceEditor = object(TSourceEditor)
+    TGDBSourceEditor = class;
+    PGDBSourceEditor = TGDBSourceEditor;
+    TGDBSourceEditor = class(TSourceEditor)
       function   InsertNewLine : Sw_integer;virtual;
       function   Valid(Command: Word): Boolean; virtual;
       procedure  AddLine(const S: string); virtual;
@@ -212,42 +224,46 @@ type
       LastCommand : String;
       end;
 
-    PGDBWindow = ^TGDBWindow;
-    TGDBWindow = object(TFPWindow)
+    TGDBWindow = class;
+    PGDBWindow = TGDBWindow;
+    TGDBWindow = class(TFPWindow)
       Editor    : PGDBSourceEditor;
       Indicator : PIndicator;
-      constructor Init(var Bounds: TRect);
+      constructor Create(var Bounds: TRect);
       procedure   HandleEvent(var Event: TEvent); virtual;
       procedure   WriteText(Buf : pchar;IsError : boolean);
       procedure   WriteString(Const S : string);
       procedure   WriteErrorString(Const S : string);
       procedure   WriteOutputText(Buf : pchar);
       procedure   WriteErrorText(Buf : pchar);
-      function    GetPalette: PPalette;virtual;
+      function    GetPalette: TPalette;virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   UpdateCommands; virtual;
       destructor  Done; virtual;
     end;
 
-    PDisasLine = ^TDisasLine;
-    TDisasLine = object(TLine)
+    TDisasLine = class;
+    PDisasLine = TDisasLine;
+    TDisasLine = class(TLine)
       address : CORE_ADDR;{ should be target size of address for cross debuggers }
     end;
 
-    PDisasLineCollection = ^TDisasLineCollection;
-    TDisasLineCollection = object(TLineCollection)
+    TDisasLineCollection = class;
+    PDisasLineCollection = TDisasLineCollection;
+    TDisasLineCollection = class(TLineCollection)
       function  At(Index: sw_Integer): PDisasLine;
     end;
 
-    PDisassemblyEditor = ^TDisassemblyEditor;
-    TDisassemblyEditor = object(TSourceEditor)
+    TDisassemblyEditor = class;
+    PDisassemblyEditor = TDisassemblyEditor;
+    TDisassemblyEditor = class(TSourceEditor)
       CurrentSource : String;
       CurrentLine : longint;
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator;const AFileName: string);
       procedure  ReleaseSource;
-      destructor Done;virtual;
+      destructor Destroy;virtual;
       procedure  AddSourceLine(const AFileName: string;line : longint); virtual;
       procedure  AddAssemblyLine(const S: string;AAddress : CORE_ADDR); virtual;
       function   GetCurrentLine(address : CORE_ADDR) : PDisasLine;
@@ -259,11 +275,12 @@ type
         CurL : PDisasLine;
       end;
 
-    PDisassemblyWindow = ^TDisassemblyWindow;
-    TDisassemblyWindow = object(TFPWindow)
+    TDisassemblyWindow = class;
+    PDisassemblyWindow = TDisassemblyWindow;
+    TDisassemblyWindow = class(TFPWindow)
       Editor    : PDisassemblyEditor;
       Indicator : PIndicator;
-      constructor Init(var Bounds: TRect);
+      constructor Create(var Bounds: TRect);
       procedure   LoadFunction(Const FuncName : string);
       procedure   LoadAddress(Addr : CORE_ADDR);
       function    ProcessPChar(p : pchar) : boolean;
@@ -272,40 +289,43 @@ type
       procedure   WriteDisassemblyString(Const S : string;address : CORE_ADDR);
       procedure   SetCurAddress(address : CORE_ADDR);
       procedure   UpdateCommands; virtual;
-      function    GetPalette: PPalette;virtual;
+      function    GetPalette: TPalette;virtual;
       destructor  Done; virtual;
     end;
 {$endif NODEBUG}
 
-    PClipboardWindow = ^TClipboardWindow;
-    TClipboardWindow = object(TSourceWindow)
-      constructor Init;
+    TClipboardWindow = class;
+    PClipboardWindow = TClipboardWindow;
+    TClipboardWindow = class(TSourceWindow)
+      constructor Create;
       procedure   Close; virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       destructor  Done; virtual;
     end;
 
-    PMessageItem = ^TMessageItem;
-    TMessageItem = object(TObject)
+    TMessageItem = class;
+    PMessageItem = TMessageItem;
+    TMessageItem = class(TObject)
       TClass    : longint;
       Text      : PString;
       Module    : PString;
       Row,Col   : sw_integer;
-      constructor Init(AClass: longint; const AText: string; AModule: PString; ARow, ACol: sw_integer);
+      constructor Create(AClass: longint; const AText: string; AModule: PString; ARow, ACol: sw_integer);
       function    GetText(MaxLen: Sw_integer): string; virtual;
       procedure   Selected; virtual;
       function    GetModuleName: string; virtual;
       destructor  Done; virtual;
     end;
 
-    PMessageListBox = ^TMessageListBox;
-    TMessageListBox = object(THSListBox)
+    TMessageListBox = class;
+    PMessageListBox = TMessageListBox;
+    TMessageListBox = class(THSListBox)
       Transparent : boolean;
       NoSelection : boolean;
       MaxWidth    : Sw_integer;
       ModuleNames : PStoreCollection;
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
       procedure   SetState(AState: Word; Enable: Boolean); virtual;
       procedure   AddItem(P: PMessageItem); virtual;
       function    AddModuleName(const Name: string): PString; virtual;
@@ -322,13 +342,13 @@ type
     end;
 
 
-    PFPDlgWindow = ^TFPDlgWindow;
-    TFPDlgWindow = object(TDlgWindow)
+    TFPDlgWindow = class;
+    PFPDlgWindow = TFPDlgWindow;
+    TFPDlgWindow = class(TDlgWindow)
       procedure   HandleEvent(var Event: TEvent); virtual;
     end;
 
-(*
-    PTabItem = ^TTabItem;
+PTabItem = ^TTabItem;
     TTabItem = record
       Next : PTabItem;
       View : PView;
@@ -344,12 +364,13 @@ type
       ShortCut : char;
     end;
 
-    PTab = ^TTab;
-    TTab = object(TGroup)
+    TTab = class;
+    PTab = TTab;
+    TTab = class(TGroup)
       TabDefs   : PTabDef;
       ActiveDef : integer;
       DefCount  : word;
-      constructor Init(var Bounds: TRect; ATabDef: PTabDef);
+      constructor Create(var Bounds: TRect; ATabDef: PTabDef);
       function    AtTab(Index: integer): PTabDef; virtual;
       procedure   SelectTab(Index: integer); virtual;
       function    TabCount: integer;
@@ -357,35 +378,38 @@ type
       function    Valid(Command: Word): Boolean; virtual;
       procedure   ChangeBounds(var Bounds: TRect); virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       procedure   Draw; virtual;
       procedure   SetState(AState: Word; Enable: Boolean); virtual;
       destructor  Done; virtual;
     private
       InDraw: boolean;
     end;
-*)
 
-    PScreenView = ^TScreenView;
-    TScreenView = object(TScroller)
+
+    TScreenView = class;
+    PScreenView = TScreenView;
+    TScreenView = class(TScroller)
       Screen: PScreen;
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar;
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar;
                     AScreen: PScreen);
       procedure   Draw; virtual;
       procedure   Update; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
     end;
 
-    PScreenWindow = ^TScreenWindow;
-    TScreenWindow = object(TFPWindow)
+    TScreenWindow = class;
+    PScreenWindow = TScreenWindow;
+    TScreenWindow = class(TFPWindow)
       ScreenView : PScreenView;
-      constructor Init(AScreen: PScreen; ANumber: integer);
+      constructor Create(AScreen: PScreen; ANumber: integer);
       destructor  Done; virtual;
     end;
 
-    PFPAboutDialog = ^TFPAboutDialog;
-    TFPAboutDialog = object(TCenterDialog)
-      constructor Init;
+    TFPAboutDialog = class;
+    PFPAboutDialog = TFPAboutDialog;
+    TFPAboutDialog = class(TCenterDialog)
+      constructor Create;
       procedure   ToggleInfo;
       procedure   HandleEvent(var Event: TEvent); virtual;
     private
@@ -393,42 +417,47 @@ type
       TitleST : PStaticText;
     end;
 
-    PFPASCIIChart = ^TFPASCIIChart;
-    TFPASCIIChart = object(TASCIIChart)
-      constructor Init;
+    TFPASCIIChart = class;
+    PFPASCIIChart = TFPASCIIChart;
+    TFPASCIIChart = class(TASCIIChart)
+      constructor Create;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   HandleEvent(var Event: TEvent); virtual;
       destructor  Done; virtual;
     end;
 
-    PVideoModeListBox = ^TVideoModeListBox;
-    TVideoModeListBox = object(TDropDownListBox)
+    TVideoModeListBox = class;
+    PVideoModeListBox = TVideoModeListBox;
+    TVideoModeListBox = class(TDropDownListBox)
       function    GetText(Item: pointer; MaxLen: sw_integer): string; virtual;
     end;
 
-    PFPDesktop = ^TFPDesktop;
-    TFPDesktop = object(TDesktop)
-      constructor Init(var Bounds: TRect);
+    TFPDesktop = class;
+    PFPDesktop = TFPDesktop;
+    TFPDesktop = class(TDesktop)
+      constructor Create(var Bounds: TRect);
       procedure   InitBackground; virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
     end;
 
-    PFPMemo = ^TFPMemo;
-    TFPMemo = object(TCodeEditor)
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+    TFPMemo = class;
+    PFPMemo = TFPMemo;
+    TFPMemo = class(TCodeEditor)
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
                     PScrollBar; AIndicator: PIndicator);
       function    IsReservedWord(const S: string): boolean; virtual;
       function    GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; virtual;
       function    GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
     end;
 
-    PFPCodeMemo = ^TFPCodeMemo;
-    TFPCodeMemo = object(TFPMemo)
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+    TFPCodeMemo = class;
+    PFPCodeMemo = TFPCodeMemo;
+    TFPCodeMemo = class(TFPMemo)
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
                     PScrollBar; AIndicator: PIndicator);
       function    IsReservedWord(const S: string): boolean; virtual;
       function    GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; virtual;
@@ -572,84 +601,90 @@ uses
   FPSwitch,FPSymbol,FPDebug,FPVars,FPUtils,FPCompil,FPHelp,
   FPTools,FPIDE,FPCodTmp,FPCodCmp;
 
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
 const
   RSourceEditor: TStreamRec = (
      ObjType: 1500;
-     VmtLink: Ofs(TypeOf(TSourceEditor)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TSourceEditor)) at runtime };
      Load:    @TSourceEditor.Load;
      Store:   @TSourceEditor.Store
   );
   RSourceWindow: TStreamRec = (
      ObjType: 1501;
-     VmtLink: Ofs(TypeOf(TSourceWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TSourceWindow)) at runtime };
      Load:    @TSourceWindow.Load;
      Store:   @TSourceWindow.Store
   );
   RFPHelpViewer: TStreamRec = (
      ObjType: 1502;
-     VmtLink: Ofs(TypeOf(TFPHelpViewer)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TFPHelpViewer)) at runtime };
      Load:    @TFPHelpViewer.Load;
      Store:   @TFPHelpViewer.Store
   );
   RFPHelpWindow: TStreamRec = (
      ObjType: 1503;
-     VmtLink: Ofs(TypeOf(TFPHelpWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TFPHelpWindow)) at runtime };
      Load:    @TFPHelpWindow.Load;
      Store:   @TFPHelpWindow.Store
   );
   RClipboardWindow: TStreamRec = (
      ObjType: 1504;
-     VmtLink: Ofs(TypeOf(TClipboardWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TClipboardWindow)) at runtime };
      Load:    @TClipboardWindow.Load;
      Store:   @TClipboardWindow.Store
   );
   RMessageListBox: TStreamRec = (
      ObjType: 1505;
-     VmtLink: Ofs(TypeOf(TMessageListBox)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TMessageListBox)) at runtime };
      Load:    @TMessageListBox.Load;
      Store:   @TMessageListBox.Store
   );
   RFPDesktop: TStreamRec = (
      ObjType: 1506;
-     VmtLink: Ofs(TypeOf(TFPDesktop)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TFPDesktop)) at runtime };
      Load:    @TFPDesktop.Load;
      Store:   @TFPDesktop.Store
   );
 
   RFPASCIIChart: TStreamRec = (
      ObjType: 1509;
-     VmtLink: Ofs(TypeOf(TFPASCIIChart)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TFPASCIIChart)) at runtime };
      Load:    @TFPASCIIChart.Load;
      Store:   @TFPASCIIChart.Store
   );
   RFPDlgWindow: TStreamRec = (
      ObjType: 1511;
-     VmtLink: Ofs(TypeOf(TFPDlgWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TFPDlgWindow)) at runtime };
      Load:    @TFPDlgWindow.Load;
      Store:   @TFPDlgWindow.Store
   );
+{$endif}
+{$endif}
+{$endif NOOBJREG}
 {$ifndef NODEBUG}
   RGDBWindow: TStreamRec = (
      ObjType: 1508;
-     VmtLink: Ofs(TypeOf(TGDBWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TGDBWindow)) at runtime };
      Load:    @TGDBWindow.Load;
      Store:   @TGDBWindow.Store
   );
   RGDBSourceEditor: TStreamRec = (
      ObjType: 1507;
-     VmtLink: Ofs(TypeOf(TGDBSourceEditor)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TGDBSourceEditor)) at runtime };
      Load:    @TGDBSourceEditor.Load;
      Store:   @TGDBSourceEditor.Store
   );
   RDisassemblyEditor: TStreamRec = (
      ObjType: 1512;
-     VmtLink: Ofs(TypeOf(TDisassemblyEditor)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TDisassemblyEditor)) at runtime };
      Load:    @TDisassemblyEditor.Load;
      Store:   @TDisassemblyEditor.Store
   );
   RDisassemblyWindow: TStreamRec = (
      ObjType: 1513;
-     VmtLink: Ofs(TypeOf(TDisassemblyWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TDisassemblyWindow)) at runtime };
      Load:    @TDisassemblyWindow.Load;
      Store:   @TDisassemblyWindow.Store
   );
@@ -1224,9 +1259,9 @@ end;
                               TIntegerLine
  *****************************************************************************}
 
-constructor TIntegerLine.Init(var Bounds: TRect; AMin, AMax: longint);
+constructor TIntegerLine.Create(var Bounds: TRect; AMin, AMax: longint);
 begin
-  if inherited Init(Bounds, Bounds.B.X-Bounds.A.X-1)=false then
+  if inherited Create(Bounds, Bounds.B.X-Bounds.A.X-1)=false then
     Fail;
   Validator:=New(PRangeValidator, Init(AMin, AMax));
 end;
@@ -1262,12 +1297,12 @@ begin
   SearchCoreForFileName:=EC;
 end;
 
-constructor TSourceEditor.Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+constructor TSourceEditor.Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator;const AFileName: string);
 var EC: PCodeEditorCore;
 begin
   EC:=SearchCoreForFileName(AFileName);
-  inherited Init(Bounds,AHScrollBar,AVScrollBar,AIndicator,EC,AFileName);
+  inherited Create(Bounds,AHScrollBar,AVScrollBar,AIndicator,EC,AFileName);
   SetStoreUndo(true);
   CompileStamp:=0;
 end;
@@ -1605,7 +1640,7 @@ begin
   inherited DeleteLine(I);
 {$ifndef NODEBUG}
   If ShouldHandleBreakpoints then
-    BreakpointsCollection^.AdaptBreakpoints(@Self,I,-1);
+    BreakpointsCollection.AdaptBreakpoints(@Self,I,-1);
 {$endif NODEBUG}
 end;
 
@@ -1625,8 +1660,8 @@ begin
     begin
       ShouldHandleBreakpoints:=false;
       I:=CurPos.Y+1;
-      PBEnd:=BreakpointsCollection^.FindBreakpointAt(@Self,I);
-      PBStart:=BreakpointsCollection^.FindBreakpointAt(@Self,I-1);
+      PBEnd:=BreakpointsCollection.FindBreakpointAt(@Self,I);
+      PBStart:=BreakpointsCollection.FindBreakpointAt(@Self,I-1);
     end;
   inherited Backspace;
   if MoveBreakpointToPreviousLine then
@@ -1638,7 +1673,7 @@ begin
             begin
               if PBEnd^.state=bs_enabled then
                 PBStart^.state:=bs_enabled;
-              BreakpointsCollection^.Free(PBEnd);
+              BreakpointsCollection.Free(PBEnd);
             end
           else
             begin
@@ -1656,7 +1691,7 @@ begin
                 end;
             end;
         end;
-      BreakpointsCollection^.AdaptBreakpoints(@Self,I,-1);
+      BreakpointsCollection.AdaptBreakpoints(@Self,I,-1);
     end;
 {$endif NODEBUG}
 end;
@@ -1676,9 +1711,9 @@ begin
   I:=CurPos.Y+1;
   InsertNewLine:=inherited InsertNewLine;
   if MoveBreakpointToNextLine then
-    BreakpointsCollection^.AdaptBreakpoints(@Self,I-1,1)
+    BreakpointsCollection.AdaptBreakpoints(@Self,I-1,1)
   else
-    BreakpointsCollection^.AdaptBreakpoints(@Self,I,1);
+    BreakpointsCollection.AdaptBreakpoints(@Self,I,1);
   ShouldHandleBreakpoints:=true;
 {$endif NODEBUG}
 end;
@@ -1701,8 +1736,8 @@ begin
     begin
       MoveBreakpointOneLineUp:=true;
       ShouldHandleBreakpoints:=false;
-      PBEnd:=BreakpointsCollection^.FindBreakpointAt(@Self,I+1);
-      PBStart:=BreakpointsCollection^.FindBreakpointAt(@Self,I);
+      PBEnd:=BreakpointsCollection.FindBreakpointAt(@Self,I+1);
+      PBStart:=BreakpointsCollection.FindBreakpointAt(@Self,I);
     end
   else
     MoveBreakpointOneLineUp:=false;
@@ -1718,7 +1753,7 @@ begin
             begin
               if PBEnd^.state=bs_enabled then
                 PBStart^.state:=bs_enabled;
-              BreakpointsCollection^.Free(PBEnd);
+              BreakpointsCollection.Free(PBEnd);
             end
           else
             begin
@@ -1736,7 +1771,7 @@ begin
                 end;
             end;
         end;
-      BreakpointsCollection^.AdaptBreakpoints(@Self,I,-1);
+      BreakpointsCollection.AdaptBreakpoints(@Self,I,-1);
     end;
 {$endif NODEBUG}
 end;
@@ -1755,8 +1790,8 @@ begin
   ShouldHandleBreakpoints:=false;
   J:=SelEnd.Y-SelStart.Y;
   MoveBreakpointToFirstLine:=J>0;
-  PBEnd:=BreakpointsCollection^.FindBreakpointAt(@Self,SelEnd.Y);
-  PBStart:=BreakpointsCollection^.FindBreakpointAt(@Self,SelEnd.Y);
+  PBEnd:=BreakpointsCollection.FindBreakpointAt(@Self,SelEnd.Y);
+  PBStart:=BreakpointsCollection.FindBreakpointAt(@Self,SelEnd.Y);
   I:=SelStart.Y;
   inherited DelSelect;
   if MoveBreakpointToFirstLine and assigned(PBEnd) then
@@ -1765,7 +1800,7 @@ begin
         begin
           if PBEnd^.state=bs_enabled then
             PBStart^.state:=bs_enabled;
-          BreakpointsCollection^.Free(PBEnd);
+          BreakpointsCollection.Free(PBEnd);
         end
       else
         begin
@@ -1783,7 +1818,7 @@ begin
             end;
         end;
     end;
-  BreakpointsCollection^.AdaptBreakpoints(@Self,I,-J);
+  BreakpointsCollection.AdaptBreakpoints(@Self,I,-J);
   ShouldHandleBreakpoints:=true;
 {$endif NODEBUG}
 end;
@@ -1794,7 +1829,7 @@ begin
   InsertLine := inherited InsertLine(LineNo,S);
 {$ifndef NODEBUG}
   If ShouldHandleBreakpoints then
-    BreakpointsCollection^.AdaptBreakpoints(@Self,LineNo,1);
+    BreakpointsCollection.AdaptBreakpoints(@Self,LineNo,1);
 {$endif NODEBUG}
 end;
 
@@ -1802,7 +1837,7 @@ procedure TSourceEditor.AddLine(const S: string);
 begin
   inherited AddLine(S);
 {$ifndef NODEBUG}
-  BreakpointsCollection^.AdaptBreakpoints(@Self,GetLineCount,1);
+  BreakpointsCollection.AdaptBreakpoints(@Self,GetLineCount,1);
 {$endif NODEBUG}
 end;
 
@@ -1833,7 +1868,7 @@ end;
 
 function TSourceEditor.GetCommandTarget: PView;
 begin
-  GetCommandTarget:=@Self;
+  GetCommandTarget:=Self;
 end;
 
 function TSourceEditor.CreateLocalMenuView(var Bounds: TRect; M: PMenu): PMenuPopup;
@@ -1966,9 +2001,9 @@ begin
   end;
 end;
 
-constructor TFPHeapView.Init(var Bounds: TRect);
+constructor TFPHeapView.Create(var Bounds: TRect);
 begin
-  if inherited Init(Bounds)=false then Fail;
+  if inherited Create(Bounds)=false then Fail;
   Options:=Options or gfGrowHiX or gfGrowHiY;
   EventMask:=EventMask or evIdle;
   GrowMode:=gfGrowAll;
@@ -1991,9 +2026,9 @@ begin
   inherited HandleEvent(Event);
 end;
 
-constructor TFPClockView.Init(var Bounds: TRect);
+constructor TFPClockView.Create(var Bounds: TRect);
 begin
-  inherited Init(Bounds);
+  inherited Create(Bounds);
   EventMask:=EventMask or evIdle;
 end;
 
@@ -2006,10 +2041,10 @@ begin
   inherited HandleEvent(Event);
 end;
 
-function TFPClockView.GetPalette: PPalette;
+function TFPClockView.GetPalette: TPalette;
 const P: string[length(CFPClockView)] = CFPClockView;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(P);
 end;
 
 procedure TFPWindow.SetState(AState: Word; Enable: Boolean);
@@ -2120,15 +2155,15 @@ begin
   GetCommandTarget:=Application;
 end;
 
-constructor TFPHelpWindow.Init(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word;
+constructor TFPHelpWindow.Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word;
   AContext: THelpCtx; ANumber: Integer);
 begin
-  inherited Init(Bounds,ATitle,ASourceFileID,AContext,ANumber);
+  inherited Create(Bounds,ATitle,ASourceFileID,AContext,ANumber);
   HelpCtx:=hcHelpWindow;
   HideOnClose:=true;
 end;
 
-destructor TFPHelpWindow.Done;
+destructor TFPHelpWindow.Destroy;
 begin
   if HelpWindow=@Self then
     HelpWindow:=nil;
@@ -2175,10 +2210,10 @@ begin
   inherited HandleEvent(Event);
 end;
 
-function TFPHelpWindow.GetPalette: PPalette;
+function TFPHelpWindow.GetPalette: TPalette;
 const P: string[length(CIDEHelpDialog)] = CIDEHelpDialog;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(P);
 end;
 
 constructor TFPHelpWindow.Load(var S: TStream);
@@ -2191,13 +2226,13 @@ begin
   Abstract;
 end;
 
-constructor TSourceWindow.Init(var Bounds: TRect; AFileName: string);
+constructor TSourceWindow.Create(var Bounds: TRect; AFileName: string);
 var HSB,VSB: PScrollBar;
     R: TRect;
     PA : Array[1..2] of pointer;
     LoadFile: boolean;
 begin
-  inherited Init(Bounds,AFileName,{SearchFreeWindowNo}0);
+  inherited Create(Bounds,AFileName,{SearchFreeWindowNo}0);
   AutoNumber:=true;
   Options:=Options or ofTileAble;
   GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
@@ -2237,7 +2272,7 @@ begin
   Insert(Editor);
 {$ifndef NODEBUG}
   If assigned(BreakpointsCollection) then
-    BreakpointsCollection^.ShowBreakpoints(@Self);
+    BreakpointsCollection.ShowBreakpoints(@Self);
 {$endif NODEBUG}
   UpdateTitle;
 end;
@@ -2330,10 +2365,10 @@ begin
 end;
 
 
-function TSourceWindow.GetPalette: PPalette;
+function TSourceWindow.GetPalette: TPalette;
 const P: string[length(CSourceWindow)] = CSourceWindow;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(P);
 end;
 
 constructor TSourceWindow.Load(var S: TStream);
@@ -2345,7 +2380,7 @@ begin
   GetSubViewPtr(S,Editor);
 {$ifndef NODEBUG}
   If assigned(BreakpointsCollection) then
-    BreakpointsCollection^.ShowBreakpoints(@Self);
+    BreakpointsCollection.ShowBreakpoints(@Self);
 {$endif NODEBUG}
   PopStatus;
 end;
@@ -2367,12 +2402,12 @@ begin
   inherited Close;
 end;
 
-destructor TSourceWindow.Done;
+destructor TSourceWindow.Destroy;
 begin
   PushStatus(FormatStrStr(msg_closingfile,GetStr(Title)));
   if not IDEApp.IsClosing then
     Message(Application,evBroadcast,cmSourceWndClosing,@Self);
-  inherited Done;
+  inherited Destroy;
   IDEApp.SourceWindowClosed;
 {  if not IDEApp.IsClosing then
     Message(Application,evBroadcast,cmUpdate,@Self);}
@@ -2453,13 +2488,13 @@ begin
         { should be true only if we are at the end ! }
         IgnoreStringAtEnd:=(CurPos.Y=GetLineCount-1) and
           (CurPos.X>=length(RTrim(GetDisplayText(GetLineCount-1))));
-        Debugger^.Command(S);
+        Debugger.Command(S);
         CommandCalled:=true;
         IgnoreStringAtEnd:=false;
       end
     else if AutoRepeat and (CurPos.Y=GetLineCount-1) then
       begin
-        Debugger^.Command(LastCommand);
+        Debugger.Command(LastCommand);
         CommandCalled:=true;
       end;
 {$endif NODEBUG}
@@ -2469,11 +2504,11 @@ begin
 end;
 
 
-constructor TGDBWindow.Init(var Bounds: TRect);
+constructor TGDBWindow.Create(var Bounds: TRect);
 var HSB,VSB: PScrollBar;
     R: TRect;
 begin
-  inherited Init(Bounds,dialog_gdbwindow,0);
+  inherited Create(Bounds,dialog_gdbwindow,0);
   Options:=Options or ofTileAble;
   AutoNumber:=true;
   HelpCtx:=hcGDBWindow;
@@ -2501,7 +2536,7 @@ begin
 {$ifndef NODEBUG}
  {$ifndef GDBMI}
   if assigned(Debugger) then
-    Debugger^.SetCommand('width ' + IntToStr(Size.X-1));
+    Debugger.SetCommand('width ' + IntToStr(Size.X-1));
  {$endif GDBMI}
 {$endif NODEBUG}
   Editor^.silent:=false;
@@ -2527,11 +2562,11 @@ begin
   inherited HandleEvent(Event);
 end;
 
-destructor TGDBWindow.Done;
+destructor TGDBWindow.Destroy;
 begin
   if @Self=GDBWindow then
     GDBWindow:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
 constructor TGDBWindow.Load(var S: TStream);
@@ -2539,7 +2574,7 @@ begin
   inherited Load(S);
   GetSubViewPtr(S,Indicator);
   GetSubViewPtr(S,Editor);
-  GDBWindow:=@self;
+  GDBWindow:=Self;
 end;
 
 procedure TGDBWindow.Store(var S: TStream);
@@ -2549,10 +2584,10 @@ begin
   PutSubViewPtr(S,Editor);
 end;
 
-function TGDBWindow.GetPalette: PPalette;
+function TGDBWindow.GetPalette: TPalette;
 const P: string[length(CSourceWindow)] = CSourceWindow;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(P);
 end;
 
 procedure TGDBWindow.WriteOutputText(Buf : pchar);
@@ -2632,7 +2667,7 @@ begin
   At := PDisasLine(Inherited At(Index));
 end;
 
-constructor TDisassemblyEditor.Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+constructor TDisassemblyEditor.Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator;const AFileName: string);
 begin
   Inherited Init(Bounds,AHScrollBar,AVScrollBar,AIndicator,AFileName);
@@ -2650,7 +2685,7 @@ begin
   Source:=nil;
 end;
 
-destructor TDisassemblyEditor.Done;
+destructor TDisassemblyEditor.Destroy;
 begin
   ReleaseSource;
   Inherited Done;
@@ -2739,15 +2774,16 @@ begin
   GetCurrentLine:=PL;
 end;
 
-    { PDisassemblyWindow = ^TDisassemblyWindow;
-    TDisassemblyWindow = object(TFPWindow)
+    { TDisassemblyWindow = class;
+    PDisassemblyWindow = TDisassemblyWindow;
+    TDisassemblyWindow = class(TFPWindow)
       Editor    : PDisassemblyEditor;
       Indicator : PIndicator; }
-constructor TDisassemblyWindow.Init(var Bounds: TRect);
+constructor TDisassemblyWindow.Create(var Bounds: TRect);
 var HSB,VSB: PScrollBar;
     R: TRect;
 begin
-  inherited Init(Bounds,dialog_disaswindow,0);
+  inherited Create(Bounds,dialog_disaswindow,0);
   Options:=Options or ofTileAble;
   AutoNumber:=true;
   HelpCtx:=hcDisassemblyWindow;
@@ -2762,7 +2798,7 @@ begin
   GetExtent(R); R.Grow(-1,-1);
   New(Editor, Init(R, HSB, VSB, nil, GDBOutputFile));
   Insert(Editor);
-  DisassemblyWindow:=@Self;
+  DisassemblyWindow:=Self;
 end;
 
 procedure   TDisassemblyWindow.LoadFunction(Const FuncName : string);
@@ -2771,13 +2807,13 @@ var
 begin
 {$ifndef NODEBUG}
   If not assigned(Debugger) then Exit;
-  Debugger^.SetCommand('print symbol on');
-  Debugger^.SetCommand('width 0xffffffff');
-  Debugger^.Command('disas /m '+FuncName);
-  p:=StrNew(Debugger^.GetOutput);
+  Debugger.SetCommand('print symbol on');
+  Debugger.SetCommand('width 0xffffffff');
+  Debugger.Command('disas /m '+FuncName);
+  p:=StrNew(Debugger.GetOutput);
   ProcessPChar(p);
-  if (Debugger^.IsRunning) and (FuncName='') then
-    Editor^.GetCurrentLine(Debugger^.current_pc);
+  if (Debugger.IsRunning) and (FuncName='') then
+    Editor^.GetCurrentLine(Debugger.current_pc);
 {$endif NODEBUG}
 end;
 
@@ -2787,15 +2823,15 @@ var
 begin
 {$ifndef NODEBUG}
   If not assigned(Debugger) then Exit;
-  Debugger^.SetCommand('print symbol on');
-  Debugger^.SetCommand('width 0xffffffff');
-  Debugger^.Command('disas /m 0x'+HexStr(Addr,sizeof(Addr)*2));
-  p:=StrNew(Debugger^.GetOutput);
+  Debugger.SetCommand('print symbol on');
+  Debugger.SetCommand('width 0xffffffff');
+  Debugger.Command('disas /m 0x'+HexStr(Addr,sizeof(Addr)*2));
+  p:=StrNew(Debugger.GetOutput);
   ProcessPChar(p);
-  if Debugger^.IsRunning and
-     (Debugger^.current_pc>=Editor^.MinAddress) and
-     (Debugger^.current_pc<=Editor^.MaxAddress) then
-    Editor^.GetCurrentLine(Debugger^.current_pc);
+  if Debugger.IsRunning and
+     (Debugger.current_pc>=Editor^.MinAddress) and
+     (Debugger.current_pc<=Editor^.MaxAddress) then
+    Editor^.GetCurrentLine(Debugger.current_pc);
 {$endif NODEBUG}
 end;
 
@@ -2888,7 +2924,7 @@ begin
   Editor^.ReleaseSource;
   Editor^.UpdateAttrs(0,attrForceFull);
   If assigned(BreakpointsCollection) then
-    BreakpointsCollection^.ShowBreakpoints(@Self);
+    BreakpointsCollection.ShowBreakpoints(@Self);
   Unlock;
   ReDraw;
 end;
@@ -2926,17 +2962,17 @@ begin
 end;
 
 
-function    TDisassemblyWindow.GetPalette: PPalette;
+function    TDisassemblyWindow.GetPalette: TPalette;
 const P: string[length(CSourceWindow)] = CSourceWindow;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(P);
 end;
 
-destructor  TDisassemblyWindow.Done;
+destructor  TDisassemblyWindow.Destroy;
 begin
   if @Self=DisassemblyWindow then
     DisassemblyWindow:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 {$endif NODEBUG}
 
@@ -2947,7 +2983,7 @@ var R: TRect;
     HSB,VSB: PScrollBar;
 begin
   Desktop^.GetExtent(R);
-  inherited Init(R, '*');
+  inherited Create(R, '*');
   SetTitle(dialog_clipboard);
   HelpCtx:=hcClipboardWindow;
   Number:=wnNoNumber;
@@ -2989,17 +3025,17 @@ begin
   inherited Store(S);
 end;
 
-destructor TClipboardWindow.Done;
+destructor TClipboardWindow.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   Clipboard:=nil;
   ClipboardWindow:=nil;
 end;
 
 
-constructor TMessageListBox.Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+constructor TMessageListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
 begin
-  inherited Init(Bounds,1,AHScrollBar, AVScrollBar);
+  inherited Create(Bounds,1,AHScrollBar, AVScrollBar);
   GrowMode:=gfGrowHiX+gfGrowHiY;
   New(ModuleNames, Init(50,100));
   NoSelection:=true;
@@ -3242,22 +3278,22 @@ var
   I, J, Item: Sw_Integer;
   NormalColor, SelectedColor, FocusedColor, Color: Word;
   ColWidth, CurCol, Indent: Integer;
-  B: TDrawBuffer;
+  B: TFVDrawBuffer;
   Text: String;
   SCOff: Byte;
   TC: byte;
 procedure MT(var C: word); begin if TC<>0 then C:=(C and $ff0f) or (TC and $f0); end;
 begin
-  if (Owner<>nil) then TC:=ord(Owner^.GetColor(6)) else TC:=0;
+  if (Owner<>nil) then TC:=ord(Owner^.GetColorW(6)) else TC:=0;
   if State and (sfSelected + sfActive) = (sfSelected + sfActive) then
   begin
-    NormalColor := GetColor(1);
-    FocusedColor := GetColor(3);
-    SelectedColor := GetColor(4);
+    NormalColor := GetColorW(1);
+    FocusedColor := GetColorW(3);
+    SelectedColor := GetColorW(4);
   end else
   begin
-    NormalColor := GetColor(2);
-    SelectedColor := GetColor(4);
+    NormalColor := GetColorW(2);
+    SelectedColor := GetColorW(4);
   end;
   if Transparent then
     begin MT(NormalColor); MT(SelectedColor); end;
@@ -3301,9 +3337,9 @@ begin
           WordRec(B[CurCol+ColWidth-2]).Lo := Byte(SpecialChars[SCOff+1]);
         end;
       end;
-      MoveChar(B[CurCol+ColWidth-1], #179, GetColor(5), 1);
+      MoveChar(B[CurCol+ColWidth-1], #179, GetColorW(5), 1);
     end;
-    WriteLine(0, I, Size.X, 1, B);
+    WriteLineW(0, I, Size.X, 1, B);
   end;
 end;
 
@@ -3332,16 +3368,16 @@ begin
     changing the obj-hierarchy you'll always have to modify this, too - BG }
 end;
 
-destructor TMessageListBox.Done;
+destructor TMessageListBox.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if List<>nil then Dispose(List, Done);
   if ModuleNames<>nil then Dispose(ModuleNames, Done);
 end;
 
-constructor TMessageItem.Init(AClass: longint; const AText: string; AModule: PString; ARow, ACol: sw_integer);
+constructor TMessageItem.Create(AClass: longint; const AText: string; AModule: PString; ARow, ACol: sw_integer);
 begin
-  inherited Init;
+  inherited Create;
   TClass:=AClass;
   Text:=NewStr(AText);
   Module:=AModule;
@@ -3367,9 +3403,9 @@ begin
   GetModuleName:=GetStr(Module);
 end;
 
-destructor TMessageItem.Done;
+destructor TMessageItem.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if Text<>nil then DisposeStr(Text);
 {  if Module<>nil then DisposeStr(Module);}
 end;
@@ -3390,9 +3426,9 @@ end;
 
 
 (*
-constructor TTab.Init(var Bounds: TRect; ATabDef: PTabDef);
+constructor TTab.Create(var Bounds: TRect; ATabDef: PTabDef);
 begin
-  inherited Init(Bounds);
+  inherited Create(Bounds);
   Options:=Options or ofSelectable or ofFirstClick or ofPreProcess or ofPostProcess;
   GrowMode:=gfGrowHiX+gfGrowHiY+gfGrowRel;
   TabDefs:=ATabDef;
@@ -3524,10 +3560,10 @@ var
     FV : PView;
 begin
   FV := First;
-  while (FV<>nil) and ((FV^.Options and ofSelectable)=0) and (FV<>Last) do
-        FV:=FV^.Next;
+  while (FV<>nil) and ((FV.Options and ofSelectable)=0) and (FV<>Last) do
+        FV:=FV.Next;
   if FV<>nil then
-    if (FV^.Options and ofSelectable)=0 then FV:=nil;
+    if (FV.Options and ofSelectable)=0 then FV:=nil;
   FirstSelectable:=FV;
 end;
 function LastSelectable: PView;
@@ -3616,7 +3652,7 @@ begin
   if CallOrig then inherited HandleEvent(Event);
 end;
 
-function TTab.GetPalette: PPalette;
+function TTab.GetPalette: TPalette;
 begin
   GetPalette:=nil;
 end;
@@ -3637,7 +3673,7 @@ var i: integer;
 begin
   if Y+H>Size.Y then H:=Size.Y-Y;
   if X+W>Size.X then W:=Size.X-X;
-  if Buffer=nil then WriteBuf(X,Y,W,H,Buf)
+  if Buffer=nil then WriteBufW(X,Y,W,H,Buf)
                 else for i:=1 to H do
                          Move(Buf,Buffer^[X+(Y+i-1)*Size.X],W*2);
 end;
@@ -3655,7 +3691,7 @@ begin
   end; }
   { - Start of TGroup.Draw - }
 
-  C1:=GetColor(1); C2:=(GetColor(7) and $f0 or $08)+GetColor(9)*256; C3:=GetColor(8)+GetColor({9}8)*256;
+  C1:=GetColorW(1); C2:=(GetColorW(7) and $f0 or $08)+GetColorW(9)*256; C3:=GetColorW(8)+GetColorW({9}8)*256;
   HeaderLen:=0; for i:=0 to DefCount-1 do HeaderLen:=HeaderLen+CStrLen(AtTab(i)^.Name^)+3; Dec(HeaderLen);
   if HeaderLen>Size.X-2 then HeaderLen:=Size.X-2;
 
@@ -3723,7 +3759,7 @@ begin
     Redraw;
     UnLock;
   end;
-  if Buffer <> nil then WriteBuf(0, 0, Size.X, Size.Y, Buffer^) else
+  if Buffer <> nil then WriteBufW(0, 0, Size.X, Size.Y, Buffer^) else
   begin
     GetClipRect(ClipR);
     Redraw;
@@ -3759,7 +3795,7 @@ begin
   if (AState and sfFocused)<>0 then DrawView;
 end;
 
-destructor TTab.Done;
+destructor TTab.Destroy;
 var P,X: PTabDef;
 procedure DeleteViews(P: PView);
 begin
@@ -3767,7 +3803,7 @@ begin
 end;
 begin
   ForEach(@DeleteViews);
-  inherited Done;
+  inherited Destroy;
   P:=TabDefs;
   while P<>nil do
         begin
@@ -3779,10 +3815,10 @@ end;
 *)
 
 
-constructor TScreenView.Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar;
+constructor TScreenView.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar;
               AScreen: PScreen);
 begin
-  inherited Init(Bounds,AHScrollBar,AVScrollBar);
+  inherited Create(Bounds,AHScrollBar,AVScrollBar);
   Screen:=AScreen;
   if Screen=nil then
    Fail;
@@ -3808,7 +3844,7 @@ begin
 end;
 
 procedure TScreenView.Draw;
-var B: TDrawBuffer;
+var B: TFVDrawBuffer;
     X,Y: integer;
     Text,Attr: string;
     P: TPoint;
@@ -3821,20 +3857,20 @@ begin
     else
        begin Text:=''; Attr:=''; end;
     Text:=copy(Text,Delta.X+1,255); Attr:=copy(Attr,Delta.X+1,255);
-    MoveChar(B,' ',GetColor(1),Size.X);
+    MoveChar(B,' ',GetColorW(1),Size.X);
     for X:=1 to length(Text) do
       MoveChar(B[X-1],Text[X],ord(Attr[X]),1);
-    WriteLine(0,Y-Delta.Y,Size.X,1,B);
+    WriteLineW(0,Y-Delta.Y,Size.X,1,B);
   end;
   SetCursor(P.X-Delta.X,P.Y-Delta.Y);
 end;
 
-constructor TScreenWindow.Init(AScreen: PScreen; ANumber: integer);
+constructor TScreenWindow.Create(AScreen: PScreen; ANumber: integer);
 var R: TRect;
     VSB,HSB: PScrollBar;
 begin
   Desktop^.GetExtent(R);
-  inherited Init(R, dialog_userscreen, ANumber);
+  inherited Create(R, dialog_userscreen, ANumber);
   Options:=Options or ofTileAble;
   GetExtent(R); R.Grow(-1,-1); R.Move(1,0); R.A.X:=R.B.X-1;
   New(VSB, Init(R)); VSB^.Options:=VSB^.Options or ofPostProcess;
@@ -3846,12 +3882,12 @@ begin
   New(ScreenView, Init(R, HSB, VSB, AScreen));
   ScreenView^.GrowMode:=gfGrowHiX+gfGrowHiY;
   Insert(ScreenView);
-  UserScreenWindow:=@Self;
+  UserScreenWindow:=Self;
 end;
 
-destructor TScreenWindow.Done;
+destructor TScreenWindow.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   UserScreenWindow:=nil;
 end;
 
@@ -4164,9 +4200,9 @@ begin
   StartEditor:=OK;
 end;
 
-constructor TTextScroller.Init(var Bounds: TRect; ASpeed: integer; AText: PUnsortedStringCollection);
+constructor TTextScroller.Create(var Bounds: TRect; ASpeed: integer; AText: PUnsortedStringCollection);
 begin
-  inherited Init(Bounds,'');
+  inherited Create(Bounds,'');
   EventMask:=EventMask or evIdle;
   Speed:=ASpeed; Lines:=AText;
 end;
@@ -4221,12 +4257,12 @@ begin
 end;
 
 procedure TTextScroller.Draw;
-var B: TDrawBuffer;
+var B: TFVDrawBuffer;
     C: word;
     Count,Y: integer;
     S: string;
 begin
-  C:=GetColor(1);
+  C:=GetColorW(1);
   Count:=GetLineCount;
   for Y:=0 to Size.Y-1 do
     begin
@@ -4236,13 +4272,13 @@ begin
         S:=CharStr(' ',Max(0,(Size.X-(length(S)-1)) div 2))+copy(S,2,255);
       MoveChar(B,' ',C,Size.X);
       MoveStr(B,S,C);
-      WriteLine(0,Y,Size.X,1,B);
+      WriteLineW(0,Y,Size.X,1,B);
     end;
 end;
 
-destructor TTextScroller.Done;
+destructor TTextScroller.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if Lines<>nil then Dispose(Lines, Done);
 end;
 
@@ -4257,7 +4293,7 @@ begin
 end;
 begin
   R.Assign(0,0,58,14{$ifdef USE_GRAPH_SWITCH}+1{$endif});
-  inherited Init(R, dialog_about);
+  inherited Create(R, dialog_about);
   HelpCtx:=hcAbout;
   GetExtent(R); R.Grow(-3,-2);
   R2.Copy(R); R2.B.Y:=R2.A.Y+1;
@@ -4376,10 +4412,10 @@ end;
 
 constructor TFPASCIIChart.Init;
 begin
-  inherited Init;
+  inherited Create;
   HelpCtx:=hcASCIITableWindow;
   Number:=SearchFreeWindowNo;
-  ASCIIChart:=@Self;
+  ASCIIChart:=Self;
 end;
 
 procedure TFPASCIIChart.Store(var S: TStream);
@@ -4434,10 +4470,10 @@ begin
   inherited HandleEvent(Event);
 end;
 
-destructor TFPASCIIChart.Done;
+destructor TFPASCIIChart.Destroy;
 begin
   ASCIIChart:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
 function TVideoModeListBox.GetText(Item: pointer; MaxLen: sw_integer): string;
@@ -4453,9 +4489,9 @@ begin
   GetText:=copy(S,1,MaxLen);
 end;
 
-constructor TFPDesktop.Init(var Bounds: TRect);
+constructor TFPDesktop.Create(var Bounds: TRect);
 begin
-  inherited Init(Bounds);
+  inherited Create(Bounds);
 end;
 
 procedure TFPDesktop.InitBackground;
@@ -4492,9 +4528,9 @@ begin
   inherited Store(S);
 end;
 
-constructor TFPToolTip.Init(var Bounds: TRect; const AText: string; AAlign: TAlign);
+constructor TFPToolTip.Create(var Bounds: TRect; const AText: string; AAlign: TAlign);
 begin
-  inherited Init(Bounds);
+  inherited Create(Bounds);
   SetAlign(AAlign);
   SetText(AText);
 end;
@@ -4502,7 +4538,7 @@ end;
 procedure TFPToolTip.Draw;
 var C: word;
 procedure DrawLine(Y: integer; S: string);
-var B: TDrawBuffer;
+var B: TFVDrawBuffer;
 begin
   S:=copy(S,1,Size.X-2);
   case Align of
@@ -4512,12 +4548,12 @@ begin
   end;
   MoveChar(B,' ',C,Size.X);
   MoveStr(B,S,C);
-  WriteLine(0,Y,Size.X,1,B);
+  WriteLineW(0,Y,Size.X,1,B);
 end;
 var S: string;
     Y: integer;
 begin
-  C:=GetColor(1);
+  C:=GetColorW(1);
   S:=GetText;
   for Y:=0 to Size.Y-1 do
     DrawLine(Y,S);
@@ -4552,22 +4588,22 @@ begin
   end;
 end;
 
-destructor TFPToolTip.Done;
+destructor TFPToolTip.Destroy;
 begin
   if Assigned(Text) then DisposeStr(Text); Text:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
-function TFPToolTip.GetPalette: PPalette;
+function TFPToolTip.GetPalette: TPalette;
 const S: string[length(CFPToolTip)] = CFPToolTip;
 begin
   GetPalette:=@S;
 end;
 
-constructor TFPMemo.Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+constructor TFPMemo.Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator);
 begin
-  inherited Init(Bounds,AHScrollBar,AVScrollBar,AIndicator,nil);
+  inherited Create(Bounds,AHScrollBar,AVScrollBar,AIndicator,nil);
   SetFlags(Flags and not (efPersistentBlocks) or efSyntaxHighlight);
 end;
 
@@ -4594,10 +4630,10 @@ begin
   inherited HandleEvent(Event);
 end;
 
-function TFPMemo.GetPalette: PPalette;
+function TFPMemo.GetPalette: TPalette;
 const P: string[length(CFPMemo)] = CFPMemo;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(P);
 end;
 
 function TFPMemo.GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer;
@@ -4616,10 +4652,10 @@ begin
   IsReservedWord:=false;
 end;
 
-constructor TFPCodeMemo.Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+constructor TFPCodeMemo.Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator);
 begin
-  inherited Init(Bounds,AHScrollBar,AVScrollBar,AIndicator);
+  inherited Create(Bounds,AHScrollBar,AVScrollBar,AIndicator);
 end;
 
 function TFPCodeMemo.GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer;

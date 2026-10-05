@@ -14,6 +14,9 @@
  **********************************************************************}
 unit FPTemplt;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses FPViews;
@@ -55,8 +58,9 @@ type
       Path : PString;
     end;
 
-    PTemplateCollection = ^TTemplateCollection;
-    TTemplateCollection = object(TSortedCollection)
+    TTemplateCollection = class;
+    PTemplateCollection = TTemplateCollection;
+    TTemplateCollection = class(TSortedCollection)
       function  At(Index: Integer): PTemplate;
       procedure FreeItem(Item: Pointer); virtual;
       function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
@@ -69,8 +73,8 @@ var P: PTemplate;
 begin
   New(P);
   FillChar(P^,SizeOf(P^),0);
-  P^.Name:=NewStr(Name);
-  P^.Path:=NewStr(Path);
+  P.Name:=NewStr(Name);
+  P.Path:=NewStr(Path);
   NewTemplate:=P;
 end;
 
@@ -78,17 +82,17 @@ procedure DisposeTemplate(P: PTemplate);
 begin
   if assigned(P) then
    begin
-     if assigned(P^.Name) then
-       DisposeStr(P^.Name);
-     if assigned(P^.Path) then
-       DisposeStr(P^.Path);
+     if assigned(P.Name) then
+       DisposeStr(P.Name);
+     if assigned(P.Path) then
+       DisposeStr(P.Path);
      Dispose(P);
    end;
 end;
 
 function TTemplateCollection.At(Index: Integer): PTemplate;
 begin
-  At:=inherited At(Index);
+  At := PTemplate(inherited At(Index));
 end;
 
 procedure TTemplateCollection.FreeItem(Item: Pointer);
@@ -102,8 +106,8 @@ var R: Sw_integer;
     K1: PTemplate absolute Key1;
     K2: PTemplate absolute Key2;
 begin
-  if K1^.Name^<K2^.Name^ then R:=-1 else
-  if K1^.Name^>K2^.Name^ then R:= 1 else
+  if K1.Name^<K2.Name^ then R:=-1 else
+  if K1.Name^>K2.Name^ then R:= 1 else
   R:=0;
   Compare:=R;
 end;
@@ -111,13 +115,13 @@ end;
 function GetTemplateCount: integer;
 var Count: integer;
 begin
-  if Templates=nil then Count:=0 else Count:=Templates^.Count;
+  if Templates=nil then Count:=0 else Count:=Templates.Count;
   GetTemplateCount:=Count;
 end;
 
 function GetTemplateName(Index: integer): string;
 begin
-  GetTemplateName:=Templates^.At(Index)^.Name^;
+  GetTemplateName:=Templates.At(Index).Name^;
 end;
 
 function SearchStr(const InS, SubS: string; var P: sw_integer): boolean;
@@ -212,7 +216,7 @@ var OK: boolean;
     S,OrigS: string;
 begin
   OK:=true;
-  with Editor^ do
+  with Editor do
   for I:=0 to GetLineCount-1 do
   begin
     S:=GetDisplayText(I); OrigS:=S;
@@ -233,8 +237,8 @@ var
     T: PTemplate;
     OK: boolean;
 begin
-  T:=Templates^.At(Index);
-  OK:=StartEditor(Editor,T^.Path^);
+  T:=Templates.At(Index);
+  OK:=StartEditor(Editor,T.Path^);
   if OK then
   begin
     ProcessTemplate(Editor);
@@ -267,8 +271,8 @@ procedure InitTemplates;
       S:=LowerCaseStr(S);
       S[1]:=Upcase(S[1]);
       PT:=NewTemplate(S,FExpand(Dir+SR.Name));
-      if not Templates^.Search(PT,i) then
-        Templates^.Insert(PT)
+      if not Templates.Search(PT,i) then
+        Templates.Insert(PT)
       else
         DisposeTemplate(PT);
       FindNext(SR);
@@ -277,7 +281,7 @@ procedure InitTemplates;
   end;
 
 begin
-  New(Templates, Init(10,10));
+  Templates := TTemplateCollection.Create(10,10);
   ScanDir('.');
   ScanDir(IDEDir);
 end;
@@ -287,7 +291,7 @@ procedure DoneTemplates;
 begin
   if assigned(Templates) then
     begin
-      Dispose(Templates, Done);
+      Templates.Free;
       Templates:=nil;
     end;
 end;

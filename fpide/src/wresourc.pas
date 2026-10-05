@@ -14,6 +14,9 @@
  **********************************************************************}
 unit WResourc;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects;
@@ -50,9 +53,10 @@ type
        TableOfs   : longint;
      end;
 
-     PResourceEntry = ^TResourceEntry;
-     TResourceEntry = object(TObject)
-       constructor Init(AID, ALangID, AFlags, ADataLen: longint);
+     TResourceEntry = class;
+     PResourceEntry = TResourceEntry;
+     TResourceEntry = class(TObject)
+       constructor Create(AID, ALangID, AFlags, ADataLen: longint);
      private
        ID      : longint;
        LangID  : longint;
@@ -62,26 +66,29 @@ type
        procedure   BuildHeader(var Header : TResourceEntryHeader);
      end;
 
-     PResourceEntryCollection = ^TResourceEntryCollection;
-     TResourceEntryCollection = object(TSortedCollection)
+     TResourceEntryCollection = class;
+     PResourceEntryCollection = TResourceEntryCollection;
+     TResourceEntryCollection = class(TSortedCollection)
        function  At(Index: Sw_Integer): PResourceEntry;
        function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
        function  SearchEntryForLang(ALangID: longint): PResourceEntry;
      end;
 
-     PGlobalResourceEntryCollection = ^TGlobalResourceEntryCollection;
-     TGlobalResourceEntryCollection = object(TSortedCollection)
+     TGlobalResourceEntryCollection = class;
+     PGlobalResourceEntryCollection = TGlobalResourceEntryCollection;
+     TGlobalResourceEntryCollection = class(TSortedCollection)
        function  At(Index: Sw_Integer): PResourceEntry;
        function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
      end;
 
-     PResource = ^TResource;
-     TResource = object(TObject)
-       constructor Init(const AName: string; AClass, AFlags: longint);
+     TResource = class;
+     PResource = TResource;
+     TResource = class(TObject)
+       constructor Create(const AName: string; AClass, AFlags: longint);
        function    GetName: string; virtual;
        function    FirstThatEntry(Func: pointer): PResourceEntry; virtual;
        procedure   ForEachEntry(Func: pointer); virtual;
-       destructor  Done; virtual;
+       destructor Destroy; virtual;
      private
        Name   : PString;
        _Class : longint;
@@ -90,15 +97,15 @@ type
        procedure   BuildHeader(var Header : TResourceHeader);
      end;
 
-     TResourceCollection = object(TSortedCollection)
+     TResourceCollection = class(TSortedCollection)
        function  At(Index: Sw_Integer): PResource;
        function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
        function  SearchResourceByName(const AName: string): PResource;
      end;
-     PResourceCollection = ^TResourceCollection;
+     PResourceCollection = TResourceCollection;
 
-     TResourceFile = object(TObject)
-       constructor Init(var RS: TStream; ALoad: boolean);
+     TResourceFile = class(TObject)
+       constructor Create(var RS: TStream; ALoad: boolean);
        constructor Create(var RS: TStream);
        constructor Load(var RS: TStream);
        constructor CreateFile(AFileName: string);
@@ -116,7 +123,7 @@ type
        function    ReadResourceEntry(const ResName: string; ALangID: longint; var Buf; BufSize: sw_word): boolean;
        function    ReadResourceEntryToStream(const ResName: string; ALangID: longint; var DestS: TStream): boolean;
        procedure   Flush; virtual;
-       destructor  Done; virtual;
+       destructor Destroy; virtual;
      public
        BaseOfs: longint;
        function    FindResource(const ResName: string): PResource;
@@ -139,7 +146,7 @@ type
        procedure  WriteHeader;
        procedure  WriteResourceTable;
      end;
-     PResourceFile = ^TResourceFile;
+     PResourceFile = TResourceFile;
 
 implementation
 
@@ -148,7 +155,7 @@ uses
 
 function TResourceEntryCollection.At(Index: Sw_Integer): PResourceEntry;
 begin
-  At:=inherited At(Index);
+  At := PResourceEntry(inherited At(Index));
 end;
 
 function TResourceEntryCollection.Compare(Key1, Key2: Pointer): Sw_Integer;
@@ -156,8 +163,8 @@ var K1: PResourceEntry absolute Key1;
     K2: PResourceEntry absolute Key2;
     Re: Sw_integer;
 begin
-  if K1^.LangID<K2^.LangID then Re:=-1 else
-  if K1^.LangID>K2^.LangID then Re:= 1 else
+  if K1.LangID<K2.LangID then Re:=-1 else
+  if K1.LangID>K2.LangID then Re:= 1 else
   Re:=0;
   Compare:=Re;
 end;
@@ -175,7 +182,7 @@ end;
 
 function TGlobalResourceEntryCollection.At(Index: Sw_Integer): PResourceEntry;
 begin
-  At:=inherited At(Index);
+  At := PResourceEntry(inherited At(Index));
 end;
 
 function TGlobalResourceEntryCollection.Compare(Key1, Key2: Pointer): Sw_Integer;
@@ -183,15 +190,15 @@ var K1: PResourceEntry absolute Key1;
     K2: PResourceEntry absolute Key2;
     Re: Sw_integer;
 begin
-  if K1^.ID<K2^.ID then Re:=-1 else
-  if K1^.ID>K2^.ID then Re:= 1 else
+  if K1.ID<K2.ID then Re:=-1 else
+  if K1.ID>K2.ID then Re:= 1 else
   Re:=0;
   Compare:=Re;
 end;
 
-constructor TResourceEntry.Init(AID, ALangID, AFlags, ADataLen: longint);
+constructor TResourceEntry.Create(AID, ALangID, AFlags, ADataLen: longint);
 begin
-  inherited Init;
+  inherited Create;
   ID:=AID;
   LangID:=ALangID; Flags:=AFlags; DataLen:=ADataLen;
 end;
@@ -206,13 +213,13 @@ begin
   Header.DataOfs:=DataOfs;
 end;
 
-constructor TResource.Init(const AName: string; AClass, AFlags: longint);
+constructor TResource.Create(const AName: string; AClass, AFlags: longint);
 begin
-  inherited Init;
+  inherited Create;
   Name:=NewStr(AName);
   _Class:=AClass;
   Flags:=AFlags;
-  New(Items, Init(10,50));
+  Items := TResourceEntryCollection.Create(10,50);
 end;
 
 function TResource.GetName: string;
@@ -225,11 +232,11 @@ var EP,P: PResourceEntry;
     I: sw_integer;
 begin
   P:=nil;
-  for I:=0 to Items^.Count-1 do
+  for I:=0 to Items.Count-1 do
     begin
-      EP:=Items^.At(I);
+      EP:=Items.At(I);
       if Byte(Longint(CallPointerMethodLocal(Func,
-           get_caller_frame(get_frame,get_pc_addr),@Self,EP)))<>0 then
+           get_caller_frame(get_frame,get_pc_addr),Self,EP)))<>0 then
         begin
           P := EP;
           Break;
@@ -242,11 +249,11 @@ procedure TResource.ForEachEntry(Func: pointer);
 var RP: PResourceEntry;
     I: sw_integer;
 begin
-  for I:=0 to Items^.Count-1 do
+  for I:=0 to Items.Count-1 do
     begin
-      RP:=Items^.At(I);
+      RP:=Items.At(I);
       CallPointerMethodLocal(Func,
-        get_caller_frame(get_frame,get_pc_addr),@Self,RP);
+        get_caller_frame(get_frame,get_pc_addr),Self,RP);
     end;
 end;
 
@@ -256,19 +263,19 @@ begin
   Header._Class:=_Class;
   Header.Flags:=Flags;
   Header.NameLen:=length(GetName);
-  Header.EntryCount:=Items^.Count;
+  Header.EntryCount:=Items.Count;
 end;
 
-destructor TResource.Done;
+destructor TResource.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if Name<>nil then DisposeStr(Name); Name:=nil;
-  if Items<>nil then Dispose(Items, Done); Items:=nil;
+  if Items<>nil then Items.Free; Items:=nil;
 end;
 
 function TResourceCollection.At(Index: Sw_Integer): PResource;
 begin
-  At:=inherited At(Index);
+  At := PResource(inherited At(Index));
 end;
 
 function TResourceCollection.Compare(Key1, Key2: Pointer): Sw_Integer;
@@ -277,7 +284,7 @@ var K1: PResource absolute Key1;
     N1,N2: string;
     Re: Sw_integer;
 begin
-  N1:=UpcaseStr(K1^.GetName); N2:=UpcaseStr(K2^.GetName);
+  N1:=UpcaseStr(K1.GetName); N2:=UpcaseStr(K2.GetName);
   if N1<N2 then Re:=-1 else
   if N1>N2 then Re:= 1 else
   Re:=0;
@@ -288,10 +295,10 @@ function TResourceCollection.SearchResourceByName(const AName: string): PResourc
 var P,R: PResource;
     Index: sw_integer;
 begin
-  New(R, Init(AName,0,0));
+  R := TResource.Create(AName,0,0);
   if Search(R,Index)=false then P:=nil else
     P:=At(Index);
-  Dispose(R, Done);
+  R.Free;
   SearchResourceByName:=P;
 end;
 
@@ -307,7 +314,7 @@ begin
     Fail;
 end;
 
-constructor TResourceFile.Init(var RS: TStream; ALoad: boolean);
+constructor TResourceFile.Create(var RS: TStream; ALoad: boolean);
 var OK: boolean;
     RH: TResourceHeader;
     REH: TResourceEntryHeader;
@@ -316,40 +323,40 @@ var OK: boolean;
     E: PResourceEntry;
     St: string;
 begin
-  inherited Init;
+  inherited Create;
   S:=@RS;
-  New(Resources, Init(100, 1000));
-  New(Entries, Init(500,2000));
+  Resources := TResourceCollection.Create(100, 1000);
+  Entries := TGlobalResourceEntryCollection.Create(500,2000);
   OK:=true;
   if ALoad=false then
     Modified:=true
   else
     begin
-      S^.Reset;
-      BaseOfs:=S^.GetPos;
-      S^.Read(Header,SizeOf(Header));
-      OK:=(S^.Status=stOK) and
+      S.Reset;
+      BaseOfs:=S.GetPos;
+      S.Read(Header,SizeOf(Header));
+      OK:=(S.Status=stOK) and
           (Header.Signature=TPDataBlockSignature) and
           (Header.InfoType=ResourceBlockSignature);
-      if OK then begin S^.Seek(BaseOfs+Header.TableOfs); OK:=S^.Status=stOK; end;
+      if OK then begin S.Seek(BaseOfs+Header.TableOfs); OK:=S.Status=stOK; end;
       EndPos:=BaseOfs+Header.InfoSize;
       if OK then
-        while OK and (S^.GetPos<EndPos) do
+        while OK and (S.GetPos<EndPos) do
           begin
-            S^.Read(RH,SizeOf(RH)); OK:=(S^.Status=stOK);
-            if OK then begin St[0]:=chr(RH.NameLen); S^.Read(St[1],RH.NameLen); OK:=(S^.Status=stOK); end;
+            S.Read(RH,SizeOf(RH)); OK:=(S.Status=stOK);
+            if OK then begin St[0]:=chr(RH.NameLen); S.Read(St[1],RH.NameLen); OK:=(S.Status=stOK); end;
             if OK then
               begin
-                New(P, Init(St,RH._Class,RH.Flags));
-                Resources^.Insert(P);
+                P := TResource.Create(St,RH._Class,RH.Flags);
+                Resources.Insert(P);
               end;
             I:=0;
             while OK and (I<RH.EntryCount) do
               begin
-                S^.Read(REH,SizeOf(REH)); OK:=(S^.Status=stOK);
+                S.Read(REH,SizeOf(REH)); OK:=(S.Status=stOK);
                 if OK then
                   begin
-                    New(E, Init(REH.ID,REH.LangID,REH.Flags,REH.DataLen));
+                    E := TResourceEntry.Create(REH.ID,REH.LangID,REH.Flags,REH.DataLen);
                     AddResEntryPtr(P,E);
                   end;
                 if OK then Inc(I);
@@ -369,11 +376,11 @@ var RP,P: PResource;
     I: sw_integer;
 begin
   P:=nil;
-  for I:=0 to Resources^.Count-1 do
+  for I:=0 to Resources.Count-1 do
     begin
-      RP:=Resources^.At(I);
+      RP:=Resources.At(I);
       if Byte(Longint(CallPointerMethodLocal(Func,
-           get_caller_frame(get_frame,get_pc_addr),@Self,RP)))<>0 then
+           get_caller_frame(get_frame,get_pc_addr),Self,RP)))<>0 then
         begin
           P := RP;
           Break;
@@ -386,10 +393,10 @@ procedure TResourceFile.ForEachResource(Func: pointer);
 var RP: PResource;
     I: sw_integer;
 begin
-  for I:=0 to Resources^.Count-1 do
+  for I:=0 to Resources.Count-1 do
     begin
-      RP:=Resources^.At(I);
-      CallPointerMethodLocal(Func,get_caller_frame(get_frame,get_pc_addr),@Self,RP);
+      RP:=Resources.At(I);
+      CallPointerMethodLocal(Func,get_caller_frame(get_frame,get_pc_addr),Self,RP);
     end;
 end;
 
@@ -397,10 +404,10 @@ procedure TResourceFile.ForEachResourceEntry(Func: pointer);
 var E: PResourceEntry;
     I: sw_integer;
 begin
-  for I:=0 to Entries^.Count-1 do
+  for I:=0 to Entries.Count-1 do
     begin
-      E:=Entries^.At(I);
-      CallPointerMethodLocal(Func,get_caller_frame(get_frame,get_pc_addr),@Self,E);
+      E:=Entries.At(I);
+      CallPointerMethodLocal(Func,get_caller_frame(get_frame,get_pc_addr),Self,E);
     end;
 end;
 
@@ -411,8 +418,8 @@ begin
   OK:=FindResource(Name)=nil;
   if OK then
     begin
-      New(P, Init(Name,AClass,AFlags));
-      Resources^.Insert(P);
+      P := TResource.Create(Name,AClass,AFlags);
+      Resources.Insert(P);
       Modified:=true;
     end;
   CreateResource:=OK;
@@ -429,19 +436,19 @@ begin
   P:=FindResource(ResName);
   OK:=P<>nil;
   if OK then
-    OK:=(P^.Items^.SearchEntryForLang(ALangID)=nil);
+    OK:=(P.Items.SearchEntryForLang(ALangID)=nil);
   if OK then
     begin
-      New(E, Init(GetNextEntryID,ALangID, AFlags, ADataSize));
+      E := TResourceEntry.Create(GetNextEntryID,ALangID, AFlags, ADataSize);
       AddResEntryPtr(P,E);
       UpdateBlockDatas;
       RemSize:=ADataSize; CurOfs:=0;
-      S^.Reset;
-      S^.Seek(BaseOfs+E^.DataOfs);
+      S.Reset;
+      S.Seek(BaseOfs+E.DataOfs);
       while (RemSize>0) do
       begin
         FragSize:=Min(RemSize,BlockSize);
-        S^.Write(PByteArray(@Data)^[CurOfs],FragSize);
+        S.Write(PByteArray(@Data)^[CurOfs],FragSize);
         Dec(RemSize,FragSize); Inc(CurOfs,FragSize);
       end;
       Modified:=true;
@@ -461,21 +468,21 @@ begin
   P:=FindResource(ResName);
   OK:=P<>nil;
   if OK then
-    OK:=(P^.Items^.SearchEntryForLang(ALangID)=nil);
+    OK:=(P.Items.SearchEntryForLang(ALangID)=nil);
   if OK then
     begin
-      New(E, Init(GetNextEntryID, ALangID, AFlags, ADataSize));
+      E := TResourceEntry.Create(GetNextEntryID, ALangID, AFlags, ADataSize);
       AddResEntryPtr(P,E);
       UpdateBlockDatas;
       GetMem(Buf,BufSize);
       RemSize:=ADataSize;
-      S^.Reset;
-      S^.Seek(BaseOfs+E^.DataOfs);
+      S.Reset;
+      S.Seek(BaseOfs+E.DataOfs);
       while (RemSize>0) do
       begin
         FragSize:=Min(RemSize,BufSize);
         Source.Read(Buf^,FragSize);
-        S^.Write(Buf^,FragSize);
+        S.Write(Buf^,FragSize);
         Dec(RemSize,FragSize);
       end;
       FreeMem(Buf,BufSize);
@@ -491,12 +498,12 @@ var E: PResourceEntry;
 begin
   P:=FindResource(ResName);
   OK:=P<>nil;
-  if OK then E:=P^.Items^.SearchEntryForLang(ALangID);
+  if OK then E:=P.Items.SearchEntryForLang(ALangID);
   OK:=OK and (E<>nil);
   if OK then
     begin
-      OK:=DeleteArea(E^.DataOfs,E^.DataLen,GetTotalSize(false));
-      if OK then begin RemoveResEntryPtr(P,E); Dispose(E, Done); end;
+      OK:=DeleteArea(E.DataOfs,E.DataLen,GetTotalSize(false));
+      if OK then begin RemoveResEntryPtr(P,E); E.Free; end;
       Modified:=true;
     end;
   DeleteResourceEntry:=OK;
@@ -511,14 +518,14 @@ begin
   OK:=P<>nil;
   if P<>nil then
   begin
-    while OK and (P^.Items^.Count>0) do
+    while OK and (P.Items.Count>0) do
       begin
-        E:=P^.Items^.At(P^.Items^.Count-1);
-        OK:=OK and DeleteResourceEntry(ResName,E^.LangID);
+        E:=P.Items.At(P.Items.Count-1);
+        OK:=OK and DeleteResourceEntry(ResName,E.LangID);
       end;
     Modified:=true;
   end;
-  if OK then Resources^.Free(P);
+  if OK then Resources.Free(P);
   DeleteResource:=OK;
 end;
 
@@ -533,22 +540,22 @@ begin
   E:=nil;
   P:=FindResource(ResName);
   OK:=P<>nil;
-  if OK then E:=P^.Items^.SearchEntryForLang(ALangID);
+  if OK then E:=P.Items.SearchEntryForLang(ALangID);
   OK:=OK and (E<>nil);
-  OK:=OK and (E^.DataLen<=BufSize);
+  OK:=OK and (E.DataLen<=BufSize);
   if OK then
     begin
       GetMem(TempBuf,TempBufSize);
-      S^.Reset;
-      S^.Seek(BaseOfs+E^.DataOfs);
-      OK:=(S^.Status=stOK);
+      S.Reset;
+      S.Seek(BaseOfs+E.DataOfs);
+      OK:=(S.Status=stOK);
       CurOfs:=0;
 
-      while OK and (CurOfs<E^.DataLen) do
+      while OK and (CurOfs<E.DataLen) do
       begin
-        CurFrag:=Min(E^.DataLen-CurOfs,TempBufSize);
-        S^.Read(TempBuf^,CurFrag);
-        OK:=OK and (S^.Status=stOK);
+        CurFrag:=Min(E.DataLen-CurOfs,TempBufSize);
+        S.Read(TempBuf^,CurFrag);
+        OK:=OK and (S.Status=stOK);
         if OK then
           Move(TempBuf^,PByteArray(@Buf)^[CurOfs],CurFrag);
         Inc(CurOfs,CurFrag);
@@ -569,24 +576,24 @@ const TempBufSize = 4096;
 begin
   P:=FindResource(ResName);
   OK:=P<>nil;
-  if OK then E:=P^.Items^.SearchEntryForLang(ALangID);
+  if OK then E:=P.Items.SearchEntryForLang(ALangID);
   OK:=OK and (E<>nil);
   if OK then
     begin
       GetMem(TempBuf,TempBufSize);
-      S^.Reset;
-      S^.Seek(BaseOfs+E^.DataOfs);
-      OK:=(S^.Status=stOK);
+      S.Reset;
+      S.Seek(BaseOfs+E.DataOfs);
+      OK:=(S.Status=stOK);
       CurOfs:=0;
       { this results sometimes in endless loops
       when the resource are changed PM }
-      if E^.DataLen<0 then
+      if E.DataLen<0 then
         OK:=false;
-      while OK and (CurOfs<E^.DataLen) do
+      while OK and (CurOfs<E.DataLen) do
       begin
-        CurFrag:=Min(E^.DataLen-CurOfs,TempBufSize);
-        S^.Read(TempBuf^,CurFrag);
-        OK:=OK and (S^.Status=stOK);
+        CurFrag:=Min(E.DataLen-CurOfs,TempBufSize);
+        S.Read(TempBuf^,CurFrag);
+        OK:=OK and (S.Status=stOK);
         if OK then
           DestS.Write(TempBuf^,CurFrag);
         OK:=OK and (DestS.Status=stOK);
@@ -600,7 +607,7 @@ end;
 
 function TResourceFile.FindResource(const ResName: string): PResource;
 begin
-  FindResource:=Resources^.SearchResourceByName(ResName);
+  FindResource:=Resources.SearchResourceByName(ResName);
 end;
 
 function TResourceFile.FindResourceEntry(const ResName: string; ALangID: longint): PResourceEntry;
@@ -610,7 +617,7 @@ begin
   E:=nil;
   P:=FindResource(ResName);
   if P<>nil then
-    E:=P^.Items^.SearchEntryForLang(ALangID);
+    E:=P.Items.SearchEntryForLang(ALangID);
   FindResourceEntry:=E;
 end;
 
@@ -618,11 +625,11 @@ procedure TResourceFile.Flush;
 begin
   if Modified=false then Exit;
   BuildFileHeader;
-  S^.Seek(BaseOfs);
+  S.Seek(BaseOfs);
   WriteHeader;
-  S^.Seek(BaseOfs+Header.TableOfs);
+  S.Seek(BaseOfs+Header.TableOfs);
   WriteResourceTable;
-  S^.Truncate;
+  S.Truncate;
   Modified:=false;
 end;
 
@@ -640,7 +647,7 @@ end;
 
 procedure TResourceFile.WriteHeader;
 begin
-  S^.Write(Header,SizeOf(Header));
+  S.Write(Header,SizeOf(Header));
 end;
 
 procedure TResourceFile.WriteResourceTable;
@@ -649,17 +656,17 @@ var RH: TResourceHeader;
 procedure WriteResource(P: PResource);
 procedure WriteResourceEntry(P: PResourceEntry);
 begin
-  P^.BuildHeader(REH);
-  S^.Write(REH,SizeOf(REH));
+  P.BuildHeader(REH);
+  S.Write(REH,SizeOf(REH));
 end;
 var N: string;
 begin
-  if P^.Items^.Count=0 then Exit; { do not store resources with no entries }
-  P^.BuildHeader(RH);
-  S^.Write(RH,SizeOf(RH));
-  N:=P^.GetName;
-  S^.Write(N[1],length(N));
-  P^.ForEachEntry(@WriteResourceEntry);
+  if P.Items.Count=0 then Exit; { do not store resources with no entries }
+  P.BuildHeader(RH);
+  S.Write(RH,SizeOf(RH));
+  N:=P.GetName;
+  S.Write(N[1],length(N));
+  P.ForEachEntry(@WriteResourceEntry);
 end;
 begin
   ForEachResource(@WriteResource);
@@ -682,14 +689,14 @@ var RH  : TResourceHeader;
     NamesSize: longint;
 procedure AddResourceEntrySize(P: PResourceEntry);
 begin
-  if UpdatePosData then P^.DataOfs:=Size;
-  P^.BuildHeader(REH);
+  if UpdatePosData then P.DataOfs:=Size;
+  P.BuildHeader(REH);
   Inc(Size,REH.DataLen);
 end;
 procedure AddResourceSize(P: PResource);
 var RH: TResourceHeader;
 begin
-  P^.BuildHeader(RH);
+  P.BuildHeader(RH);
   Inc(NamesSize,RH.NameLen);
 end;
 begin
@@ -699,8 +706,8 @@ begin
   if IncludeHeaders then
     begin
       ForEachResource(@AddResourceSize);
-      Inc(Size,SizeOf(RH)*Resources^.Count);
-      Inc(Size,SizeOf(REH)*Entries^.Count);
+      Inc(Size,SizeOf(RH)*Resources.Count);
+      Inc(Size,SizeOf(REH)*Entries.Count);
       Inc(Size,NamesSize);
     end;
   CalcSizes:=Size;
@@ -718,14 +725,14 @@ begin
   while (RemSize>0) do
     begin
       FragSize:=Min(RemSize,BufSize);
-      S^.Seek(BaseOfs+AreaStart+AreaSize+CurOfs);
-      S^.Read(Buf^,BufSize);
-      OK:=OK and (S^.Status=stOK);
+      S.Seek(BaseOfs+AreaStart+AreaSize+CurOfs);
+      S.Read(Buf^,BufSize);
+      OK:=OK and (S.Status=stOK);
       if OK then
       begin
-        S^.Seek(BaseOfs+AreaStart+CurOfs);
-        S^.Write(Buf^,BufSize);
-        OK:=OK and (S^.Status=stOK);
+        S.Seek(BaseOfs+AreaStart+CurOfs);
+        S.Write(Buf^,BufSize);
+        OK:=OK and (S.Status=stOK);
       end;
       Inc(CurOfs,FragSize); Dec(RemSize,FragSize);
     end;
@@ -736,47 +743,47 @@ end;
 procedure TResourceFile.AddResEntryPtr(P: PResource; E: PResourceEntry);
 begin
   if (P=nil) or (E=nil) then Exit;
-  P^.Items^.Insert(E);
-  Entries^.Insert(E);
+  P.Items.Insert(E);
+  Entries.Insert(E);
 end;
 
 procedure TResourceFile.RemoveResEntryPtr(P: PResource; E: PResourceEntry);
 begin
   if (P=nil) or (E=nil) then Exit;
-  Entries^.Delete(E);
-  P^.Items^.Delete(E);
+  Entries.Delete(E);
+  P.Items.Delete(E);
 end;
 
 function TResourceFile.GetNextEntryID: longint;
 var ID: longint;
 begin
-  if Entries^.Count=0 then ID:=1 else
-    ID:=Entries^.At(Entries^.Count-1)^.ID+1;
+  if Entries.Count=0 then ID:=1 else
+    ID:=Entries.At(Entries.Count-1).ID+1;
   GetNextEntryID:=ID;
 end;
 
-destructor TResourceFile.Done;
+destructor TResourceFile.Destroy;
 begin
   Flush;
-  inherited Done;
-{  if assigned(S) then dispose(S,Done); S:=nil;}
-  if Resources<>nil then Dispose(Resources, Done); Resources:=nil;
+  inherited Destroy;
+{  if assigned(S) then S.Free; S:=nil;}
+  if Resources<>nil then Resources.Free; Resources:=nil;
   if Entries<>nil then
-    begin Entries^.DeleteAll; Dispose(Entries, Done); Entries:=nil; end;
+    begin Entries.DeleteAll; Entries.Free; Entries:=nil; end;
   if MyStream and Assigned(S) then
-    Dispose(S, Done);
+    S.Free;
 end;
 
 constructor TResourceFile.CreateFile(AFileName: string);
 var B: PFastBufStream;
 begin
-  New(B, Init(AFileName, stCreate, 4096));
-  if (B<>nil) and (B^.Status<>stOK) then
-    begin Dispose(B, Done); B:=nil; end;
+  B := TFastBufStream.Create(AFileName, stCreate, 4096);
+  if (B<>nil) and (B.Status<>stOK) then
+    begin B.Free; B:=nil; end;
   if B=nil then Fail;
   if Create(B^)=false then
     Begin
-      Dispose(B,Done);
+      B.Free;
       Fail;
     End;
   MyStream:=true;
@@ -788,13 +795,13 @@ end;
 constructor TResourceFile.LoadFile(AFileName: string);
 var B: PFastBufStream;
 begin
-  New(B, Init(AFileName, stOpen, 4096));
-  if (B<>nil) and (B^.Status<>stOK) then
-    begin Dispose(B, Done); B:=nil; end;
+  B := TFastBufStream.Create(AFileName, stOpen, 4096);
+  if (B<>nil) and (B.Status<>stOK) then
+    begin B.Free; B:=nil; end;
   if B=nil then Fail;
   if Load(B^)=false then
     Begin
-      Dispose(B,Done);
+      B.Free;
       Fail;
     End;
   MyStream:=true;

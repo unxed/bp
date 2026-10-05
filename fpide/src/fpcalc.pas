@@ -31,13 +31,15 @@ type
 
   TCalcState = (csFirst, csValid, csError);
 
-  PCalcButton = ^TCalcButton;
-  TCalcButton = object(TButton)
+  TCalcButton = class;
+  PCalcButton = TCalcButton;
+  TCalcButton = class(TButton)
     procedure HandleEvent(var Event: TEvent); virtual;
   end;
 
-  PCalcDisplay = ^TCalcDisplay;
-  TCalcDisplay = object(TView)
+  TCalcDisplay = class;
+  PCalcDisplay = TCalcDisplay;
+  TCalcDisplay = class(TView)
     Status: TCalcState;
     Number: string[MaxDigits];
     Sign: Char;
@@ -48,51 +50,56 @@ type
     Memory: extended;
     DispNumber: extended;
     HexShown : boolean;
-    constructor Init(var Bounds: TRect);
-    constructor Load(var S: TStream);
+    constructor Create(var Bounds: TRect);
+    constructor Load(S: TStream);
     function  CalcKey(Key: string): boolean;
     procedure Clear;
     procedure Draw; virtual;
-    function  GetPalette: PPalette; virtual;
+    function  GetPalette: TPalette; virtual;
     procedure HandleEvent(var Event: TEvent); virtual;
-    procedure Store(var S: TStream);
+    procedure Store(S: TStream);
   private
     procedure GetDisplay(var R: extended);
     procedure SetDisplay(R: extended;ShouldKeepZeroes : boolean);
     procedure Error;
   end;
 
-  PCalculator = ^TCalculator;
-  TCalculator = object(TCenterDialog)
+  TCalculator = class;
+  PCalculator = TCalculator;
+  TCalculator = class(TCenterDialog)
     CD : PCalcDisplay;
-    constructor Init;
+    constructor Create;
     procedure   HandleEvent(var Event: TEvent); virtual;
     procedure   Show; {virtual;}
     procedure   Close; virtual;
-    constructor Load(var S: TStream);
-    procedure   Store(var S: TStream);
+    constructor Load(S: TStream);
+    procedure   Store(S: TStream);
   end;
 
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 const
   RCalcButton: TStreamRec = (
      ObjType: 10139;
-     VmtLink: Ofs(TypeOf(TCalcButton)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TCalcButton)) at runtime };
      Load:    @TCalcButton.Load;
      Store:   @TCalcButton.Store
   );
   RCalcDisplay: TStreamRec = (
      ObjType: 10140;
-     VmtLink: Ofs(TypeOf(TCalcDisplay)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TCalcDisplay)) at runtime };
      Load:    @TCalcDisplay.Load;
      Store:   @TCalcDisplay.Store
   );
   RCalculator: TStreamRec = (
      ObjType: 10141;
-     VmtLink: Ofs(TypeOf(TCalculator)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TCalculator)) at runtime };
      Load:    @TCalculator.Load;
      Store:   @TCalculator.Store
   );
+{$endif}
+{$endif}
 {$endif}
 
 procedure RegisterFPCalc;
@@ -160,9 +167,9 @@ begin
   inherited HandleEvent(Event);
 end;
 
-constructor TCalcDisplay.Init(var Bounds: TRect);
+constructor TCalcDisplay.Create(var Bounds: TRect);
 begin
-  inherited Init(Bounds);
+  inherited Create(Bounds);
   Options := Options or ofSelectable;
   EventMask := evKeyDown + evBroadcast;
   Clear;
@@ -170,7 +177,7 @@ begin
   HexShown:=false;
 end;
 
-constructor TCalcDisplay.Load(var S: TStream);
+constructor TCalcDisplay.Load(S: TStream);
 begin
   inherited Load(S);
   S.Read(Status, SizeOf(Status) + SizeOf(Number) + SizeOf(Sign) +
@@ -429,21 +436,21 @@ procedure TCalcDisplay.Draw;
 var
   Color: Byte;
   I: Integer;
-  B: TDrawBuffer;
+  B: TFVDrawBuffer;
 begin
-  Color := GetColor(1);
+  Color := GetColorW(1);
   I := Size.X - Length(Number) - 2;
   MoveChar(B, ' ', Color, Size.X);
   MoveChar(B[I], Sign, Color, 1);
   MoveStr(B[I + 1], Number, Color);
-  WriteBuf(0, 0, Size.X, 1, B);
+  WriteBufW(0, 0, Size.X, 1, B);
 end;
 
-function TCalcDisplay.GetPalette: PPalette;
+function TCalcDisplay.GetPalette: TPalette;
 const
   P: string[1] = #19;
 begin
-  GetPalette := @P;
+  Result := MakePalette(P);
 end;
 
 procedure TCalcDisplay.HandleEvent(var Event: TEvent);
@@ -453,32 +460,32 @@ begin
   case Event.What of
     evKeyDown:
       if Owner<>nil then
-      if (Owner^.State and sfSelected)<>0 then
+      if (Owner.State and sfSelected)<>0 then
       begin
-        S:=Event.CharCode;
+        S:=Chr(Event.CharCode);
         Message(Owner,evBroadcast,cmPressButton,@S);
-        if CalcKey(Event.CharCode) then
+        if CalcKey(Chr(Event.CharCode)) then
         ClearEvent(Event);
       end;
     evBroadcast:
       if Event.Command = cmCalcButton then
       begin
-        CalcKey(PButton(Event.InfoPtr)^.Title^);
+        CalcKey(PButton(Event.InfoPtr).Title^);
         ClearEvent(Event);
       end;
   end;
 end;
 
-procedure TCalcDisplay.Store(var S: TStream);
+procedure TCalcDisplay.Store(S: TStream);
 begin
-  TView.Store(S);
+  inherited Store(S);
   S.Write(Status, SizeOf(Status) + SizeOf(Number) + SizeOf(Sign) +
     SizeOf(_Operator) + SizeOf(Operand));
 end;
 
 { TCalculator }
 
-constructor TCalculator.Init;
+constructor TCalculator.Create;
 const
   Keys: array[0..29] of string[4] =
    ('M+',  'x^y','C'  ,#27  ,'%'  ,#241 ,
@@ -492,7 +499,7 @@ var
   R: TRect;
 begin
   R.Assign(5, 3, 43, 18);
-  inherited Init(R, dialog_Calculator);
+  inherited Create(R, dialog_Calculator);
   Options := Options or ofFirstClick or ofTopSelect;
   HelpCtx:=hcCalcWindow;
 
@@ -505,14 +512,14 @@ begin
     if (I mod 6)=0 then Inc(R.B.X,1) else
     if (I mod 6)=1 then begin R.Move(1,0); Inc(R.B.X,2) end else
     R.Move(3,0);
-    P := New(PCalcButton, Init(R, Keys[I], cmCalcButton,
-      bfNormal + bfBroadcast+bfGrabFocus));
-    P^.Options := P^.Options {and not ofSelectable};
+    P := TCalcButton.Create(R, Keys[I], cmCalcButton,
+      bfNormal + bfBroadcast+bfGrabFocus);
+    P.Options := P.Options {and not ofSelectable};
     Insert(P);
   end;
   R.Assign(3, 2, 35, 3);
-  New(CD, Init(R));
-  CD^.Options:=CD^.Options or ofSelectable;
+  CD := TCalcDisplay.Create(R);
+  CD.Options:=CD.Options or ofSelectable;
   Insert(CD);
 end;
 
@@ -525,29 +532,29 @@ begin
     evCommand :
      case Event.Command of
        cmCalculatorPaste :
-         Message(@Self,evKeyDown,kbCtrlEnter,nil);
+         Message(Self,evKeyDown,kbCtrlEnter,nil);
      end;
     evKeyDown :
      case Event.KeyCode of
        kbEnter :
          begin
            Event.KeyCode:=0;
-           Event.CharCode:='=';
+           Event.CharCode:=Ord('=');
          end;
        kbCtrlEnter :
          begin
            ClearEvent(Event);
-           CD^.GetDisplay(R); {Re:=R;}
+           CD.GetDisplay(R); {Re:=R;}
            Close;
            CalcClipboard:=R;
            Message(Application,evBroadcast,cmCalculatorPaste,nil);
          end;
        kbEsc :
          begin
-           CD^.GetDisplay(R);
+           CD.GetDisplay(R);
            if R<>0 then begin
-                          CD^.SetDisplay(0,false);
-                          CD^.DrawView;
+                          CD.SetDisplay(0,false);
+                          CD.DrawView;
                         end
                    else Close;
            ClearEvent(Event);
@@ -562,7 +569,7 @@ end;
 
 procedure TCalculator.Show;
 begin
-{  if GetState(sfVisible)=false then CD^.Clear;}
+{  if GetState(sfVisible)=false then CD.Clear;}
   inherited Show;
 end;
 
@@ -571,13 +578,13 @@ begin
   Hide;
 end;
 
-constructor TCalculator.Load(var S: TStream);
+constructor TCalculator.Load(S: TStream);
 begin
   inherited Load(S);
   GetSubViewPtr(S,CD);
 end;
 
-procedure TCalculator.Store(var S: TStream);
+procedure TCalculator.Store(S: TStream);
 begin
   inherited Store(S);
   PutSubViewPtr(S,CD);

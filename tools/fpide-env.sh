@@ -21,13 +21,14 @@ if [ ! -f "$FPIDE_COMPILER/finput.pas" ]; then
 fi
 
 # Matches packages/ide/fpmake.pp for a native linux64 IDE with GDB/MI.
+# GEN + tv/src must be first: FPC's default path has rtl-extra/Objects and fv/Drivers.
 FPIDE_OPTS="-Mobjfpc -Sh- -Se1 -Sg -Ur"
 FPIDE_OPTS="$FPIDE_OPTS -dNOCATCH -dBrowserCol -dGDB -d$FPIDE_CPU"
-FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_STAGE -Fu$FPIDE_STAGE/compiler -Fu$FPIDE_COMPAT"
+FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_GEN -Fu$here/tv/src -Fu$FPIDE_COMPAT"
+FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_STAGE -Fu$FPIDE_STAGE/compiler"
 FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_COMPILER -Fu$FPIDE_COMPILER/$FPIDE_CPU -Fu$FPIDE_COMPILER/targets"
 FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_COMPILER/systems -Fu$FPIDE_COMPILER/x86"
-FPIDE_OPTS="$FPIDE_OPTS -Fu$here/tv/src -Fu$FPIDE_GEN"
-FPIDE_OPTS="$FPIDE_OPTS -Fi$FPIDE_STAGE -Fi$FPIDE_COMPAT -Fi$here/fpide/compat/shims"
+FPIDE_OPTS="$FPIDE_OPTS -Fi$FPIDE_GEN -Fi$FPIDE_STAGE -Fi$FPIDE_COMPAT -Fi$here/fpide/compat/shims"
 FPIDE_OPTS="$FPIDE_OPTS -Fi$FPIDE_COMPILER -Fi$FPIDE_COMPILER/$FPIDE_CPU"
 FPIDE_OPTS="$FPIDE_OPTS -FU$FPIDE_OBJ -FE$out"
 
@@ -42,6 +43,15 @@ fpide_gen_shims() {
     python3 "$here/tools/gen-shim.py" "$here/fpide/compat/shims/shims.map" "$FPIDE_GEN" "$here/tv/src" >/dev/null
     rm -rf "$FPIDE_GEN/manual"
     cp -a "$here/fpide/compat/shims/manual" "$FPIDE_GEN/manual"
+    # Linux FS is case-sensitive; FPC looks up the uses-clause spelling.
+    # Provide lowercase aliases for generated units (objects vs Objects).
+    for f in "$FPIDE_GEN"/*.pas; do
+        base=$(basename "$f")
+        lower=$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]')
+        if [ "$base" != "$lower" ] && [ ! -e "$FPIDE_GEN/$lower" ]; then
+            ln -s "$base" "$FPIDE_GEN/$lower"
+        fi
+    done
 }
 
 fpide_compile() {

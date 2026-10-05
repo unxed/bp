@@ -28,13 +28,14 @@ const
 type
     TCaptureTarget = (capNone,capMessageWindow,capEditWindow,capNoSwap);
 
-    PTool = ^TTool;
-    TTool = object(TObject)
-      constructor Init(const ATitle, AProgramPath, ACommandLine: string; AHotKey: word);
+    TTool = class;
+  PTool = TTool;
+    TTool = class(TObject)
+      constructor Create(const ATitle, AProgramPath, ACommandLine: string; AHotKey: word);
       function    GetTitle: string; virtual;
       procedure   GetParams(var ATitle, AProgramPath, ACommandLine: string; var AHotKey: word); virtual;
       procedure   SetParams(const ATitle, AProgramPath, ACommandLine: string; const AHotKey: word); virtual;
-      destructor  Done; virtual;
+      destructor Destroy; override;
     private
       Title       : PString;
       ProgramPath : PString;
@@ -42,27 +43,31 @@ type
       HotKey      : word;
     end;
 
-    PToolCollection = ^TToolCollection;
-    TToolCollection = object(TCollection)
+    TToolCollection = class;
+  PToolCollection = TToolCollection;
+    TToolCollection = class(TCollection)
       function At(Index: sw_Integer): PTool;
     end;
 
-    PToolListBox = ^TToolListBox;
-    TToolListBox = object(TAdvancedListBox)
+    TToolListBox = class;
+  PToolListBox = TToolListBox;
+    TToolListBox = class(TAdvancedListBox)
       function GetText(Item,MaxLen: Sw_Integer): String; virtual;
     end;
 
-    PToolParamValidator = ^TToolParamValidator;
-    TToolParamValidator = object(TValidator)
+    TToolParamValidator = class;
+  PToolParamValidator = TToolParamValidator;
+    TToolParamValidator = class(TValidator)
       function  IsValid(const S: string): Boolean; virtual;
       procedure Error; virtual;
     private
       ErrorPos: integer;
     end;
 
-    PToolItemDialog = ^TToolItemDialog;
-    TToolItemDialog = object(TCenterDialog)
-      constructor Init(ATool: PTool);
+    TToolItemDialog = class;
+  PToolItemDialog = TToolItemDialog;
+    TToolItemDialog = class(TCenterDialog)
+      constructor Create(ATool: PTool);
       function    Execute: Word; virtual;
     private
       Tool     : PTool;
@@ -72,9 +77,10 @@ type
       HotKeyRB : PRadioButtons;
     end;
 
-    PToolsDialog = ^TToolsDialog;
-    TToolsDialog = object(TCenterDialog)
-      constructor Init;
+    TToolsDialog = class;
+  PToolsDialog = TToolsDialog;
+    TToolsDialog = class(TCenterDialog)
+      constructor Create;
       function    Execute: Word; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
     private
@@ -84,32 +90,35 @@ type
       procedure Delete;
     end;
 
-    PToolMessage = ^TToolMessage;
-    TToolMessage = object(TMessageItem)
-      constructor Init(AModule: PString; ALine: string; ARow, ACol: sw_integer);
+    TToolMessage = class;
+  PToolMessage = TToolMessage;
+    TToolMessage = class(TMessageItem)
+      constructor Create(AModule: PString; ALine: string; ARow, ACol: sw_integer);
       function    GetText(MaxLen: Sw_integer): string; virtual;
     end;
 
-    PToolMessageListBox = ^TToolMessageListBox;
-    TToolMessageListBox = object(TMessageListBox)
+    TToolMessageListBox = class;
+  PToolMessageListBox = TToolMessageListBox;
+    TToolMessageListBox = class(TMessageListBox)
       procedure   NewList(AList: PCollection); virtual;
       procedure   Clear; virtual;
       procedure   Update; virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
-      destructor  Done; virtual;
+      destructor Destroy; override;
     end;
 
-    PMessagesWindow = ^TMessagesWindow;
-    TMessagesWindow = object(TFPWindow)
-      constructor Init;
+    TMessagesWindow = class;
+  PMessagesWindow = TMessagesWindow;
+    TMessagesWindow = class(TFPWindow)
+      constructor Create;
       procedure   Update; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
-      destructor  Done; virtual;
+      destructor Destroy; override;
       procedure   FocusItem(i : sw_integer);
       procedure   SizeLimits(var Min, Max: TPoint); virtual;
     private
@@ -162,19 +171,23 @@ uses Dos,
      FPConst,FPVars,FPUtils;
 
 {$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
 const
   RToolMessageListBox: TStreamRec = (
      ObjType: 1600;
-     VmtLink: Ofs(TypeOf(TToolMessageListBox)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TToolMessageListBox)) at runtime };
      Load:    @TToolMessageListBox.Load;
      Store:   @TToolMessageListBox.Store
   );
   RMessagesWindow: TStreamRec = (
      ObjType: 1601;
-     VmtLink: Ofs(TypeOf(TMessagesWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TMessagesWindow)) at runtime };
      Load:    @TMessagesWindow.Load;
      Store:   @TMessagesWindow.Store
   );
+{$endif}
+{$endif}
 {$endif}
 
 {$ifdef useresstrings}
@@ -292,10 +305,10 @@ begin
   Rewrite(f);
   OK:=EatIO=0;
   if Assigned(ToolMessages) then
-  while OK and (I<ToolMessages^.Count) do
+  while OK and (I<ToolMessages.Count) do
   begin
-    M:=ToolMessages^.At(I);
-    writeln(f,GetStr(M^.Module)+#0+GetStr(M^.Text)+#0+IntToStr(M^.Row)+#0+IntToStr(M^.Col));
+    M:=PToolMessage(ToolMessages.At(I));
+    writeln(f,GetStr(M.Module)+#0+GetStr(M.Text)+#0+IntToStr(M.Row)+#0+IntToStr(M.Col));
     Inc(I);
     OK:=EatIO=0;
   end;
@@ -305,9 +318,9 @@ begin
   WriteToolMessagesToFile:=OK;
 end;
 
-constructor TTool.Init(const ATitle, AProgramPath, ACommandLine: string; AHotKey: word);
+constructor TTool.Create(const ATitle, AProgramPath, ACommandLine: string; AHotKey: word);
 begin
-  inherited Init;
+  inherited Create;
   SetParams(ATitle,AProgramPath,ACommandLine,AHotKey);
 end;
 
@@ -333,9 +346,9 @@ begin
   HotKey:=AHotKey;
 end;
 
-destructor TTool.Done;
+destructor TTool.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if Title<>nil then DisposeStr(Title);
   if ProgramPath<>nil then DisposeStr(ProgramPath);
   if CommandLine<>nil then DisposeStr(CommandLine);
@@ -343,15 +356,15 @@ end;
 
 function TToolCollection.At(Index: sw_Integer): PTool;
 begin
-  At:=inherited At(Index);
+  At:=PTool(inherited At(Index));
 end;
 
 function TToolListBox.GetText(Item,MaxLen: sw_integer): String;
 var S: string;
     P: PTool;
 begin
-  P:=List^.At(Item);
-  S:=P^.GetTitle;
+  P:=PTool(List.At(Item));
+  S:=P.GetTitle;
   GetText:=copy(S,1,MaxLen);
 end;
 
@@ -390,14 +403,14 @@ procedure GetToolParams(Idx: sw_integer; var Title, ProgramPath, Params: string;
 var P: PTool;
 begin
   P:=Tools^.At(Idx);
-  P^.GetParams(Title,ProgramPath,Params,HotKey);
+  P.GetParams(Title,ProgramPath,Params,HotKey);
 end;
 
 procedure SetToolParams(Idx: sw_integer; Title, ProgramPath, Params: string; HotKey: word);
 var P: PTool;
 begin
   P:=Tools^.At(Idx);
-  P^.GetParams(Title,ProgramPath,Params,HotKey);
+  P.GetParams(Title,ProgramPath,Params,HotKey);
 end;
 
 procedure DoneTools;
@@ -419,7 +432,7 @@ begin
   IsValid:=ErrorPos=0;
 end;
 
-constructor TToolItemDialog.Init(ATool: PTool);
+constructor TToolItemDialog.Create(ATool: PTool);
 var R,R2,R3: TRect;
     Items: PSItem;
     I,KeyCount: sw_integer;
@@ -427,7 +440,7 @@ begin
   KeyCount:=GetHotKeyCount;
 
   R.Assign(0,0,60,Max(3+KeyCount,12));
-  inherited Init(R,dialog_modifynewtool);
+  inherited Create(R,dialog_modifynewtool);
   Tool:=ATool;
 
   GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
@@ -474,12 +487,12 @@ begin
   Execute:=R;
 end;
 
-constructor TToolsDialog.Init;
+constructor TToolsDialog.Create;
 var R,R2,R3: TRect;
     SB: PScrollBar;
 begin
   R.Assign(0,0,46,16);
-  inherited Init(R,dialog_tools);
+  inherited Create(R,dialog_tools);
 
   HelpCtx:=hcTools;
   GetExtent(R); R.Grow(-3,-2); Inc(R.A.Y); R3.Copy(R); Dec(R.B.X,12);
@@ -578,8 +591,8 @@ begin
   IC:=ToolsLB^.Range=0;
   if IC=false then
     begin
-      P:=ToolsLB^.List^.At(ToolsLB^.Focused);
-      P^.GetParams(S1,S2,S3,W);
+      P:=ToolsLB^.List.At(ToolsLB^.Focused);
+      P.GetParams(S1,S2,S3,W);
     end
   else
     begin
@@ -588,8 +601,8 @@ begin
   New(P, Init(S1,S2,S3,W));
   if Application^.ExecuteDialog(New(PToolItemDialog, Init(P)), nil)=cmOK then
     begin
-      ToolsLB^.List^.Insert(P);
-      ToolsLB^.SetRange(ToolsLB^.List^.Count);
+      ToolsLB^.List.Insert(P);
+      ToolsLB^.SetRange(ToolsLB^.List.Count);
       ReDraw;
     end
   else
@@ -600,7 +613,7 @@ procedure TToolsDialog.Edit;
 var P: PTool;
 begin
   if ToolsLB^.Range=0 then Exit;
-  P:=ToolsLB^.List^.At(ToolsLB^.Focused);
+  P:=ToolsLB^.List.At(ToolsLB^.Focused);
   Application^.ExecuteDialog(New(PToolItemDialog, Init(P)), nil);
   ReDraw;
 end;
@@ -608,8 +621,8 @@ end;
 procedure TToolsDialog.Delete;
 begin
   if ToolsLB^.Range=0 then Exit;
-  ToolsLB^.List^.AtFree(ToolsLB^.Focused);
-  ToolsLB^.SetRange(ToolsLB^.List^.Count);
+  ToolsLB^.List.AtFree(ToolsLB^.Focused);
+  ToolsLB^.SetRange(ToolsLB^.List.Count);
   ReDraw;
 end;
 
@@ -646,7 +659,7 @@ var OK: boolean;
     S: string;
     Px: integer;
 begin
-  S:=F^.GetEntry(Section,Entry,'');
+  S:=F.GetEntry(Section,Entry,'');
   S:=Trim(S);
   OK:=(S<>'') and (S[1]='(') and (S[length(S)]=')');
   if OK then S:=copy(S,2,length(S)-2);
@@ -727,54 +740,54 @@ var
       Count: sw_integer;
   begin
     if (OK=false) or
-       ( (UpcaseStr(Sec^.GetName)=secMain) or
-         (UpcaseStr(Sec^.GetName)=UpcaseStr(MainSectionName)) ) then
+       ( (UpcaseStr(Sec.GetName)=secMain) or
+         (UpcaseStr(Sec.GetName)=UpcaseStr(MainSectionName)) ) then
       Exit;
 
     ViewItemCount[ViewCount]:=0;
 
-    OK:=(Sec^.SearchEntry(tieType)<>nil) and
-        (Sec^.SearchEntry(tieOrigin)<>nil) and
-        (Sec^.SearchEntry(tieSize)<>nil);
+    OK:=(Sec.SearchEntry(tieType)<>nil) and
+        (Sec.SearchEntry(tieOrigin)<>nil) and
+        (Sec.SearchEntry(tieSize)<>nil);
     if OK=false then
-      begin ErrorBox(FormatStrStr(msg_requiredparametermissingin,Sec^.GetName),nil); Exit; end;
+      begin ErrorBox(FormatStrStr(msg_requiredparametermissingin,Sec.GetName),nil); Exit; end;
 
-    Typ:=UpcaseStr(Trim(F^.GetEntry(Sec^.GetName,tieType,'')));
+    Typ:=UpcaseStr(Trim(F.GetEntry(Sec.GetName,tieType,'')));
     if Typ=vtsCheckBox    then ViewTypes[ViewCount]:=vtCheckBox    else
     if Typ=vtsRadioButton then ViewTypes[ViewCount]:=vtRadioButton else
     if Typ=vtsInputLine   then ViewTypes[ViewCount]:=vtInputLine   else
     if Typ=vtsLabel       then ViewTypes[ViewCount]:=vtLabel       else
     if Typ=vtsMemo        then ViewTypes[ViewCount]:=vtMemo        else
-     begin OK:=false; ErrorBox(FormatStrStr(msg_unknowntypein,Sec^.GetName),nil); Exit; end;
+     begin OK:=false; ErrorBox(FormatStrStr(msg_unknowntypein,Sec.GetName),nil); Exit; end;
 
-    ViewNames[ViewCount]:=Sec^.GetName;
-    GetCoordEntry(F,Sec^.GetName,tieOrigin,P1);
-    GetCoordEntry(F,Sec^.GetName,tieSize,P2);
+    ViewNames[ViewCount]:=Sec.GetName;
+    GetCoordEntry(F,Sec.GetName,tieOrigin,P1);
+    GetCoordEntry(F,Sec.GetName,tieSize,P2);
     ViewBounds[ViewCount].Assign(P1.X,P1.Y,P1.X+P2.X,P1.Y+P2.Y);
     { allow conversion of $EDNAME for instance in
       default values PM }
-    Typ:=F^.GetEntry(Sec^.GetName,tieValue,'');
+    Typ:=F.GetEntry(Sec.GetName,tieValue,'');
     ParseToolParams(Typ,true);
     ViewValues[ViewCount]:=Typ;
 
     case ViewTypes[ViewCount] of
       vtLabel      :
         begin
-          OK:=OK and (Sec^.SearchEntry(tieLink)<>nil) and
-                     (Sec^.SearchEntry(tieText)<>nil);
+          OK:=OK and (Sec.SearchEntry(tieLink)<>nil) and
+                     (Sec.SearchEntry(tieText)<>nil);
           if OK=false then
-            begin ErrorBox(FormatStrStr(msg_requiredpropertymissingin,Sec^.GetName),nil); Exit; end;
+            begin ErrorBox(FormatStrStr(msg_requiredpropertymissingin,Sec.GetName),nil); Exit; end;
         end;
       vtInputLine  : ;
       vtMemo  : ;
       vtCheckBox   :
         begin
-          OK:=OK and (Sec^.SearchEntry(tieName)<>nil);
+          OK:=OK and (Sec.SearchEntry(tieName)<>nil);
           if Typ='' then
             Typ:=tieOffParm;
-          if F^.GetEntry(Sec^.GetName,tieDefault,'')<>'' then
+          if F.GetEntry(Sec.GetName,tieDefault,'')<>'' then
             begin
-              Typ:=F^.GetEntry(Sec^.GetName,tieDefault,'');
+              Typ:=F.GetEntry(Sec.GetName,tieDefault,'');
             end;
           Typ:=UpcaseStr(Trim(Typ));
           if Typ=tieOnParm then
@@ -785,17 +798,17 @@ var
             Ok:=false;
           ViewValues[ViewCount]:=Typ;
           if OK=false then
-            begin ErrorBox(FormatStrStr2(msg_propertymissingin,tieName,Sec^.GetName),nil); Exit; end;
+            begin ErrorBox(FormatStrStr2(msg_propertymissingin,tieName,Sec.GetName),nil); Exit; end;
         end;
       vtRadioButton:
         begin
           Count:=0;
-          while Sec^.SearchEntry(tieItem+IntToStr(Count+1))<>nil do
+          while Sec.SearchEntry(tieItem+IntToStr(Count+1))<>nil do
             Inc(Count);
           ViewItemCount[ViewCount]:=Count;
           OK:=Count>0;
           if OK=false then
-            begin ErrorBox(FormatStrStr(msg_invaliditemsin,Sec^.GetName),nil); Exit; end;
+            begin ErrorBox(FormatStrStr(msg_invaliditemsin,Sec.GetName),nil); Exit; end;
         end;
     end;
 
@@ -804,25 +817,25 @@ var
 
 begin
   BuildPromptDialogInfo:=false;
-  _IS:=F^.SearchSection(secMain);
+  _IS:=F.SearchSection(secMain);
   OK:=_IS<>nil;
-  if OK then OK:=(_IS^.SearchEntry(tmeTitle)<>nil) and
-                 (_IS^.SearchEntry(tmeSize)<>nil) and
-                 (_IS^.SearchEntry(tmeCommandLine)<>nil);
+  if OK then OK:=(_IS.SearchEntry(tmeTitle)<>nil) and
+                 (_IS.SearchEntry(tmeSize)<>nil) and
+                 (_IS.SearchEntry(tmeCommandLine)<>nil);
   if OK then
   begin
-    Title:=F^.GetEntry(secMain,tmeTitle,'');
+    Title:=F.GetEntry(secMain,tmeTitle,'');
     OK:=OK and GetCoordEntry(F,secMain,tmeSize,DSize);
-    CmdLine:=F^.GetEntry(secMain,tmeCommandLine,'');
+    CmdLine:=F.GetEntry(secMain,tmeCommandLine,'');
     OK:=OK and (CmdLine<>'');
   end;
   if OK=false then
-    begin ErrorBox(FormatStrStr(msg_requiredpropertymissingin,_IS^.GetName),nil); Exit; end;
+    begin ErrorBox(FormatStrStr(msg_requiredpropertymissingin,_IS.GetName),nil); Exit; end;
 
   if OK then
     begin
       ViewCount:=0;
-      F^.ForEachSection(@ProcessSection);
+      F.ForEachSection(@ProcessSection);
     end;
   BuildPromptDialogInfo:=OK;
 end;
@@ -848,9 +861,9 @@ begin
       S:='';
     vtMemo :
       begin
-        S:=F^.GetEntry(ViewNames[Idx],tieFileName,'');
+        S:=F.GetEntry(ViewNames[Idx],tieFileName,'');
         if S='' then S:=GenTempFileName;
-        ToolTempFiles^.InsertStr(S);
+        ToolTempFiles.InsertStr(S);
         if PFPMemo(ViewPtrs[Idx])^.SaveToFile(S)=false then
           ErrorBox(FormatStrStr(msg_errorsavingfile,S),nil);
       end;
@@ -860,13 +873,13 @@ begin
       with PCheckBoxes(ViewPtrs[Idx])^ do
       begin
         if Mark(0) then Entry:=tieOnParm else Entry:=tieOffParm;
-        S:=F^.GetEntry(ViewNames[Idx],Entry,'');
+        S:=F.GetEntry(ViewNames[Idx],Entry,'');
       end;
     vtRadioButton :
       with PRadioButtons(ViewPtrs[Idx])^ do
       begin
         Entry:=tieParam+IntToStr(Value+1);
-        S:=F^.GetEntry(ViewNames[Idx],Entry,'');
+        S:=F.GetEntry(ViewNames[Idx],Entry,'');
       end;
   end;
   GetParamValueStr:=S;
@@ -943,24 +956,24 @@ begin
         case ViewTypes[I] of
           vtLabel :
             begin
-              S:=F^.GetEntry(ViewNames[I],tieLink,'');
+              S:=F.GetEntry(ViewNames[I],tieLink,'');
               J:=SearchViewByName(S);
               if J=-1 then P:=nil else
                 P:=ViewPtrs[J];
-              S:=F^.GetEntry(ViewNames[I],tieText,'');
+              S:=F.GetEntry(ViewNames[I],tieText,'');
               New(LV, Init(ViewBounds[I], S, P));
               ViewPtrs[I]:=LV;
             end;
           vtInputLine :
             begin
-              MaxLen:=F^.GetIntEntry(ViewNames[I],tieMaxLen,80);
+              MaxLen:=F.GetIntEntry(ViewNames[I],tieMaxLen,80);
               New(IL, Init(ViewBounds[I], MaxLen));
               IL^.Data^:=ViewValues[I];
               ViewPtrs[I]:=IL;
             end;
           vtMemo :
             begin
-{              MaxLen:=F^.GetIntEntry(ViewNames[I],tieMaxLen,80);}
+{              MaxLen:=F.GetIntEntry(ViewNames[I],tieMaxLen,80);}
               New(Memo, Init(ViewBounds[I],nil,nil,nil));
               if ViewValues[I]<>'' then
                 begin
@@ -973,7 +986,7 @@ begin
             begin
               New(CB, Init(ViewBounds[I],
                NewSItem(
-                F^.GetEntry(ViewNames[I],tieName,''),
+                F.GetEntry(ViewNames[I],tieName,''),
                 nil)));
               if StrToInt(ViewValues[I])=1 then
                 CB^.Press(0);
@@ -983,7 +996,7 @@ begin
             begin
               SI:=nil;
               for J:=ViewItemCount[I] downto 1 do
-                SI:=NewSItem(F^.GetEntry(ViewNames[I],tieItem+IntToStr(J),''),SI);
+                SI:=NewSItem(F.GetEntry(ViewNames[I],tieItem+IntToStr(J),''),SI);
               New(RB, Init(ViewBounds[I], SI));
               RB^.Press(StrToInt(ViewValues[I]));
               ViewPtrs[I]:=RB;
@@ -993,7 +1006,7 @@ begin
       end;
   end;
   InsertButtons(PromptDialog);
-  S:=F^.GetEntry(secMain,tmeDefaultView,'');
+  S:=F.GetEntry(secMain,tmeDefaultView,'');
   if S<>'' then
     begin
       S:=UpcaseStr(S);
@@ -1422,15 +1435,15 @@ end;
 begin
   if not Assigned(ToolTempFiles) then Exit;
 {$ifndef DEBUG}
-  ToolTempFiles^.ForEach(@DeleteIt);
+  ToolTempFiles.ForEach(@DeleteIt);
 {$endif ndef DEBUG}
   Dispose(ToolTempFiles, Done);
   ToolTempFiles:=nil;
 end;
 
-constructor TToolMessage.Init(AModule: PString; ALine: string; ARow, ACol: sw_integer);
+constructor TToolMessage.Create(AModule: PString; ALine: string; ARow, ACol: sw_integer);
 begin
-  inherited Init(0,ALine,AModule,ARow,ACol);
+  inherited Create(0,ALine,AModule,ARow,ACol);
   if LongestTool<Length(Aline)+Length(GetStr(AModule))+4 then
     LongestTool:=Length(Aline)+Length(GetStr(AModule))+4;
 end;
@@ -1449,7 +1462,7 @@ end;
 procedure AddToolCommand(Command: string);
 begin
   AddToolMessage('',Command,0,0);
-  LastToolMessageFocused:=ToolMessages^.At(ToolMessages^.Count-1);
+  LastToolMessageFocused:=ToolMessages.At(ToolMessages.Count-1);
 end;
 
 procedure AddToolMessage(ModuleName, Text: string; Row, Col: longint);
@@ -1460,13 +1473,13 @@ begin
   if ToolModuleNames=nil then
     New(ToolModuleNames, Init(50,100));
   MN:=ToolModuleNames^.Add(ModuleName);
-  ToolMessages^.Insert(New(PToolMessage, Init(MN,Text,Row,Col)));
+  ToolMessages.Insert(New(PToolMessage, Init(MN,Text,Row,Col)));
 end;
 
 procedure ClearToolMessages;
 begin
   If assigned(ToolMessages) then
-    ToolMessages^.FreeAll;
+    ToolMessages.FreeAll;
   If assigned(ToolModuleNames) then
     ToolModuleNames^.FreeAll;
   LastToolMessageFocused:=nil;
@@ -1492,7 +1505,7 @@ end;
 procedure UpdateToolMessages;
 begin
   if Assigned(MessagesWindow) then
-    MessagesWindow^.Update;
+    MessagesWindow.Update;
 end;
 
 procedure TToolMessageListBox.Update;
@@ -1505,7 +1518,7 @@ begin
     HScrollbar^.SetRange(0,LongestTool);
   if (Range>0) and (P<>nil) then
     begin
-      Idx:=List^.IndexOf(P);
+      Idx:=List.IndexOf(P);
       if Idx>=0 then
         begin
           FocusItem(Idx);
@@ -1529,11 +1542,11 @@ begin
   Message(Application,evBroadcast,cmClearLineHighlights,@Self);
 end;
 
-function TToolMessageListBox.GetPalette: PPalette;
+function TToolMessageListBox.GetPalette: TPalette;
 const
   P: string[length(CBrowserListBox)] = CBrowserListBox;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(P);
 end;
 
 constructor TToolMessageListBox.Load(var S: TStream);
@@ -1553,19 +1566,19 @@ begin
   List:=OL;
 end;
 
-destructor TToolMessageListBox.Done;
+destructor TToolMessageListBox.Destroy;
 begin
   HScrollBar:=nil; VScrollBar:=nil;
   if List=ToolMessages then begin List:=nil; SetRange(0); end;
-  inherited Done;
+  inherited Destroy;
 end;
 
-constructor TMessagesWindow.Init;
+constructor TMessagesWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
   Desktop^.GetExtent(R); R.A.Y:=R.B.Y-7;
-  inherited Init(R,dialog_messages,SearchFreeWindowNo);
+  inherited Create(R,dialog_messages,SearchFreeWindowNo);
   HelpCtx:=hcMessagesWindow;
 
   HSB:=StandardScrollBar(sbHorizontal+sbHandleKeyboard); Insert(HSB);
@@ -1579,7 +1592,7 @@ begin
 
   Update;
 
-  MessagesWindow:=@Self;
+  MessagesWindow:=Self;
 end;
 
 procedure TMessagesWindow.Update;
@@ -1600,7 +1613,7 @@ begin
         cmListFocusChanged :
           if Event.InfoPtr=MsgLB then
             begin
-              LastToolMessageFocused:=MsgLB^.List^.At(MsgLB^.Focused);
+              LastToolMessageFocused:=MsgLB^.List.At(MsgLB^.Focused);
               Message(Application,evBroadcast,cmClearLineHighlights,@Self);
             end;
       end;
@@ -1615,7 +1628,7 @@ begin
   Min.Y:=4;
 end;
 
-function TMessagesWindow.GetPalette: PPalette;
+function TMessagesWindow.GetPalette: TPalette;
 const S: string[length(CBrowserWindow)] = CBrowserWindow;
 begin
   GetPalette:=@S;
@@ -1628,7 +1641,7 @@ begin
   GetSubViewPtr(S,MsgLB);
 
   Update;
-  MessagesWindow:=@Self;
+  MessagesWindow:=Self;
 end;
 
 procedure TMessagesWindow.Store(var S: TStream);
@@ -1638,10 +1651,10 @@ begin
   PutSubViewPtr(S,MsgLB);
 end;
 
-destructor TMessagesWindow.Done;
+destructor TMessagesWindow.Destroy;
 begin
   MessagesWindow:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
 procedure RegisterFPTools;

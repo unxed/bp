@@ -14,6 +14,9 @@
  **********************************************************************}
 unit WTPHWriter;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses
@@ -25,16 +28,17 @@ const
      DefFormatVersion = $34;
 
 type
-    PHelpFileWriter = ^THelpFileWriter;
-    THelpFileWriter = object(TOAHelpFile)
-      constructor Init(AFileName: string; AID: word);
+    THelpFileWriter = class;
+    PHelpFileWriter = THelpFileWriter;
+    THelpFileWriter = class(TOAHelpFile)
+      constructor Create(AFileName: string; AID: word);
       function    CreateTopic(HelpCtx: THelpCtx): PTopic; virtual;
       procedure   AddTopicToIndex(IndexTag: string; P: PTopic); virtual;
       procedure   AddLineToTopic(P: PTopic; Line: string); virtual;
       procedure   AddLinkToTopic(P: PTopic; AHelpCtx: THelpCtx);
       procedure   AddIndexEntry(Tag: string; P: PTopic); virtual;
       function    WriteFile: boolean; virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     private
       procedure   CompleteContextNo;
       procedure   CalcTopicOfs;
@@ -48,13 +52,13 @@ type
 
 implementation
 
-constructor THelpFileWriter.Init(AFileName: string; AID: word);
+constructor THelpFileWriter.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
   THelpFile.Init(AID);
   New(F, Init(AFileName, stCreate, HelpStreamBufSize));
   OK:=F<>nil;
-  if OK then OK:=(F^.Status=stOK);
+  if OK then OK:=(F.Status=stOK);
   if OK=false then Fail;
 end;
 
@@ -66,14 +70,14 @@ begin
   else
     begin
       P:=NewTopic(ID,HelpCtx,0,'');
-      Topics^.Insert(P);
+      Topics.Insert(P);
     end;
   CreateTopic:=P;
 end;
 
 procedure THelpFileWriter.AddTopicToIndex(IndexTag: string; P: PTopic);
 begin
-  IndexEntries^.Insert(NewIndexEntry(IndexTag,P^.FileID,P^.HelpCtx));
+  IndexEntries.Insert(NewIndexEntry(IndexTag,P.FileID,P.HelpCtx));
 end;
 
 procedure THelpFileWriter.AddLineToTopic(P: PTopic; Line: string);
@@ -81,12 +85,12 @@ var OldText: pointer;
     OldSize: word;
 begin
   if P=nil then Exit;
-  OldText:=P^.Text; OldSize:=P^.TextSize;
-  Inc(P^.TextSize,length(Line)+1);
-  GetMem(P^.Text,P^.TextSize);
-  if OldText<>nil then Move(OldText^,P^.Text^,OldSize);
-  Move(Line[1],P^.Text^[OldSize],length(Line));
-  P^.Text^[OldSize+length(Line)]:=0;
+  OldText:=P.Text; OldSize:=P.TextSize;
+  Inc(P.TextSize,length(Line)+1);
+  GetMem(P.Text,P.TextSize);
+  if OldText<>nil then Move(OldText^,P.Text^,OldSize);
+  Move(Line[1],P.Text^[OldSize],length(Line));
+  P.Text^[OldSize+length(Line)]:=0;
   if OldText<>nil then FreeMem(OldText,OldSize);
 end;
 
@@ -96,11 +100,11 @@ var OldEntries: pointer;
     OldSize   : word;
 begin
   if P=nil then Exit;
-  OldEntries:=P^.Links; OldCount:=P^.LinkCount; OldSize:=P^.LinkSize;
-  Inc(P^.LinkCount);
-  GetMem(P^.Links,P^.LinkSize);
-  if OldEntries<>nil then Move(OldEntries^,P^.Links^,OldSize);
-  with P^.Links^[P^.LinkCount-1] do
+  OldEntries:=P.Links; OldCount:=P.LinkCount; OldSize:=P.LinkSize;
+  Inc(P.LinkCount);
+  GetMem(P.Links,P.LinkSize);
+  if OldEntries<>nil then Move(OldEntries^,P.Links^,OldSize);
+  with P.Links^[P.LinkCount-1] do
     begin
       FileID:=ID;
       Context:=AHelpCtx;
@@ -111,7 +115,7 @@ end;
 procedure THelpFileWriter.AddIndexEntry(Tag: string; P: PTopic);
 begin
   if P=nil then Exit;
-  IndexEntries^.Insert(NewIndexEntry(Tag,P^.FileID,P^.HelpCtx));
+  IndexEntries.Insert(NewIndexEntry(Tag,P.FileID,P.HelpCtx));
 end;
 
 function THelpFileWriter.WriteFile: boolean;
@@ -123,14 +127,14 @@ begin
 
   WriteHeader(F^);
   WriteCompressionRecord(F^);
-  CtxStart:=F^.GetPos;
+  CtxStart:=F.GetPos;
   WriteContextTable(F^);
   WriteIndexTable(F^);
-  for I:=0 to Topics^.Count-1 do
+  for I:=0 to Topics.Count-1 do
     begin
-      WriteTopic(F^,Topics^.At(I));
+      WriteTopic(F^,Topics.At(I));
     end;
-  F^.Seek(CtxStart);
+  F.Seek(CtxStart);
   WriteContextTable(F^);
 end;
 
@@ -140,10 +144,10 @@ begin
   Version.FormatVersion:=DefFormatVersion;
 
   St:=HelpStamp+#0#$1a;
-  F^.Write(St[1],length(St));
+  F.Write(St[1],length(St));
   St:=Signature;
-  F^.Write(St[1],length(St));
-  F^.Write(Version,SizeOf(Version));
+  F.Write(St[1],length(St));
+  F.Write(Version,SizeOf(Version));
 
   WriteRecord(F^,rtFileHeader,Header,SizeOf(Header));
 end;
@@ -161,7 +165,7 @@ var P: ^THLPIndexTable;
     TableSize: word;
 procedure AddByte(B: byte);
 begin
-  PByteArray(@P^.Entries)^[TableSize]:=B;
+  PByteArray(@P.Entries)^[TableSize]:=B;
   Inc(TableSize);
 end;
 procedure AddEntry(Tag: string; HelpCtx: word);
@@ -175,15 +179,15 @@ begin
 end;
 var I: sw_integer;
 begin
-  if IndexEntries^.Count=0 then Exit;
+  if IndexEntries.Count=0 then Exit;
   GetMem(P,BufSize);
 
   TableSize:=0;
-  P^.IndexCount:=IndexEntries^.Count;
-  for I:=0 to IndexEntries^.Count-1 do
-    with IndexEntries^.At(I)^ do
+  P.IndexCount:=IndexEntries.Count;
+  for I:=0 to IndexEntries.Count-1 do
+    with IndexEntries.At(I)^ do
     AddEntry(Tag^,HelpCtx);
-  Inc(TableSize,SizeOf(P^.IndexCount));
+  Inc(TableSize,SizeOf(P.IndexCount));
   WriteRecord(F^,rtIndex,P^,TableSize);
 
   FreeMem(P,BufSize);
@@ -195,18 +199,18 @@ var Ctxs: ^THLPContexts;
     T: PTopic;
     MaxCtx: longint;
 begin
-  if Topics^.Count=0 then MaxCtx:=1 else
-    MaxCtx:=Topics^.At(Topics^.Count-1)^.HelpCtx;
-  CtxSize:=SizeOf(Ctxs^.ContextCount)+SizeOf(Ctxs^.Contexts[0])*(MaxCtx+1);
+  if Topics.Count=0 then MaxCtx:=1 else
+    MaxCtx:=Topics.At(Topics.Count-1).HelpCtx;
+  CtxSize:=SizeOf(Ctxs.ContextCount)+SizeOf(Ctxs.Contexts[0])*(MaxCtx+1);
   GetMem(Ctxs,CtxSize); FillChar(Ctxs^,CtxSize,0);
-  Ctxs^.ContextCount:=MaxCtx+1;
-  for I:=1 to Topics^.Count do
+  Ctxs.ContextCount:=MaxCtx+1;
+  for I:=1 to Topics.Count do
     begin
-      T:=Topics^.At(I-1);
-      with Ctxs^.Contexts[T^.HelpCtx] do
+      T:=Topics.At(I-1);
+      with Ctxs.Contexts[T.HelpCtx] do
        begin
-         LoW:=(T^.FileOfs and $ffff);
-         HiB:=(T^.FileOfs shr 16) and $ff;
+         LoW:=(T.FileOfs and $ffff);
+         HiB:=(T.FileOfs shr 16) and $ff;
        end;
     end;
   WriteRecord(F^,rtContext,Ctxs^,CtxSize);
@@ -219,15 +223,15 @@ var TextBuf: PByteArray;
     KWBuf: ^THLPKeywordRecord;
     I,KWBufSize: word;
 begin
-  T^.FileOfs:=S.GetPos;
-  TextBuf:=T^.Text; TextSize:=T^.TextSize;
+  T.FileOfs:=S.GetPos;
+  TextBuf:=T.Text; TextSize:=T.TextSize;
   WriteRecord(F^,rtText,TextBuf^,TextSize);
   { write keyword record here }
-  KWBufSize:=SizeOf(KWBuf^)+SizeOf(KWBuf^.Keywords[0])*T^.LinkCount;
+  KWBufSize:=SizeOf(KWBuf^)+SizeOf(KWBuf.Keywords[0])*T.LinkCount;
   GetMem(KWBuf,KWBufSize); FillChar(KWBuf^,KWBufSize,0);
-  KWBuf^.KeywordCount:=T^.LinkCount;
-  for I:=0 to T^.LinkCount-1 do
-    KWBuf^.Keywords[I].kwContext:=T^.Links^[I].Context;
+  KWBuf.KeywordCount:=T.LinkCount;
+  for I:=0 to T.LinkCount-1 do
+    KWBuf.Keywords[I].kwContext:=T.Links^[I].Context;
   WriteRecord(F^,rtKeyword,KWBuf^,KWBufSize);
   FreeMem(KWBuf,KWBufSize);
 end;
@@ -237,19 +241,19 @@ var P: PTopic;
     NextTopicID: THelpCtx;
 function SearchNextFreeTopicID: THelpCtx;
 begin
-  while Topics^.SearchTopic(NextTopicID)<>nil do
+  while Topics.SearchTopic(NextTopicID)<>nil do
     Inc(NextTopicID);
   SearchNextFreeTopicID:=NextTopicID;
 end;
 begin
   NextTopicID:=1;
   repeat
-    P:=Topics^.SearchTopic(0);
+    P:=Topics.SearchTopic(0);
     if P<>nil then
       begin
-        Topics^.Delete(P);
-        P^.HelpCtx:=SearchNextFreeTopicID;
-        Topics^.Insert(P);
+        Topics.Delete(P);
+        P.HelpCtx:=SearchNextFreeTopicID;
+        Topics.Insert(P);
       end;
   until P=nil;
 end;
@@ -266,9 +270,9 @@ begin
   S.Write(Buf,Size);
 end;
 
-destructor THelpFileWriter.Done;
+destructor THelpFileWriter.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
 end;
 
 END.

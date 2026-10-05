@@ -17,7 +17,9 @@
 
 unit gdbmicon;
 
-{$MODE fpc}{$H-}
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 
 {$I globdir.inc}
 
@@ -31,7 +33,7 @@ type
   TWatchpointType = (wtWrite, wtReadWrite, wtRead);
   TPrintFormatType = (pfbinary, pfdecimal, pfhexadecimal, pfoctal, pfnatural);
 
-  TGDBController = object(TGDBInterface)
+  TGDBController = class(TGDBInterface)
   private
     FRegisterNames: array of AnsiString;
     procedure UpdateRegisterNames;
@@ -47,8 +49,8 @@ type
     procedure CommandEnd(const s: string); virtual;
 
   public
-    constructor Init;
-    destructor Done;
+    constructor Create;
+    destructor Destroy;
 
     procedure Command(const s: string);
     procedure Reset; virtual;
@@ -115,14 +117,14 @@ begin
 {$endif windows}
 end;
 
-constructor TGDBController.Init;
+constructor TGDBController.Create;
 begin
-  inherited Init;
+  inherited Create;
 end;
 
-destructor TGDBController.Done;
+destructor TGDBController.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
 end;
 
 procedure TGDBController.CommandBegin(const s: string);
@@ -456,17 +458,17 @@ begin
   frame_count := FrameList.Count;
   frames := AllocMem(SizeOf(PFrameEntry) * frame_count);
   for I := 0 to frame_count - 1 do
-    frames[I] := New(PFrameEntry, Init);
+    frames[I] := TFrameEntry.Create;
   for I := 0 to FrameList.Count - 1 do
   begin
-    frames[I]^.address := FrameList.ValueAt[I].AsTuple['addr'].AsCoreAddr;
-    frames[I]^.level := FrameList.ValueAt[I].AsTuple['level'].AsLongInt;
+    frames[I].address := FrameList.ValueAt[I].AsTuple['addr'].AsCoreAddr;
+    frames[I].level := FrameList.ValueAt[I].AsTuple['level'].AsLongInt;
     if Assigned(FrameList.ValueAt[I].AsTuple['line']) then
-      frames[I]^.line_number := FrameList.ValueAt[I].AsTuple['line'].AsLongInt;
+      frames[I].line_number := FrameList.ValueAt[I].AsTuple['line'].AsLongInt;
     if Assigned(FrameList.ValueAt[I].AsTuple['func']) then
-      frames[I]^.function_name := StrNew(PChar(FrameList.ValueAt[I].AsTuple['func'].AsString));
+      frames[I].function_name := StrNew(PChar(FrameList.ValueAt[I].AsTuple['func'].AsString));
     if Assigned(FrameList.ValueAt[I].AsTuple['fullname']) then
-      frames[I]^.file_name := StrNew(PChar(FrameList.ValueAt[I].AsTuple['fullname'].AsString));
+      frames[I].file_name := StrNew(PChar(FrameList.ValueAt[I].AsTuple['fullname'].AsString));
   end;
   Command('-stack-list-arguments 1');
   if not GDB.ResultRecord.Success then
@@ -488,7 +490,7 @@ begin
           s:=s+':='+ArgList.ValueAt[J].AsTuple['value'].ASString;
       end;
     s:=s+')';
-    frames[I]^.args:=StrNew(pchar(s));
+    frames[I].args:=StrNew(pchar(s));
   end;
 end;
 

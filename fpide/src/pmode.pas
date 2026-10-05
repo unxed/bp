@@ -19,7 +19,7 @@ interface
 uses Dos;
 
 type
-    MemPtr = object
+    MemPtr = class
       Ofs,Seg: word;
       Size   : word;
       Sel    : word;

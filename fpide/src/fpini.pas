@@ -250,7 +250,7 @@ begin
        end
      else
        begin
-         New(INI, Init(CurDir+DirInfoName));
+         INI := TINIFile.Create(CurDir+DirInfoName);
          INI^.SetEntry(MainSectionName,'Comment','Do NOT delete this file!!!');
          if INI^.Update=false then
            ErrorBox(FormatStrStr(msg_errorwritingfile,INI^.GetFileName),nil);
@@ -407,7 +407,7 @@ begin
   OK:=ExistsFile(IniFileName);
   if OK then
  begin
-  New(INIFile, Init(IniFileName));
+  INIFile := TINIFile.Create(IniFileName);
   { Files }
   OpenExts:=INIFile^.GetEntry(secFiles,ieOpenExts,OpenExts);
   RecentFileCount:=High(RecentFiles);
@@ -613,7 +613,7 @@ begin
         MkDir(FExpand(GetEnv('APPDATA')+'/fp'));
    end;
 {$endif WINDOWS}
-  New(INIFile, Init(IniFileName));
+  INIFile := TINIFile.Create(IniFileName);
   { Files }
   { avoid keeping old files }
   INIFile^.DeleteSection(secFiles);

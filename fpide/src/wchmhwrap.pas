@@ -15,8 +15,10 @@
  **********************************************************************}
 unit wchmhwrap;
 
+
+{$mode delphi}
+{$modeswitch nestedprocvars}
 interface
-{$Mode Delphi}
 
 Uses  wutils,whelp,whtml,SysUtils,ChmReader,ChmSiteMap,Classes;
 
@@ -110,8 +112,8 @@ function TChmWrapper.LoadIndex(id:integer;TopicLinks: PTopicLinkCollection;Index
 function FormatAlias(Alias: string): string;
 begin
   if Assigned(HelpFacility) then
-    if length(Alias)>HelpFacility^.IndexTabSize-4 then
-       Alias:=Trim(copy(Alias,1,HelpFacility^.IndexTabSize-4-2))+'..';
+    if length(Alias)>HelpFacility.IndexTabSize-4 then
+       Alias:=Trim(copy(Alias,1,HelpFacility.IndexTabSize-4-2))+'..';
 //  if (length(alias)>0) and (alias[1]<>'/') then Alias:='/'+alias;
   FormatAlias:=Alias;
 end;
@@ -150,9 +152,9 @@ begin
      debugmessageS({$i %file%},'TCHMWrapper: loadindex after final ',{$i %line%},'1',0,0);
   {$endif}
 
-  tli:=TopicLinks^.AddItem(fchmr.defaultpage);
+  tli:=TopicLinks.AddItem(fchmr.defaultpage);
   TLI:=EncodeHTMLCtx(ID,TLI+1);
-  IndexEntries^.Insert(NewIndexEntry(  FormatAlias('Table of contents'),ID,TLI));
+  IndexEntries.Insert(NewIndexEntry(  FormatAlias('Table of contents'),ID,TLI));
   if findex= Nil Then
     begin
       floaded:=true;
@@ -171,11 +173,11 @@ begin
           if s2='' then
             s2:=searchlocal(item);
           if (length(s2)>0) and (s2[1]<>'/') then
-            tli:=TopicLinks^.AddItem('/'+s2)
+            tli:=TopicLinks.AddItem('/'+s2)
           else
-            tli:=TopicLinks^.AddItem(s2);
+            tli:=TopicLinks.AddItem(s2);
           TLI:=EncodeHTMLCtx(ID,TLI+1);
-          IndexEntries^.Insert(NewIndexEntry(  FormatAlias(item.text),ID,TLI));
+          IndexEntries.Insert(NewIndexEntry(  FormatAlias(item.text),ID,TLI));
         end;
     end;
    {$ifdef wdebug}
@@ -247,7 +249,7 @@ begin
 
     if not assigned(m) then exit;
     linedata.loadfromstream(m);
-    result:=new(PMemoryTextFile,Init);
+    result:=TMemoryTextFile.Create;
     for i:=0 to linedata.count-1 do
        begin
          if length(linedata[i])>250 Then

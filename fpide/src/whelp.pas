@@ -15,6 +15,9 @@
 {$R-}
 unit WHelp;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses
@@ -84,38 +87,42 @@ type
         function GetNamedMarkIndex(const MarkName: string): sw_integer;
       end;
 
-      PTopicCollection = ^TTopicCollection;
-      TTopicCollection = object(TSortedCollection)
+      TTopicCollection = class;
+      PTopicCollection = TTopicCollection;
+      TTopicCollection = class(TSortedCollection)
         function   At(Index: sw_Integer): PTopic;
-        procedure  FreeItem(Item: Pointer); virtual;
-        function   Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
+        procedure  FreeItem(Item: Pointer); override;
+        function   Compare(Key1, Key2: Pointer): Sw_Integer; override;
         function   SearchTopic(AHelpCtx: THelpCtx): PTopic;
       end;
 
-      PIndexEntryCollection = ^TIndexEntryCollection;
-      TIndexEntryCollection = object(TSortedCollection)
+      TIndexEntryCollection = class;
+      PIndexEntryCollection = TIndexEntryCollection;
+      TIndexEntryCollection = class(TSortedCollection)
         function   At(Index: Sw_Integer): PIndexEntry;
-        procedure  FreeItem(Item: Pointer); virtual;
-        function   Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
+        procedure  FreeItem(Item: Pointer); override;
+        function   Compare(Key1, Key2: Pointer): Sw_Integer; override;
       end;
 
-      PUnsortedIndexEntryCollection = ^TUnsortedIndexEntryCollection;
-      TUnsortedIndexEntryCollection = object(TCollection)
+      TUnsortedIndexEntryCollection = class;
+      PUnsortedIndexEntryCollection = TUnsortedIndexEntryCollection;
+      TUnsortedIndexEntryCollection = class(TCollection)
         function   At(Index: Sw_Integer): PIndexEntry;
-        procedure  FreeItem(Item: Pointer); virtual;
+        procedure  FreeItem(Item: Pointer); override;
       end;
 
-      PHelpFile = ^THelpFile;
-      THelpFile = object(TObject)
+      THelpFile = class;
+      PHelpFile = THelpFile;
+      THelpFile = class(TObject)
         ID           : word;
         Topics       : PTopicCollection;
         IndexEntries : PUnsortedIndexEntryCollection;
-        constructor Init(AID: word);
+        constructor Create(AID: word);
         function    LoadTopic(HelpCtx: THelpCtx): PTopic; virtual;
         procedure   AddTopic(HelpCtx: THelpCtx; Pos: longint; const Param: string;
                     ExtData: pointer; ExtDataSize: longint);
         procedure   AddIndexEntry(const Text: string; AHelpCtx: THelpCtx);
-        destructor  Done; virtual;
+        destructor Destroy; override;
       public
         function    LoadIndex: boolean; virtual;
         function    SearchTopic(HelpCtx: THelpCtx): PTopic; virtual;
@@ -127,18 +134,19 @@ type
 
       PHelpFileCollection = PCollection;
 
-      PHelpFacility = ^THelpFacility;
-      THelpFacility = object(TObject)
+      THelpFacility = class;
+      PHelpFacility = THelpFacility;
+      THelpFacility = class(TObject)
         HelpFiles: PHelpFileCollection;
         IndexTabSize: sw_integer;
-        constructor Init;
+        constructor Create;
         function    AddFile(const FileName, Param: string): PHelpFile;
         function    AddHelpFile(H: PHelpFile): boolean;
         function    LoadTopic(SourceFileID: word; Context: THelpCtx): PTopic; virtual;
         function    GetTopicInfo(SourceFileID: word; Context: THelpCtx) : string; virtual;
         function    TopicSearch(Keyword: string; var FileID: word; var Context: THelpCtx): boolean; virtual;
         function    BuildIndexTopic: PTopic; virtual;
-        destructor  Done; virtual;
+        destructor Destroy; override;
       private
         LastID: word;
         function  SearchFile(ID: byte): PHelpFile;
@@ -199,8 +207,9 @@ uses
   WConsts;
 
 type
-  PHelpFileTypeCollection = ^THelpFileTypeCollection;
-  THelpFileTypeCollection = object(TCollection)
+  THelpFileTypeCollection = class;
+  PHelpFileTypeCollection = THelpFileTypeCollection;
+  THelpFileTypeCollection = class(TCollection)
     function At(Index: sw_Integer): PHelpFileType;
     procedure FreeItem(Item: Pointer); virtual;
   end;
@@ -231,12 +240,12 @@ end;
 procedure DoneHelpFilesTypes;
 begin
   if Assigned(HelpFileTypes) then
-    Dispose(HelpFileTypes, Done);
+    HelpFileTypes.Free;
 end;
 
 function THelpFileTypeCollection.At(Index: sw_Integer): PHelpFileType;
 begin
-  At:=inherited At(Index);
+  At := PHelpFileType(inherited At(Index));
 end;
 
 procedure THelpFileTypeCollection.FreeItem(Item: Pointer);
@@ -248,8 +257,8 @@ end;
 procedure RegisterHelpFileType(AOpenProc: THelpFileOpenProc);
 begin
   if not Assigned(HelpFileTypes) then
-    New(HelpFileTypes, Init(10,10));
-  HelpFileTypes^.Insert(NewHelpFileType(AOpenProc));
+    HelpFileTypes := THelpFileTypeCollection.Create(10,10);
+  HelpFileTypes.Insert(NewHelpFileType(AOpenProc));
 end;
 
 function  GetHelpFileTypeCount: integer;
@@ -258,13 +267,13 @@ begin
   if not Assigned(HelpFileTypes) then
     Count:=0
   else
-    Count:=HelpFileTypes^.Count;
+    Count:=HelpFileTypes.Count;
   GetHelpFileTypeCount:=Count;
 end;
 
 procedure GetHelpFileType(Index: sw_integer; var HT: THelpFileType);
 begin
-  HT:=HelpFileTypes^.At(Index)^;
+  HT:=HelpFileTypes.At(Index)^;
 end;
 
 {$R-}
@@ -341,7 +350,7 @@ begin
     GetMem(P^.ExtData,ExtDataSize);
     Move(ExtData^,P^.ExtData^,ExtDataSize);
   end;
-  New(P^.NamedMarks, Init(100,100));
+  P^.NamedMarks := TUnsortedStringCollection.Create(100,100);
   NewTopic:=P;
 end;
 
@@ -358,16 +367,16 @@ begin
     if P^.Param<>nil then DisposeStr(P^.Param); P^.Param:=nil;
     if Assigned(P^.ExtData) then
       FreeMem(P^.ExtData);
-    if Assigned(P^.NamedMarks) then Dispose(P^.NamedMarks, Done); P^.NamedMarks:=nil;
+    if Assigned(P^.NamedMarks) then P^.NamedMarks.Free; P^.NamedMarks:=nil;
     Dispose(P);
   end;
 end;
 
 function CloneTopic(T: PTopic): PTopic;
 var NT: PTopic;
-procedure CloneMark(P: PString);
+procedure CloneMark(Item: Pointer);
 begin
-  NT^.NamedMarks^.InsertStr(GetStr(P));
+  NT^.NamedMarks.InsertStr(GetStr(PString(Item)));
 end;
 begin
   New(NT);
@@ -383,8 +392,8 @@ begin
      NT^.Param:=NewStr(T^.Param^);
   if Assigned(T^.NamedMarks) then
   begin
-    New(NT^.NamedMarks, Init(T^.NamedMarks^.Count,10));
-    T^.NamedMarks^.ForEach(@CloneMark);
+    NT^.NamedMarks := TUnsortedStringCollection.Create(T^.NamedMarks.Count,10);
+    T^.NamedMarks.ForEach(@CloneMark);
   end;
   NT^.ExtDataSize:=T^.ExtDataSize;
   if Assigned(T^.ExtData) and (T^.ExtDataSize>0) then
@@ -400,18 +409,18 @@ var Size,CurPtr,I,MSize: sw_word;
     S: string;
 begin
   CurPtr:=0;
-  for I:=0 to Lines^.Count-1 do
+  for I:=0 to Lines.Count-1 do
   begin
-    S:=GetStr(Lines^.At(I));
+    S:=GetStr(Lines.At(I));
     Size:=length(S)+1;
     Inc(CurPtr,Size);
   end;
   Size:=CurPtr;
   T^.TextSize:=Size; GetMem(T^.Text,T^.TextSize);
   CurPtr:=0;
-  for I:=0 to Lines^.Count-1 do
+  for I:=0 to Lines.Count-1 do
   begin
-    S:=GetStr(Lines^.At(I)); Size:=length(S); MSize:=Size;
+    S:=GetStr(Lines.At(I)); Size:=length(S); MSize:=Size;
     if CurPtr+Size>=T^.TextSize then
       MSize:=T^.TextSize-CurPtr;
     Move(S[1],PByteArray(T^.Text)^[CurPtr],MSize);
@@ -430,18 +439,18 @@ var Size,CurPtr,MSize: sw_word;
     S: string;
 begin
   CurPtr:=0;
-  for I:=0 to Lines^.Count-1 do
+  for I:=0 to Lines.Count-1 do
   begin
-    S:=GetStr(Lines^.At(I));
+    S:=GetStr(Lines.At(I));
     Size:=length(S);
     Inc(CurPtr,Size);
   end;
   Size:=CurPtr;
   T^.TextSize:=Size; GetMem(T^.Text,T^.TextSize);
   CurPtr:=0;
-  for I:=0 to Lines^.Count-1 do
+  for I:=0 to Lines.Count-1 do
   begin
-    S:=GetStr(Lines^.At(I)); Size:=length(S); MSize:=Size;
+    S:=GetStr(Lines.At(I)); Size:=length(S); MSize:=Size;
     if Size>0 then
     begin
       if CurPtr+Size>=T^.TextSize then
@@ -502,8 +511,8 @@ var I,Index: sw_integer;
 begin
   Index:=-1;
   if Assigned(NamedMarks) then
-  for I:=0 to NamedMarks^.Count-1 do
-    if CompareText(GetStr(NamedMarks^.At(I)),MarkName)=0 then
+  for I:=0 to NamedMarks.Count-1 do
+    if CompareText(GetStr(NamedMarks.At(I)),MarkName)=0 then
      begin
        Index:=I;
        Break;
@@ -513,7 +522,7 @@ end;
 
 function TTopicCollection.At(Index: sw_Integer): PTopic;
 begin
-  At:=inherited At(Index);
+  At := PTopic(inherited At(Index));
 end;
 
 procedure TTopicCollection.FreeItem(Item: Pointer);
@@ -537,6 +546,7 @@ var T: TTopic;
     P: PTopic;
     Index: sw_integer;
 begin
+  FillChar(T, SizeOf(T), 0);
   T.HelpCtx:=AHelpCtx;
   if Search(@T,Index) then
     P:=At(Index)
@@ -547,7 +557,7 @@ end;
 
 function TIndexEntryCollection.At(Index: Sw_Integer): PIndexEntry;
 begin
-  At:=inherited At(Index);
+  At := PIndexEntry(inherited At(Index));
 end;
 
 procedure TIndexEntryCollection.FreeItem(Item: Pointer);
@@ -557,7 +567,7 @@ end;
 
 function TUnsortedIndexEntryCollection.At(Index: Sw_Integer): PIndexEntry;
 begin
-  At:=inherited At(Index);
+  At := PIndexEntry(inherited At(Index));
 end;
 
 procedure TUnsortedIndexEntryCollection.FreeItem(Item: Pointer);
@@ -586,10 +596,10 @@ begin
   (* if assigned(HelpFacility) then
     begin
       { Try to read the title of the topic }
-      T1:=HelpFacility^.LoadTopic(K1^.FileID,K1^.HelpCtx);
-      T2:=HelpFacility^.LoadTopic(K2^.FileID,K2^.HelpCtx);
-      if assigned(T1^.Text) and assigned(T2^.Text) then
-        r:=strcomp(pchar(T1^.Text),pchar(T2^.Text))
+      T1:=HelpFacility.LoadTopic(K1^.FileID,K1^.HelpCtx);
+      T2:=HelpFacility.LoadTopic(K2^.FileID,K2^.HelpCtx);
+      if assigned(T1.Text) and assigned(T2.Text) then
+        r:=strcomp(pchar(T1.Text),pchar(T2.Text))
       else
         r:=0;
       if r>0 then
@@ -614,22 +624,22 @@ begin
   Compare:=R;
 end;
 
-constructor THelpFile.Init(AID: word);
+constructor THelpFile.Create(AID: word);
 begin
-  inherited Init;
+  inherited Create;
   ID:=AID;
-  New(Topics, Init(2000,1000));
-  New(IndexEntries, Init(2000,1000));
+  Topics := TTopicCollection.Create(2000,1000);
+  IndexEntries := TUnsortedIndexEntryCollection.Create(2000,1000);
 end;
 
 procedure THelpFile.AddTopic(HelpCtx: THelpCtx; Pos: longint; const Param: string; ExtData: pointer; ExtDataSize: longint);
 begin
-  Topics^.Insert(NewTopic(ID,HelpCtx,Pos,Param,ExtData,ExtDataSize));
+  Topics.Insert(NewTopic(ID,HelpCtx,Pos,Param,ExtData,ExtDataSize));
 end;
 
 procedure THelpFile.AddIndexEntry(const Text: string; AHelpCtx: THelpCtx);
 begin
-  IndexEntries^.Insert(NewIndexEntry(Text,ID,AHelpCtx));
+  IndexEntries.Insert(NewIndexEntry(Text,ID,AHelpCtx));
 end;
 
 function THelpFile.LoadTopic(HelpCtx: THelpCtx): PTopic;
@@ -661,7 +671,7 @@ end;
 function THelpFile.SearchTopic(HelpCtx: THelpCtx): PTopic;
 var T: PTopic;
 begin
-  T:=Topics^.SearchTopic(HelpCtx);
+  T:=Topics.SearchTopic(HelpCtx);
   SearchTopic:=T;
 end;
 
@@ -680,16 +690,24 @@ end;
 procedure THelpFile.MaintainTopicCache;
 var Count: sw_integer;
     MinLRU: longint;
-procedure CountThem(P: PTopic);
-begin if (P^.Text<>nil) or (P^.Links<>nil) then Inc(Count); end;
-procedure SearchLRU(P: PTopic);
-begin if P^.LastAccess<MinLRU then begin MinLRU:=P^.LastAccess; end; end;
+procedure CountThem(Item: Pointer);
 var P: PTopic;
 begin
-  Count:=0; Topics^.ForEach(@CountThem);
+  P:=PTopic(Item);
+  if (P^.Text<>nil) or (P^.Links<>nil) then Inc(Count);
+end;
+procedure SearchLRU(Item: Pointer);
+var P: PTopic;
+begin
+  P:=PTopic(Item);
+  if P^.LastAccess<MinLRU then begin MinLRU:=P^.LastAccess; end;
+end;
+var P: PTopic;
+begin
+  Count:=0; Topics.ForEach(@CountThem);
   if (Count>=TopicCacheSize) then
   begin
-    MinLRU:=MaxLongint; P:=nil; Topics^.ForEach(@SearchLRU);
+    MinLRU:=MaxLongint; P:=nil; Topics.ForEach(@SearchLRU);
     if P<>nil then
     begin
       FreeMem(P^.Text,P^.TextSize); P^.TextSize:=0; P^.Text:=nil;
@@ -698,17 +716,17 @@ begin
   end;
 end;
 
-destructor THelpFile.Done;
+destructor THelpFile.Destroy;
 begin
-  if Topics<>nil then Dispose(Topics, Done);
-  if IndexEntries<>nil then Dispose(IndexEntries, Done);
-  inherited Done;
+  if Topics<>nil then Topics.Free;
+  if IndexEntries<>nil then IndexEntries.Free;
+  inherited Destroy;
 end;
 
-constructor THelpFacility.Init;
+constructor THelpFacility.Create;
 begin
-  inherited Init;
-  New(HelpFiles, Init(10,10));
+  inherited Create;
+  HelpFiles := TCollection.Create(10,10);
   IndexTabSize:=40;
 end;
 
@@ -728,7 +746,7 @@ begin
   end;
   if Assigned(H) then
     OK:=AddHelpFile(H);
-  if (not OK) and Assigned(H) then begin Dispose(H, Done); H:=nil; end;
+  if (not OK) and Assigned(H) then begin H.Free; H:=nil; end;
   AddFile:=H;
 end;
 
@@ -736,9 +754,9 @@ function THelpFacility.AddHelpFile(H: PHelpFile): boolean;
 begin
   if H<>nil then
     begin
-      HelpFiles^.Insert(H);
+      HelpFiles.Insert(H);
       Inc(LastID);
-      { H^.ID:=LastID; now already set by OpenProc PM }
+      { H.ID:=LastID; now already set by OpenProc PM }
     end;
   AddHelpFile:=H<>nil;
 end;
@@ -746,8 +764,10 @@ end;
 function THelpFacility.SearchTopicOwner(SourceFileID: word; Context: THelpCtx): PHelpFile;
 var P: PTopic;
     HelpFile: PHelpFile;
-function Search(F: PHelpFile): boolean;
+function Search(Item: Pointer): boolean;
+var F: PHelpFile;
 begin
+  F:=PHelpFile(Item);
   P:=SearchTopicInHelpFile(F,Context); if P<>nil then HelpFile:=F;
   Search:=P<>nil;
 end;
@@ -758,7 +778,7 @@ begin
        HelpFile:=SearchFile(SourceFileID);
        P:=SearchTopicInHelpFile(HelpFile,Context);
      end;
-  if P=nil then HelpFiles^.FirstThat(@Search);
+  if P=nil then HelpFiles.FirstThat(@Search);
   if P=nil then HelpFile:=nil;
   SearchTopicOwner:=HelpFile;
 end;
@@ -772,7 +792,7 @@ begin
   begin
     H:=SearchTopicOwner(SourceFileID,Context);
     if (H=nil) then P:=nil else
-       P:=H^.LoadTopic(Context);
+       P:=H.LoadTopic(Context);
   end;
   LoadTopic:=P;
 end;
@@ -789,48 +809,56 @@ begin
     begin
       H:=SearchTopicOwner(SourceFileID,Context);
       if (H=nil) then P:=nil else
-         P:=H^.SearchTopic(Context);
+         P:=H.SearchTopic(Context);
     end;
   If not assigned(P) then
     GetTopicInfo:='Not found'
   else
-    GetTopicInfo:=H^.GetTopicInfo(P);
+    GetTopicInfo:=H.GetTopicInfo(P);
 end;
 
 
 
 function THelpFacility.TopicSearch(Keyword: string; var FileID: word; var Context: THelpCtx): boolean;
-function ScanHelpFileExact(H: PHelpFile): boolean;
-function SearchExact(P: PIndexEntry): boolean;
+function ScanHelpFileExact(Item: Pointer): boolean;
+var H: PHelpFile;
+function SearchExact(Item2: Pointer): boolean;
+var P: PIndexEntry;
 begin
+  P:=PIndexEntry(Item2);
   SearchExact:=UpcaseStr(P^.Tag^)=Keyword;
 end;
 var P: PIndexEntry;
 begin
-  H^.LoadIndex;
-  P:=H^.IndexEntries^.FirstThat(@SearchExact);
-  if P<>nil then begin FileID:=H^.ID; Context:=P^.HelpCtx; end;
+  H:=PHelpFile(Item);
+  H.LoadIndex;
+  P:=PIndexEntry(H.IndexEntries.FirstThat(@SearchExact));
+  if P<>nil then begin FileID:=H.ID; Context:=P^.HelpCtx; end;
   ScanHelpFileExact:=P<>nil;
 end;
-function ScanHelpFile(H: PHelpFile): boolean;
-function Search(P: PIndexEntry): boolean;
+function ScanHelpFile(Item: Pointer): boolean;
+var H: PHelpFile;
+function Search(Item2: Pointer): boolean;
+var P: PIndexEntry;
 begin
+  P:=PIndexEntry(Item2);
   Search:=copy(UpcaseStr(P^.Tag^),1,length(Keyword))=Keyword;
 end;
 var P: PIndexEntry;
 begin
-  H^.LoadIndex;
-  P:=H^.IndexEntries^.FirstThat(@Search);
-  if P<>nil then begin FileID:=H^.ID; Context:=P^.HelpCtx; end;
+  H:=PHelpFile(Item);
+  H.LoadIndex;
+  P:=PIndexEntry(H.IndexEntries.FirstThat(@Search));
+  if P<>nil then begin FileID:=H.ID; Context:=P^.HelpCtx; end;
   ScanHelpFile:=P<>nil;
 end;
 var
   PH : PHelpFile;
 begin
   Keyword:=UpcaseStr(Keyword);
-  PH:=HelpFiles^.FirstThat(@ScanHelpFileExact);
+  PH:=PHelpFile(HelpFiles.FirstThat(@ScanHelpFileExact));
   if not assigned(PH) then
-    PH:=HelpFiles^.FirstThat(@ScanHelpFile);
+    PH:=PHelpFile(HelpFiles.FirstThat(@ScanHelpFile));
   TopicSearch:=PH<>nil;
 end;
 
@@ -838,21 +866,25 @@ function THelpFacility.BuildIndexTopic: PTopic;
 var T: PTopic;
     Keywords: PIndexEntryCollection;
     Lines: PUnsortedStringCollection;
-procedure InsertKeywordsOfFile(H: PHelpFile);
-function InsertKeywords(P: PIndexEntry): boolean;
+procedure InsertKeywordsOfFile(Item: Pointer);
+var H: PHelpFile;
+function InsertKeywords(Item2: Pointer): boolean;
+var P: PIndexEntry;
 begin
-  Keywords^.Insert(P);
-  InsertKeywords:=Keywords^.Count>=MaxCollectionSize;
+  P:=PIndexEntry(Item2);
+  Keywords.Insert(P);
+  InsertKeywords:=Keywords.Count>=MaxCollectionSize;
 end;
 begin
-  H^.LoadIndex;
-  if Keywords^.Count<MaxCollectionSize then
-  H^.IndexEntries^.FirstThat(@InsertKeywords);
+  H:=PHelpFile(Item);
+  H.LoadIndex;
+  if Keywords.Count<MaxCollectionSize then
+  H.IndexEntries.FirstThat(@InsertKeywords);
 end;
 procedure AddLine(S: string);
 begin
   if S='' then S:=' ';
-  Lines^.Insert(NewStr(S));
+  Lines.Insert(NewStr(S));
 end;
 var Line: string;
 procedure FlushLine;
@@ -911,11 +943,11 @@ var KW: PIndexEntry;
     MultiCount : longint;
     St,LastTag : String;
 begin
-  New(Keywords, Init(5000,5000));
-  HelpFiles^.ForEach(@InsertKeywordsOfFile);
-  New(Lines, Init((Keywords^.Count div 2)+100,1000));
+  Keywords := TIndexEntryCollection.Create(5000,5000);
+  HelpFiles.ForEach(@InsertKeywordsOfFile);
+  Lines := TUnsortedStringCollection.Create((Keywords.Count div 2)+100,1000);
   T:=NewTopic(0,0,0,'',nil,0);
-  if HelpFiles^.Count=0 then
+  if HelpFiles.Count=0 then
     begin
       AddLine('');
       AddLine(msg_nohelpfilesinstalled1);
@@ -927,24 +959,24 @@ begin
   begin
     AddLine(' '+msg_helpindex);
     KWCount:=0; Line:='';
-    T^.LinkCount:=Min(Keywords^.Count,MaxBytes div sizeof(T^.Links^[0])-1);
+    T^.LinkCount:=Min(Keywords.Count,MaxBytes div sizeof(T^.Links^[0])-1);
     GetMem(T^.Links,T^.LinkSize);
     MultiCount:=0;
     LastTag:='';
     for I:=0 to T^.LinkCount-1 do
     begin
-      KW:=Keywords^.At(I);
+      KW:=Keywords.At(I);
       if (LastTag<>KW^.Tag^) then
         Begin
           MultiCount:=0;
-          IsMultiple:=(I<T^.LinkCount-1) and (KW^.Tag^=Keywords^.At(I+1)^.Tag^);
+          IsMultiple:=(I<T^.LinkCount-1) and (KW^.Tag^=Keywords.At(I+1)^.Tag^);
         End
       else
         IsMultiple:=true;
       if IsMultiple then
         Begin
           Inc(MultiCount);
-          (* St:=Trim(strpas(pchar(HelpFacility^.LoadTopic(KW^.FileID,KW^.HelpCtx)^.Text))); *)
+          (* St:=Trim(strpas(pchar(HelpFacility.LoadTopic(KW^.FileID,KW^.HelpCtx).Text))); *)
           St:=KW^.Tag^+' ['+IntToStr(MultiCount)+']';
           (* { Remove all special chars }
           for p:=1 to Length(st) do
@@ -967,32 +999,32 @@ begin
     AddLine('');
   end;
   RenderTopic(Lines,T);
-  Dispose(Lines, Done);
-  Keywords^.DeleteAll; Dispose(Keywords, Done);
+  Lines.Free;
+  Keywords.DeleteAll; Keywords.Free;
   BuildIndexTopic:=T;
 end;
 
 function THelpFacility.SearchFile(ID: byte): PHelpFile;
-function Match(P: PHelpFile): boolean;
+function Match(Item: Pointer): boolean;
 begin
-  Match:=(P^.ID=ID);
+  Match:=(PHelpFile(Item).ID=ID);
 end;
 begin
-  SearchFile:=HelpFiles^.FirstThat(@Match);
+  SearchFile:=PHelpFile(HelpFiles.FirstThat(@Match));
 end;
 
 function THelpFacility.SearchTopicInHelpFile(F: PHelpFile; Context: THelpCtx): PTopic;
 var P: PTopic;
 begin
   if F=nil then P:=nil else
-  P:=F^.SearchTopic(Context);
+  P:=F.SearchTopic(Context);
   SearchTopicInHelpFile:=P;
 end;
 
-destructor THelpFacility.Done;
+destructor THelpFacility.Destroy;
 begin
-  inherited Done;
-  Dispose(HelpFiles, Done);
+  inherited Destroy;
+  HelpFiles.Free;
 end;
 
 {$ifdef HASAMIGA}

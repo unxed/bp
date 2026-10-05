@@ -38,8 +38,9 @@ uses
 
 type
 {$ifndef NODEBUG}
-  PDebugController=^TDebugController;
-  TDebugController=object(TGDBController)
+  TDebugController = class;
+  PDebugController = TDebugController;
+  TDebugController= class(TGDBController)
   private
     function  GetFPCBreakErrorParameters(var ExitCode: LongInt; var ExitAddr, ExitFrame: CORE_ADDR): Boolean;
   public
@@ -64,10 +65,10 @@ type
      isConnectedToRemote,
      usessh :boolean;
 {$endif SUPPORT_REMOTE}
-    constructor Init;
+    constructor Create;
     procedure SetExe(const exefn:string);
     procedure SetSourceDirs;
-    destructor  Done;
+    destructor Destroy;
     function DoSelectSourceline(const fn:string;line,BreakIndex:longint): Boolean;virtual;
 {    procedure DoStartSession;virtual;
     procedure DoBreakSession;virtual;}
@@ -104,10 +105,12 @@ type
                     bt_awatch,bt_rwatch,bt_address,bt_invalid);
   BreakpointState = (bs_enabled,bs_disabled,bs_deleted,bs_delete_after);
 
-  PBreakpointCollection=^TBreakpointCollection;
+  TBreakpointCollection = class;
+  PBreakpointCollection = TBreakpointCollection;
 
-  PBreakpoint=^TBreakpoint;
-  TBreakpoint=object(TObject)
+  TBreakpoint = class;
+  PBreakpoint = TBreakpoint;
+  TBreakpoint= class(TObject)
      typ  : BreakpointType;
      state : BreakpointState;
      owner : PBreakpointCollection;
@@ -133,10 +136,10 @@ type
      procedure  Disable;
      procedure  UpdateSource;
      procedure  ResetValues;
-     destructor Done;virtual;
+     destructor Destroy;virtual;
   end;
 
-  TBreakpointCollection=object(TCollection)
+  TBreakpointCollection= class(TCollection)
       function  At(Index: Integer): PBreakpoint;
       function  GetGDB(index : longint) : PBreakpoint;
       function  GetType(typ : BreakpointType;Const s : String) : PBreakpoint;
@@ -148,22 +151,24 @@ type
       procedure ShowAllBreakpoints;
     end;
 
-    PBreakpointItem = ^TBreakpointItem;
-    TBreakpointItem = object(TObject)
+    TBreakpointItem = class;
+  PBreakpointItem = TBreakpointItem;
+    TBreakpointItem = class(TObject)
       Breakpoint : PBreakpoint;
-      constructor Init(ABreakpoint : PBreakpoint);
+      constructor Create(ABreakpoint : PBreakpoint);
       function    GetText(MaxLen: Sw_integer): string; virtual;
       procedure   Selected; virtual;
       function    GetModuleName: string; virtual;
     end;
 
-    PBreakpointsListBox = ^TBreakpointsListBox;
-    TBreakpointsListBox = object(THSListBox)
+    TBreakpointsListBox = class;
+  PBreakpointsListBox = TBreakpointsListBox;
+    TBreakpointsListBox = class(THSListBox)
       Transparent : boolean;
       NoSelection : boolean;
       MaxWidth    : Sw_integer;
       (* ModuleNames : PStoreCollection; *)
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
       procedure   AddBreakpoint(P: PBreakpointItem); virtual;
       function    GetText(Item,MaxLen: Sw_Integer): String; virtual;
       function    GetLocalMenu: PMenu;virtual;
@@ -177,13 +182,14 @@ type
       procedure   HandleEvent(var Event: TEvent); virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PBreakpointsWindow = ^TBreakpointsWindow;
-    TBreakpointsWindow = object(TFPDlgWindow)
+    TBreakpointsWindow = class;
+  PBreakpointsWindow = TBreakpointsWindow;
+    TBreakpointsWindow = class(TFPDlgWindow)
       BreakLB : PBreakpointsListBox;
-      constructor Init;
+      constructor Create;
       procedure   AddBreakpoint(ABreakpoint : PBreakpoint);
       procedure   ClearBreakpoints;
       procedure   ReloadBreakpoints;
@@ -193,13 +199,14 @@ type
       procedure   Update; virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PBreakpointItemDialog = ^TBreakpointItemDialog;
+    TBreakpointItemDialog = class;
+  PBreakpointItemDialog = TBreakpointItemDialog;
 
-    TBreakpointItemDialog = object(TCenterDialog)
-      constructor Init(ABreakpoint: PBreakpoint);
+    TBreakpointItemDialog = class(TCenterDialog)
+      constructor Create(ABreakpoint: PBreakpoint);
       function    Execute: Word; virtual;
     private
       Breakpoint : PBreakpoint;
@@ -210,11 +217,12 @@ type
       IgnoreIL  : PEditorInputLine;
     end;
 
-    PWatch = ^TWatch;
-    TWatch =  Object(TObject)
+    TWatch = class;
+  PWatch = TWatch;
+    TWatch = class(TObject)
       expr : pstring;
       last_value,current_value : pchar;
-      constructor Init(s : string);
+      constructor Create(s : string);
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure rename(s : string);
@@ -225,9 +233,10 @@ type
       GDBRunCount : longint;
     end;
 
-    PWatchesCollection = ^TWatchesCollection;
-    TWatchesCollection = Object(TCollection)
-      constructor Init;
+    TWatchesCollection = class;
+  PWatchesCollection = TWatchesCollection;
+    TWatchesCollection = class(TCollection)
+      constructor Create;
       procedure Insert(Item: Pointer); virtual;
       function  At(Index: Integer): PWatch;
       procedure Update;
@@ -235,11 +244,12 @@ type
       MaxW : integer;
     end;
 
-    PWatchesListBox = ^TWatchesListBox;
-    TWatchesListBox = object(THSListBox)
+    TWatchesListBox = class;
+  PWatchesListBox = TWatchesListBox;
+    TWatchesListBox = class(THSListBox)
       Transparent : boolean;
       MaxWidth    : Sw_integer;
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
       (* procedure   AddWatch(P: PWatch); virtual; *)
       procedure   Update(AMaxWidth : integer);
       function    GetText (Item: Sw_Integer; MaxLen: Sw_Integer): String; Virtual;
@@ -255,13 +265,14 @@ type
       procedure   HandleEvent(var Event: TEvent); virtual;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PWatchItemDialog = ^TWatchItemDialog;
+    TWatchItemDialog = class;
+  PWatchItemDialog = TWatchItemDialog;
 
-    TWatchItemDialog = object(TCenterDialog)
-      constructor Init(AWatch: PWatch);
+    TWatchItemDialog = class(TCenterDialog)
+      constructor Create(AWatch: PWatch);
       function    Execute: Word; virtual;
     private
       Watch : PWatch;
@@ -269,35 +280,38 @@ type
       TextST : PAdvancedStaticText;
     end;
 
-    PWatchesWindow = ^TWatchesWindow;
-    TWatchesWindow = Object(TFPDlgWindow)
+    TWatchesWindow = class;
+  PWatchesWindow = TWatchesWindow;
+    TWatchesWindow = class(TFPDlgWindow)
       WLB : PWatchesListBox;
       Constructor Init;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   Update; virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PFramesListBox = ^TFramesListBox;
-    TFramesListBox = object(TMessageListBox)
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+    TFramesListBox = class;
+  PFramesListBox = TFramesListBox;
+    TFramesListBox = class(TMessageListBox)
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
       procedure   Update;
       function    GetLocalMenu: PMenu;virtual;
       procedure   GotoSource; virtual;
       procedure   GotoAssembly; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PStackWindow = ^TStackWindow;
-    TStackWindow = Object(TFPDlgWindow)
+    TStackWindow = class;
+  PStackWindow = TStackWindow;
+    TStackWindow = class(TFPDlgWindow)
       FLB : PFramesListBox;
       Constructor Init;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   Update; virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
   procedure InitStackWindow;
@@ -364,59 +378,65 @@ uses
   FPIntf,FPCompil,FPIde,FPHelp,
   Validate,WUtils,Wconsts;
 
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
 const
   RBreakpointsWindow: TStreamRec = (
      ObjType: 1701;
-     VmtLink: Ofs(TypeOf(TBreakpointsWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TBreakpointsWindow)) at runtime };
      Load:    @TBreakpointsWindow.Load;
      Store:   @TBreakpointsWindow.Store
   );
 
-  RBreakpointsListBox : TStreamRec = (
+  {$endif}
+{$endif}
+{$endif NOOBJREG}
+RBreakpointsListBox : TStreamRec = (
      ObjType: 1702;
-     VmtLink: Ofs(TypeOf(TBreakpointsListBox)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TBreakpointsListBox)) at runtime };
      Load:    @TBreakpointsListBox.Load;
      Store:   @TBreakpointsListBox.Store
   );
 
   RWatchesWindow: TStreamRec = (
      ObjType: 1703;
-     VmtLink: Ofs(TypeOf(TWatchesWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TWatchesWindow)) at runtime };
      Load:    @TWatchesWindow.Load;
      Store:   @TWatchesWindow.Store
   );
 
   RWatchesListBox: TStreamRec = (
      ObjType: 1704;
-     VmtLink: Ofs(TypeOf(TWatchesListBox)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TWatchesListBox)) at runtime };
      Load:    @TWatchesListBox.Load;
      Store:   @TWatchesListBox.Store
   );
 
   RStackWindow: TStreamRec = (
      ObjType: 1705;
-     VmtLink: Ofs(TypeOf(TStackWindow)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TStackWindow)) at runtime };
      Load:    @TStackWindow.Load;
      Store:   @TStackWindow.Store
   );
 
   RFramesListBox: TStreamRec = (
      ObjType: 1706;
-     VmtLink: Ofs(TypeOf(TFramesListBox)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TFramesListBox)) at runtime };
      Load:    @TFramesListBox.Load;
      Store:   @TFramesListBox.Store
   );
 
   RBreakpoint: TStreamRec = (
      ObjType: 1707;
-     VmtLink: Ofs(TypeOf(TBreakpoint)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TBreakpoint)) at runtime };
      Load:    @TBreakpoint.Load;
      Store:   @TBreakpoint.Store
   );
 
   RWatch: TStreamRec = (
      ObjType: 1708;
-     VmtLink: Ofs(TypeOf(TWatch)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TWatch)) at runtime };
      Load:    @TWatch.Load;
      Store:   @TWatch.Store
   );
@@ -424,14 +444,14 @@ const
 
   RBreakpointCollection: TStreamRec = (
      ObjType: 1709;
-     VmtLink: Ofs(TypeOf(TBreakpointCollection)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TBreakpointCollection)) at runtime };
      Load:    @TBreakpointCollection.Load;
      Store:   @TBreakpointCollection.Store
   );
 
   RWatchesCollection: TStreamRec = (
      ObjType: 1710;
-     VmtLink: Ofs(TypeOf(TWatchesCollection)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TWatchesCollection)) at runtime };
      Load:    @TWatchesCollection.Load;
      Store:   @TWatchesCollection.Store
   );
@@ -629,26 +649,26 @@ procedure UpdateDebugViews;
   begin
 {$ifdef SUPPORT_REMOTE}
      if assigned(Debugger) and
-        Debugger^.isRemoteDebugging then
+        Debugger.isRemoteDebugging then
        PushStatus(msg_getting_info_on+RemoteMachine);
 {$endif SUPPORT_REMOTE}
      DeskTop^.Lock;
      If assigned(StackWindow) then
        StackWindow^.Update;
      If assigned(RegistersWindow) then
-       RegistersWindow^.Update;
+       RegistersWindow.Update;
 {$ifndef NODEBUG}
      If assigned(Debugger) then
-       Debugger^.ReadWatches;
+       Debugger.ReadWatches;
 {$endif NODEBUG}
      If assigned(FPUWindow) then
-       FPUWindow^.Update;
+       FPUWindow.Update;
      If assigned(VectorWindow) then
-       VectorWindow^.Update;
+       VectorWindow.Update;
      DeskTop^.UnLock;
 {$ifdef SUPPORT_REMOTE}
      if assigned(Debugger) and
-        Debugger^.isRemoteDebugging then
+        Debugger.isRemoteDebugging then
        PopStatus;
 {$endif SUPPORT_REMOTE}
   end;
@@ -657,12 +677,12 @@ procedure UpdateDebugViews;
 
 constructor TDebugController.Init;
 begin
-  inherited Init;
+  inherited Create;
   CenterDebuggerRow:=IniCenterDebuggerRow;
   Disableallinvalidbreakpoints:=false;
   NoSwitch:=False;
   HasExe:=false;
-  Debugger:=@self;
+  Debugger:=Self;
   switch_to_user:=true;
   GetDir(0,OrigPwd);
   SetCommand('print object off');
@@ -770,7 +790,7 @@ procedure TDebugController.InsertBreakpoints;
   end;
 
 begin
-  BreakpointsCollection^.ForEach(@DoInsert);
+  BreakpointsCollection.ForEach(@DoInsert);
   Disableallinvalidbreakpoints:=false;
 end;
 
@@ -782,7 +802,7 @@ procedure TDebugController.ReadWatches;
   end;
 
 begin
-  WatchesCollection^.ForEach(@DoRead);
+  WatchesCollection.ForEach(@DoRead);
   If Assigned(WatchesWindow) then
     WatchesWindow^.Update;
 end;
@@ -795,7 +815,7 @@ procedure TDebugController.RereadWatches;
   end;
 
 begin
-  WatchesCollection^.ForEach(@DoRead);
+  WatchesCollection.ForEach(@DoRead);
   If Assigned(WatchesWindow) then
     WatchesWindow^.Update;
 end;
@@ -807,7 +827,7 @@ procedure TDebugController.RemoveBreakpoints;
       PB^.Remove;
     end;
 begin
-   BreakpointsCollection^.ForEach(@DoDelete);
+   BreakpointsCollection.ForEach(@DoDelete);
 end;
 
 procedure TDebugController.ResetBreakpointsValues;
@@ -816,15 +836,15 @@ procedure TDebugController.ResetBreakpointsValues;
       PB^.ResetValues;
     end;
 begin
-   BreakpointsCollection^.ForEach(@DoResetVal);
+   BreakpointsCollection.ForEach(@DoResetVal);
 end;
 
-destructor TDebugController.Done;
+destructor TDebugController.Destroy;
 begin
   { kill the program if running }
   Reset;
   RemoveBreakpoints;
-  inherited Done;
+  inherited Destroy;
 end;
 
 
@@ -1442,7 +1462,7 @@ begin
   Desktop^.UnLock;
   if BreakIndex>0 then
     begin
-      PB:=BreakpointsCollection^.GetGDB(BreakIndex);
+      PB:=BreakpointsCollection.GetGDB(BreakIndex);
       if (BreakIndex=FPCBreakErrorNumber) then
        begin
           if (ExitCode<>0) or (ExitAddr<>0) then
@@ -1614,7 +1634,7 @@ function  ActiveBreakpoints : boolean;
 begin
    IsActive:=false;
    If assigned(BreakpointsCollection) then
-     BreakpointsCollection^.ForEach(@TestActive);
+     BreakpointsCollection.ForEach(@TestActive);
    ActiveBreakpoints:=IsActive;
 end;
 
@@ -1776,28 +1796,28 @@ begin
   if (GDBState=bs_deleted) and (state=bs_enabled) then
     begin
       if (typ=bt_file_line) and assigned(FileName) then
-        bkpt_no := Debugger^.BreakpointInsert(GDBFileName(NameAndExtOf(GetStr(FileName)))+':'+IntToStr(Line), [])
+        bkpt_no := Debugger.BreakpointInsert(GDBFileName(NameAndExtOf(GetStr(FileName)))+':'+IntToStr(Line), [])
       else if (typ=bt_function) and assigned(name) then
-        bkpt_no := Debugger^.BreakpointInsert(name^, [])
+        bkpt_no := Debugger.BreakpointInsert(name^, [])
       else if (typ=bt_address) and assigned(name) then
-        bkpt_no := Debugger^.BreakpointInsert('*0x'+name^, [])
+        bkpt_no := Debugger.BreakpointInsert('*0x'+name^, [])
       else if (typ=bt_watch) and assigned(name) then
-        bkpt_no := Debugger^.WatchpointInsert(name^, wtWrite)
+        bkpt_no := Debugger.WatchpointInsert(name^, wtWrite)
       else if (typ=bt_awatch) and assigned(name) then
-        bkpt_no := Debugger^.WatchpointInsert(name^, wtReadWrite)
+        bkpt_no := Debugger.WatchpointInsert(name^, wtReadWrite)
       else if (typ=bt_rwatch) and assigned(name) then
-        bkpt_no := Debugger^.WatchpointInsert(name^, wtRead);
+        bkpt_no := Debugger.WatchpointInsert(name^, wtRead);
       if bkpt_no<>0 then
         begin
           GDBIndex:=bkpt_no;
           GDBState:=bs_enabled;
-          Debugger^.BreakpointCondition(GDBIndex, GetStr(Conditions));
+          Debugger.BreakpointCondition(GDBIndex, GetStr(Conditions));
           If IgnoreCount>0 then
-            Debugger^.BreakpointSetIgnoreCount(GDBIndex, IgnoreCount);
+            Debugger.BreakpointSetIgnoreCount(GDBIndex, IgnoreCount);
           If Assigned(Commands) then
             begin
               {Commands are not handled yet }
-              Debugger^.Command('command '+IntToStr(GDBIndex));
+              Debugger.Command('command '+IntToStr(GDBIndex));
               p:=commands;
               while assigned(p) do
                 begin
@@ -1805,21 +1825,21 @@ begin
                   if assigned(p2) then
                       p2^:=#0;
                   st:=strpas(p);
-                  Debugger^.command(st);
+                  Debugger.command(st);
                   if assigned(p2) then
                       p2^:=#10;
                   p:=p2;
                   if assigned(p) then
                     inc(p);
                 end;
-              Debugger^.Command('end');
+              Debugger.Command('end');
             end;
         end
       else
       { Here there was a problem !! }
         begin
           GDBIndex:=0;
-          if not Debugger^.Disableallinvalidbreakpoints then
+          if not Debugger.Disableallinvalidbreakpoints then
             begin
               if (typ=bt_file_line) and assigned(FileName) then
                 begin
@@ -1827,7 +1847,7 @@ begin
                   AddFormatParamStr(NameAndExtOf(FileName^));
                   AddFormatParamInt(Line);
                   if ChoiceBox(msg_couldnotsetbreakpointat,@FormatParams,[btn_ok,button_DisableAllBreakpoints],false)=cmUserBtn2 then
-                    Debugger^.Disableallinvalidbreakpoints:=true;
+                    Debugger.Disableallinvalidbreakpoints:=true;
                 end
               else
                 begin
@@ -1835,7 +1855,7 @@ begin
                   AddFormatParamStr(BreakpointTypeStr[typ]);
                   AddFormatParamStr(GetStr(Name));
                   if ChoiceBox(msg_couldnotsetbreakpointtype,@FormatParams,[btn_ok,button_DisableAllBreakpoints],false)=cmUserBtn2 then
-                    Debugger^.Disableallinvalidbreakpoints:=true;
+                    Debugger.Disableallinvalidbreakpoints:=true;
                 end;
             end;
           state:=bs_disabled;
@@ -1854,7 +1874,7 @@ begin
 {$ifndef NODEBUG}
   If not assigned(Debugger) then Exit;
   if GDBIndex>0 then
-    Debugger^.BreakpointDelete(GDBIndex);
+    Debugger.BreakpointDelete(GDBIndex);
   GDBIndex:=0;
   GDBState:=bs_deleted;
 {$endif NODEBUG}
@@ -1865,7 +1885,7 @@ begin
 {$ifndef NODEBUG}
   If not assigned(Debugger) then Exit;
   if GDBIndex>0 then
-    Debugger^.BreakpointEnable(GDBIndex)
+    Debugger.BreakpointEnable(GDBIndex)
   else
     Insert;
   GDBState:=bs_disabled;
@@ -1877,7 +1897,7 @@ begin
 {$ifndef NODEBUG}
   If not assigned(Debugger) then Exit;
   if GDBIndex>0 then
-    Debugger^.BreakpointDisable(GDBIndex);
+    Debugger.BreakpointDisable(GDBIndex);
   GDBState:=bs_disabled;
 {$endif NODEBUG}
 end;
@@ -1910,7 +1930,7 @@ begin
     end;
 end;
 
-destructor TBreakpoint.Done;
+destructor TBreakpoint.Destroy;
 begin
   Remove;
   ResetValues;
@@ -1922,7 +1942,7 @@ begin
     DisposeStr(Conditions);
   if assigned(Commands) then
     StrDispose(Commands);
-  inherited Done;
+  inherited Destroy;
 end;
 
 {****************************************************************************
@@ -1940,8 +1960,8 @@ begin
 {$ifndef NODEBUG}
   if assigned(Debugger) then
     begin
-      Debugger^.RemoveBreakpoints;
-      Debugger^.InsertBreakpoints;
+      Debugger.RemoveBreakpoints;
+      Debugger.InsertBreakpoints;
     end;
 {$endif NODEBUG}
   if assigned(BreakpointsWindow) then
@@ -2118,7 +2138,7 @@ begin
         PB^.state:=bs_disabled;
         PB^.UpdateSource;
         { remove from collection }
-        BreakpointsCollection^.free(PB);
+        BreakpointsCollection.free(PB);
       end
     else
       begin
@@ -2139,9 +2159,9 @@ end;
                          TBreakpointItem
 ****************************************************************************}
 
-constructor TBreakpointItem.Init(ABreakpoint : PBreakpoint);
+constructor TBreakpointItem.Create(ABreakpoint : PBreakpoint);
 begin
-  inherited Init;
+  inherited Create;
   Breakpoint:=ABreakpoint;
 end;
 
@@ -2199,9 +2219,9 @@ end;
                          TBreakpointsListBox
 ****************************************************************************}
 
-constructor TBreakpointsListBox.Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+constructor TBreakpointsListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
 begin
-  inherited Init(Bounds,1,AHScrollBar, AVScrollBar);
+  inherited Create(Bounds,1,AHScrollBar, AVScrollBar);
   GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
   NoSelection:=true;
 end;
@@ -2360,7 +2380,7 @@ begin
   else if P^.Breakpoint^.state=bs_disabled then
     P^.Breakpoint^.state:=bs_enabled;
   P^.Breakpoint^.UpdateSource;
-  BreakpointsCollection^.Update;
+  BreakpointsCollection.Update;
 end;
 
 procedure TBreakpointsListBox.EditCurrent;
@@ -2372,7 +2392,7 @@ begin
   if P=nil then Exit;
   Application^.ExecuteDialog(New(PBreakpointItemDialog,Init(P^.Breakpoint)),nil);
   P^.Breakpoint^.UpdateSource;
-  BreakpointsCollection^.Update;
+  BreakpointsCollection.Update;
 end;
 
 procedure TBreakpointsListBox.DeleteCurrent;
@@ -2385,9 +2405,9 @@ begin
   { delete it form source window }
   P^.Breakpoint^.state:=bs_disabled;
   P^.Breakpoint^.UpdateSource;
-  BreakpointsCollection^.free(P^.Breakpoint);
+  BreakpointsCollection.free(P^.Breakpoint);
   List^.free(P);
-  BreakpointsCollection^.Update;
+  BreakpointsCollection.Update;
 end;
 
 procedure TBreakpointsListBox.EditNew;
@@ -2398,8 +2418,8 @@ begin
   if Application^.ExecuteDialog(New(PBreakpointItemDialog,Init(P)),nil)<>cmCancel then
     begin
       P^.UpdateSource;
-      BreakpointsCollection^.Insert(P);
-      BreakpointsCollection^.Update;
+      BreakpointsCollection.Insert(P);
+      BreakpointsCollection.Update;
     end
   else
     dispose(P,Done);
@@ -2410,22 +2430,22 @@ var
   I, J, Item: Sw_Integer;
   NormalColor, SelectedColor, FocusedColor, Color: Word;
   ColWidth, CurCol, Indent: Integer;
-  B: TDrawBuffer;
+  B: TFVDrawBuffer;
   Text: String;
   SCOff: Byte;
   TC: byte;
 procedure MT(var C: word); begin if TC<>0 then C:=(C and $ff0f) or (TC and $f0); end;
 begin
-  if (Owner<>nil) then TC:=ord(Owner^.GetColor(6)) else TC:=0;
+  if (Owner<>nil) then TC:=ord(Owner^.GetColorW(6)) else TC:=0;
   if State and (sfSelected + sfActive) = (sfSelected + sfActive) then
   begin
-    NormalColor := GetColor(1);
-    FocusedColor := GetColor(3);
-    SelectedColor := GetColor(4);
+    NormalColor := GetColorW(1);
+    FocusedColor := GetColorW(3);
+    SelectedColor := GetColorW(4);
   end else
   begin
-    NormalColor := GetColor(2);
-    SelectedColor := GetColor(4);
+    NormalColor := GetColorW(2);
+    SelectedColor := GetColorW(4);
   end;
   if Transparent then
     begin MT(NormalColor); MT(SelectedColor); end;
@@ -2469,9 +2489,9 @@ begin
           WordRec(B[CurCol+ColWidth-2]).Lo := Byte(SpecialChars[SCOff+1]);
         end;
       end;
-      MoveChar(B[CurCol+ColWidth-1], #179, GetColor(5), 1);
+      MoveChar(B[CurCol+ColWidth-1], #179, GetColorW(5), 1);
     end;
-    WriteLine(0, I, Size.X, 1, B);
+    WriteLineW(0, I, Size.X, 1, B);
   end;
 end;
 
@@ -2500,9 +2520,9 @@ begin
     changing the obj-hierarchy you'll always have to modify this, too - BG }
 end;
 
-destructor TBreakpointsListBox.Done;
+destructor TBreakpointsListBox.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if List<>nil then Dispose(List, Done);
 end;
 
@@ -2521,7 +2541,7 @@ const
   NumButtons = 5;
 begin
   Desktop^.GetExtent(R); R.A.Y:=R.B.Y-18;
-  inherited Init(R, dialog_breakpointlist, wnNoNumber);
+  inherited Create(R, dialog_breakpointlist, wnNoNumber);
 
   HelpCtx:=hcBreakpointListWindow;
 
@@ -2576,7 +2596,7 @@ begin
   Insert(Btn);
   BreakLB^.Select;
   Update;
-  BreakpointsWindow:=@self;
+  BreakpointsWindow:=Self;
 end;
 
 constructor TBreakpointsWindow.Load(var S: TStream);
@@ -2610,7 +2630,7 @@ procedure TBreakpointsWindow.ReloadBreakpoints;
 begin
   If not assigned(BreakpointsCollection) then
     exit;
-  BreakpointsCollection^.ForEach(@InsertInBreakLB);
+  BreakpointsCollection.ForEach(@InsertInBreakLB);
   ReDraw;
 end;
 
@@ -2677,9 +2697,9 @@ begin
     BreakLB^.FocusItem(StoreFocus);
 end;
 
-destructor TBreakpointsWindow.Done;
+destructor TBreakpointsWindow.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   BreakpointsWindow:=nil;
 end;
 
@@ -2687,7 +2707,7 @@ end;
                          TBreakpointItemDialog
 ****************************************************************************}
 
-constructor TBreakpointItemDialog.Init(ABreakpoint: PBreakpoint);
+constructor TBreakpointItemDialog.Create(ABreakpoint: PBreakpoint);
 var R,R2,R3: TRect;
     Items: PSItem;
     I : BreakpointType;
@@ -2696,7 +2716,7 @@ begin
   KeyCount:=longint(high(BreakpointType));
 
   R.Assign(0,0,60,Max(9+KeyCount,18));
-  inherited Init(R,dialog_modifynewbreakpoint);
+  inherited Create(R,dialog_modifynewbreakpoint);
   Breakpoint:=ABreakpoint;
 
   GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
@@ -2812,7 +2832,7 @@ end;
                          TWatch
 ****************************************************************************}
 
-constructor TWatch.Init(s : string);
+constructor TWatch.Create(s : string);
   begin
     expr:=NewStr(s);
     last_value:=nil;
@@ -2862,17 +2882,17 @@ procedure TWatch.Get_new_value;
 
     function GetValue(var s : AnsiString) : boolean;
       begin
-        s:=Debugger^.PrintCommand(s);
-        GetValue := not Debugger^.Error;
+        s:=Debugger.PrintCommand(s);
+        GetValue := not Debugger.Error;
         { do not open a messagebox for such errors }
-        Debugger^.got_error:=false;
+        Debugger.got_error:=false;
       end;
 
   begin
-    If not assigned(Debugger) or Not Debugger^.HasExe or
-       (GDBRunCount=Debugger^.RunCount) then
+    If not assigned(Debugger) or Not Debugger.HasExe or
+       (GDBRunCount=Debugger.RunCount) then
       exit;
-    GDBRunCount:=Debugger^.RunCount;
+    GDBRunCount:=Debugger.RunCount;
     if assigned(last_value) then
       strdispose(last_value);
     last_value:=current_value;
@@ -2894,11 +2914,11 @@ procedure TWatch.Get_new_value;
       end;
     found:=GetValue(s);
     orig_s_result:=s;
-    Debugger^.got_error:=false;
+    Debugger.got_error:=false;
     loop_higher:=not found;
     if not found then
       begin
-        curframe:=Debugger^.get_current_frame;
+        curframe:=Debugger.get_current_frame;
         startframe:=curframe;
       end
     else
@@ -2913,7 +2933,7 @@ procedure TWatch.Get_new_value;
            begin
              repeat
                inc(curframe);
-               if not Debugger^.set_current_frame(curframe) then
+               if not Debugger.set_current_frame(curframe) then
                  loop_higher:=false;
 {$ifdef FrameNameKnown}
                s2:=FrameName;
@@ -2937,7 +2957,7 @@ procedure TWatch.Get_new_value;
       current_value:=StrNew(PChar('= ' + s))
     else
       current_value:=StrNew(PChar(orig_s_result));
-    Debugger^.got_error:=false;
+    Debugger.got_error:=false;
     { We should try here to find the expr in parent
       procedure if there are
       I will implement this as I added a
@@ -2946,9 +2966,9 @@ procedure TWatch.Get_new_value;
     { But there are some pitfalls like
       locals redefined in other sublocals that call the function }
     if curframe<>startframe then
-      Debugger^.set_current_frame(startframe);
+      Debugger.set_current_frame(startframe);
 
-    GDBRunCount:=Debugger^.RunCount;
+    GDBRunCount:=Debugger.RunCount;
   end;
 {$else NODEBUG}
   begin
@@ -2961,7 +2981,7 @@ procedure TWatch.Force_new_value;
     Get_new_value;
   end;
 
-destructor TWatch.Done;
+destructor TWatch.Destroy;
   begin
     if assigned(expr) then
       disposestr(expr);
@@ -2978,7 +2998,7 @@ destructor TWatch.Done;
 
       constructor TWatchesCollection.Init;
         begin
-          inherited Init(10,10);
+          inherited Create(10,10);
         end;
 
       procedure TWatchesCollection.Insert(Item: Pointer);
@@ -3019,9 +3039,9 @@ destructor TWatch.Done;
                          TWatchesListBox
 ****************************************************************************}
 
-constructor TWatchesListBox.Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+constructor TWatchesListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
   begin
-    inherited Init(Bounds,1,AHScrollBar,AVScrollBar);
+    inherited Create(Bounds,1,AHScrollBar,AVScrollBar);
     If assigned(List) then
       dispose(list,done);
     List:=WatchesCollection;
@@ -3059,13 +3079,13 @@ var
   S : String;
 begin
   Modified:=false;
-  if Item>=WatchesCollection^.Count then
+  if Item>=WatchesCollection.Count then
     begin
       GetIndentedText:='';
       exit;
     end;
 
-  PW:=WatchesCollection^.At(Item);
+  PW:=WatchesCollection.At(Item);
   ValOffset:=Length(GetStr(PW^.Expr))+2;
   if not assigned(PW^.expr) then
     GetIndentedText:=''
@@ -3102,12 +3122,12 @@ var
   P: PWatch;
 begin
   if Range=0 then Exit;
-  if Focused<WatchesCollection^.Count then
-    P:=WatchesCollection^.At(Focused)
+  if Focused<WatchesCollection.Count then
+    P:=WatchesCollection.At(Focused)
   else
     P:=New(PWatch,Init(''));
   Application^.ExecuteDialog(New(PWatchItemDialog,Init(P)),nil);
-  WatchesCollection^.Update;
+  WatchesCollection.Update;
 end;
 
 function    TWatchesListBox.GetText (Item: Sw_Integer; MaxLen: Sw_Integer): String;
@@ -3122,11 +3142,11 @@ var
   P: PWatch;
 begin
   if (Range=0) or
-     (Focused>=WatchesCollection^.Count) then
+     (Focused>=WatchesCollection.Count) then
     exit;
-  P:=WatchesCollection^.At(Focused);
-  WatchesCollection^.free(P);
-  WatchesCollection^.Update;
+  P:=WatchesCollection.At(Focused);
+  WatchesCollection.free(P);
+  WatchesCollection.Update;
 end;
 
 procedure TWatchesListBox.EditNew;
@@ -3134,9 +3154,9 @@ var
   P: PWatch;
   S : string;
 begin
-  if Focused<WatchesCollection^.Count then
+  if Focused<WatchesCollection.Count then
     begin
-      P:=WatchesCollection^.At(Focused);
+      P:=WatchesCollection.At(Focused);
       S:=GetStr(P^.expr);
     end
   else
@@ -3144,8 +3164,8 @@ begin
   P:=New(PWatch,Init(S));
   if Application^.ExecuteDialog(New(PWatchItemDialog,Init(P)),nil)<>cmCancel then
     begin
-      WatchesCollection^.AtInsert(Focused,P);
-      WatchesCollection^.Update;
+      WatchesCollection.AtInsert(Focused,P);
+      WatchesCollection.Update;
     end
   else
     dispose(P,Done);
@@ -3156,7 +3176,7 @@ var
   I, J, Item: Sw_Integer;
   NormalColor, SelectedColor, FocusedColor, Color: Word;
   ColWidth, CurCol, Indent: Integer;
-  B: TDrawBuffer;
+  B: TFVDrawBuffer;
   Modified : boolean;
   Text: String;
   SCOff: Byte;
@@ -3166,16 +3186,16 @@ var
       if TC<>0 then C:=(C and $ff0f) or (TC and $f0);
     end;
 begin
-  if (Owner<>nil) then TC:=ord(Owner^.GetColor(6)) else TC:=0;
+  if (Owner<>nil) then TC:=ord(Owner^.GetColorW(6)) else TC:=0;
   if State and (sfSelected + sfActive) = (sfSelected + sfActive) then
   begin
-    NormalColor := GetColor(1);
-    FocusedColor := GetColor(3);
-    SelectedColor := GetColor(4);
+    NormalColor := GetColorW(1);
+    FocusedColor := GetColorW(3);
+    SelectedColor := GetColorW(4);
   end else
   begin
-    NormalColor := GetColor(2);
-    SelectedColor := GetColor(4);
+    NormalColor := GetColorW(2);
+    SelectedColor := GetColorW(4);
   end;
   if Transparent then
     begin MT(NormalColor); MT(SelectedColor); end;
@@ -3226,9 +3246,9 @@ begin
           WordRec(B[CurCol+ColWidth-2]).Hi := Color and $ff;
         end;
       end;
-      MoveChar(B[CurCol+ColWidth-1], #179, GetColor(5), 1);
+      MoveChar(B[CurCol+ColWidth-1], #179, GetColorW(5), 1);
     end;
-    WriteLine(0, I, Size.X, 1, B);
+    WriteLineW(0, I, Size.X, 1, B);
   end;
 end;
 
@@ -3326,10 +3346,10 @@ end;
           SetRange(OldRange);
         end;
 
-      destructor  TWatchesListBox.Done;
+      destructor  TWatchesListBox.Destroy;
         begin
           List:=nil;
-          inherited Done;
+          inherited Destroy;
         end;
 
 {****************************************************************************
@@ -3343,7 +3363,7 @@ end;
     begin
       Desktop^.GetExtent(R);
       R.A.Y:=R.B.Y-7;
-      inherited Init(R, dialog_watches,SearchFreeWindowNo);
+      inherited Create(R, dialog_watches,SearchFreeWindowNo);
       Palette:=wpCyanWindow;
       GetExtent(R);
       HelpCtx:=hcWatchesWindow;
@@ -3367,13 +3387,13 @@ end;
       Insert(WLB);
       If assigned(WatchesWindow) then
         dispose(WatchesWindow,done);
-      WatchesWindow:=@Self;
+      WatchesWindow:=Self;
       Update;
     end;
 
   procedure TWatchesWindow.Update;
     begin
-      WatchesCollection^.Update;
+      WatchesCollection.Update;
       Draw;
     end;
 
@@ -3383,7 +3403,7 @@ end;
       GetSubViewPtr(S,WLB);
       If assigned(WatchesWindow) then
         dispose(WatchesWindow,done);
-      WatchesWindow:=@Self;
+      WatchesWindow:=Self;
     end;
 
   procedure TWatchesWindow.Store(var S: TStream);
@@ -3392,7 +3412,7 @@ end;
       PutSubViewPtr(S,WLB);
     end;
 
-  Destructor TWatchesWindow.Done;
+  Destructor TWatchesWindow.Destroy;
     begin
       WatchesWindow:=nil;
       Dispose(WLB,done);
@@ -3404,11 +3424,11 @@ end;
                          TWatchItemDialog
 ****************************************************************************}
 
-constructor TWatchItemDialog.Init(AWatch: PWatch);
+constructor TWatchItemDialog.Create(AWatch: PWatch);
 var R,R2: TRect;
 begin
   R.Assign(0,0,50,10);
-  inherited Init(R,'Edit Watch');
+  inherited Create(R,'Edit Watch');
   Watch:=AWatch;
 
   GetExtent(R); R.Grow(-3,-2);
@@ -3464,7 +3484,7 @@ begin
     Watch^.Rename(S1);
 {$ifndef NODEBUG}
     If assigned(Debugger) then
-       Debugger^.ReadWatches;
+       Debugger.ReadWatches;
 {$endif NODEBUG}
   end;
   Execute:=R;
@@ -3474,7 +3494,7 @@ end;
                          TStackWindow
 ****************************************************************************}
 
-  constructor TFramesListBox.Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+  constructor TFramesListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
     begin
       Inherited Init(Bounds,AHScrollBar,AVScrollBar);
     end;
@@ -3492,12 +3512,12 @@ end;
       DeskTop^.Lock;
       Clear;
 
-      Debugger^.Backtrace;
+      Debugger.Backtrace;
       { generate list }
       { all is in tframeentry }
-      for i:=0 to Debugger^.frame_count-1 do
+      for i:=0 to Debugger.frame_count-1 do
         begin
-          with Debugger^.frames[i]^ do
+          with Debugger.frames[i]^ do
             begin
               if assigned(file_name) then
                 AddItem(new(PMessageItem,init(0,GetPChar(function_name)+GetPChar(args),
@@ -3515,9 +3535,9 @@ end;
             end;
         end;
       { Now set all Debugger rows }
-      for i:=0 to Debugger^.frame_count-1 do
+      for i:=0 to Debugger.frame_count-1 do
         begin
-          with Debugger^.frames[i]^ do
+          with Debugger.frames[i]^ do
             begin
               W:=SearchOnDesktop(GetPChar(file_name),false);
               If assigned(W) then
@@ -3547,9 +3567,9 @@ end;
       { select frame for watches }
       If not assigned(Debugger) then
         exit;
-      Debugger^.SelectFrameCommand(Focused);
+      Debugger.SelectFrameCommand(Focused);
       { for local vars }
-      Debugger^.RereadWatches;
+      Debugger.RereadWatches;
 {$endif NODEBUG}
       { goto source }
       inherited GotoSource;
@@ -3561,15 +3581,15 @@ end;
       { select frame for watches }
       If not assigned(Debugger) then
         exit;
-      Debugger^.SelectFrameCommand(Focused);
+      Debugger.SelectFrameCommand(Focused);
       { for local vars }
-      Debugger^.RereadWatches;
+      Debugger.RereadWatches;
 {$endif}
       { goto source/assembly mixture }
       InitDisassemblyWindow;
       DisassemblyWindow^.LoadFunction('');
 {$ifndef NODEBUG}
-      DisassemblyWindow^.SetCurAddress(Debugger^.frames[Focused]^.address);
+      DisassemblyWindow^.SetCurAddress(Debugger.frames[Focused]^.address);
       DisassemblyWindow^.SelectInDebugSession;
 {$endif NODEBUG}
     end;
@@ -3583,7 +3603,7 @@ end;
       inherited HandleEvent(Event);
     end;
 
-  destructor  TFramesListBox.Done;
+  destructor  TFramesListBox.Destroy;
     begin
       Inherited Done;
     end;
@@ -3595,7 +3615,7 @@ end;
     begin
       Desktop^.GetExtent(R);
       R.A.Y:=R.B.Y-5;
-      inherited Init(R, dialog_callstack, wnNoNumber);
+      inherited Create(R, dialog_callstack, wnNoNumber);
       Palette:=wpCyanWindow;
       GetExtent(R);
       HelpCtx:=hcStackWindow;
@@ -3617,7 +3637,7 @@ end;
       Insert(FLB);
       If assigned(StackWindow) then
         dispose(StackWindow,done);
-      StackWindow:=@Self;
+      StackWindow:=Self;
       Update;
     end;
 
@@ -3633,7 +3653,7 @@ end;
       GetSubViewPtr(S,FLB);
       If assigned(StackWindow) then
         dispose(StackWindow,done);
-      StackWindow:=@Self;
+      StackWindow:=Self;
     end;
 
   procedure TStackWindow.Store(var S: TStream);
@@ -3642,7 +3662,7 @@ end;
       PutSubViewPtr(S,FLB);
     end;
 
-  Destructor TStackWindow.Done;
+  Destructor TStackWindow.Destroy;
     begin
       StackWindow:=nil;
       Dispose(FLB,done);
@@ -3803,7 +3823,7 @@ begin
       new(Debugger,Init);
       PopStatus;
     end;
-  Debugger^.SetExe(ExeFile);
+  Debugger.SetExe(ExeFile);
 {$endif NODEBUG}
 {$ifdef GDBWINDOW}
   InitGDBWindow;

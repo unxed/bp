@@ -15,6 +15,9 @@
 {$i globdir.inc}
 unit FPUsrScr;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses
@@ -28,12 +31,13 @@ uses
   linuxvcs,
 {$endif}
 {$endif}
-  video,Objects;
+  video,Objects, WUtils;
 
 type
 
-    PScreen = ^TScreen;
-    TScreen = object(TObject)
+    TScreen = class;
+    PScreen = TScreen;
+    TScreen = class(TObject)
       function    GetWidth: integer; virtual;
       function    GetHeight: integer; virtual;
       procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
@@ -57,8 +61,9 @@ type
     end;
 
 {$IFDEF netwlibc}
-    PNWLScreen = ^TNWLScreen;
-    TNWLScreen = object(TScreen)
+    TNWLScreen = class;
+    PNWLScreen = TNWLScreen;
+    TNWLScreen = class(TScreen)
       function    GetWidth: integer; virtual;
       function    GetHeight: integer; virtual;
       procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
@@ -92,8 +97,9 @@ type
 
 
 {$IFDEF AMIGASCREEN}
-    PAmigaScreen = ^TAmigaScreen;
-    TAmigaScreen = object(TScreen)
+    TAmigaScreen = class;
+    PAmigaScreen = TAmigaScreen;
+    TAmigaScreen = class(TScreen)
       function    GetWidth: integer; virtual;
       function    GetHeight: integer; virtual;
       procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
@@ -114,10 +120,11 @@ type
 {$ENDIF}
 
 {$IFDEF OS2}
-    POS2Screen = ^TOS2Screen;
-    TOS2Screen = object(TScreen)
-      constructor Init;
-      destructor  Done; virtual;
+    TOS2Screen = class;
+    POS2Screen = TOS2Screen;
+    TOS2Screen = class(TScreen)
+      constructor Create;
+      destructor Destroy; virtual;
     public
       function    GetWidth: integer; virtual;
       function    GetHeight: integer; virtual;
@@ -153,10 +160,11 @@ type
       StateBuf  : pointer;
     end;
 
-    PDOSScreen = ^TDOSScreen;
-    TDOSScreen = object(TScreen)
-      constructor Init;
-      destructor  Done; virtual;
+    TDOSScreen = class;
+    PDOSScreen = TDOSScreen;
+    TDOSScreen = class(TScreen)
+      constructor Create;
+      destructor Destroy; virtual;
     public
       function    GetWidth: integer; virtual;
       function    GetHeight: integer; virtual;
@@ -199,10 +207,11 @@ type
 
     TConsoleType = (ttyNetwork,ttyLinux,ttyFreeBSD,ttyNetBSD);
 
-    PLinuxScreen = ^TLinuxScreen;
-    TLinuxScreen = object(TScreen)
-      constructor Init;
-      destructor  Done; virtual;
+    TLinuxScreen = class;
+    PLinuxScreen = TLinuxScreen;
+    TLinuxScreen = class(TScreen)
+      constructor Create;
+      destructor Destroy; virtual;
     public
       function    GetWidth: integer; virtual;
       function    GetHeight: integer; virtual;
@@ -230,10 +239,11 @@ type
 {$endif}
 
 {$ifdef Windows}
-    PWindowsScreen = ^TWindowsScreen;
-    TWindowsScreen = object(TScreen)
-      constructor Init;
-      destructor  Done; virtual;
+    TWindowsScreen = class;
+    PWindowsScreen = TWindowsScreen;
+    TWindowsScreen = class(TScreen)
+      constructor Create;
+      destructor Destroy; virtual;
     public
       function    GetWidth: integer; virtual;
       function    GetHeight: integer; virtual;
@@ -272,7 +282,7 @@ const UserScreen : PScreen = nil;
 implementation
 
 uses
-  Dos,WUtils
+  Dos
   {$ifdef GO32V2}
   ,Dpmiexcp, Go32
   {$endif}
@@ -355,9 +365,9 @@ end;
 
 {$ifdef DOS}
 
-constructor TDOSScreen.Init;
+constructor TDOSScreen.Create;
 begin
-  inherited Init;
+  inherited Create;
   FillChar(LastTextConsoleVideoInfo,Sizeof(TDOSVideoInfo),#0);
   Capture;
   { get the current ctrl-C state }
@@ -366,12 +376,12 @@ begin
 end;
 
 
-destructor TDOSScreen.Done;
+destructor TDOSScreen.Destroy;
 begin
   FreeBuffer;
   if assigned(VIDEBuffer) then
     FreeMem(VIDEBuffer,VIDEBufferSize);
-  inherited Done;
+  inherited Destroy;
 end;
 
 
@@ -746,7 +756,7 @@ end;
 
 {$ifdef Unix}
 
-constructor TLinuxScreen.Init;
+constructor TLinuxScreen.Create;
 var
   ThisTTY: string[30];
   FName: string;
@@ -754,7 +764,7 @@ var
     ws_row, ws_col, ws_xpixel, ws_ypixel: Word;
   end;
 begin
-  inherited Init;
+  inherited Create;
   IdeScreen := nil;
   TTYFd:=-1;
   IsXterm:=getenv('TERM')='xterm';
@@ -798,13 +808,13 @@ begin
 end;
 
 
-destructor TLinuxScreen.Done;
+destructor TLinuxScreen.Destroy;
 begin
   if assigned(IdeScreen) then
     freemem(IdeScreen,IdeSize);
   if assigned(ConsVideoBuf) then
     freemem(ConsVideoBuf,ConsVideoBufSize);
-  inherited Done;
+  inherited Destroy;
 end;
 
 
@@ -963,7 +973,7 @@ begin
   {TextRec(StdErr).Handle:=StdErrorHandle;}
 end;
 
-constructor TWindowsScreen.Init;
+constructor TWindowsScreen.Create;
 var
   SecurityAttr : Security_attributes;
   BigWin : Coord;
@@ -971,7 +981,7 @@ var
   Error : dword;
   ConsoleScreenBufferInfo : Console_screen_buffer_info;
 begin
-  inherited Init;
+  inherited Create;
   {if GetConsoleOutputCP<>437 then
     res:=SetConsoleOutputCP(437);}
   SecurityAttr.nLength:=SizeOf(Security_attributes);
@@ -1026,7 +1036,7 @@ begin
   SwitchBackToIDEScreen;
 end;
 
-destructor TWindowsScreen.Done;
+destructor TWindowsScreen.Destroy;
 begin
   { copy the Dos buffer content into the original ScreenBuffer
     which remains the startup std_output_handle PM }
@@ -1037,7 +1047,7 @@ begin
   UpdateFileHandles;
   CloseHandle(NewScreenBufferHandle);
   CloseHandle(DummyScreenBufferHandle);
-  inherited Done;
+  inherited Destroy;
 end;
 
 function TWindowsScreen.GetWidth: integer;
@@ -1324,7 +1334,7 @@ begin
 {$endif DEBUG}
   { needed to force the correct size for videobuf }
   if Assigned(Application) and (IdeScreenMode.row<>0)then
-    Application^.SetScreenVideoMode(IdeScreenMode);
+    Application.SetScreenVideoMode(IdeScreenMode);
   IDEActive:=true;
 end;
 
@@ -1426,11 +1436,11 @@ procedure TOS2Screen.SwitchBackToIDEScreen;
 begin
 end;
 
-constructor TOS2Screen.Init;
+constructor TOS2Screen.Create;
 begin
 end;
 
-destructor TOS2Screen.Done;
+destructor TOS2Screen.Destroy;
 begin
 end;
 
@@ -1566,25 +1576,25 @@ end;
 procedure InitUserScreen;
 begin
 {$ifdef DOS}
-  UserScreen:=New(PDOSScreen, Init);
+  UserScreen:=TDOSScreen.Create;
 {$else}
   {$ifdef Unix}
-    UserScreen:=New(PLinuxScreen, Init);
+    UserScreen:=TLinuxScreen.Create;
   {$else}
 
     {$ifdef Windows}
-      UserScreen:=New(PWindowsScreen, Init);
+      UserScreen:=TWindowsScreen.Create;
     {$else}
       {$ifdef OS2}
-        UserScreen:=New(POS2Screen, Init);
+        UserScreen:=TOS2Screen.Create;
       {$else}
         {$ifdef netwlibc}
-          UserScreen:=New(PNWLScreen, Init);
+          UserScreen:=TNWLScreen.Create;
         {$else}
           {$ifdef AMIGASCREEN}
-            UserScreen:=New(PAmigaScreen, Init);
+            UserScreen:=TAmigaScreen.Create;
           {$else}
-            UserScreen:=New(PScreen, Init);
+            UserScreen:=TScreen.Create;
           {$endif AMIGASCREEN}
         {$endif netwlibc}
       {$endif OS2}
@@ -1598,8 +1608,8 @@ procedure DoneUserScreen;
 begin
   if UserScreen<>nil then
    begin
-     UserScreen^.Restore;
-     Dispose(UserScreen, Done);
+     UserScreen.Restore;
+     UserScreen.Free;
      UserScreen:=nil;
    end;
 end;

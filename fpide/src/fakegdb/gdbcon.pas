@@ -4,19 +4,23 @@
 
  **********************************************************************}
 unit GDBCon;
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 uses
   GdbInt;
 
 type
-  PGDBController=^TGDBController;
-  TGDBController=object(TGDBInterface)
+  TGDBController = class;
+  PGDBController = TGDBController;
+  TGDBController=class(TGDBInterface)
     progname   : pchar;
     progargs   : pchar;
     in_command,
     init_count : longint;
-    constructor Init;
-    destructor  Done;
+    constructor Create;
+    destructor Destroy;
     procedure CommandBegin(const s:string);virtual;
     procedure Command(const s:string);
     procedure CommandEnd(const s:string);virtual;
@@ -54,15 +58,15 @@ begin
 end;
 
 
-constructor TGDBController.Init;
+constructor TGDBController.Create;
 begin
-  inherited Init;
+  inherited Create;
 end;
 
 
-destructor TGDBController.Done;
+destructor TGDBController.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
 end;
 
 

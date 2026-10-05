@@ -19,7 +19,7 @@ var FileID: word;
 var Found: boolean;
 begin
   CheckHelpSystem;
-  Found:=HelpFacility^.TopicSearch('Table of contents',FileID,Ctx);
+  Found:=HelpFacility.TopicSearch('Table of contents',FileID,Ctx);
   if Found then
      Help(FileID,Ctx,false)
   else
@@ -41,13 +41,13 @@ var
 begin
   EditorWindow:=FirstEditorWindow;
   If assigned(EditorWindow) then
-    S:=LowerCaseStr(EditorWindow^.Editor^.GetCurrentWord)
+    S:=LowerCaseStr(EditorWindow.Editor.GetCurrentWord)
   else
     S:='';
   CheckHelpSystem;
   Found:=false;
   if S<>'' then
-    Found:=HelpFacility^.TopicSearch(S,FileID,Ctx);
+    Found:=HelpFacility.TopicSearch(S,FileID,Ctx);
   if Found then
      Help(FileID,Ctx,false)
   else
@@ -58,9 +58,9 @@ end;
 procedure TIDEApp.HelpPrevTopic;
 begin
   if HelpWindow=nil then HelpContents else
-  with HelpWindow^ do
-  if GetState(sfVisible) then Message(HelpWindow^.HelpView,evCommand,cmPrevTopic,nil)
-     else begin HelpWindow^.Show; HelpWindow^.MakeFirst; end;
+  with HelpWindow do
+  if GetState(sfVisible) then Message(HelpWindow.HelpView,evCommand,cmPrevTopic,nil)
+     else begin HelpWindow.Show; HelpWindow.MakeFirst; end;
 end;
 
 procedure TIDEApp.HelpUsingHelp;
@@ -69,16 +69,18 @@ begin
 end;
 
 type
-    PHelpFileListBox = ^THelpFileListBox;
-    THelpFileListBox = object(TListBox)
+    THelpFileListBox = class;
+    PHelpFileListBox = THelpFileListBox;
+    THelpFileListBox = class(TListBox)
       function GetText(Item: sw_Integer; MaxLen: sw_Integer): String; virtual;
     end;
 
-    PHelpFilesDialog = ^THelpFilesDialog;
-    THelpFilesDialog = object(TCenterDialog)
-      constructor Init;
+    THelpFilesDialog = class;
+    PHelpFilesDialog = THelpFilesDialog;
+    THelpFilesDialog = class(TCenterDialog)
+      constructor Create;
       procedure   HandleEvent(var Event: TEvent); virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     private
       LB: PHelpFileListBox;
       C : PUnsortedStringCollection;
@@ -94,13 +96,13 @@ begin
   GetText:=copy(S,1,MaxLen);
 end;
 
-constructor THelpFilesDialog.Init;
+constructor THelpFilesDialog.Create;
 var R,R2: TRect;
     SB: PScrollBar;
     I: integer;
 begin
   R.Assign(0,0,round(ScreenWidth*5/8),ScreenHeight-10);
-  inherited Init(R, dialog_helpfiles);
+  inherited Create(R, dialog_helpfiles);
 
   New(C, Init(20,10));
 
@@ -109,26 +111,26 @@ begin
   New(SB, Init(R2)); Insert(SB);
   New(LB, Init(R, 1, SB));
 
-  for I:=0 to HelpFiles^.Count-1 do
+  for I:=0 to HelpFiles.Count-1 do
     begin
-      C^.Insert(NewStr(HelpFiles^.At(I)^));
+      C.Insert(NewStr(HelpFiles.At(I)^));
     end;
 
-  LB^.NewList(C);
+  LB.NewList(C);
   Insert(LB);
   R2.Copy(R); Dec(R2.A.Y); R2.B.Y:=R2.A.Y+1;
-  Insert(New(PLabel, Init(R2, label_helpfiles_helpfiles, LB)));
+  Insert(TLabel.Create(R2, label_helpfiles_helpfiles, LB));
 
   GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y); R.A.X:=R.B.X-13+1; R.B.Y:=R.A.Y+2;
-  Insert(New(PButton, Init(R, button_OK, cmOK, bfDefault)));
+  Insert(TButton.Create(R, button_OK, cmOK, bfDefault));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_New, cmAddItem, bfNormal)));
+  Insert(TButton.Create(R, button_New, cmAddItem, bfNormal));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_Delete, cmDeleteItem, bfNormal)));
+  Insert(TButton.Create(R, button_Delete, cmDeleteItem, bfNormal));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_Cancel, cmCancel, bfNormal)));
+  Insert(TButton.Create(R, button_Cancel, cmCancel, bfNormal));
 
-  LB^.Select;
+  LB.Select;
 end;
 
 procedure THelpFilesDialog.HandleEvent(var Event: TEvent);
@@ -153,16 +155,16 @@ procedure THelpFilesDialog.HandleEvent(var Event: TEvent);
         end
       else
         begin
-          LS^.StoreDocuments(BS^);
-          if BS^.Status<>stOK then
+          LS.StoreDocuments(BS^);
+          if BS.Status<>stOK then
             begin
               if not SilentFails then
               begin
-                ErrorBox(FormatStrInt(msg_errorstoringindexdata,BS^.Status),nil);
+                ErrorBox(FormatStrInt(msg_errorstoringindexdata,BS.Status),nil);
               end;
               Re:=cmCancel;
             end;
-          Dispose(BS, Done);
+          BS.Free;
         end;
       PopStatus;
     end;
@@ -180,12 +182,12 @@ begin
       case Event.KeyCode of
         kbIns :
           begin
-            Message(@Self,evCommand,cmAddItem,nil);
+            Message(Self,evCommand,cmAddItem,nil);
             ClearEvent(Event);
           end;
         kbDel :
           begin
-            Message(@Self,evCommand,cmDeleteItem,nil);
+            Message(Self,evCommand,cmDeleteItem,nil);
             ClearEvent(Event);
           end;
       end;
@@ -198,10 +200,10 @@ begin
               dialog_installhelpfile,
               label_installhelpfile_filename,
               fdOpenButton,hidOpenHelpFile));
-            Re:=Desktop^.ExecView(D);
+            Re:=Desktop.ExecView(D);
             if Re<>cmCancel then
             begin
-              D^.GetFileName(FileName);
+              D.GetFileName(FileName);
               if UpcaseStr(ExtOf(FileName))=UpcaseStr(HTMLIndexExt) then
                 begin
                   S:='HTML Index';
@@ -219,8 +221,8 @@ begin
                     S:='HTML Index';
                     PushStatus(FormatStrStr(msg_buildingindexfile,FileName));
                     New(LS, Init(DirOf(FileName)));
-                    LS^.ProcessDocument(FileName,[soSubDocsOnly]);
-                    if LS^.GetDocumentCount=0 then
+                    LS.ProcessDocument(FileName,[soSubDocsOnly]);
+                    if LS.GetDocumentCount=0 then
                       begin
                         ErrorBox(FormatStrStr(msg_filedoesnotcontainanylinks,FileName),nil);
                         Re:=cmCancel;
@@ -238,7 +240,7 @@ begin
                           end;
                         end
                       end;
-                    Dispose(LS, Done);
+                    LS.Free;
                     PopStatus;
                     HideMessage;
                   end;
@@ -247,40 +249,40 @@ begin
             if Re<>cmCancel then
             begin
               if S<>'' then FileName:=FileName+'|'+S;
-              LB^.List^.Insert(NewStr(FileName));
-              LB^.SetRange(LB^.List^.Count);
+              LB.List.Insert(NewStr(FileName));
+              LB.SetRange(LB.List.Count);
               ReDraw;
             end;
-            Dispose(D, Done);
+            D.Free;
             ClearEvent(Event);
           end;
         cmDeleteItem :
-          if LB^.Range>0 then
+          if LB.Range>0 then
           begin
-            LB^.List^.AtFree(LB^.Focused);
-            LB^.SetRange(LB^.List^.Count);
+            LB.List.AtFree(LB.Focused);
+            LB.SetRange(LB.List.Count);
             ReDraw;
             ClearEvent(Event);
           end;
         cmOK :
           begin
-            HelpFiles^.FreeAll;
-            for I:=0 to LB^.List^.Count-1 do
-              HelpFiles^.Insert(NewStr(C^.At(I)^));
+            HelpFiles.FreeAll;
+            for I:=0 to LB.List.Count-1 do
+              HelpFiles.Insert(NewStr(C.At(I)^));
           end;
       end;
   end;
   inherited HandleEvent(Event);
 end;
 
-destructor THelpFilesDialog.Done;
+destructor THelpFilesDialog.Destroy;
 begin
   if C<>nil then
     begin
-      C^.FreeAll;
-      Dispose(C, Done);
+      C.FreeAll;
+      C.Free;
     end;
-  inherited Done;
+  inherited Destroy;
 end;
 
 procedure TIDEApp.HelpFiles;
@@ -288,14 +290,14 @@ var
   PHFD : PHelpFilesDialog;
 begin
   New(PHFD, Init);
-  if Desktop^.ExecView(PHFD)=cmOK then
+  if Desktop.ExecView(PHFD)=cmOK then
   begin
     DoneHelpSystem;
     Message(Application,evBroadcast,cmHelpFilesChanged,nil);
     InitHelpSystem;
   end;
   if assigned(PHFD) then
-    Dispose(PHFD, Done);
+    PHFD.Free;
 end;
 
 procedure TIDEApp.About;

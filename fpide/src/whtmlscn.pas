@@ -14,6 +14,9 @@
  **********************************************************************}
 unit WHTMLScn;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,
@@ -24,10 +27,12 @@ const
      HTMLIndexVersion = 2;
 
 type
-     PHTMLLinkScanner = ^THTMLLinkScanner;
-     PHTMLLinkScanDocument = ^THTMLLinkScanDocument;
+     THTMLLinkScanner = class;
+     PHTMLLinkScanner = THTMLLinkScanner;
+     THTMLLinkScanDocument = class;
+     PHTMLLinkScanDocument = THTMLLinkScanDocument;
 
-     TCustomHTMLLinkScanner = object(THTMLParser)
+     TCustomHTMLLinkScanner = class(THTMLParser)
        function    DocAddTextChar(C: char): boolean; virtual;
        procedure   DocAnchor(Entered: boolean); virtual;
      public
@@ -53,10 +58,11 @@ type
      TNameIDStates = set of TNameIDState;
 
 
-     PNameID  = ^TNameID;
-     TNameID  = object(TObject)
-       constructor Init(const AName : string; Astate : TNameIDState);
-       destructor  Done; virtual;
+     TNameID = class;
+     PNameID = TNameID;
+     TNameID  = class(TObject)
+       constructor Create(const AName : string; Astate : TNameIDState);
+       destructor Destroy; virtual;
        procedure SetState(Astate : TNameIDState; enabled : boolean);
        procedure SetOrigin(const AOrigin : string);
        procedure SetLine(ALine : sw_integer);
@@ -71,32 +77,34 @@ type
        State : TNameIDStates;
      end;
 
-     PNameIDCollection = ^TNameIDCollection;
-     TNameIDCollection = object(TSortedCollection)
+     TNameIDCollection = class;
+     PNameIDCollection = TNameIDCollection;
+     TNameIDCollection = class(TSortedCollection)
        function At(Index: sw_Integer): PNameID;
        function Compare(Key1, Key2: Pointer): sw_Integer; virtual;
      end;
 
 
-     THTMLLinkScanDocument = object(TObject)
-       constructor Init(const ADocName: string);
+     THTMLLinkScanDocument = class(TObject)
+       constructor Create(const ADocName: string);
        function    GetName: string;
        function    GetUniqueName: string;
        function    GetAliasCount: sw_integer;
        function    GetAlias(Index: sw_integer): string;
        procedure   AddAlias(const Alias: string);
-       constructor Load(var S: TStream);
-       procedure   Store(var S: TStream);
-       destructor  Done; virtual;
+       constructor Load(S: TStream);
+       procedure   Store(S: TStream);
+       destructor Destroy; virtual;
      private
        DocName: PString;
        Synonym: PHTMLLinkScanDocument;
        Aliases: PStringCollection;
      end;
 
-     PHTMLLinkScanDocumentCollection = ^THTMLLinkScanDocumentCollection;
-     THTMLLinkScanDocumentCollection = object(TSortedCollection)
-       constructor Init(AScanner: PHTMLLinkScanner; ALimit, ADelta: Integer);
+     THTMLLinkScanDocumentCollection = class;
+     PHTMLLinkScanDocumentCollection = THTMLLinkScanDocumentCollection;
+     THTMLLinkScanDocumentCollection = class(TSortedCollection)
+       constructor Create(AScanner: PHTMLLinkScanner; ALimit, ADelta: Integer);
        function    Compare(Key1, Key2: Pointer): sw_Integer; virtual;
        function    At(Index: sw_Integer): PHTMLLinkScanDocument;
        function    SearchDocument(const DocName: string): PHTMLLinkScanDocument;
@@ -105,8 +113,8 @@ type
        Scanner: PHTMLLinkScanner;
      end;
 
-     THTMLLinkScanner = object(TCustomHTMLLinkScanner)
-       constructor Init(const ABaseDir: string);
+     THTMLLinkScanner = class(TCustomHTMLLinkScanner)
+       constructor Create(const ABaseDir: string);
        procedure   SetBaseDir(const ABaseDir: string);
     {a}function    FindID(const AName : string) : PNameID; virtual;
        function    GetDocumentCount: sw_integer;
@@ -114,9 +122,9 @@ type
        function    GetUniqueDocumentURL(DocIndex: sw_integer): string;
        function    GetDocumentAliasCount(DocIndex: sw_integer): sw_integer;
        function    GetDocumentAlias(DocIndex, AliasIndex: sw_integer): string;
-       constructor LoadDocuments(var S: TStream);
-       procedure   StoreDocuments(var S: TStream);
-       destructor  Done; virtual;
+       constructor LoadDocuments(S: TStream);
+       procedure   StoreDocuments(S: TStream);
+       destructor Destroy; virtual;
      public
        procedure   AddLink(const LinkText, LinkURL: string); virtual;
      private
@@ -128,11 +136,12 @@ type
 
      THTMLLinkScanState = (ssScheduled,ssProcessing,ssScanned);
 
-     PHTMLLinkScanFile = ^THTMLLinkScanFile;
-     THTMLLinkScanFile = object(TObject)
-       constructor Init(const ADocumentURL: string);
+     THTMLLinkScanFile = class;
+     PHTMLLinkScanFile = THTMLLinkScanFile;
+     THTMLLinkScanFile = class(TObject)
+       constructor Create(const ADocumentURL: string);
        function    GetDocumentURL: string;
-       destructor  Done; virtual;
+       destructor Destroy; virtual;
        function    AddReferencedName (const AName : string) : PNameID;
        function    AddFoundName (const AName : string) : PNameID;
        procedure   CheckNameList;
@@ -145,8 +154,9 @@ type
        State        : THTMLLinkScanState;
      end;
 
-     PHTMLLinkScanFileCollection = ^THTMLLinkScanFileCollection;
-     THTMLLinkScanFileCollection = object(TSortedCollection)
+     THTMLLinkScanFileCollection = class;
+     PHTMLLinkScanFileCollection = THTMLLinkScanFileCollection;
+     THTMLLinkScanFileCollection = class(TSortedCollection)
        function   At(Index: sw_Integer): PHTMLLinkScanFile;
        function   Compare(Key1, Key2: Pointer): sw_Integer; virtual;
        function   SearchFile(const DocURL: string): PHTMLLinkScanFile;
@@ -157,10 +167,10 @@ type
      THTMLLinkScanOption = (soSubDocsOnly);
      THTMLLinkScanOptions = set of THTMLLinkScanOption;
 
-     THTMLFileLinkScanner = object(THTMLLinkScanner)
-       constructor Init(const ABaseDir: string);
+     THTMLFileLinkScanner = class(THTMLLinkScanner)
+       constructor Create(const ABaseDir: string);
        procedure   ProcessDocument(const DocumentURL: string; AOptions: THTMLLinkScanOptions);
-       destructor  Done; virtual;
+       destructor Destroy; virtual;
      public
        function    GetDocumentBaseURL: string; virtual;
        function    FindID(const AName : string) : PNameID; virtual;
@@ -187,13 +197,17 @@ implementation
 uses
   WUtils;
 
-const
-  RHTMLLinkScanDocument: TStreamRec = (
-     ObjType: 19500;
-     VmtLink: Ofs(TypeOf(THTMLLinkScanDocument)^);
-     Load:    @THTMLLinkScanDocument.Load;
-     Store:   @THTMLLinkScanDocument.Store
-  );
+var
+  RHTMLLinkScanDocument: TStreamRec;
+
+function BuildHTMLLinkScanDocument(S: TStream): TStreamable;
+begin
+  Result := THTMLLinkScanDocument.Load(S);
+end;
+procedure StoreHTMLLinkScanDocument(P: TStreamable; S: TStream);
+begin
+  THTMLLinkScanDocument(P).Store(S);
+end;
 
 const
   CurrentHTMLIndexVersion : sw_integer = HTMLIndexVersion;
@@ -319,15 +333,15 @@ begin
 end;
 
 
-constructor TNameID.Init(const AName : string; Astate : TNameIDState);
+constructor TNameID.Create(const AName : string; Astate : TNameIDState);
 begin
-  inherited Init;
+  inherited Create;
   SetStr(Name,AName);
   Origin:=nil;
   State:=[AState];
 end;
 
-destructor  TNameID.Done;
+destructor  TNameID.Destroy;
 begin
   if assigned(Name) then
     DisposeStr(Name);
@@ -335,7 +349,7 @@ begin
   if assigned(Origin) then
     DisposeStr(Origin);
   Origin:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
 procedure TNameID.SetState(Astate : TNameIDState; enabled : boolean);
@@ -379,7 +393,7 @@ end;
 
 function TNameIDCollection.At(Index: sw_Integer): PNameID;
 begin
-  At:=Inherited At(Index);
+  At := PNameID(inherited At(Index));
 end;
 
 function TNameIDCollection.Compare(Key1, Key2: Pointer): sw_Integer;
@@ -389,8 +403,8 @@ var
   K2: PNameID absolute Key2;
   S1,S2: string;
 begin
-  S1:=K1^.GetName;
-  S2:=K2^.GetName;
+  S1:=K1.GetName;
+  S2:=K2.GetName;
   S1:=UpcaseStr(S1); S2:=UpcaseStr(S2);
   if S1<S2 then R:=-1 else
   if S1>S2 then R:= 1 else
@@ -399,11 +413,11 @@ begin
 end;
 
 
-constructor THTMLLinkScanDocument.Init(const ADocName: string);
+constructor THTMLLinkScanDocument.Create(const ADocName: string);
 begin
-  inherited Init;
+  inherited Create;
   SetStr(DocName,ADocName);
-  New(Aliases, Init(10,10));
+  Aliases := TStringCollection.Create(10,10);
 {$ifdef DEBUG}
   DebugMessage('',' Adding New LinkScan document "'+ADocName+'"',1,1);
 {$endif DEBUG}
@@ -419,64 +433,64 @@ function THTMLLinkScanDocument.GetUniqueName: string;
 var
   PD: PHTMLLinkScanDocument;
 begin
-  PD:=@Self;
-  while assigned(PD^.synonym) do
-    PD:=PD^.Synonym;
-  GetUniqueName:=GetStr(PD^.DocName);
+  PD:=Self;
+  while assigned(PD.synonym) do
+    PD:=PD.Synonym;
+  GetUniqueName:=GetStr(PD.DocName);
 end;
 
 
 function THTMLLinkScanDocument.GetAliasCount: sw_integer;
 begin
-  GetAliasCount:=Aliases^.Count;
+  GetAliasCount:=Aliases.Count;
 end;
 
 function THTMLLinkScanDocument.GetAlias(Index: sw_integer): string;
 begin
-  GetAlias:=GetStr(Aliases^.At(Index));
+  GetAlias:=GetStr(Aliases.At(Index));
 end;
 
 procedure THTMLLinkScanDocument.AddAlias(const Alias: string);
 begin
-  Aliases^.Insert(NewStr(Alias));
+  Aliases.Insert(NewStr(Alias));
 {$ifdef DEBUG}
   DebugMessage('',' Adding alias "'+Alias+'" to LinkScan document "'+GetStr(DocName)+'"',1,1);
 {$endif DEBUG}
 end;
 
-constructor THTMLLinkScanDocument.Load(var S: TStream);
+constructor THTMLLinkScanDocument.Load(S: TStream);
 var
   i: sw_integer;
 begin
-  inherited Init;
+  inherited Create;
   DocName:=S.ReadStr;
   if assigned(DocName) then
     for i:=1 to Length(DocName^) do
       if (DocName^[i]='\') or  (DocName^[i]='/') then
         DocName^[i]:=DirSep;
-  New(Aliases, Load(S));
+  Aliases := TStringCollection.Load(S);
 end;
 
-procedure THTMLLinkScanDocument.Store(var S: TStream);
+procedure THTMLLinkScanDocument.Store(S: TStream);
 begin
   S.WriteStr(DocName);
-  Aliases^.Store(S);
+  Aliases.Store(S);
 end;
 
-destructor THTMLLinkScanDocument.Done;
+destructor THTMLLinkScanDocument.Destroy;
 begin
   if Assigned(Aliases) then
-    Dispose(Aliases, Done);
+    Aliases.Free;
   Aliases:=nil;
   if Assigned(DocName) then
     DisposeStr(DocName);
   DocName:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
-constructor THTMLLinkScanDocumentCollection.Init(AScanner: PHTMLLinkScanner; ALimit, ADelta: Integer);
+constructor THTMLLinkScanDocumentCollection.Create(AScanner: PHTMLLinkScanner; ALimit, ADelta: Integer);
 begin
-  inherited Init(ALimit,ADelta);
+  inherited Create(ALimit,ADelta);
   Scanner:=AScanner;
 end;
 
@@ -486,9 +500,9 @@ var R: sw_integer;
     K2: PHTMLLinkScanDocument absolute Key2;
     S1,S2: string;
 begin
-  S1:=K1^.GetName; S2:=K2^.GetName;
+  S1:=K1.GetName; S2:=K2.GetName;
   if Assigned(Scanner) then
-   begin S1:=Scanner^.ExpandChildURL(S1); S2:=Scanner^.ExpandChildURL(S2); end;
+   begin S1:=Scanner.ExpandChildURL(S1); S2:=Scanner.ExpandChildURL(S2); end;
   S1:=UpcaseStr(S1); S2:=UpcaseStr(S2);
   if S1<S2 then R:=-1 else
   if S1>S2 then R:= 1 else
@@ -498,46 +512,47 @@ end;
 
 function THTMLLinkScanDocumentCollection.At(Index: sw_Integer): PHTMLLinkScanDocument;
 begin
-  At:=inherited At(Index);
+  At := PHTMLLinkScanDocument(inherited At(Index));
 end;
 
 function THTMLLinkScanDocumentCollection.SearchDocument(const DocName: string): PHTMLLinkScanDocument;
 var D,P: PHTMLLinkScanDocument;
     Index: sw_integer;
 begin
-  New(D, Init(DocName));
+  D := THTMLLinkScanDocument.Create(DocName);
   if Search(D, Index)=false then P:=nil else
     P:=At(Index);
-  Dispose(D, Done);
+  D.Free;
   SearchDocument:=P;
 end;
 
 procedure THTMLLinkScanDocumentCollection.MoveAliasesToSynonym;
-  procedure MoveAliases(P: PHTMLLinkScanDocument);
+  procedure MoveAliases(Item: Pointer);
   var
-    PD: PHTMLLinkScanDocument;
+    P, PD: PHTMLLinkScanDocument;
     i: sw_integer;
   begin
-    if not assigned(P^.synonym) then
+    P:=PHTMLLinkScanDocument(Item);
+    if not assigned(P.synonym) then
       exit;
     PD:=P;
-    while assigned(PD^.synonym) do
-      PD:=PD^.Synonym;
+    while assigned(PD.synonym) do
+      PD:=PD.Synonym;
 
-    For i:=P^.GetAliasCount-1 downto 0 do
+    For i:=P.GetAliasCount-1 downto 0 do
       begin
-        PD^.AddAlias(P^.GetAlias(i));
-        P^.Aliases^.AtFree(i);
+        PD.AddAlias(P.GetAlias(i));
+        P.Aliases.AtFree(i);
       end;
   end;
 begin
   ForEach(@MoveAliases);
 end;
 
-constructor THTMLLinkScanner.Init(const ABaseDir: string);
+constructor THTMLLinkScanner.Create(const ABaseDir: string);
 begin
-  inherited Init;
-  New(Documents, Init(@Self,50,100));
+  inherited Create;
+  Documents := THTMLLinkScanDocumentCollection.Create(Self,50,100);
   SetBaseDir(ABaseDir);
 end;
 
@@ -549,7 +564,7 @@ end;
 
 function THTMLLinkScanner.GetDocumentCount: sw_integer;
 begin
-  GetDocumentCount:=Documents^.Count;
+  GetDocumentCount:=Documents.Count;
 end;
 
 function THTMLLinkScanner.ExpandChildURL(const S: string): string;
@@ -569,22 +584,22 @@ end;
 
 function THTMLLinkScanner.GetDocumentURL(DocIndex: sw_integer): string;
 begin
-  GetDocumentURL:=ExpandChildURL(Documents^.At(DocIndex)^.GetName);
+  GetDocumentURL:=ExpandChildURL(Documents.At(DocIndex).GetName);
 end;
 
 function THTMLLinkScanner.GetUniqueDocumentURL(DocIndex: sw_integer): string;
 begin
-  GetUniqueDocumentURL:=ExpandChildURL(Documents^.At(DocIndex)^.GetUniqueName);
+  GetUniqueDocumentURL:=ExpandChildURL(Documents.At(DocIndex).GetUniqueName);
 end;
 
 function THTMLLinkScanner.GetDocumentAliasCount(DocIndex: sw_integer): sw_integer;
 begin
-  GetDocumentAliasCount:=Documents^.At(DocIndex)^.GetAliasCount;
+  GetDocumentAliasCount:=Documents.At(DocIndex).GetAliasCount;
 end;
 
 function THTMLLinkScanner.GetDocumentAlias(DocIndex, AliasIndex: sw_integer): string;
 begin
-  GetDocumentAlias:=Documents^.At(DocIndex)^.GetAlias(AliasIndex);
+  GetDocumentAlias:=Documents.At(DocIndex).GetAlias(AliasIndex);
 end;
 
 procedure THTMLLinkScanner.AddLink(const LinkText, LinkURL: string);
@@ -594,14 +609,14 @@ var D: PHTMLLinkScanDocument;
     Text: string;
     error: word;
 begin
-  D:=Documents^.SearchDocument(LinkURL);
+  D:=Documents.SearchDocument(LinkURL);
   if D=nil then
   begin
-    New(D, Init(NormalizeChildURL(LinkURL)));
-    Documents^.Insert(D);
+    D := THTMLLinkScanDocument.Create(NormalizeChildURL(LinkURL));
+    Documents.Insert(D);
   end;
   If assigned(LastSynonym) then
-    LastSynonym^.Synonym:=D;
+    LastSynonym.Synonym:=D;
   DoInsert:=true;
   If (length(LinkText)=0) or (Pos(',',LinkText)=1) then
     DoInsert:=false;
@@ -611,12 +626,12 @@ begin
   else
     Text:=LinkText;
   IF DoInsert then
-    D^.AddAlias(Text);
+    D.AddAlias(Text);
   If InNameAnchor then
     LastSynonym:=D;
 end;
 
-constructor THTMLLinkScanner.LoadDocuments(var S: TStream);
+constructor THTMLLinkScanner.LoadDocuments(S: TStream);
 var P,L: longint;
     OK: boolean;
     PS: PString;
@@ -637,10 +652,10 @@ begin
     end
   else
     BaseDir:=S.ReadStr;
-  New(Documents, Load(S));
+  Documents := THTMLLinkScanDocumentCollection.Load(S);
   if not Assigned(Documents) then
     Fail;
-  Documents^.MoveAliasesToSynonym;
+  Documents.MoveAliasesToSynonym;
   CurrentHTMLIndexVersion:=HTMLIndexVersion;
 end;
 
@@ -650,7 +665,7 @@ begin
 end;
 
 
-procedure THTMLLinkScanner.StoreDocuments(var S: TStream);
+procedure THTMLLinkScanner.StoreDocuments(S: TStream);
 var L: longint;
 begin
   L:=HTMLIndexMagicNo;
@@ -659,26 +674,26 @@ begin
   CurrentHTMLIndexVersion:=L;
   S.Write(L,sizeof(L));
   S.WriteStr(BaseDir);
-  Documents^.MoveAliasesToSynonym;
-  Documents^.Store(S);
+  Documents.MoveAliasesToSynonym;
+  Documents.Store(S);
 end;
 
-destructor THTMLLinkScanner.Done;
+destructor THTMLLinkScanner.Destroy;
 begin
   if Assigned(Documents) then
-    Dispose(Documents, Done);
+    Documents.Free;
   Documents:=nil;
   if Assigned(BaseDir) then
     DisposeStr(BaseDir);
   BaseDir:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
-constructor THTMLLinkScanFile.Init(const ADocumentURL: string);
+constructor THTMLLinkScanFile.Create(const ADocumentURL: string);
 begin
-  inherited Init;
+  inherited Create;
   SetStr(DocumentURL,ADocumentURL);
-  New(NameIDList, Init(5,10));
+  NameIDList := TNameIDCollection.Create(5,10);
 end;
 
 function THTMLLinkScanFile.GetDocumentURL: string;
@@ -691,14 +706,14 @@ var
   index : sw_integer;
   PN : PNameID;
 begin
-  new(PN,init(AName,IsReferenced));
-  if not NameIDList^.Search(PN,Index) then
-    NameIDList^.Insert(PN)
+  PN := TNameID.Create(AName,IsReferenced);
+  if not NameIDList.Search(PN,Index) then
+    NameIDList.Insert(PN)
   else
     begin
-      dispose(PN,Done);
-      PN:=NameIDList^.At(Index);
-      PN^.SetState(IsReferenced,true);
+      PN.Free;
+      PN:=NameIDList.At(Index);
+      PN.SetState(IsReferenced,true);
     end;
   AddReferencedName:=PN;
 end;
@@ -708,14 +723,14 @@ var
   index : sw_integer;
   PN : PNameID;
 begin
-  new(PN,init(AName,IsFound));
-  if not NameIDList^.Search(PN,Index) then
-    NameIDList^.Insert(PN)
+  PN := TNameID.Create(AName,IsFound);
+  if not NameIDList.Search(PN,Index) then
+    NameIDList.Insert(PN)
   else
     begin
-      dispose(PN,Done);
-      PN:=NameIDList^.At(Index);
-      PN^.SetState(IsFound,true);
+      PN.Free;
+      PN:=NameIDList.At(Index);
+      PN.SetState(IsFound,true);
     end;
   AddFoundName:=PN;
 end;
@@ -726,19 +741,19 @@ var
   PN,PN2 : PNameID;
 begin
 {$ifdef DEBUG}
-  for i:=0 to NameIDList^.Count-1 do
+  for i:=0 to NameIDList.Count-1 do
     begin
-      PN:=NameIDList^.At(i);
-      if not (IsFound in PN^.GetState) then
+      PN:=NameIDList.At(i);
+      if not (IsFound in PN.GetState) then
         begin
-          if (IsReferenced in PN^.GetState) then
-            DebugMessage(GetDocumentURL,'Name "'+PN^.GetName+'" from "'+
-              PN^.GetOrigin+'" not found',1,1);
-          PN2:=Owner^.FindID(PN^.GetName);
+          if (IsReferenced in PN.GetState) then
+            DebugMessage(GetDocumentURL,'Name "'+PN.GetName+'" from "'+
+              PN.GetOrigin+'" not found',1,1);
+          PN2:=Owner.FindID(PN.GetName);
           if assigned(PN2) then
             begin
-              DebugMessage('','ID found in "'+PN2^.GetOrigin+'"',1,1);
-              if not (IsFound in PN2^.GetState) then
+              DebugMessage('','ID found in "'+PN2.GetOrigin+'"',1,1);
+              if not (IsFound in PN2.GetState) then
                 DebugMessage('','ID not found',1,1);
             end;
         end;
@@ -752,37 +767,37 @@ var
   PN : PNameID;
   Index : sw_integer;
 begin
-  new(PN,init(AName,IsID));
-  if NameIDList^.Search(PN,Index) then
+  PN := TNameID.Create(AName,IsID);
+  if NameIDList.Search(PN,Index) then
     begin
-      dispose(PN,done);
-      PN:=NameIDList^.At(Index);
-      if (IsID in PN^.GetState) then
+      PN.Free;
+      PN:=NameIDList.At(Index);
+      if (IsID in PN.GetState) then
         FindId:=PN
       else
         FindID:=nil;
     end
   else
     begin
-      dispose(PN,done);
+      PN.Free;
       PN:=nil;
       FindID:=nil;
     end;
 
 end;
-destructor THTMLLinkScanFile.Done;
+destructor THTMLLinkScanFile.Destroy;
 begin
   if Assigned(DocumentURL) then
     DisposeStr(DocumentURL);
   DocumentURL:=nil;
-  dispose(NameIDList,done);
+  NameIDList.Free;
   NameIDList:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
 function THTMLLinkScanFileCollection.At(Index: sw_Integer): PHTMLLinkScanFile;
 begin
-  At:=inherited At(Index);
+  At := PHTMLLinkScanFile(inherited At(Index));
 end;
 
 function THTMLLinkScanFileCollection.Compare(Key1, Key2: Pointer): sw_Integer;
@@ -791,7 +806,7 @@ var R: integer;
     K2: PHTMLLinkScanFile absolute Key2;
     S1,S2: string;
 begin
-  S1:=UpcaseStr(K1^.GetDocumentURL); S2:=UpcaseStr(K2^.GetDocumentURL);
+  S1:=UpcaseStr(K1.GetDocumentURL); S2:=UpcaseStr(K2.GetDocumentURL);
   if S1<S2 then R:=-1 else
   if S1>S2 then R:= 1 else
   R:=0;
@@ -802,10 +817,10 @@ function THTMLLinkScanFileCollection.SearchFile(const DocURL: string): PHTMLLink
 var P,D: PHTMLLinkScanFile;
     Index: sw_integer;
 begin
-  New(D, Init(DocURL));
+  D := THTMLLinkScanFile.Create(DocURL);
   if Search(D,Index)=false then P:=nil else
     P:=At(Index);
-  Dispose(D, Done);
+  D.Free;
   SearchFile:=P;
 end;
 
@@ -817,7 +832,7 @@ begin
   for I:=0 to Count-1 do
   begin
     D:=At(I);
-    if D^.State=AState then
+    if D.State=AState then
       begin
         P:=D;
         Break;
@@ -828,9 +843,9 @@ end;
 
 procedure THTMLLinkScanFileCollection.CheckNameIDLists;
 
-  procedure DoCheckNameList(P : PHTMLLinkScanFile);
+  procedure DoCheckNameList(Item: Pointer);
     begin
-      P^.CheckNameList;
+      PHTMLLinkScanFile(Item).CheckNameList;
     end;
 
 begin
@@ -838,11 +853,11 @@ begin
 end;
 
 
-constructor THTMLFileLinkScanner.Init(const ABaseDir: string);
+constructor THTMLFileLinkScanner.Create(const ABaseDir: string);
 begin
-  inherited Init(ABaseDir);
-  New(DocumentFiles, Init(50,100));
-  New(IDList, Init(50,100));
+  inherited Create(ABaseDir);
+  DocumentFiles := THTMLLinkScanFileCollection.Create(50,100);
+  IDList := TNameIDCollection.Create(50,100);
 {$ifdef DEBUG}
   DebugMessage('','THTMLFileLinkScanner Init "'+ABaseDir+'"',1,1);
 {$endif DEBUG}
@@ -855,13 +870,13 @@ begin
   Options:=AOptions;
   ScheduleDoc(DocumentURL);
   repeat
-    P:=DocumentFiles^.FindFileWithState(ssScheduled);
+    P:=DocumentFiles.FindFileWithState(ssScheduled);
     if Assigned(P) then
       ProcessDoc(P);
   until P=nil;
 {$ifdef DEBUG}
   DebugMessage('','THTMLFileLinkScanner CheckNameList start ',1,1);
-  DocumentFiles^.CheckNameIDLists;
+  DocumentFiles.CheckNameIDLists;
   DebugMessage('','THTMLFileLinkScanner CheckNameList end ',1,1);
 {$endif DEBUG}
 end;
@@ -888,7 +903,7 @@ var D: PHTMLLinkScanFile;
 begin
   P:=Pos('#',LinkURL);
   if P=0 then DocURL:=LinkURL else DocURL:=copy(LinkURL,1,P-1);
-  D:=DocumentFiles^.SearchFile(DocURL);
+  D:=DocumentFiles.SearchFile(DocURL);
   if not Assigned(D) then
       ScheduleDoc(DocURL);
   inherited AddLink(LinkText,LinkURL);
@@ -906,15 +921,15 @@ begin
 {$endif DEBUG}
   P:=Pos('#',LinkURL);
   if P=0 then DocURL:=LinkURL else DocURL:=copy(LinkURL,1,P-1);
-  D:=DocumentFiles^.SearchFile(DocURL);
+  D:=DocumentFiles.SearchFile(DocURL);
   if not Assigned(D) then
       ScheduleDoc(DocURL);
-  D:=DocumentFiles^.SearchFile(DocURL);
+  D:=DocumentFiles.SearchFile(DocURL);
   if P>0 then
     begin
-      PN:=D^.AddReferencedName(copy(LinkURL,P+1,length(LinkURL)));
-      PN^.SetOrigin(CurDoc);
-      PN^.SetLine(Line);
+      PN:=D.AddReferencedName(copy(LinkURL,P+1,length(LinkURL)));
+      PN.SetOrigin(CurDoc);
+      PN.SetLine(Line);
     end;
 end;
 
@@ -930,13 +945,13 @@ begin
 {$endif DEBUG}
   P:=Pos('#',AName);
   if P=0 then DocURL:=AName else DocURL:=copy(AName,1,P-1);
-  D:=DocumentFiles^.SearchFile(DocURL);
+  D:=DocumentFiles.SearchFile(DocURL);
   if not Assigned(D) then
       ScheduleDoc(DocURL);
-  D:=DocumentFiles^.SearchFile(DocURL);
-  PN:=D^.AddFoundName(copy(AName,P+1,length(AName)));
-  PN^.SetOrigin(CurDoc);
-  PN^.SetLine(Line);
+  D:=DocumentFiles.SearchFile(DocURL);
+  PN:=D.AddFoundName(copy(AName,P+1,length(AName)));
+  PN.SetOrigin(CurDoc);
+  PN.SetLine(Line);
 end;
 
 procedure THTMLFileLinkScanner.AddID(AName : string);
@@ -949,45 +964,45 @@ begin
   DebugMessage(CurDoc,' Adding Id "'+
     AName+'"',Line,1);
 {$endif DEBUG}
-  D:=DocumentFiles^.SearchFile(CurDoc);
+  D:=DocumentFiles.SearchFile(CurDoc);
   if not Assigned(D) then
       ScheduleDoc(CurDoc);
-  D:=DocumentFiles^.SearchFile(CurDoc);
-  PN:=D^.AddFoundName(AName);
-  PN^.SetState(IsId,true);
-  PN^.SetOrigin(CurDoc);
-  PN^.SetLine(Line);
+  D:=DocumentFiles.SearchFile(CurDoc);
+  PN:=D.AddFoundName(AName);
+  PN.SetState(IsId,true);
+  PN.SetOrigin(CurDoc);
+  PN.SetLine(Line);
 
-  new(PN,init(AName,IsID));
-  if IDList^ .Search(PN,index) then
+  PN := TNameID.Create(AName,IsID);
+  if IDList.Search(PN,index) then
     begin
-      dispose(PN,done);
+      PN.Free;
 {$ifdef DEBUG}
-      PN:=IDList^.At(Index);
+      PN:=IDList.At(Index);
       DebugMessage(CurDoc,'ID "'+AName+'" already defined in "'+
-        PN^.GetOrigin+'('+IntToStr(PN^.GetLine)+')"',Line,1);
+        PN.GetOrigin+'('+IntToStr(PN.GetLine)+')"',Line,1);
 {$endif DEBUG}
     end
   else
     begin
-      IDList^.Insert(PN);
-      PN^.SetOrigin(CurDoc);
-      PN^.SetLine(Line);
+      IDList.Insert(PN);
+      PN.SetOrigin(CurDoc);
+      PN.SetLine(Line);
     end;
 end;
 
 function THTMLFileLinkScanner.FindID(const AName : string) : PNameID;
 
-  Function ContainsNamedID(D : PHTMLLinkScanFile) : boolean;
+  Function ContainsNamedID(Item: Pointer) : boolean;
     begin
-      ContainsNamedID:=D^.FindID(AName)<>nil;
+      ContainsNamedID:=PHTMLLinkScanFile(Item).FindID(AName)<>nil;
     end;
 var
   D : PHTMLLinkScanFile;
 begin
-  D:=DocumentFiles^.FirstThat(@ContainsNamedID);
+  D:=PHTMLLinkScanFile(DocumentFiles.FirstThat(@ContainsNamedID));
   if assigned(D) then
-    FindID:=D^.FindID(AName)
+    FindID:=D.FindID(AName)
   else
     FindID:=nil;
 end;
@@ -997,9 +1012,9 @@ var F: PDOSTextFile;
 begin
   if Assigned(Doc)=false then Exit;
 
-  Doc^.State:=ssProcessing;
-  CurDoc:=Doc^.GetDocumentURL;
-  New(F, Init(CurDoc));
+  Doc.State:=ssProcessing;
+  CurDoc:=Doc.GetDocumentURL;
+  F := TDOSTextFile.Create(CurDoc);
   if Assigned(F) then
     begin
       CurBaseURL:=CompleteURL(CurDoc,'');
@@ -1010,7 +1025,7 @@ begin
 {$ifdef DEBUG}
       DebugMessage(CurDoc,'Finished processing "'+CurDoc+'"',Line,1);
 {$endif DEBUG}
-      Dispose(F, Done);
+      F.Free;
     end
   else
     begin
@@ -1018,36 +1033,43 @@ begin
       DebugMessage(CurDoc,'file not found',1,1);
 {$endif DEBUG}
     end;
-  Doc^.State:=ssScanned;
+  Doc.State:=ssScanned;
   CurDoc:='';
 end;
 
 procedure THTMLFileLinkScanner.ScheduleDoc(const DocumentURL: string);
 var D: PHTMLLinkScanFile;
 begin
-  New(D, Init(DocumentURL));
-  D^.State:=ssScheduled;
-  D^.Owner:=@Self;
+  D := THTMLLinkScanFile.Create(DocumentURL);
+  D.State:=ssScheduled;
+  D.Owner:=Self;
 {$ifdef DEBUG}
       DebugMessage('','Scheduling file "'+DocumentURL+'"',1,1);
 {$endif DEBUG}
-  DocumentFiles^.Insert(D);
+  DocumentFiles.Insert(D);
 end;
 
-destructor THTMLFileLinkScanner.Done;
+destructor THTMLFileLinkScanner.Destroy;
 begin
   if Assigned(DocumentFiles) then
-    Dispose(DocumentFiles, Done);
+    DocumentFiles.Free;
   DocumentFiles:=nil;
   if Assigned(IDList) then
-    Dispose(IDList, Done);
+    IDList.Free;
   IDList:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
 procedure RegisterWHTMLScan;
 begin
+{$ifndef NOOBJREG}
+  RHTMLLinkScanDocument.ObjType := 19500;
+  RHTMLLinkScanDocument.VmtLink := PtrUInt(System.TClass(THTMLLinkScanDocument));
+  RHTMLLinkScanDocument.Load := @BuildHTMLLinkScanDocument;
+  RHTMLLinkScanDocument.Store := @StoreHTMLLinkScanDocument;
+  RHTMLLinkScanDocument.Next := nil;
   RegisterType(RHTMLLinkScanDocument);
+{$endif}
 end;
 
 

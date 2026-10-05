@@ -23,11 +23,11 @@ uses Objects,Drivers,Dialogs,
 
 type
      PCodeCompleteWordList = ^TCodeCompleteWordList;
-     TCodeCompleteWordList = object(TTextCollection)
+     TCodeCompleteWordList = class(TTextCollection)
      end;
 
     PCodeCompleteDialog = ^TCodeCompleteDialog;
-    TCodeCompleteDialog = object(TCenterDialog)
+    TCodeCompleteDialog = class(TCenterDialog)
       constructor Init;
       function    Execute: Word; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
@@ -69,13 +69,17 @@ uses App,Views,MsgBox,Validate,
      FPConst,FPViews;
 
 {$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
 const
   RCodeCompleteWordList: TStreamRec = (
      ObjType: 14401;
-     VmtLink: Ofs(TypeOf(TCodeCompleteWordList)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TCodeCompleteWordList)) at runtime };
      Load:    @TCodeCompleteWordList.Load;
      Store:   @TCodeCompleteWordList.Store
   );
+{$endif}
+{$endif}
 {$endif}
 
 {$ifdef useresstrings}

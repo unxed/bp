@@ -28,8 +28,9 @@ uses Objects,Drivers,Dialogs,
      FPViews;
 
 type
-    PCodeTemplate = ^TCodeTemplate;
-    TCodeTemplate = object(TObject)
+    TCodeTemplate = class;
+  PCodeTemplate = TCodeTemplate;
+    TCodeTemplate = class(TObject)
       constructor Init(const AShortCut: string; AText: PUnsortedStringCollection);
       function    GetShortCut: string;
       procedure   GetText(AList: PUnsortedStringCollection);
@@ -45,20 +46,23 @@ type
       Text: PUnsortedStringCollection;
     end;
 
-    PCodeTemplateCollection = ^TCodeTemplateCollection;
-    TCodeTemplateCollection = object(TSortedCollection)
+    TCodeTemplateCollection = class;
+  PCodeTemplateCollection = TCodeTemplateCollection;
+    TCodeTemplateCollection = class(TSortedCollection)
       function Compare(Key1, Key2: Pointer): sw_Integer; virtual;
       function SearchByShortCut(const ShortCut: string): PCodeTemplate; virtual;
       function LookUp(const S: string; AcceptMulti: boolean; var Idx: sw_integer): string; virtual;
     end;
 
-    PCodeTemplateListBox = ^TCodeTemplateListBox;
-    TCodeTemplateListBox = object(TAdvancedListBox)
+    TCodeTemplateListBox = class;
+  PCodeTemplateListBox = TCodeTemplateListBox;
+    TCodeTemplateListBox = class(TAdvancedListBox)
       function GetText(Item,MaxLen: Sw_Integer): String; virtual;
     end;
 
-    PCodeTemplateDialog = ^TCodeTemplateDialog;
-    TCodeTemplateDialog = object(TCenterDialog)
+    TCodeTemplateDialog = class;
+  PCodeTemplateDialog = TCodeTemplateDialog;
+    TCodeTemplateDialog = class(TCenterDialog)
       constructor Init(const ATitle: string; ATemplate: PCodeTemplate);
       function    Execute: Word; virtual;
     private
@@ -67,8 +71,9 @@ type
       CodeMemo   : PFPCodeMemo;
     end;
 
-    PCodeTemplatesDialog = ^TCodeTemplatesDialog;
-    TCodeTemplatesDialog = object(TCenterDialog)
+    TCodeTemplatesDialog = class;
+  PCodeTemplatesDialog = TCodeTemplatesDialog;
+    TCodeTemplatesDialog = class(TCenterDialog)
       SelMode: boolean;
       constructor Init(ASelMode: boolean;const AShortCut : string);
       function    Execute: Word; virtual;
@@ -116,19 +121,23 @@ resourcestring  label_codetemplate_shortcut = '~S~hortcut';
                 button_Delete      = '~D~elete';
 
 {$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
+{$ifndef NOOBJREG}
 const
   RCodeTemplate: TStreamRec = (
      ObjType: 14501;
-     VmtLink: Ofs(TypeOf(TCodeTemplate)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TCodeTemplate)) at runtime };
      Load:    @TCodeTemplate.Load;
      Store:   @TCodeTemplate.Store
   );
   RCodeTemplateCollection: TStreamRec = (
      ObjType: 14502;
-     VmtLink: Ofs(TypeOf(TCodeTemplateCollection)^);
+     VmtLink: 0 { PtrUInt(System.TClass(TCodeTemplateCollection)) at runtime };
      Load:    @TCodeTemplateCollection.Load;
      Store:   @TCodeTemplateCollection.Store
   );
+{$endif}
+{$endif}
 {$endif}
 
 constructor TCodeTemplate.Init(const AShortCut: string; AText: PUnsortedStringCollection);

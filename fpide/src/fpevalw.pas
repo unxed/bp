@@ -13,34 +13,37 @@
  **********************************************************************}
 unit fpevalw;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 {****************************************************************************}
                                   interface
 {****************************************************************************}
 
 uses fpdebug,dialogs,views,objects,fpconst,drivers;
 
-type  Pevaluate_dialog=^Tevaluate_dialog;
-      Tevaluate_dialog=object(Tdialog)
+type  Pevaluate_dialog = Tevaluate_dialog;
+      Tevaluate_dialog=class(Tdialog)
         watch:Pwatch;
         expr_input,expr_output:Pinputline;
-        constructor init(var bounds:Trect);
+        constructor Create(var bounds:Trect);
         procedure evaluate;
         procedure handleevent(var event:Tevent);virtual;
-        destructor done;
+        destructor Destroy;
       end;
 
 {****************************************************************************}
                                 implementation
 {****************************************************************************}
 
-constructor Tevaluate_dialog.init(var bounds:Trect);
+constructor Tevaluate_dialog.Create(var bounds:Trect);
 
 var r:Trect;
     l:Plabel;
     b:Pbutton;
 
 begin
-  inherited init(bounds,'Evaluate expression');
+  inherited Create(bounds,'Evaluate expression');
   options:=options or ofcentered;
   {watch is auto initialized to nil.}
 
@@ -49,7 +52,7 @@ begin
   insert(expr_input);
 
   r.assign(size.x-20,3,size.x-18,4);
-  insert(new(Phistory,init(r,expr_input,hidEvaluate)));
+  Insert(Thistory.Create(r,expr_input,hidEvaluate));
 
   r.assign(2,2,size.x-20,3);
   new(l,init(r,'E~x~pression:',expr_input));
@@ -71,17 +74,17 @@ begin
   //new(b,init(r,'Help',cmHelp,bfNormal));
   //insert(b);
 
-  expr_input^.select;
+  expr_input.select;
 end;
 
 procedure Tevaluate_dialog.evaluate;
 
 begin
   if watch<>nil then
-    dispose(watch,done);
-  new(watch,init(expr_input^.data^));
-  expr_output^.data^:=strpas(watch^.current_value);
-  expr_output^.drawview;
+    watch.Free;
+  new(watch,init(expr_input.data^));
+  expr_output.data^:=strpas(watch.current_value);
+  expr_output.drawview;
 end;
 
 procedure Tevaluate_dialog.handleevent(var event:Tevent);
@@ -95,11 +98,11 @@ begin
     end;
 end;
 
-destructor Tevaluate_dialog.done;
+destructor Tevaluate_dialog.Destroy;
 
 begin
   if watch<>nil then
-    dispose(watch,done);
+    watch.Free;
 end;
 
 end.

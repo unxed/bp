@@ -15,6 +15,9 @@
 {$R-}
 unit WVPHelp;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,
@@ -40,10 +43,11 @@ type
       PVPHSectionTable = ^TVPHSectionTable;
       TVPHSectionTable = packed array[0..4095] of longint;
 
-      PVPHHelpFile = ^TVPHHelpFile;
-      TVPHHelpFile = object(THelpFile)
-        constructor Init(AFileName: string; AID: word);
-        destructor  Done; virtual;
+      TVPHHelpFile = class;
+      PVPHHelpFile = TVPHHelpFile;
+      TVPHHelpFile = class(THelpFile)
+        constructor Create(AFileName: string; AID: word);
+        destructor Destroy; virtual;
       public
         function    LoadIndex: boolean; virtual;
         function    ReadTopic(T: PTopic): boolean; virtual;
@@ -76,13 +80,13 @@ begin
   DefVPHGetAttrColor:=false;
 end;
 
-constructor TVPHHelpFile.Init(AFileName: string; AID: word);
+constructor TVPHHelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
-  if inherited Init(AID)=false then Fail;
-  F:=New(PFastBufStream, Init(AFileName, stOpenRead, HelpStreamBufSize));
+  if inherited Create(AID)=false then Fail;
+  F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
-  if OK then OK:=(F^.Status=stOK);
+  if OK then OK:=(F.Status=stOK);
   if OK then
   begin
     OK:=ReadHeader;
@@ -90,8 +94,8 @@ begin
     begin
       SectionTableSize:=sizeof(SectionTable^[0])*Header.SectionCount;
       GetMem(SectionTable,SectionTableSize);
-      F^.Read(SectionTable^,SectionTableSize);
-      OK:=(F^.Status=stOK);
+      F.Read(SectionTable^,SectionTableSize);
+      OK:=(F.Status=stOK);
     end;
     if OK then
       OK:=ReadBlock(nil,2);
@@ -112,8 +116,8 @@ end;
 function TVPHHelpFile.ReadHeader: boolean;
 var OK: boolean;
 begin
-  F^.Read(Header,sizeof(Header));
-  OK:=(F^.Status=stOK);
+  F.Read(Header,sizeof(Header));
+  OK:=(F.Status=stOK);
   ReadHeader:=OK;
 end;
 
@@ -128,15 +132,15 @@ function TVPHHelpFile.ReadBlock(Data: pointer; DataSize: longint): boolean;
 var OK: boolean;
     C: char;
 begin
-  F^.Read(C,sizeof(C));
-  OK:=(F^.Status=stOK) and (C='þ');
+  F.Read(C,sizeof(C));
+  OK:=(F.Status=stOK) and (C='þ');
   if OK then
   begin
     if Assigned(Data) then
-      F^.Read(Data^,DataSize)
+      F.Read(Data^,DataSize)
     else
-      F^.Seek(F^.GetPos+DataSize);
-    OK:=(F^.Status=stOK);
+      F.Seek(F.GetPos+DataSize);
+    OK:=(F.Status=stOK);
   end;
   ReadBlock:=OK;
 end;
@@ -145,7 +149,7 @@ function TVPHHelpFile.ReadTopicTable: boolean;
 var OK: boolean;
 begin
   OK:=ReadBlock(TopicTable,TopicTableSize);
-  TopicBaseOfs:=F^.GetPos;
+  TopicBaseOfs:=F.GetPos;
   ReadTopicTable:=OK;
 end;
 
@@ -156,7 +160,7 @@ begin
   ReadTopic:=OK;
 end;
 
-destructor TVPHHelpFile.Done;
+destructor TVPHHelpFile.Destroy;
 begin
   if Assigned(TopicTable) and (TopicTableSize>0) then
       FreeMem(TopicTable{$ifndef FP},TopicTableSize{$endif});
@@ -164,13 +168,13 @@ begin
   if Assigned(SectionTable) and (SectionTableSize>0) then
       FreeMem(SectionTable{$ifndef FP},SectionTableSize{$endif});
   SectionTable:=nil;
-  if Assigned(F) then Dispose(F, Done); F:=nil;
-  inherited Done;
+  if Assigned(F) then F.Free; F:=nil;
+  inherited Destroy;
 end;
 
 function CreateProc(const FileName,Param: string;Index : longint): PHelpFile;
 begin
-  CreateProc:=New(PVPHHelpFile, Init(FileName,Index));
+  CreateProc := TVPHHelpFile.Create(FileName,Index);
 end;
 
 procedure RegisterHelpType;

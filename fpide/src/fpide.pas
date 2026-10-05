@@ -14,6 +14,9 @@
  **********************************************************************}
 unit fpide;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 {2.0 compatibility}
 {$ifdef VER2_0}
   {$macro on}
@@ -38,10 +41,10 @@ type
     TExecType = (exNormal,exNoSwap,exDosShell);
     Tdisplaymode = (dmIDE,dmUser);
 
-    TIDEApp = object(TApplication)
+    TIDEApp = class(TApplication)
       IsRunning : boolean;
       displaymode : Tdisplaymode;
-      constructor Init;
+      constructor Create;
       procedure   InitDesktop; virtual;
       procedure   LoadMenuBar;
       procedure   InitMenuBar; virtual;
@@ -60,10 +63,10 @@ type
       procedure   GetEvent(var Event: TEvent); virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
       procedure   GetTileRect(var R: TRect); virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       procedure   DosShell; {virtual;}
       procedure   ShowReadme;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
       procedure   ShowUserScreen;
       procedure   ShowIDEScreen;
       function    IsClosing : boolean;
@@ -794,43 +797,43 @@ end;
 
 function IDEUseSyntaxHighlight(Editor: PFileEditor): boolean;
 begin
-  IDEUseSyntaxHighlight:=(Editor^.IsFlagSet(efSyntaxHighlight)) and ((Editor^.FileName='') or MatchesMaskList(NameAndExtOf(Editor^.FileName),HighlightExts));
+  IDEUseSyntaxHighlight:=(Editor.IsFlagSet(efSyntaxHighlight)) and ((Editor.FileName='') or MatchesMaskList(NameAndExtOf(Editor.FileName),HighlightExts));
 end;
 
 function IDEUseTabsPattern(Editor: PFileEditor): boolean;
 begin
   { the commented code lead all new files
     to become with TAB use enabled which is wrong in my opinion PM }
-  IDEUseTabsPattern:={(Editor^.FileName='') or }MatchesMaskList(NameAndExtOf(Editor^.FileName),TabsPattern);
+  IDEUseTabsPattern:={(Editor.FileName='') or }MatchesMaskList(NameAndExtOf(Editor.FileName),TabsPattern);
 end;
 
-constructor TIDEApp.Init;
+constructor TIDEApp.Create;
 var R: TRect;
 begin
   displaymode:=dmIDE;
   UseSyntaxHighlight:=@IDEUseSyntaxHighlight;
   UseTabsPattern:=@IDEUseTabsPattern;
-  inherited Init;
+  inherited Create;
   InitAdvMsgBox;
   InsideDone:=false;
   IsRunning:=true;
-  MenuBar^.GetBounds(R); R.A.X:=R.B.X-8;
+  MenuBar.GetBounds(R); R.A.X:=R.B.X-8;
   New(ClockView, Init(R));
-  ClockView^.GrowMode:=gfGrowLoX+gfGrowHiX;
-  Application^.Insert(ClockView);
+  ClockView.GrowMode:=gfGrowLoX+gfGrowHiX;
+  Application.Insert(ClockView);
   New(ClipboardWindow, Init);
-  Desktop^.Insert(ClipboardWindow);
-  New(CalcWindow, Init); CalcWindow^.Hide;
-  Desktop^.Insert(CalcWindow);
+  Desktop.Insert(ClipboardWindow);
+  New(CalcWindow, Init); CalcWindow.Hide;
+  Desktop.Insert(CalcWindow);
   New(CompilerMessageWindow, Init);
-  CompilerMessageWindow^.Hide;
-  Desktop^.Insert(CompilerMessageWindow);
-  Message(@Self,evBroadcast,cmUpdate,nil);
+  CompilerMessageWindow.Hide;
+  Desktop.Insert(CompilerMessageWindow);
+  Message(Self,evBroadcast,cmUpdate,nil);
   CurDirChanged;
   { heap viewer }
   GetExtent(R); Dec(R.B.X); R.A.X:=R.B.X-9; R.A.Y:=R.B.Y-1;
   New(HeapView, InitKb(R));
-  if (StartupOptions and soHeapMonitor)=0 then HeapView^.Hide;
+  if (StartupOptions and soHeapMonitor)=0 then HeapView.Hide;
   Insert(HeapView);
   Drivers.ShowMouse;
 {$ifdef Windows}
@@ -845,7 +848,7 @@ begin
   GetExtent(R);
   Inc(R.A.Y);
   Dec(R.B.Y);
-  Desktop:=New(PFPDesktop, Init(R));
+  Desktop := TFPDesktop.Create(R);
 end;
 
 procedure TIDEApp.LoadMenuBar;
@@ -863,7 +866,7 @@ begin
       NewItem(menu_edit_pastewin,'', kbNoKey, cmPasteWin, hcPasteWin,
       nil)));
 {$endif WinClipSupported}
-  MenuBar:=New(PAdvancedMenuBar, Init(R, NewMenu(
+  MenuBar := TAdvancedMenuBar.Create(R, NewMenu(
     NewSubMenu(menu_file,hcFileMenu, NewMenu(
       NewItem(menu_file_new,'',kbNoKey,cmNew,hcNew,
       NewItem(menu_file_template,'',kbNoKey,cmNewFromTemplate,hcNewFromTemplate,
@@ -879,7 +882,7 @@ begin
       NewItem(menu_file_changedir,'',kbNoKey,cmChangeDir,hcChangeDir,
       NewItem(menu_file_dosshell,'',kbNoKey,cmDOSShell,hcDOSShell,
       NewItem(menu_file_exit,menu_key_file_exit,kbNoKey,cmQuit,hcQuit,
-      nil))))))))))))))),
+      nil)))))))))))))),
     NewSubMenu(menu_edit,hcEditMenu, NewMenu(
       NewItem(menu_edit_undo,menu_key_edit_undo, kbAltBack, cmUndo, hcUndo,
       NewItem(menu_edit_redo,'', kbNoKey, cmRedo, hcRedo,
@@ -1049,7 +1052,7 @@ procedure Tideapp.reload_menubar;
 
 begin
    delete(menubar);
-   dispose(menubar,done);
+   menubar.Free;
    case EditKeys of
      ekm_microsoft:
        begin
@@ -1086,7 +1089,7 @@ var
 begin
   GetExtent(R);
   R.A.Y := R.B.Y - 1;
-  StatusLine:=New(PIDEStatusLine, Init(R,
+  StatusLine := TIDEStatusLine.Create(R,
     NewStatusDef(hcDragging, hcDragging,
       NewStatusKey(status_help, kbF1, cmHelp,
       StdStatusKeys(
@@ -1094,7 +1097,7 @@ begin
       NewStatusKey('~Shift+Cursor~ Size', kbNoKey, 65535,
       NewStatusKey('~'#17'ды~ Done', kbNoKey, 65535, {#17 = left arrow}
       NewStatusKey('~Esc~ Cancel', kbNoKey, 65535,
-      nil)))))),
+      nil))))),
     NewStatusDef(hcStackWindow, hcStackWindow,
       NewStatusKey(status_help, kbF1, cmHelp,
       NewStatusKey(status_disassemble, kbAltI, cmDisassemble,
@@ -1171,7 +1174,7 @@ var P: PView;
 begin
   { first of all dispatch queued targeted events }
   while GetTargetedEvent(P,Event) do
-    P^.HandleEvent(Event);
+    P.HandleEvent(Event);
   { Handle System events directly }
   Drivers.GetSystemEvent(Event);         { Load system event }
   If (Event.What <> evNothing) Then
@@ -1261,7 +1264,7 @@ begin
                                    begin
                                      W:=LastSourceEditor;
                                      if assigned(W) then
-                                       FSplit(W^.Editor^.FileName,DS,NS,ES)
+                                       FSplit(W.Editor.FileName,DS,NS,ES)
                                      else
                                        DS:='';
                                      Open(OpenFileName,DS);
@@ -1368,7 +1371,7 @@ begin
              cmAbout         : About;
              cmShowReadme    : ShowReadme;
              cmResizeApp     : ResizeApplication(Event.Id, Event.InfoWord);
-             cmQuitApp       : Message(@Self, evCommand, cmQuit, nil);
+             cmQuitApp       : Message(Self, evCommand, cmQuit, nil);
            else DontClear:=true;
            end;
            if DontClear=false then ClearEvent(Event);
@@ -1380,17 +1383,17 @@ begin
            cmUpdateTools :
              UpdateTools;
            cmCommandSetChanged :
-             UpdateMenu(MenuBar^.Menu);
+             UpdateMenu(MenuBar.Menu);
            cmUpdate              :
              Update;
            cmSourceWndClosing :
              begin
                with PSourceWindow(Event.InfoPtr)^ do
-                 if Editor^.FileName<>'' then
-                   AddRecentFile(Editor^.FileName,Editor^.CurPos.X,Editor^.CurPos.Y);
+                 if Editor.FileName<>'' then
+                   AddRecentFile(Editor.FileName,Editor.CurPos.X,Editor.CurPos.Y);
                {$ifndef NODEBUG}
-               if assigned(Debugger) and (PView(Event.InfoPtr)=Debugger^.LastSource) then
-                 Debugger^.LastSource:=nil;
+               if assigned(Debugger) and (PView(Event.InfoPtr)=Debugger.LastSource) then
+                 Debugger.LastSource:=nil;
                {$endif}
              end;
 
@@ -1412,17 +1415,17 @@ end;
 
 procedure TIDEApp.GetTileRect(var R: TRect);
 begin
-  Desktop^.GetExtent(R);
+  Desktop.GetExtent(R);
 { Leave the compiler messages window in the bottom }
-  if assigned(CompilerMessageWindow) and (CompilerMessageWindow^.GetState(sfVisible)) then
-   R.B.Y:=Min(CompilerMessageWindow^.Origin.Y,R.B.Y);
+  if assigned(CompilerMessageWindow) and (CompilerMessageWindow.GetState(sfVisible)) then
+   R.B.Y:=Min(CompilerMessageWindow.Origin.Y,R.B.Y);
 { Leave the messages window in the bottom }
-  if assigned(MessagesWindow) and (MessagesWindow^.GetState(sfVisible)) then
-   R.B.Y:=Min(MessagesWindow^.Origin.Y,R.B.Y);
+  if assigned(MessagesWindow) and (MessagesWindow.GetState(sfVisible)) then
+   R.B.Y:=Min(MessagesWindow.Origin.Y,R.B.Y);
 {$ifndef NODEBUG}
 { Leave the watch window in the bottom }
-  if assigned(WatchesWindow) and (WatchesWindow^.GetState(sfVisible)) then
-   R.B.Y:=Min(WatchesWindow^.Origin.Y,R.B.Y);
+  if assigned(WatchesWindow) and (WatchesWindow.GetState(sfVisible)) then
+   R.B.Y:=Min(WatchesWindow.Origin.Y,R.B.Y);
 {$endif NODEBUG}
 end;
 
@@ -1435,7 +1438,7 @@ procedure TIDEApp.ShowUserScreen;
 begin
   displaymode:=dmUser;
   if Assigned(UserScreen) then
-    UserScreen^.SaveIDEScreen;
+    UserScreen.SaveIDEScreen;
   DoneSysError;
   DoneEvents;
   { DoneKeyboard should be called last to
@@ -1451,14 +1454,14 @@ begin
 {  DoneDosMem;}
 
   if Assigned(UserScreen) then
-    UserScreen^.SwitchToConsoleScreen;
+    UserScreen.SwitchToConsoleScreen;
 end;
 
 
 procedure TIDEApp.ShowIDEScreen;
 begin
   if Assigned(UserScreen) then
-    UserScreen^.SaveConsoleScreen;
+    UserScreen.SaveConsoleScreen;
 {  InitDosMem;}
   InitKeyboard;
   If UseMouse then
@@ -1486,7 +1489,7 @@ begin
 {$endif Windows}
 
   if Assigned(UserScreen) then
-    UserScreen^.SwitchBackToIDEScreen;
+    UserScreen.SwitchBackToIDEScreen;
 {$ifdef Windows}
   { This message was sent when the VideoBuffer was smaller
     than was the IdeApp thought => writes to random memory and random crashes... PM }
@@ -1618,7 +1621,7 @@ begin
   SetCmdState([cmTile,cmCascade],IsThereAnyVisibleWindow);
   SetCmdState([cmFindProcedure,cmObjects,cmModules,cmGlobals,cmSymbol],IsSymbolInfoAvailable);
 {$ifndef NODEBUG}
-  SetCmdState([cmResetDebugger,cmUntilReturn],assigned(debugger) and debugger^.debuggee_started);
+  SetCmdState([cmResetDebugger,cmUntilReturn],assigned(debugger) and debugger.debuggee_started);
 {$endif}
   SetCmdState([cmToolsMsgNext,cmToolsMsgPrev],MessagesWindow<>nil);
   UpdateTools;
@@ -1626,7 +1629,7 @@ begin
   UpdatePrimaryFile;
   UpdateINIFile;
   Message(Application,evBroadcast,cmCommandSetChanged,nil);
-  application^.redraw;
+  application.redraw;
 end;
 
 procedure TIDEApp.SourceWindowClosed;
@@ -1640,22 +1643,22 @@ begin
   Message(Application,evBroadcast,cmUpdateTitle,nil);
   UpdatePrimaryFile;
   UpdateINIFile;
-  UpdateMenu(MenuBar^.Menu);
+  UpdateMenu(MenuBar.Menu);
 end;
 
 
 procedure TIDEApp.UpdatePrimaryFile;
 begin
-  SetMenuItemParam(SearchMenuItem(MenuBar^.Menu,cmPrimaryFile),SmartPath(PrimaryFile));
+  SetMenuItemParam(SearchMenuItem(MenuBar.Menu,cmPrimaryFile),SmartPath(PrimaryFile));
   SetCmdState([cmClearPrimary],PrimaryFile<>'');
   if PrimaryFile<>'' then
      SetCmdState(CompileCmds,true);
-  UpdateMenu(MenuBar^.Menu);
+  UpdateMenu(MenuBar.Menu);
 end;
 
 procedure TIDEApp.UpdateINIFile;
 begin
-  SetMenuItemParam(SearchMenuItem(MenuBar^.Menu,cmSaveINI),SmartPath(IniFileName));
+  SetMenuItemParam(SearchMenuItem(MenuBar.Menu,cmSaveINI),SmartPath(IniFileName));
 end;
 
 procedure TIDEApp.UpdateRecentFileList;
@@ -1667,29 +1670,29 @@ var P: PMenuItem;
 begin
   if not assigned(MenuBar) then exit;
 {  ID:=cmRecentFileBase;}
-  FileMenu:=SearchSubMenu(MenuBar^.Menu,menuFile);
+  FileMenu:=SearchSubMenu(MenuBar.Menu,menuFile);
   repeat
 {    Inc(ID);
-    P:=SearchMenuItem(FileMenu^.SubMenu,ID);
-    if FileMenu^.SubMenu^.Default=P then
-      FileMenu^.SubMenu^.Default:=FileMenu^.SubMenu^.Items;
-    if P<>nil then RemoveMenuItem(FileMenu^.SubMenu,P);}
-    P:=GetMenuItemBefore(FileMenu^.SubMenu,nil);
+    P:=SearchMenuItem(FileMenu.SubMenu,ID);
+    if FileMenu.SubMenu.Default=P then
+      FileMenu.SubMenu.Default:=FileMenu.SubMenu.Items;
+    if P<>nil then RemoveMenuItem(FileMenu.SubMenu,P);}
+    P:=GetMenuItemBefore(FileMenu.SubMenu,nil);
     if (P<>nil) then
     begin
-      if (cmRecentFileBase<P^.Command) and (P^.Command<=cmRecentFileBase+MaxRecentFileCount) then
+      if (cmRecentFileBase<P.Command) and (P.Command<=cmRecentFileBase+MaxRecentFileCount) then
         begin
-          RemoveMenuItem(FileMenu^.SubMenu,P);
-          if FileMenu^.SubMenu^.Default=P then
-            FileMenu^.SubMenu^.Default:=FileMenu^.SubMenu^.Items;
+          RemoveMenuItem(FileMenu.SubMenu,P);
+          if FileMenu.SubMenu.Default=P then
+            FileMenu.SubMenu.Default:=FileMenu.SubMenu.Items;
         end
       else
         P:=nil;
     end;
   until P=nil;
-  P:=GetMenuItemBefore(FileMenu^.SubMenu,nil);
+  P:=GetMenuItemBefore(FileMenu.SubMenu,nil);
   if (P<>nil) and IsSeparator(P) then
-     RemoveMenuItem(FileMenu^.SubMenu,P);
+     RemoveMenuItem(FileMenu.SubMenu,P);
 
   GetExtent(R);
   AdjustRecentCount :=0;
@@ -1702,13 +1705,13 @@ begin
 
   if AdjustRecentCount>0 then
   begin
-     AppendMenuItem(FileMenu^.SubMenu,NewLine(nil));
+     AppendMenuItem(FileMenu.SubMenu,NewLine(nil));
 
     for I:=1 to AdjustRecentCount do
     begin
       P:=NewItem('~'+IntToStr(I)+'~ '+ShrinkPath(SmartPath(RecentFiles[I].FileName),27),' ',
           kbNoKey,cmRecentFileBase+I,hcRecentFileBase+I,nil);
-      AppendMenuItem(FileMenu^.SubMenu,P);
+      AppendMenuItem(FileMenu.SubMenu,P);
     end;
   end;
 end;
@@ -1721,32 +1724,32 @@ var P: PMenuItem;
     W: word;
 begin
 {  ID:=cmToolsBase;}
-  ToolsMenu:=SearchSubMenu(MenuBar^.Menu,menuTools);
+  ToolsMenu:=SearchSubMenu(MenuBar.Menu,menuTools);
   repeat
-    P:=GetMenuItemBefore(ToolsMenu^.SubMenu,nil);
+    P:=GetMenuItemBefore(ToolsMenu.SubMenu,nil);
     if (P<>nil) then
     begin
-      if (cmToolsBase<P^.Command) and (P^.Command<=cmToolsBase+MaxToolCount) then
+      if (cmToolsBase<P.Command) and (P.Command<=cmToolsBase+MaxToolCount) then
         begin
-          RemoveMenuItem(ToolsMenu^.SubMenu,P);
-          if ToolsMenu^.SubMenu^.Default=P then
-            ToolsMenu^.SubMenu^.Default:=ToolsMenu^.SubMenu^.Items;
+          RemoveMenuItem(ToolsMenu.SubMenu,P);
+          if ToolsMenu.SubMenu.Default=P then
+            ToolsMenu.SubMenu.Default:=ToolsMenu.SubMenu.Items;
         end
       else
         P:=nil;
     end;
   until P=nil;
-  P:=GetMenuItemBefore(ToolsMenu^.SubMenu,nil);
+  P:=GetMenuItemBefore(ToolsMenu.SubMenu,nil);
   if (P<>nil) and IsSeparator(P) then
-     RemoveMenuItem(ToolsMenu^.SubMenu,P);
+     RemoveMenuItem(ToolsMenu.SubMenu,P);
 
   if GetToolCount>0 then
-     AppendMenuItem(ToolsMenu^.SubMenu,NewLine(nil));
+     AppendMenuItem(ToolsMenu.SubMenu,NewLine(nil));
   for I:=1 to GetToolCount do
   begin
     GetToolParams(I-1,S1,S2,S3,W);
     P:=NewItem(S1,KillTilde(GetHotKeyName(W)),W,cmToolsBase+I,hcToolsBase+I,nil);
-    AppendMenuItem(ToolsMenu^.SubMenu,P);
+    AppendMenuItem(ToolsMenu.SubMenu,P);
   end;
 end;
 
@@ -1790,26 +1793,26 @@ var R,R2: TRect;
     VSB: PScrollBar;
     S: PFastBufStream;
 begin
-  New(S, Init(ReadmeName, stOpenRead, 4096));
-  if S^.Status=stOK then
+  S := TFastBufStream.Create(ReadmeName, stOpenRead, 4096);
+  if S.Status=stOK then
   begin
     R.Assign(0,0,63,18);
-    New(D, Init(R, 'Free Pascal IDE'));
-    with D^ do
+    D := TCenterDialog.Create(R, 'Free Pascal IDE');
+    with D do
     begin
       GetExtent(R);
       R.Grow(-2,-2); Inc(R.B.Y);
       R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
-      New(VSB, Init(R2)); VSB^.GrowMode:=0; Insert(VSB);
-      New(M, Init(R,nil,VSB,nil));
-      M^.LoadFromStream(S);
-      M^.ReadOnly:=true;
+      VSB := TScrollBar.Create(R2); VSB.GrowMode:=0; Insert(VSB);
+      M := TFPMemo.Create(R,nil,VSB,nil);
+      M.LoadFromStream(S);
+      M.ReadOnly:=true;
       Insert(M);
     end;
     InsertOK(D);
     ExecuteDialog(D,nil);
   end;
-  Dispose(S, Done);
+  S.Free;
 end;
 
 {$I FPMFILE.INC}
@@ -1866,7 +1869,7 @@ begin
   UpdateRecentFileList;
 end;
 
-function TIDEApp.GetPalette: PPalette;
+function TIDEApp.GetPalette: TPalette;
 begin
   GetPalette:=@AppPalette;
 end;
@@ -1876,11 +1879,11 @@ begin
   IsClosing:=InsideDone;
 end;
 
-destructor TIDEApp.Done;
+destructor TIDEApp.Destroy;
 begin
   InsideDone:=true;
   IsRunning:=false;
-  inherited Done;
+  inherited Destroy;
   Desktop:=nil;
   RemoveBrowsersCollection;
   DoneHelpSystem;

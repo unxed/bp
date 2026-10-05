@@ -15,6 +15,9 @@
 {$R-}
 unit WOS2Help;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,
@@ -101,10 +104,11 @@ type
         EscCode: byte;  { which escape function }
       end;
 
-      POS2HelpFile = ^TOS2HelpFile;
-      TOS2HelpFile = object(THelpFile)
-        constructor Init(AFileName: string; AID: word);
-        destructor  Done; virtual;
+      TOS2HelpFile = class;
+      POS2HelpFile = TOS2HelpFile;
+      TOS2HelpFile = class(THelpFile)
+        constructor Create(AFileName: string; AID: word);
+        destructor Destroy; virtual;
       public
         function    LoadIndex: boolean; virtual;
         function    ReadTopic(T: PTopic): boolean; virtual;
@@ -176,14 +180,14 @@ begin
       end;
 end;
 
-constructor TOS2HelpFile.Init(AFileName: string; AID: word);
+constructor TOS2HelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
-  if inherited Init(AID)=false then Fail;
-  New(Dictionary, Init(100,1000));
-  F:=New(PFastBufStream, Init(AFileName, stOpenRead, HelpStreamBufSize));
+  if inherited Create(AID)=false then Fail;
+  Dictionary := TUnsortedStringCollection.Create(100,1000);
+  F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
-  if OK then OK:=(F^.Status=stOK);
+  if OK then OK:=(F.Status=stOK);
   if OK then OK:=ReadHeader;
   if OK=false then
   begin
@@ -195,8 +199,8 @@ end;
 function TOS2HelpFile.ReadHeader: boolean;
 var OK: boolean;
 begin
-  F^.Read(Header,sizeof(Header));
-  OK:=(F^.Status=stOK);
+  F.Read(Header,sizeof(Header));
+  OK:=(F.Status=stOK);
   OK:=OK and (Header.Signature=INFFileSignature);
   ReadHeader:=OK;
 end;
@@ -216,16 +220,16 @@ var OK: boolean;
     C: array[0..255] of char;
     B: byte;
 begin
-  F^.Seek(Header.DictOfs);
-  OK:=(F^.Status=stOK);
+  F.Seek(Header.DictOfs);
+  OK:=(F.Status=stOK);
   I:=0;
   while OK and (I<Header.NumDictEntries) do
   begin
     FillChar(C,sizeof(C),0);
-    F^.Read(B,sizeof(B)); F^.Read(C,B-1);
-    OK:=(F^.Status=stOK);
+    F.Read(B,sizeof(B)); F.Read(C,B-1);
+    OK:=(F.Status=stOK);
     if OK then
-      Dictionary^.InsertStr(StrPas(@C));
+      Dictionary.InsertStr(StrPas(@C));
     Inc(I);
   end;
   ReadDictionary:=OK;
@@ -236,12 +240,12 @@ var OK: boolean;
 begin
   SlotsSize:=Header.NumSlots*sizeof(Slots^[0]);
   GetMem(Slots,SlotsSize);
-  F^.Seek(Header.SlotTabOfs);
-  OK:=(F^.Status=stOK);
+  F.Seek(Header.SlotTabOfs);
+  OK:=(F.Status=stOK);
   if OK then
   begin
-    F^.Read(Slots^,SlotsSize);
-    OK:=(F^.Status=stOK);
+    F.Read(Slots^,SlotsSize);
+    OK:=(F.Status=stOK);
   end;
   ReadSlots:=OK;
 end;
@@ -259,43 +263,43 @@ var OK: boolean;
     TOC: PINFTOCArray;
     TOCSize: longint;
 begin
-  F^.Seek(Header.TOCArrayOfs); TOCSize:=Header.TOCStrTabSize;
-  OK:=(F^.Status=stOK);
+  F.Seek(Header.TOCArrayOfs); TOCSize:=Header.TOCStrTabSize;
+  OK:=(F.Status=stOK);
   if OK then
   begin
     GetMem(TOC,TOCSize);
-    F^.Read(TOC^,TOCSize);
-    OK:=(F^.Status=stOK);
+    F.Read(TOC^,TOCSize);
+    OK:=(F.Status=stOK);
     I:=0;
     while OK and (I<Header.NumTOC) do
     begin
-      F^.Seek(TOC^[I]);
-      OK:=(F^.Status=stOK);
+      F.Seek(TOC^[I]);
+      OK:=(F.Status=stOK);
       if OK then
       begin
-        StartOfs:=F^.GetPos;
-        F^.Read(TE,sizeof(TE));
-        OK:=(F^.Status=stOK);
+        StartOfs:=F.GetPos;
+        F.Read(TE,sizeof(TE));
+        OK:=(F.Status=stOK);
       end;
       if OK and ((TE.Flags and inf_tef_Extended)<>0) then
       begin
-        F^.Read(W,sizeof(W));
+        F.Read(W,sizeof(W));
         Count:=0;
         if (W and 1)<>0 then Inc(Count,5);
         if (W and 2)<>0 then Inc(Count,5);
         if (W and 4)<>0 then Inc(Count,2);
         if (W and 8)<>0 then Inc(Count,2);
-        F^.Seek(F^.GetPos+Count);
-        OK:=(F^.Status=stOK);
+        F.Seek(F.GetPos+Count);
+        OK:=(F.Status=stOK);
       end;
       if OK then
       begin
         SubSlotsSize:=sizeof(Word)*TE.NumSlots;
         GetMem(SubSlots,SubSlotsSize);
-        F^.Read(SubSlots^,SubSlotsSize);
+        F.Read(SubSlots^,SubSlotsSize);
         FillChar(C,sizeof(C),0);
-        F^.Read(C,Max(0,TE.Size-(F^.GetPos-StartOfs)));
-        OK:=(F^.Status=stOK);
+        F.Read(C,Max(0,TE.Size-(F.GetPos-StartOfs)));
+        OK:=(F.Status=stOK);
         if OK then
         begin
           S:=StrPas(@C);
@@ -323,7 +327,7 @@ var Line: string;
     LineNo: longint;
 procedure FlushLine;
 begin
-  if Line<>'' then Lines^.InsertStr(Line);
+  if Line<>'' then Lines.InsertStr(Line);
   Line:='';
 end;
 procedure AddChar(C: char);
@@ -395,7 +399,7 @@ begin
 end;
 procedure AddWord(LocalIndex: word);
 begin
-  AddText(GetStr(Dictionary^.At(Dict^[LocalIndex])));
+  AddText(GetStr(Dictionary.At(Dict^[LocalIndex])));
   if Spacing and not InMonospace then AddTextChar(' ');
 end;
 var
@@ -407,13 +411,13 @@ var
     CurLinkCtx: longint;
     InTempMargin: boolean;
 begin
-  F^.Reset;
-  F^.Seek(FileOfs);
-  OK:=(F^.Status=stOK);
+  F.Reset;
+  F.Seek(FileOfs);
+  OK:=(F.Status=stOK);
   if OK then
   begin
-    F^.Read(H,sizeof(H));
-    OK:=(F^.Status=stOK);
+    F.Read(H,sizeof(H));
+    OK:=(F.Status=stOK);
   end;
   if OK then
   begin
@@ -425,10 +429,10 @@ begin
     DictSize:=H.NumLocalDict*sizeof(Dict^[0]);
     GetMem(Text,H.TextSize);
     GetMem(Dict,DictSize);
-    F^.Read(Text^,H.TextSize);
-    F^.Seek(H.LocalDictPos);
-    F^.Read(Dict^,DictSize);
-    OK:=(F^.Status=stOK);
+    F.Read(Text^,H.TextSize);
+    F.Seek(H.LocalDictPos);
+    F.Read(Dict^,DictSize);
+    OK:=(F.Status=stOK);
 
     TextOfs:=0; Spacing:=true;
     while OK and (TextOfs<H.TextSize) do
@@ -545,7 +549,7 @@ begin
     FreeMem(Dict,DictSize);
     FreeMem(Text,H.TextSize);
   end;
-  F^.Reset;
+  F.Reset;
   ReadTopicRec:=OK;
 end;
 
@@ -557,49 +561,49 @@ var OK: boolean;
     Title: string;
 begin
   OK:=false;
-  NumSlots:=T^.ExtDataSize div 2; { extdata is array of word }
-  New(L, Init(100,100));
-  Title:=GetStr(T^.Param);
+  NumSlots:=T.ExtDataSize div 2; { extdata is array of word }
+  L := TUnsortedStringCollection.Create(100,100);
+  Title:=GetStr(T.Param);
   if Title<>'' then
   begin
-    L^.InsertStr('  '+Title+' Ü'+hscLineBreak);
-    L^.InsertStr(' '+CharStr('ß',length(Title)+3)+hscLineBreak);
+    L.InsertStr('  '+Title+' Ü'+hscLineBreak);
+    L.InsertStr(' '+CharStr('ß',length(Title)+3)+hscLineBreak);
   end;
-  if 0<T^.HelpCtx then
+  if 0<T.HelpCtx then
   begin
-    L^.InsertStr(hscLink+'[previous topic]'+hscLink+'  ');
-    AddLinkToTopic(T,ID,T^.HelpCtx-1);
+    L.InsertStr(hscLink+'[previous topic]'+hscLink+'  ');
+    AddLinkToTopic(T,ID,T.HelpCtx-1);
   end;
-  if T^.HelpCtx<Header.NumTOC then
+  if T.HelpCtx<Header.NumTOC then
   begin
-    L^.InsertStr(hscLink+'[next topic]'+hscLink);
-    AddLinkToTopic(T,ID,T^.HelpCtx+1);
+    L.InsertStr(hscLink+'[next topic]'+hscLink);
+    AddLinkToTopic(T,ID,T.HelpCtx+1);
   end;
-  L^.InsertStr(hscLineBreak);
+  L.InsertStr(hscLineBreak);
   for I:=0 to NumSlots-1 do
   begin
-    Idx:=PWordArray(T^.ExtData)^[I];
+    Idx:=PWordArray(T.ExtData)^[I];
     TopicOfs:=Slots^[Idx];
     OK:=ReadTopicRec(TopicOfs,T,L);
     if not OK then
       Break;
   end;
   if OK then BuildTopic(L,T);
-  Dispose(L, Done);
+  L.Free;
   ReadTopic:=OK;
 end;
 
-destructor TOS2HelpFile.Done;
+destructor TOS2HelpFile.Destroy;
 begin
   if Assigned(Slots) then FreeMem(Slots, SlotsSize); Slots:=nil;
-  if Assigned(Dictionary) then Dispose(Dictionary, Done); Dictionary:=nil;
-  if Assigned(F) then Dispose(F, Done); F:=nil;
-  inherited Done;
+  if Assigned(Dictionary) then Dictionary.Free; Dictionary:=nil;
+  if Assigned(F) then F.Free; F:=nil;
+  inherited Destroy;
 end;
 
 function CreateProc(const FileName,Param: string;Index : longint): PHelpFile;
 begin
-  CreateProc:=New(POS2HelpFile, Init(FileName,Index));
+  CreateProc := TOS2HelpFile.Create(FileName,Index);
 end;
 
 procedure RegisterHelpType;

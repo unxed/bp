@@ -17,7 +17,8 @@
 
 unit gdbmiint;
 
-{$MODE fpc}{$H-}
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 
 {$I globdir.inc}
 
@@ -29,9 +30,10 @@ uses
 type
   CORE_ADDR = gdbmiwrap.CORE_ADDR;
 
+  TFrameEntry = class;
   PPFrameEntry = ^PFrameEntry;
-  PFrameEntry = ^TFrameEntry;
-  TFrameEntry = object
+  PFrameEntry = TFrameEntry;
+  TFrameEntry = class
   private
     procedure Reset;
     procedure Clear;
@@ -42,11 +44,11 @@ type
     line_number: LongInt;
     address: CORE_ADDR;
     level : longint;
-    constructor Init;
-    destructor Done;
+    constructor Create;
+    destructor Destroy; override;
   end;
 
-  TGDBBuffer = object
+  TGDBBuffer = class
   private
     buf: PChar;
     size, idx: LongInt;
@@ -54,12 +56,12 @@ type
     procedure Append(p: PChar);
     procedure LAppend(p: PChar; len: LongInt);
   public
-    constructor Init;
-    destructor Done;
+    constructor Create;
+    destructor Destroy; override;
     procedure Reset;
   end;
 
-  TGDBInterface = object
+  TGDBInterface = class
   private
     user_screen_shown: Boolean;
 {$ifdef GDB_RAW_OUTPUT}
@@ -93,8 +95,8 @@ type
     switch_to_user: Boolean;
 
     { init }
-    constructor Init;
-    destructor Done;
+    constructor Create;
+    destructor Destroy;
     { from gdbcon }
     function GetOutput: PChar;
     function GetError: PChar;
@@ -144,12 +146,12 @@ implementation
 uses
   strings;
 
-constructor TFrameEntry.Init;
+constructor TFrameEntry.Create;
 begin
   Reset;
 end;
 
-destructor TFrameEntry.Done;
+destructor TFrameEntry.Destroy;
 begin
   Clear;
 end;
@@ -178,7 +180,7 @@ end;
 const
   BlockSize = 2048;
 
-constructor TGDBBuffer.Init;
+constructor TGDBBuffer.Create;
 begin
   buf := nil;
   size := 0;
@@ -186,7 +188,7 @@ begin
   Reset;
 end;
 
-destructor TGDBBuffer.Done;
+destructor TGDBBuffer.Destroy;
 begin
   if Assigned(buf) then
     FreeMem(buf, size);
@@ -234,17 +236,17 @@ begin
   buf[idx] := #0;
 end;
 
-constructor TGDBInterface.Init;
+constructor TGDBInterface.Create;
 begin
-  GDBErrorBuf.Init;
-  GDBOutputBuf.Init;
+  GDBErrorBuf := TGDBBuffer.Create;
+  GDBOutputBuf := TGDBBuffer.Create;
   GDB := TGDBWrapper.Create;
   command_level := 0;
   Debuggee_started:=false;
   init_count:=0;
 {$ifdef GDB_RAW_OUTPUT}
   output_raw:=true;
-  GDBRawBuf.Init;
+  GDBRawBuf := TGDBBuffer.Create;
 {$endif GDB_RAW_OUTPUT}
 { other standard commands used for fpc debugging }
   i_gdb_command('-gdb-set print demangle off');
@@ -255,14 +257,14 @@ begin
   i_gdb_command('-gdb-set print null-stop');
 end;
 
-destructor TGDBInterface.Done;
+destructor TGDBInterface.Destroy;
 begin
   clear_frames;
   GDB.Free;
-  GDBErrorBuf.Done;
-  GDBOutputBuf.Done;
+  GDBErrorBuf.Free;
+  GDBOutputBuf.Free;
 {$ifdef GDB_RAW_OUTPUT}
-  GDBRawBuf.Done;
+  GDBRawBuf.Free;
 {$endif GDB_RAW_OUTPUT}
 end;
 
@@ -514,7 +516,7 @@ var
   I: LongInt;
 begin
   for I := 0 to frame_count - 1 do
-    Dispose(frames[I], Done);
+    frames[I].Free;
   if Assigned(frames) then
   begin
     FreeMem(frames, SizeOf(Pointer) * frame_count);

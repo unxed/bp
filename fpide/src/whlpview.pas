@@ -14,6 +14,9 @@
  **********************************************************************}
 unit WHlpView;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses
@@ -56,18 +59,21 @@ type
         Index    : sw_integer;
       end;
 
-      PLinkCollection = ^TLinkCollection;
-      TLinkCollection = object(TCollection)
+      TLinkCollection = class;
+      PLinkCollection = TLinkCollection;
+      TLinkCollection = class(TCollection)
         procedure FreeItem(Item: Pointer); virtual;
       end;
 
-      PColorAreaCollection = ^TColorAreaCollection;
-      TColorAreaCollection = object(TCollection)
+      TColorAreaCollection = class;
+      PColorAreaCollection = TColorAreaCollection;
+      TColorAreaCollection = class(TCollection)
         procedure FreeItem(Item: Pointer); virtual;
       end;
 
-      PKeywordCollection = ^TKeywordCollection;
-      TKeywordCollection = object({TSorted}TCollection)
+      TKeywordCollection = class;
+      PKeywordCollection = TKeywordCollection;
+      TKeywordCollection = class({TSorted}TCollection)
         function  At(Index: sw_Integer): PHelpKeyword;
         procedure FreeItem(Item: Pointer); virtual;
         function  Compare(Key1, Key2: Pointer): sw_Integer; virtual;
@@ -75,23 +81,26 @@ type
 
 {      TSearchRelation = (srEqual,srGreater,srLess,srGreatEqu,srLessEqu);
 
-      PAdvancedStringCollection = ^TAdvancedStringCollection;
-      TAdvancedStringCollection = object(TStringCollection)
+      TAdvancedStringCollection = class;
+      PAdvancedStringCollection = TAdvancedStringCollection;
+      TAdvancedStringCollection = class(TStringCollection)
         function SearchItem(Key: pointer; Rel: TSearchRelation; var Index: integer): boolean; virtual;
       end;}
 
-      PNamedMark = ^TNamedMark;
-      TNamedMark = object(TObject)
-        constructor Init(const AName: string; AX, AY: integer);
+      TNamedMark = class;
+      PNamedMark = TNamedMark;
+      TNamedMark = class(TObject)
+        constructor Create(const AName: string; AX, AY: integer);
         function    GetName: string;
-        destructor  Done; virtual;
+        destructor Destroy; virtual;
       private
         Name: PString;
         Pos: TPoint;
       end;
 
-      PNamedMarkCollection = ^TNamedMarkCollection;
-      TNamedMarkCollection = object(TSortedCollection)
+      TNamedMarkCollection = class;
+      PNamedMarkCollection = TNamedMarkCollection;
+      TNamedMarkCollection = class(TSortedCollection)
         function At(Index: sw_Integer): PNamedMark;
         function Compare(Key1, Key2: Pointer): sw_Integer; virtual;
         function SearchMark(const Name: string): PNamedMark;
@@ -99,14 +108,16 @@ type
         procedure Add(const Name: string; P: TPoint);
       end;
 
-      PLinePosCollection = ^TLinePosCollection;
-      TLinePosCollection = object(TNoDisposeCollection)
+      TLinePosCollection = class;
+      PLinePosCollection = TLinePosCollection;
+      TLinePosCollection = class(TNoDisposeCollection)
         function At(Index: sw_Integer): sw_integer;
         procedure Insert (Item: pointer);virtual;
       end;
 
-      PHelpTopic = ^THelpTopic;
-      THelpTopic = object(TObject)
+      THelpTopic = class;
+      PHelpTopic = THelpTopic;
+      THelpTopic = class(TObject)
         Topic: PTopic;
         Lines: PUnsortedStringCollection;
         LinesPos: PLinePosCollection;
@@ -114,7 +125,7 @@ type
         NamedMarks: PNamedMarkCollection;
         ColorAreas: PColorAreaCollection;
       public
-        constructor Init(ATopic: PTopic);
+        constructor Create(ATopic: PTopic);
         procedure   SetParams(AMargin, AWidth: sw_integer); virtual;
         function    GetLineCount: sw_integer; virtual;
         function    GetLineText(Line: sw_integer): string; virtual;
@@ -126,7 +137,7 @@ type
         procedure   GetColorAreaBounds(Index: sw_integer; var R: TRect); virtual;
         function    GetColorAreaColor(Index: sw_integer): word; virtual;
         function    GetColorAreaMask(Index: sw_integer): word; virtual;
-        destructor  Done; virtual;
+        destructor Destroy; virtual;
       private
         Width,Margin: sw_integer;
 {        StockItem: boolean;}
@@ -141,12 +152,13 @@ type
         FileID_      : word;
       end;
 
-      PHelpViewer = ^THelpViewer;
-      THelpViewer = object(TEditor)
+      THelpViewer = class;
+      PHelpViewer = THelpViewer;
+      THelpViewer = class(TEditor)
         Margin: sw_integer;
         HelpTopic: PHelpTopic;
         CurLink: sw_integer;
-        constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+        constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
         procedure   ChangeBounds(var Bounds: TRect); virtual;
         procedure   Draw; virtual;
         procedure   HandleEvent(var Event: TEvent); virtual;
@@ -174,10 +186,10 @@ type
         procedure   PrevTopic; virtual;
         procedure   RenderTopic; virtual;
         procedure   Lookup(S: string); virtual;
-        function    GetPalette: PPalette; virtual;
+        function    GetPalette: TPalette; virtual;
         constructor Load(var S: TStream);
         procedure   Store(var S: TStream);
-        destructor  Done; virtual;
+        destructor Destroy; virtual;
       private
         History    : array[0..HistorySize] of THelpHistoryEntry;
         HistoryPtr : integer;
@@ -192,17 +204,19 @@ type
         procedure   BuildTopicWordList;
       end;
 
-      PHelpFrame = ^THelpFrame;
-      THelpFrame = object(TFrame)
-        function GetPalette: PPalette; virtual;
+      THelpFrame = class;
+      PHelpFrame = THelpFrame;
+      THelpFrame = class(TFrame)
+        function GetPalette: TPalette; virtual;
       end;
 
-      PHelpWindow = ^THelpWindow;
-      THelpWindow = object(TWindow)
+      THelpWindow = class;
+      PHelpWindow = THelpWindow;
+      THelpWindow = class(TWindow)
         HSB,VSB : PScrollBar;
         HelpView: PHelpViewer;
         HideOnClose: boolean;
-        constructor Init(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
+        constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
         procedure   InitFrame; virtual;
         procedure   InitScrollBars; virtual;
         procedure   InitHelpView; virtual;
@@ -211,7 +225,7 @@ type
         procedure   ShowTopic(SourceFileID: word; Context: THelpCtx); virtual;
         procedure   HandleEvent(var Event: TEvent); virtual;
         procedure   Close; virtual;
-        function    GetPalette: PPalette; virtual; { needs to be overridden }
+        function    GetPalette: TPalette; virtual; { needs to be overridden }
       end;
 
 implementation
@@ -279,7 +293,7 @@ end;
 
 function TKeywordCollection.At(Index: sw_Integer): PHelpKeyword;
 begin
-  At:=inherited At(Index);
+  At := PHelpKeyword(inherited At(Index));
 end;
 
 procedure TKeywordCollection.FreeItem(Item: Pointer);
@@ -336,9 +350,9 @@ begin
   Search:=Index<>-1;
 end;}
 
-constructor TNamedMark.Init(const AName: string; AX, AY: integer);
+constructor TNamedMark.Create(const AName: string; AX, AY: integer);
 begin
-  inherited Init;
+  inherited Create;
   Name:=NewStr(AName);
   Pos.X:=AX; Pos.Y:=AY;
 end;
@@ -348,15 +362,15 @@ begin
   GetName:=GetStr(Name);
 end;
 
-destructor TNamedMark.Done;
+destructor TNamedMark.Destroy;
 begin
   if Assigned(Name) then DisposeStr(Name); Name:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
 function TNamedMarkCollection.At(Index: sw_Integer): PNamedMark;
 begin
-  At:=inherited At(Index);
+  At := PNamedMark(inherited At(Index));
 end;
 
 function TNamedMarkCollection.Compare(Key1, Key2: Pointer): sw_Integer;
@@ -365,7 +379,7 @@ var K1: PNamedMark absolute Key1;
     R: integer;
     N1,N2: string;
 begin
-  N1:=UpcaseStr(K1^.GetName); N2:=UpcaseStr(K2^.GetName);
+  N1:=UpcaseStr(K1.GetName); N2:=UpcaseStr(K2.GetName);
   if N1<N2 then R:=-1 else
   if N1>N2 then R:= 1 else
   R:=0;
@@ -376,10 +390,10 @@ function TNamedMarkCollection.SearchMark(const Name: string): PNamedMark;
 var M,P: PNamedMark;
     I: sw_integer;
 begin
-  New(M, Init(Name,0,0));
+  M := TNamedMark.Create(Name,0,0);
   if Search(M,I)=false then P:=nil else
     P:=At(I);
-  Dispose(M, Done);
+  M.Free;
   SearchMark:=P;
 end;
 
@@ -388,13 +402,13 @@ var M: PNamedMark;
 begin
   M:=SearchMark(Name);
   if Assigned(M) then
-    P:=M^.Pos;
+    P:=M.Pos;
   GetMarkPos:=Assigned(M);
 end;
 
 procedure TNamedMarkCollection.Add(const Name: string; P: TPoint);
 begin
-  Insert(New(PNamedMark, Init(Name, P.X, P.Y)));
+  Insert(TNamedMark.Create(Name, P.X, P.Y));
 end;
 
 function TLinePosCollection.At(Index: sw_Integer): sw_integer;
@@ -407,15 +421,15 @@ begin
   Inherited Insert(Item);
 end;
 
-constructor THelpTopic.Init(ATopic: PTopic);
+constructor THelpTopic.Create(ATopic: PTopic);
 begin
-  inherited Init;
+  inherited Create;
   Topic:=ATopic;
-  New(Lines, Init(100,100));
-  New(LinesPos, Init(100,100));
-  New(Links, Init(50,50));
-  New(ColorAreas, Init(50,50));
-  New(NamedMarks, Init(10,10));
+  Lines := TUnsortedStringCollection.Create(100,100);
+  LinesPos := TLinePosCollection.Create(100,100);
+  Links := TLinkCollection.Create(50,50);
+  ColorAreas := TColorAreaCollection.Create(50,50);
+  NamedMarks := TNamedMarkCollection.Create(10,10);
 end;
 
 procedure THelpTopic.SetParams(AMargin, AWidth: sw_integer);
@@ -478,11 +492,11 @@ begin
   end;
   if (Delta>0) and (FirstLink<>LastLink) then
   for I:=FirstLink to LastLink-1 do
-    with PHelpLink(Links^.At(I))^ do
+    with PHelpLink(Links.At(I))^ do
       Bounds.Move(Delta,0);
   if Line='' then Line:=' ';
-  Lines^.Insert(NewStr(Line));
-  LinesPos^.Insert(pointer(LinePos));
+  Lines.Insert(NewStr(Line));
+  LinesPos.Insert(pointer(LinePos));
   ClearLine;
   LineStart:=NextLineStart;
   CurPos.X:=Margin+LineStart; Line:=CharStr(#255,LineStart); Inc(CurPos.Y);
@@ -524,13 +538,13 @@ begin
   if ColorAreaType=atText then Mask:=$f0 else Mask:=$00;
   if CurWord<>'' then AddWord(CurWord); CurWord:='';
   ColorAreaEnd:=CurPos; Dec(ColorAreaEnd.X);
-  ColorAreas^.Insert(NewColorArea(AreaColor,Mask,ColorAreaStart,ColorAreaEnd));
+  ColorAreas.Insert(NewColorArea(AreaColor,Mask,ColorAreaStart,ColorAreaEnd));
   InColorArea:=false; AreaColor:=0;
 end;
 begin
-  Lines^.FreeAll; LinesPos^.FreeAll;
-  Links^.FreeAll; NamedMarks^.FreeAll; ColorAreas^.FreeAll;
-  if Topic=nil then Lines^.Insert(NewStr(msg_nohelpavailabelforthistopic)) else
+  Lines.FreeAll; LinesPos.FreeAll;
+  Links.FreeAll; NamedMarks.FreeAll; ColorAreas.FreeAll;
+  if Topic=nil then Lines.Insert(NewStr(msg_nohelpavailabelforthistopic)) else
   begin
     LineStart:=0; NextLineStart:=0;
     TextPos:=0; ClearLine; CurWord:=''; Line:='';
@@ -582,7 +596,7 @@ begin
                             if LinkNo<Topic^.LinkCount then
                               begin
                                 Inc(LastLink);
-                                Links^.Insert(NewLink(Topic^.Links^[LinkNo].FileID,
+                                Links.Insert(NewLink(Topic^.Links^[LinkNo].FileID,
                                   Topic^.Links^[LinkNo].Context,LinkStart,LinkEnd));
                               end;
                             Inc(LinkNo);
@@ -602,7 +616,7 @@ begin
                       begin
                         if CurWord<>'' then AddWord(CurWord); CurWord:='';
                         CodeAreaEnd:=CurPos; Dec(CodeAreaEnd.X);
-                        ColorAreas^.Insert(NewColorArea(CommentColor,$f0,CodeAreaStart,CodeAreaEnd));
+                        ColorAreas.Insert(NewColorArea(CommentColor,$f0,CodeAreaStart,CodeAreaEnd));
                       end;
                      InCodeArea:=not InCodeArea;
                    end;
@@ -612,8 +626,8 @@ begin
                    LineAlign:=laRight{was laCenter, typo error ? PM };
               hscNamedMark :
                    begin
-                     if NamedMarkNo<Topic^.NamedMarks^.Count then
-                       NamedMarks^.Add(GetStr(Topic^.NamedMarks^.At(NamedMarkNo)),CurPos);
+                     if NamedMarkNo<Topic^.NamedMarks.Count then
+                       NamedMarks.Add(GetStr(Topic^.NamedMarks.At(NamedMarkNo)),CurPos);
                      Inc(NamedMarkNo);
                    end;
               hscTextAttr,hscTextColor :
@@ -654,85 +668,85 @@ end;
 
 function THelpTopic.GetLineCount: sw_integer;
 begin
-  GetLineCount:=Lines^.Count;
+  GetLineCount:=Lines.Count;
 end;
 
 function THelpTopic.GetLineText(Line: sw_integer): string;
 var S: string;
 begin
-  if Line<GetLineCount then S:=PString(Lines^.At(Line))^ else S:='';
+  if Line<GetLineCount then S:=PString(Lines.At(Line))^ else S:='';
   GetLineText:=S;
 end;
 
 function THelpTopic.GetLinkCount: sw_integer;
 begin
-  GetLinkCount:=Links^.Count;
+  GetLinkCount:=Links.Count;
 end;
 
 procedure THelpTopic.GetLinkBounds(Index: sw_integer; var R: TRect);
 var P: PHelpLink;
 begin
-  P:=Links^.At(Index);
+  P:=Links.At(Index);
   R:=P^.Bounds;
 end;
 
 function THelpTopic.GetLinkFileID(Index: sw_integer): word;
 var P: PHelpLink;
 begin
-  P:=Links^.At(Index);
+  P:=Links.At(Index);
   GetLinkFileID:=P^.FileID;
 end;
 
 function THelpTopic.GetLinkContext(Index: sw_integer): THelpCtx;
 var P: PHelpLink;
 begin
-  P:=Links^.At(Index);
+  P:=Links.At(Index);
   GetLinkContext:=P^.Context;
 end;
 
 function THelpTopic.GetColorAreaCount: sw_integer;
 begin
-  GetColorAreaCount:=ColorAreas^.Count;
+  GetColorAreaCount:=ColorAreas.Count;
 end;
 
 procedure THelpTopic.GetColorAreaBounds(Index: sw_integer; var R: TRect);
 var P: PHelpColorArea;
 begin
-  P:=ColorAreas^.At(Index);
+  P:=ColorAreas.At(Index);
   R:=P^.Bounds;
 end;
 
 function THelpTopic.GetColorAreaColor(Index: sw_integer): word;
 var P: PHelpColorArea;
 begin
-  P:=ColorAreas^.At(Index);
+  P:=ColorAreas.At(Index);
   GetColorAreaColor:=P^.Color;
 end;
 
 function THelpTopic.GetColorAreaMask(Index: sw_integer): word;
 var P: PHelpColorArea;
 begin
-  P:=ColorAreas^.At(Index);
+  P:=ColorAreas.At(Index);
   GetColorAreaMask:=P^.AttrMask;
 end;
 
-destructor THelpTopic.Done;
+destructor THelpTopic.Destroy;
 begin
-  inherited Done;
-  Dispose(Lines, Done);
-  Dispose(LinesPos, Done);
-  Dispose(Links, Done);
-  Dispose(ColorAreas, Done);
-  Dispose(NamedMarks, Done);
+  inherited Destroy;
+  Lines.Free;
+  LinesPos.Free;
+  Links.Free;
+  ColorAreas.Free;
+  NamedMarks.Free;
   if (Topic<>nil) then DisposeTopic(Topic);
 end;
 
-constructor THelpViewer.Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+constructor THelpViewer.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
 begin
-  inherited Init(Bounds, AHScrollBar, AVScrollBar, nil, nil);
+  inherited Create(Bounds, AHScrollBar, AVScrollBar, nil, nil);
   Flags:=efInsertMode or efPersistentBlocks;
   ReadOnly:=true;
-  New(WordList, Init(50,50));
+  WordList := TKeywordCollection.Create(50,50);
   Margin:=1; CurLink:=-1;
 end;
 
@@ -742,7 +756,7 @@ var
   ymin, ymax : sw_integer;
   prop : real;
 begin
-  if Owner<>nil then Owner^.Lock;
+  if Owner<>nil then Owner.Lock;
   ymin:=Delta.Y;
   ymax:=ymin+Size.Y;
   if ymax>ymin then
@@ -750,14 +764,14 @@ begin
   else
     prop:=0;
   inherited ChangeBounds(Bounds);
-  if (HelpTopic<>nil) and (HelpTopic^.Topic<>nil) and
-     (HelpTopic^.Topic^.FileID<>0) then
+  if (HelpTopic<>nil) and (HelpTopic.Topic<>nil) and
+     (HelpTopic.Topic^.FileID<>0) then
     Begin
-      LinePos:=HelpTopic^.LinesPos^.At(CurPos.Y)+CurPos.X;
+      LinePos:=HelpTopic.LinesPos.At(CurPos.Y)+CurPos.X;
       RenderTopic;
       NewLineIndex:=-1;
-      For i:=0 to HelpTopic^.LinesPos^.Count-1 do
-        if LinePos<HelpTopic^.LinesPos^.At(i) then
+      For i:=0 to HelpTopic.LinesPos.Count-1 do
+        if LinePos<HelpTopic.LinesPos.At(i) then
           begin
             NewLineIndex:=i-1;
             break;
@@ -768,16 +782,16 @@ begin
           if ymin<0 then
             ymin:=0;
           ScrollTo(0,ymin);
-          SetCurPtr(LinePos-HelpTopic^.LinesPos^.At(NewLineIndex),NewLineIndex);
+          SetCurPtr(LinePos-HelpTopic.LinesPos.At(NewLineIndex),NewLineIndex);
         End;
     End;
-  if Owner<>nil then Owner^.UnLock;
+  if Owner<>nil then Owner.UnLock;
 end;
 
 procedure THelpViewer.RenderTopic;
 begin
   if HelpTopic<>nil then
-    HelpTopic^.SetParams(Margin,Size.X);
+    HelpTopic.SetParams(Margin,Size.X);
   SetLimit(255,GetLineCount);
   DrawView;
 end;
@@ -818,7 +832,7 @@ end;
 function THelpViewer.GetLineCount: sw_integer;
 var Count: sw_integer;
 begin
-  if HelpTopic=nil then Count:=0 else Count:=HelpTopic^.GetLineCount;
+  if HelpTopic=nil then Count:=0 else Count:=HelpTopic.GetLineCount;
   GetLineCount:=Count;
 end;
 
@@ -835,30 +849,30 @@ end;
 function THelpViewer.GetLineText(Line: sw_integer): string;
 var S: string;
 begin
-  if HelpTopic=nil then S:='' else S:=HelpTopic^.GetLineText(Line);
+  if HelpTopic=nil then S:='' else S:=HelpTopic.GetLineText(Line);
   GetLineText:=S;
 end;
 
 function THelpViewer.GetLinkCount: sw_integer;
 var Count: sw_integer;
 begin
-  if HelpTopic=nil then Count:=0 else Count:=HelpTopic^.GetLinkCount;
+  if HelpTopic=nil then Count:=0 else Count:=HelpTopic.GetLinkCount;
   GetLinkCount:=Count;
 end;
 
 procedure THelpViewer.GetLinkBounds(Index: sw_integer; var R: TRect);
 begin
-  HelpTopic^.GetLinkBounds(Index,R);
+  HelpTopic.GetLinkBounds(Index,R);
 end;
 
 function THelpViewer.GetLinkFileID(Index: sw_integer): word;
 begin
-  GetLinkFileID:=HelpTopic^.GetLinkFileID(Index);
+  GetLinkFileID:=HelpTopic.GetLinkFileID(Index);
 end;
 
 function THelpViewer.GetLinkContext(Index: sw_integer): THelpCtx;
 begin
-  GetLinkContext:=HelpTopic^.GetLinkContext(Index);
+  GetLinkContext:=HelpTopic.GetLinkContext(Index);
 end;
 
 function THelpViewer.GetLinkTarget(Index: sw_integer): string;
@@ -872,7 +886,7 @@ begin
        ID:=GetLinkFileID(Index);
        Ctx:=GetLinkContext(Index);
      end;
-  GetLinkTarget:=HelpFacility^.GetTopicInfo(ID,CTx);
+  GetLinkTarget:=HelpFacility.GetTopicInfo(ID,CTx);
 end;
 
 function THelpViewer.GetLinkText(Index: sw_integer): string;
@@ -895,23 +909,23 @@ end;
 function THelpViewer.GetColorAreaCount: sw_integer;
 var Count: sw_integer;
 begin
-  if HelpTopic=nil then Count:=0 else Count:=HelpTopic^.GetColorAreaCount;
+  if HelpTopic=nil then Count:=0 else Count:=HelpTopic.GetColorAreaCount;
   GetColorAreaCount:=Count;
 end;
 
 procedure THelpViewer.GetColorAreaBounds(Index: sw_integer; var R: TRect);
 begin
-  HelpTopic^.GetColorAreaBounds(Index,R);
+  HelpTopic.GetColorAreaBounds(Index,R);
 end;
 
 function THelpViewer.GetColorAreaColor(Index: sw_integer): word;
 begin
-  GetColorAreaColor:=HelpTopic^.GetColorAreaColor(Index);
+  GetColorAreaColor:=HelpTopic.GetColorAreaColor(Index);
 end;
 
 function THelpViewer.GetColorAreaMask(Index: sw_integer): word;
 begin
-  GetColorAreaMask:=HelpTopic^.GetColorAreaMask(Index);
+  GetColorAreaMask:=HelpTopic.GetColorAreaMask(Index);
 end;
 
 procedure THelpViewer.SelectNextLink(ANext: boolean);
@@ -956,7 +970,7 @@ end;
 procedure THelpViewer.SwitchToIndex;
 begin
   if IndexTopic=nil then
-     IndexTopic:=HelpFacility^.BuildIndexTopic;
+     IndexTopic:=HelpFacility.BuildIndexTopic;
   ISwitchToTopicPtr(IndexTopic,true);
 end;
 
@@ -971,7 +985,7 @@ begin
   if HelpFacility=nil then P:=nil else
     if (SourceFileID=0) and (Context=0) and (HelpTopic<>nil) then
        P:=IndexTopic else
-     P:=HelpFacility^.LoadTopic(SourceFileID, Context);
+     P:=HelpFacility.LoadTopic(SourceFileID, Context);
   ISwitchToTopicPtr(P,RecordInHistory);
 end;
 
@@ -985,24 +999,24 @@ begin
        Move(History[1],History[0],SizeOf(History)-SizeOf(History[0]));
     with History[HistoryPtr] do
     begin
-      {SourceTopic_:=SourceTopic; }Context_:=HelpTopic^.Topic^.HelpCtx;
-      FileID_:=HelpTopic^.Topic^.FileID;
+      {SourceTopic_:=SourceTopic; }Context_:=HelpTopic.Topic^.HelpCtx;
+      FileID_:=HelpTopic.Topic^.FileID;
       Delta_:=Delta; CurPos_:=CurPos; CurLink_:=CurLink;
     end;
     if HistoryFull=false then Inc(HistoryPtr);
   end;
 
-  if Owner<>nil then Owner^.Lock;
+  if Owner<>nil then Owner.Lock;
   SetTopic(P);
   DrawView;
-  if Owner<>nil then Owner^.UnLock;
+  if Owner<>nil then Owner.UnLock;
 end;
 
 procedure THelpViewer.PrevTopic;
 begin
   if HistoryPtr>0 then
   begin
-    if Owner<>nil then Owner^.Lock;
+    if Owner<>nil then Owner.Lock;
     Dec(HistoryPtr);
     with History[HistoryPtr] do
     begin
@@ -1013,7 +1027,7 @@ begin
       if CurLink<>CurLink_ then SetCurLink(CurLink_);
     end;
     DrawView;
-    if Owner<>nil then Owner^.UnLock;
+    if Owner<>nil then Owner.UnLock;
   end;
 end;
 
@@ -1022,22 +1036,22 @@ var Bookmark: string;
     P: TPoint;
 begin
   CurLink:=-1;
-  if (HelpTopic=nil) or (Topic<>HelpTopic^.Topic) then
+  if (HelpTopic=nil) or (Topic<>HelpTopic.Topic) then
  begin
   if (HelpTopic<>nil) and (HelpTopic<>IndexHelpTopic) then
-     Dispose(HelpTopic, Done);
+     HelpTopic.Free;
   HelpTopic:=nil;
   if Topic<>nil then
      begin
        if (Topic=IndexTopic) and (IndexHelpTopic<>nil) then
           HelpTopic:=IndexHelpTopic else
-       New(HelpTopic, Init(Topic));
+       HelpTopic := THelpTopic.Create(Topic);
        if Topic=IndexTopic then
           IndexHelpTopic:=HelpTopic;
      end;
  end;
   if Owner<>nil then
-    Owner^.Lock;
+    Owner.Lock;
   SetCurPtr(0,0);
   TrackCursor(do_not_centre);
   RenderTopic;
@@ -1045,10 +1059,10 @@ begin
   Lookup('');
   if Assigned(Topic) then
   if Topic^.StartNamedMark>0 then
-   if Topic^.NamedMarks^.Count>=Topic^.StartNamedMark then
+   if Topic^.NamedMarks.Count>=Topic^.StartNamedMark then
     begin
-      Bookmark:=GetStr(Topic^.NamedMarks^.At(Topic^.StartNamedMark-1));
-      if HelpTopic^.NamedMarks^.GetMarkPos(Bookmark,P) then
+      Bookmark:=GetStr(Topic^.NamedMarks.At(Topic^.StartNamedMark-1));
+      if HelpTopic.NamedMarks.GetMarkPos(Bookmark,P) then
       begin
         SetCurPtr(P.X,P.Y);
         ScrollTo(0,Max(0,P.Y-1));
@@ -1056,15 +1070,15 @@ begin
     end;
   SetSelection(CurPos,CurPos);
   DrawView;
-  if Owner<>nil then Owner^.UnLock;
+  if Owner<>nil then Owner.UnLock;
 end;
 
 procedure THelpViewer.BuildTopicWordList;
 var I: sw_integer;
 begin
-  WordList^.FreeAll;
+  WordList.FreeAll;
   for I:=0 to GetLinkCount-1 do
-    WordList^.Insert(NewKeyword(I,Trim(GetLinkText(I))));
+    WordList.Insert(NewKeyword(I,Trim(GetLinkText(I))));
 end;
 
 procedure THelpViewer.Lookup(S: string);
@@ -1088,9 +1102,9 @@ begin
     end;}
   if S='' then LookupWord:='' else
   begin
-    while (Index=-1) and (I<WordList^.Count) do
+    while (Index=-1) and (I<WordList.Count) do
       begin
-        P:=WordList^.At(I);
+        P:=WordList.At(I);
         if P^.KWord<>nil then
           begin
             W:=UpcaseStr(Trim(P^.KWord^));
@@ -1101,7 +1115,7 @@ begin
       end;
     if Index<>-1 then
     begin
-      W:=Trim(WordList^.At(Index)^.KWord^);
+      W:=Trim(WordList.At(Index)^.KWord^);
       LookupWord:=copy(W,1,length(S));
     end;
   end;
@@ -1110,15 +1124,15 @@ begin
   begin
     if Index=-1 then SetCurLink(CurLink) else
     begin
-      if Owner<>nil then Owner^.Lock;
-      P:=WordList^.At(Index);
+      if Owner<>nil then Owner.Lock;
+      P:=WordList.At(Index);
       S:=GetLinkText(P^.Index);
       I:=Pos(LookupWord,S); if I=0 then I:=1;
       GetLinkBounds(P^.Index,R);
       SetCurPtr(R.A.X+(I-1)+length(Lookupword),R.A.Y);
       CurLink:=P^.Index; DrawView;
       TrackCursor(do_centre);
-      if Owner<>nil then Owner^.UnLock;
+      if Owner<>nil then Owner.UnLock;
     end;
   end;
   InLookup:=false;
@@ -1160,7 +1174,7 @@ begin
           begin
             if HelpTopic=IndexHelpTopic then HelpTopic:=nil;
             IndexTopic:=nil;
-            if IndexHelpTopic<>nil then Dispose(IndexHelpTopic, Done);
+            if IndexHelpTopic<>nil then IndexHelpTopic.Free;
             IndexHelpTopic:=nil;
           end;
       end;
@@ -1193,16 +1207,21 @@ begin
             if Length(LookupWord)>0 then
               Lookup(Copy(LookupWord,1,Length(LookupWord)-1));
         else
-          case Event.CharCode of
-             #32..#255 :
-               begin
-                 NoSelect:=true;
-                 Lookup(LookupWord+Event.CharCode);
-                 NoSelect:=false;
-               end;
+          { CharCode is Byte in tv3; UTF-8 text is in Event.Text/TextLength. }
+          if (Event.TextLength > 0) and (Byte(Event.Text[0]) >= 32) then
+            begin
+              NoSelect:=true;
+              Lookup(LookupWord+EventText(Event));
+              NoSelect:=false;
+            end
+          else if Event.CharCode in [32..255] then
+            begin
+              NoSelect:=true;
+              Lookup(LookupWord+Chr(Event.CharCode));
+              NoSelect:=false;
+            end
           else
             DontClear:=true;
-          end;
         end;
         TrackCursor(do_not_centre);
         if not DontClear then
@@ -1215,7 +1234,7 @@ end;
 procedure THelpViewer.Draw;
 var NormalColor, LinkColor,
     SelectColor, SelectionColor: word;
-    B: TDrawBuffer;
+    B: TFVDrawBuffer;
     DX,DY,X,Y,I,MinX,MaxX,ScreenX: sw_integer;
     LastLinkDrawn,LastColorAreaDrawn: sw_integer;
     S: string;
@@ -1233,8 +1252,8 @@ begin
   DrawCalled:=false;
 
 
-  NormalColor:=GetColor(1); LinkColor:=GetColor(2);
-  SelectColor:=GetColor(3); SelectionColor:=GetColor(4);
+  NormalColor:=GetColorW(1); LinkColor:=GetColorW(2);
+  SelectColor:=GetColorW(3); SelectionColor:=GetColorW(4);
   SelR.A:=SelStart; SelR.B:=SelEnd;
   LastLinkDrawn:=0; LastColorAreaDrawn:=0;
   for DY:=0 to Size.Y-1 do
@@ -1311,15 +1330,14 @@ begin
       end;
 
     end;
-    WriteLine(0,DY,Size.X,1,B);
+    WriteLineW(0,DY,Size.X,1,B);
   end;
   DrawCursor;
 end;
 
-function THelpViewer.GetPalette: PPalette;
-const P: string[length(CHelpViewer)] = CHelpViewer;
+function THelpViewer.GetPalette: TPalette;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(CHelpViewer);
 end;
 
 constructor THelpViewer.Load(var S: TStream);
@@ -1332,28 +1350,27 @@ begin
   inherited Store(S);
 end;
 
-destructor THelpViewer.Done;
+destructor THelpViewer.Destroy;
 begin
   if (HelpTopic<>nil) and (HelpTopic<>IndexHelpTopic) then
-     Dispose(HelpTopic, Done);
+     HelpTopic.Free;
   HelpTopic:=nil;
   if IndexHelpTopic<>nil then
-    Dispose(IndexHelpTopic, Done);
+    IndexHelpTopic.Free;
   IndexHelpTopic:=nil;
-  inherited Done;
+  inherited Destroy;
   if assigned(WordList) then
-    Dispose(WordList, Done);
+    WordList.Free;
 end;
 
-function THelpFrame.GetPalette: PPalette;
-const P: string[length(CHelpFrame)] = CHelpFrame;
+function THelpFrame.GetPalette: TPalette;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(CHelpFrame);
 end;
 
-constructor THelpWindow.Init(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
+constructor THelpWindow.Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
 begin
-  inherited Init(Bounds, ATitle, ANumber);
+  inherited Create(Bounds, ATitle, ANumber);
   InitScrollBars;
   if Assigned(HSB) then Insert(HSB);
   if Assigned(VSB) then Insert(VSB);
@@ -1370,10 +1387,10 @@ procedure THelpWindow.ShowDebugInfos;
 begin
 {$ifdef DEBUG}
   DebugMessage(GetTitle(255),'Generic Help window',1,1);
-  if HelpView^.CurLink<>-1 then
+  if HelpView.CurLink<>-1 then
     begin
-      DebugMessage('','Curlink is '+IntToStr(HelpView^.CurLink),1,1);
-      DebugMessage('',HelpView^.GetLinkTarget(HelpView^.CurLink),1,1);
+      DebugMessage('','Curlink is '+IntToStr(HelpView.CurLink),1,1);
+      DebugMessage('',HelpView.GetLinkTarget(HelpView.CurLink),1,1);
     end;
 {$endif DEBUG}
 end;
@@ -1382,34 +1399,34 @@ procedure THelpWindow.InitScrollBars;
 var R: TRect;
 begin
   GetExtent(R); R.Grow(0,-1); R.A.X:=R.B.X-1;
-  New(VSB, Init(R)); VSB^.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
+  VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
   GetExtent(R); R.Grow(-1,0); R.A.Y:=R.B.Y-1;
-  New(HSB, Init(R)); HSB^.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY;
+  HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY;
 end;
 
 procedure THelpWindow.InitHelpView;
 var R: TRect;
 begin
   GetExtent(R); R.Grow(-1,-1);
-  New(HelpView, Init(R, HSB, VSB));
-  HelpView^.GrowMode:=gfGrowHiX+gfGrowHiY;
+  HelpView := THelpViewer.Create(R, HSB, VSB);
+  HelpView.GrowMode:=gfGrowHiX+gfGrowHiY;
 end;
 
 procedure THelpWindow.InitFrame;
 var R: TRect;
 begin
   GetExtent(R);
-  Frame:=New(PHelpFrame, Init(R));
+  Frame := THelpFrame.Create(R);
 end;
 
 procedure THelpWindow.ShowIndex;
 begin
-  HelpView^.SwitchToIndex;
+  HelpView.SwitchToIndex;
 end;
 
 procedure THelpWindow.ShowTopic(SourceFileID: word; Context: THelpCtx);
 begin
-  HelpView^.SwitchToTopic(SourceFileID, Context);
+  HelpView.SwitchToTopic(SourceFileID, Context);
 end;
 
 procedure THelpWindow.HandleEvent(var Event: TEvent);
@@ -1431,7 +1448,7 @@ begin
   if HideOnClose then Hide else inherited Close;
 end;
 
-function THelpWindow.GetPalette: PPalette;
+function THelpWindow.GetPalette: TPalette;
 begin
   GetPalette:=nil;
 end;

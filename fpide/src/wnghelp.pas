@@ -15,6 +15,9 @@
 {$R-}
 unit WNGHelp;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,
@@ -95,10 +98,11 @@ type
         FilePos  : longint;
       end;
 
-      PNGHelpFile = ^TNGHelpFile;
-      TNGHelpFile = object(THelpFile)
-        constructor Init(AFileName: string; AID: word);
-        destructor  Done; virtual;
+      TNGHelpFile = class;
+      PNGHelpFile = TNGHelpFile;
+      TNGHelpFile = class(THelpFile)
+        constructor Create(AFileName: string; AID: word);
+        destructor Destroy; virtual;
       public
         function    LoadIndex: boolean; virtual;
         function    ReadTopic(T: PTopic): boolean; virtual;
@@ -191,26 +195,26 @@ procedure TranslateLines(P: PUnsortedStringCollection);
 var S: string;
     I: sw_integer;
 begin
-  for I:=0 to P^.Count-1 do
+  for I:=0 to P.Count-1 do
   begin
-    S:=GetStr(P^.At(I));
-    P^.AtFree(I);
-    P^.AtInsert(I,NewStr(TranslateStr(S)));
+    S:=GetStr(P.At(I));
+    P.AtFree(I);
+    P.AtInsert(I,NewStr(TranslateStr(S)));
   end;
 end;
 
-constructor TNGHelpFile.Init(AFileName: string; AID: word);
+constructor TNGHelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
-  if inherited Init(AID)=false then Fail;
-  F:=New(PFastBufStream, Init(AFileName, stOpenRead, HelpStreamBufSize));
+  if inherited Create(AID)=false then Fail;
+  F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
-  if OK then OK:=(F^.Status=stOK);
+  if OK then OK:=(F.Status=stOK);
   if OK then
     begin
       OK:=ReadHeader;
       if OK then
-        FirstRecordPos:=F^.GetPos;
+        FirstRecordPos:=F.GetPos;
     end;
   if OK=false then
   begin
@@ -222,8 +226,8 @@ end;
 function TNGHelpFile.ReadHeader: boolean;
 var OK: boolean;
 begin
-  F^.Read(Header,sizeof(Header));
-  OK:=(F^.Status=stOK);
+  F.Read(Header,sizeof(Header));
+  OK:=(F.Status=stOK);
   OK:=OK and (Header.Signature=NGFileSignature);
   ReadHeader:=OK;
 end;
@@ -286,9 +290,9 @@ begin
     if Assigned(LinkEnumProc) and (SeeAlsoOfs>0) then
     begin
       SeeAlso:=@PByteArray(R.Data)^[NGMinRecordSize-sizeof(TNGRecordHeader)+SeeAlsoOfs];
-      NextLinkOfsPtr:=@SeeAlso^.Entries;
-      NextLinkNamePtr:=@PByteArray(NextLinkOfsPtr)^[SeeAlso^.EntryCount*4];
-      for I:=1 to SeeAlso^.EntryCount do
+      NextLinkOfsPtr:=@SeeAlso.Entries;
+      NextLinkNamePtr:=@PByteArray(NextLinkOfsPtr)^[SeeAlso.EntryCount*4];
+      for I:=1 to SeeAlso.EntryCount do
       begin
         FillChar(LR,sizeof(LR),0);
         S:=StrPas(NextLinkNamePtr);
@@ -310,8 +314,8 @@ var OK: boolean;
     I: sw_integer;
 begin
   FillChar(R, SizeOf(R), 0);
-  F^.Read(H,SizeOf(H));
-  OK:=F^.Status=stOK;
+  F.Read(H,SizeOf(H));
+  OK:=F.Status=stOK;
   if OK then
     for I:=0 to SizeOf(H)-1 do
       PByteArray(@H)^[I]:=PByteArray(@H)^[I] xor NGXORByte;
@@ -321,11 +325,11 @@ begin
     if (R.Size>0) and ReadData then
     begin
       GetMem(R.Data,R.Size);
-      F^.Read(R.Data^,R.Size);
+      F.Read(R.Data^,R.Size);
       if R.Size>0 then
       for I:=0 to R.Size-1 do
         PByteArray(R.Data)^[I]:=PByteArray(R.Data)^[I] xor NGXORByte;
-      OK:=F^.Status=stOK;
+      OK:=F.Status=stOK;
     end;
     if OK=false then DisposeRecord(R);
   end;
@@ -346,21 +350,21 @@ begin
     end;
   until StartP=0;
   if Assigned(HelpFacility) then
-    if length(Alias)>HelpFacility^.IndexTabSize-4 then
-      Alias:=Trim(copy(Alias,1,HelpFacility^.IndexTabSize-4-2))+'..';
+    if length(Alias)>HelpFacility.IndexTabSize-4 then
+      Alias:=Trim(copy(Alias,1,HelpFacility.IndexTabSize-4-2))+'..';
   FormatAlias:=Alias;
 end;}
 procedure AddToIndex(P: PContainerItemRec);
 var S: string;
 begin
-  S:=Trim(P^.Name);
+  S:=Trim(P.Name);
   S:=TranslateStr(S);
   S:=Trim({FormatAlias}(S));
-  if (S<>'') and (P^.FilePos<>-1) then
+  if (S<>'') and (P.FilePos<>-1) then
     begin
 {      Inc(NextHelpCtx);}
-      AddIndexEntry(S,P^.FilePos);
-      AddTopic(P^.FilePos,P^.FilePos,'',nil,0);
+      AddIndexEntry(S,P.FilePos);
+      AddTopic(P.FilePos,P.FilePos,'',nil,0);
     end;
 end;
 var OK: boolean;
@@ -370,17 +374,17 @@ var OK: boolean;
 begin
   if IndexLoaded then OK:=true else
   begin
-    FS:=F^.GetSize;
+    FS:=F.GetSize;
     OK:=FirstRecordPos<>0;
 
     while OK do
     begin
-      L:=F^.GetPos;
+      L:=F.GetPos;
       if (L>=FS) then Break;
       OK:=ReadRecord(R,false);
       if (OK=false) then Break;
       case R.SClass of
-        ng_rtContainer : begin F^.Seek(L); OK:=ReadContainer(@AddToIndex); end;
+        ng_rtContainer : begin F.Seek(L); OK:=ReadContainer(@AddToIndex); end;
         ng_rtTopic     : ;
       else
        begin
@@ -398,8 +402,8 @@ begin
       end;
       if OK then
          begin
-           Inc(L, sizeof(TNGRecordHeader)+R.Size); F^.Seek(L);
-           OK:=(F^.Status=stOK);
+           Inc(L, sizeof(TNGRecordHeader)+R.Size); F.Seek(L);
+           OK:=(F.Status=stOK);
          end;
     end;
     IndexLoaded:=OK;
@@ -442,12 +446,12 @@ end;
 var Lines: PUnsortedStringCollection;
 procedure AddLine(const S: string);
 begin
-  Lines^.InsertStr(S);
+  Lines.InsertStr(S);
 end;
 procedure AddToTopic(P: PContainerItemRec);
 begin
-  AddLine(hscLink+Trim(P^.Name)+hscLink);
-  AddLinkToTopic(T,ID,P^.FilePos);
+  AddLine(hscLink+Trim(P.Name)+hscLink);
+  AddLinkToTopic(T,ID,P.FilePos);
 end;
 procedure AddTopicLine(P: PString);
 begin
@@ -462,27 +466,27 @@ begin
     AddLine('');
     AddLine(' See also :');
   end;
-  AddLine('  '+hscLink+Trim(P^.Name)+hscLink);
-  AddLinkToTopic(T,ID,P^.FilePos);
+  AddLine('  '+hscLink+Trim(P.Name)+hscLink);
+  AddLinkToTopic(T,ID,P.FilePos);
 end;
 var OK: boolean;
     R: TRecord;
 begin
   LinkCount:=0;
-  New(Lines, Init(100,100));
-  F^.Seek(T^.FileOfs); OK:=F^.Status=stOK;
+  Lines := TUnsortedStringCollection.Create(100,100);
+  F.Seek(T.FileOfs); OK:=F.Status=stOK;
   if OK then OK:=ReadRecord(R,false);
   case R.SClass of
       ng_rtContainer :
         begin
-          F^.Seek(T^.FileOfs);
+          F.Seek(T.FileOfs);
           AddLine('');
           OK:=ReadContainer(@AddToTopic);
           RenderTopic(Lines,T);
         end;
       ng_rtTopic     :
         begin
-          F^.Seek(T^.FileOfs);
+          F.Seek(T.FileOfs);
           AddLine('');
           OK:=ReadTopicRec(@AddTopicLine,@AddLink);
           TranslateLines(Lines);
@@ -495,19 +499,19 @@ begin
         end;
   else OK:=false;
   end;
-  Dispose(Lines, Done);
+  Lines.Free;
   ReadTopic:=OK;
 end;
 
-destructor TNGHelpFile.Done;
+destructor TNGHelpFile.Destroy;
 begin
-  if Assigned(F) then Dispose(F, Done); F:=nil;
-  inherited Done;
+  if Assigned(F) then F.Free; F:=nil;
+  inherited Destroy;
 end;
 
 function CreateProc(const FileName,Param: string;Index : longint): PHelpFile;
 begin
-  CreateProc:=New(PNGHelpFile, Init(FileName,Index));
+  CreateProc := TNGHelpFile.Create(FileName,Index);
 end;
 
 procedure RegisterHelpType;

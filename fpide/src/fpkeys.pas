@@ -15,6 +15,9 @@
 
 unit fpkeys;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
   uses
@@ -34,13 +37,14 @@ Const
    kbEnd,kbHome,kbBack,kbShiftTab);
 
 type
-   PKeyDialog = ^TKeyDialog;
-   TKeyDialog = object(TCenterDialog)
+   TKeyDialog = class;
+   PKeyDialog = TKeyDialog;
+   TKeyDialog = class(TCenterDialog)
       PSTL : Array [1..NumWantedKeys] of PLabel;
       PL : Array [1..NumWantedKeys] of PInputLine;
       KeyOK : Array [1..NumWantedKeys] of boolean;
       PST,PST2 : PAdvancedStaticText;
-      Constructor Init(Const ATitle : String);
+      constructor Create(Const ATitle : String);
      {Procedure HandleEvent(var E : TEvent);virtual;}
      function Execute : Word;Virtual;
    end;
@@ -150,7 +154,7 @@ begin
   NiceEscape:=s;
 end;
 
-constructor TKeyDialog.Init(Const ATitle : String);
+constructor TKeyDialog.Create(Const ATitle : String);
   var
       St : String;
       D : PCenterDialog;
@@ -160,7 +164,7 @@ constructor TKeyDialog.Init(Const ATitle : String);
 begin
   Hight:=(NumWantedKeys + 2) div 3;
   R.Assign(0,0,63 + 4,Hight + 4);
-  Inherited Init(R,ATitle);
+  inherited Create(R,ATitle);
   for i:=1 to NumWantedKeys do
     begin
       GetExtent(R);
@@ -185,15 +189,15 @@ begin
   R.Grow(-1,-1);
   Dec(R.B.Y);
   R.A.Y:=R.B.Y-1;
-  New(PST,init(R,'Press all listed keys'));
+  TST.Create(R,'Press all listed keys');
   Insert(PST);
   GetExtent(R);
   R.Grow(-1,-1);
   R.A.Y:=R.B.Y-1;
-  New(PST2,init(R,'Alt prefix "'+NiceEscape(chr(AltPrefix))+'" Shift prefix = "'+
+  TST2.Create(R,'Alt prefix "'+NiceEscape(chr(AltPrefix)+'" Shift prefix = "'+
     NiceEscape(chr(ShiftPrefix))+'" Ctrl prefix = "'+NiceEscape(chr(CtrlPrefix))+'"'));
   Insert(PST2);
-  InsertButtons(@Self);
+  InsertButtons(Self);
 end;
 
 function TKeyDialog.Execute : Word;
@@ -213,7 +217,7 @@ begin
     if TypeOf(Current^)=Typeof(TInputLine) then
       APL:=PInputLine(Current)
     else if TypeOf(Current^)=Typeof(TLabel) then
-      APL:=PInputLine(Plabel(Current)^.Link)
+      APL:=PInputLine(Plabel(Current).Link)
     else
       APL:=nil;
     FillChar(E,SizeOf(E),#0);
@@ -222,7 +226,7 @@ begin
     else
       begin
         St:='';
-        Application^.GetEvent(E);
+        Application.GetEvent(E);
       end;
     if E.What= evNothing then
       begin
@@ -271,7 +275,7 @@ begin
        ((E.What<>evKeyDown) or
        ((E.KeyCode<>kbTab) and (E.Keycode<>kbEnter) and (E.Keycode<>kbEsc))) then
       begin
-        PST^.SetText('"'+NiceEscape(St)+'"');
+        PST.SetText('"'+NiceEscape(St)+'"');
         if Assigned(APL) then
           begin
             j:=-1;
@@ -304,7 +308,7 @@ begin
                     SetKey(St,WantedKeys[j]);
                     KeyEscape[j]:=St;
                     St:=NiceEscape(St);
-                    APL^.SetData(St);
+                    APL.SetData(St);
                   end;
               end;
             ClearEvent(E);
@@ -330,8 +334,8 @@ begin
 {$ifdef NotUseTree}
   NotImplemented;
 {$else not NotUseTree}
-  New(D,Init('Learn keys'));
-  Application^.ExecuteDialog(D,nil);
+  D := TKeyDialog.Create('Learn keys');
+  Application.ExecuteDialog(D,nil);
 {$endif not NotUseTree}
 end;
 

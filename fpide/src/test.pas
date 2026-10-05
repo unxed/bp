@@ -21,27 +21,27 @@ const A =  1234;
 {$i empty.inc}
 
 type
-      PObj = ^TObj;
-      TObj = object
-        constructor Init;
+      PObj = TObj;
+      TObj = class
+        constructor Create;
         function    Func: boolean;
         procedure   Proc; virtual;
-        destructor  Done; virtual;
+        destructor Destroy; virtual;
       private
         Z: integer;
       end;
 
-      TObj2 = object(TObj)
+      TObj2 = class(TObj)
         procedure Proc; virtual;
       end;
 
-      TObj3  = object(TObj)
+      TObj3  = class(TObj)
       end;
 
-      TObj32 = object(TObj3)
+      TObj32 = class(TObj3)
       end;
 
-      TObj4 = object(TObj)
+      TObj4 = class(TObj)
       end;
 
       TClass = class
@@ -95,7 +95,7 @@ var Hello : word;
     ExtendedPackedArray : packed Array[1..2000] of extended;
     SingleArrayArray : Array[1..10,1..10] of single;
 
-constructor TObj.Init;
+constructor TObj.Create;
 begin
   Z:=1;
 end;
@@ -110,7 +110,7 @@ begin
   if Func=false then Halt;
 end;
 
-destructor TObj.Done;
+destructor TObj.Destroy;
 begin
 end;
 
@@ -196,8 +196,8 @@ BEGIN
   writeln(IsOdd(3));
   writeln(Func1(5,5,Bool,T));
   new(X);
-  new(X^.next);
-  X^.next^.next:=X;
+  new(X.next);
+  X.next.next:=X;
   dispose(X);
  { for i:=1 to 99 do
     Writeln('Line ',i); }

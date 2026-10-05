@@ -12,45 +12,52 @@
  **********************************************************************}
 unit WHTML;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 {$I globdir.inc}
 
 interface
 
-uses Objects;
+uses Objects, WUtils;
 
 type
-    PTextFile = ^TTextFile;
-    TTextFile = object(TObject)
+    TTextFile = class;
+    PTextFile = TTextFile;
+    TTextFile = class(TObject)
       function GetLine(Idx: sw_integer; var S: string): boolean; virtual;
       function GetFileName : string; virtual;
     end;
 
-    PMemoryTextFile = ^TMemoryTextFile;
-    TMemoryTextFile = object(TTextFile)
-      constructor Init;
+    TMemoryTextFile = class;
+    PMemoryTextFile = TMemoryTextFile;
+    TMemoryTextFile = class(TTextFile)
+      constructor Create;
       procedure   AddLine(const S: string); virtual;
       function    GetLine(Idx: sw_integer; var S: string): boolean; virtual;
       function    GetFileName : string; virtual;
       function    GetLineCount : sw_integer;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     private
       Lines : PUnsortedStrCollection;
     end;
 
-    PDOSTextFile = ^TDOSTextFile;
-    TDOSTextFile = object(TMemoryTextFile)
-      constructor Init(AFileName: string);
+    TDOSTextFile = class;
+    PDOSTextFile = TDOSTextFile;
+    TDOSTextFile = class(TMemoryTextFile)
+      constructor Create(AFileName: string);
       function GetFileName : string; virtual;
     private
       DosFileName : string;
     end;
 
-    PSGMLParser = ^TSGMLParser;
-    TSGMLParser = object(TObject)
-      constructor Init;
+    TSGMLParser = class;
+    PSGMLParser = TSGMLParser;
+    TSGMLParser = class(TObject)
+      constructor Create;
       function    Process(HTMLFile: PTextFile): boolean; virtual;
       function    ProcessLine(LineText: string): boolean; virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     public
       Line,LinePos: sw_integer;
       procedure   DocSoftBreak; virtual;
@@ -66,8 +73,9 @@ type
       InTag,InComment,InString: boolean;
     end;
 
-    PHTMLParser = ^THTMLParser;
-    THTMLParser = object(TSGMLParser)
+    THTMLParser = class;
+    PHTMLParser = THTMLParser;
+    THTMLParser = class(TSGMLParser)
       procedure   DocSoftBreak; virtual;
       function    DocAddTextChar(C: char): boolean; virtual;
       procedure   DocProcessTag(Tag: string); virtual;
@@ -116,8 +124,9 @@ type
     end;
 
 Type
-    PTopicLinkCollection = ^TTopicLinkCollection;
-    TTopicLinkCollection = object(TStringCollection)
+    TTopicLinkCollection = class;
+    PTopicLinkCollection = TTopicLinkCollection;
+    TTopicLinkCollection = class(TStringCollection)
       procedure   Insert(Item: Pointer); virtual;
       function    At(Index: sw_Integer): PString;
       function    AddItem(Item: string): sw_integer;
@@ -129,8 +138,6 @@ procedure DecodeHTMLCtx(Ctx: longint; var FileID: word; var LinkNo: word);
 
 implementation
 
-uses
-  WUtils;
 
 function TTextFile.GetLine(Idx: sw_integer; var S: string): boolean;
 begin
@@ -143,10 +150,10 @@ begin
   GetFileName:='unknown';
 end;
 
-constructor TMemoryTextFile.Init;
+constructor TMemoryTextFile.Create;
 begin
-  inherited Init;
-  New(Lines, Init(500,500));
+  inherited Create;
+  Lines := TUnsortedStrCollection.Create(500,500);
 end;
 
 
@@ -157,42 +164,42 @@ end;
 
 function TMemoryTextFile.GetLineCount : sw_integer;
 begin
-  GetLineCount:=Lines^.Count;
+  GetLineCount:=Lines.Count;
 end;
 
 procedure TMemoryTextFile.AddLine(const S: string);
 begin
-  Lines^.Insert(NewStr(S));
+  Lines.Insert(NewStr(S));
 end;
 
 function TMemoryTextFile.GetLine(Idx: sw_integer; var S: string): boolean;
 var OK: boolean;
     PS: PString;
 begin
-  OK:=(Lines<>nil) and (Idx<Lines^.Count);
+  OK:=(Lines<>nil) and (Idx<Lines.Count);
   if OK then
     begin
-      PS:=Lines^.At(Idx);
+      PS:=Lines.At(Idx);
       if PS=nil then S:='' else S:=PS^;
     end;
   GetLine:=OK;
 end;
 
-destructor TMemoryTextFile.Done;
+destructor TMemoryTextFile.Destroy;
 begin
   if Lines<>nil then
-    Dispose(Lines, Done);
+    Lines.Free;
   Lines:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
-constructor TDOSTextFile.Init(AFileName: string);
+constructor TDOSTextFile.Create(AFileName: string);
 var f: file;
     linecomplete,hasCR: boolean;
     S: string;
     OldFMode : Integer;
 begin
-  inherited Init;
+  inherited Create;
   if AFileName='' then Fail;
 {$I-}
   Assign(f,AFileName);
@@ -202,8 +209,8 @@ begin
   FileMode:= OldFMode;
   if IOResult<>0 then Fail;
   DosFileName:=AFileName;
-  Dispose(Lines,Done);
-  New(Lines, Init(500,2000));
+  Lines.Free;
+  Lines := TUnsortedStrCollection.Create(500,2000);
   while (Eof(f)=false) and (IOResult=0) do
     begin
       ReadlnFromFile(f,S,linecomplete,hasCR,true);
@@ -219,9 +226,9 @@ begin
 end;
 
 
-constructor TSGMLParser.Init;
+constructor TSGMLParser.Create;
 begin
-  inherited Init;
+  inherited Create;
   FileName:='';
 end;
 
@@ -237,9 +244,9 @@ begin
   if HTMLFile=nil then Exit;
   InTag:=false; InComment:=false; InString:=false; CurTag:='';
   Line:=0; OK:=true;
-  FileName:=HTMLFile^.GetFileName;
+  FileName:=HTMLFile.GetFileName;
   repeat
-    LineOK:=HTMLFile^.GetLine(Line,S);
+    LineOK:=HTMLFile.GetLine(Line,S);
     if LineOK then
       begin
         Inc(Line);
@@ -379,9 +386,9 @@ begin
   Abstract;
 end;
 
-destructor TSGMLParser.Done;
+destructor TSGMLParser.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
 end;
 
 procedure THTMLParser.DocSoftBreak;
@@ -898,7 +905,7 @@ end;
 
 function TTopicLinkCollection.At(Index: sw_Integer): PString;
 begin
-  At:=inherited At(Index);
+  At := PString(inherited At(Index));
 end;
 
 function TTopicLinkCollection.AddItem(Item: string): sw_integer;

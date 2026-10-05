@@ -14,6 +14,9 @@
  **********************************************************************}
 unit FPHelp;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses
@@ -25,14 +28,16 @@ uses
   FPViews;
 
 type
-    PIDEStatusLine = ^TIDEStatusLine;
-    TIDEStatusLine = object(TAdvancedStatusLine)
+    TIDEStatusLine = class;
+    PIDEStatusLine = TIDEStatusLine;
+    TIDEStatusLine = class(TAdvancedStatusLine)
       function  Hint(AHelpCtx: Word): String; virtual;
       procedure HandleEvent(var Event: TEvent); virtual;
     end;
 
-    PFPHTMLFileLinkScanner = ^TFPHTMLFileLinkScanner;
-    TFPHTMLFileLinkScanner = object(THTMLFileLinkScanner)
+    TFPHTMLFileLinkScanner = class;
+    PFPHTMLFileLinkScanner = TFPHTMLFileLinkScanner;
+    TFPHTMLFileLinkScanner = class(THTMLFileLinkScanner)
        function    CheckURL(const URL: string): boolean; virtual;
        function    CheckText(const Text: string): boolean; virtual;
        procedure   ProcessDoc(Doc: PHTMLLinkScanFile); virtual;
@@ -412,7 +417,7 @@ end;
 
 procedure TFPHTMLFileLinkScanner.ProcessDoc(Doc: PHTMLLinkScanFile);
 begin
-  PushStatus(FormatStrStr(msg_indexingfile,Doc^.GetDocumentURL));
+  PushStatus(FormatStrStr(msg_indexingfile,Doc.GetDocumentURL));
   inherited ProcessDoc(Doc);
   PopStatus;
 end;
@@ -455,7 +460,7 @@ procedure InitHelpSystem;
   procedure AddHelpFile(HelpFile,Param: string);
   begin
     {$IFDEF DEBUG}SetStatus(msg_LoadingHelpFile+' ('+SmartPath(HelpFile)+')');{$ENDIF}
-    if HelpFacility^.AddFile(HelpFile,Param)=nil then
+    if HelpFacility.AddFile(HelpFile,Param)=nil then
       ErrorBox(FormatStrStr(msg_failedtoloadhelpfile,HelpFile),nil);
     {$IFDEF DEBUG}SetStatus(msg_LoadingHelpFile);{$ENDIF}
   end;
@@ -474,9 +479,9 @@ begin
   WHTMLHlp.RegisterHelpType; // Also registers chm and html index (.htx)
 
   PushStatus(msg_LoadingHelpFiles);
-  for I:=0 to HelpFiles^.Count-1 do
+  for I:=0 to HelpFiles.Count-1 do
     begin
-      S:=HelpFiles^.At(I)^; Param:='';
+      S:=HelpFiles.At(I)^; Param:='';
       P:=Pos('|',S);
       if P>0 then
         begin Param:=copy(S,P+1,High(S)); S:=copy(S,1,P-1); end;
@@ -496,7 +501,7 @@ procedure DoneHelpSystem;
 begin
   if assigned(HelpFacility) then
     begin
-      Dispose(HelpFacility, Done);
+      HelpFacility.Free;
       HelpFacility:=nil;
     end;
   HelpInited:=false;
@@ -508,12 +513,12 @@ begin
   CheckHelpSystem;
   if HelpWindow=nil then
   begin
-     Desktop^.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
-     New(HelpWindow, Init(R, dialog_help, 0, 0, SearchFreeWindowNo));
+     Desktop.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
+     HelpWindow := TFPHelpWindow.Create(R, dialog_help, 0, 0, SearchFreeWindowNo);
      if HelpWindow<>nil then
      begin
-       HelpWindow^.Hide;
-       Desktop^.Insert(HelpWindow);
+       HelpWindow.Hide;
+       Desktop.Insert(HelpWindow);
      end;
   end;
 end;
@@ -523,9 +528,9 @@ begin
   if Modal then
      begin MessageBox(msg_modalhelpnotimplemented,nil,mfInformation+mfInsertInApp+mfOKButton); Exit; end;
   HelpCreateWindow;
-  with HelpWindow^ do
+  with HelpWindow do
   begin
-    HelpWindow^.ShowTopic(FileID,Context);
+    HelpWindow.ShowTopic(FileID,Context);
     if GetState(sfVisible)=false then Show;
     MakeFirst;
   end;
@@ -547,7 +552,7 @@ var Found: boolean;
 begin
   CheckHelpSystem;
   PushStatus(msg_LocatingTopic);
-  Found:=HelpFacility^.TopicSearch(S,FileID,Ctx);
+  Found:=HelpFacility.TopicSearch(S,FileID,Ctx);
   PopStatus;
   if Found then
      Help(FileID,Ctx,false)
@@ -558,12 +563,12 @@ end;
 procedure HelpIndex(Keyword: string);
 begin
   HelpCreateWindow;
-  with HelpWindow^ do
+  with HelpWindow do
   begin
     PushStatus(msg_BuildingHelpIndex);
-    HelpWindow^.ShowIndex;
+    HelpWindow.ShowIndex;
     if Keyword<>'' then
-       HelpWindow^.HelpView^.Lookup(Keyword);
+       HelpWindow.HelpView.Lookup(Keyword);
     PopStatus;
     if GetState(sfVisible)=false then Show;
     MakeFirst;
@@ -574,7 +579,7 @@ end;
 procedure HelpDebugInfos;
 begin
   HelpCreateWindow;
-  HelpWindow^.ShowDebugInfos;
+  HelpWindow.ShowDebugInfos;
 end;
 
 procedure PushStatus(S: string);
@@ -582,9 +587,9 @@ begin
   if StatusLine=nil then
     Exit;
   If StatusStackPtr<=MaxStatusLevel then
-    StatusStack[StatusStackPtr]:=PAdvancedStatusLine(StatusLine)^.GetStatusText
+    StatusStack[StatusStackPtr]:=PAdvancedStatusLine(StatusLine).GetStatusText
   else
-    StatusStack[MaxStatusLevel]:=PAdvancedStatusLine(StatusLine)^.GetStatusText;
+    StatusStack[MaxStatusLevel]:=PAdvancedStatusLine(StatusLine).GetStatusText;
   SetStatus(S);
   Inc(StatusStackPtr);
 end;
@@ -604,12 +609,12 @@ procedure SetStatus(S: string);
 begin
   if StatusLine=nil then
     Exit;
-  PAdvancedStatusLine(StatusLine)^.SetStatusText(S);
+  PAdvancedStatusLine(StatusLine).SetStatusText(S);
 end;
 
 procedure ClearStatus;
 begin
-  PAdvancedStatusLine(StatusLine)^.ClearStatusText;
+  PAdvancedStatusLine(StatusLine).ClearStatusText;
 end;
 
 function FPHTMLGetSectionColor(Section: THTMLSection; var Color: byte): boolean;
@@ -623,7 +628,7 @@ begin
     S:=#0;
     S:=copy(CHTMLSectionAttrs,ord(Section),1);
     if Assigned(Application)=false then Color:=0 else
-    Color:=Application^.GetColor(ord(S[1]));
+    Color:=Application.GetColorW(ord(S[1]));
     if (Color and $0f) = ((Color and $f0) shr 4) then { same color ? }
       OK:=false;
   end;
@@ -670,23 +675,23 @@ end;
 procedure DoneHelpFiles;
 begin
   if assigned(HelpFiles) then
-    Dispose(HelpFiles, Done);
+    HelpFiles.Free;
 end;
 
 procedure CloseHelpWindows;
 procedure CloseIfHelpWindow(P: PView);
 begin
-  if P^.HelpCtx=hcHelpWindow then
+  if P.HelpCtx=hcHelpWindow then
     begin
       Message(P,evCommand,cmClose,nil);
-      {Dispose(P, Done);  help windows are only hidden on close so we've
+      {P.Free;  help windows are only hidden on close so we've
                           to destroy them manually
        but this was wrong as it was not correctly
        resetting the corresponding pointer in whelp unit PM }
     end;
 end;
 begin
-  Desktop^.ForEach(@CloseIfHelpWindow);
+  Desktop.ForEach(@CloseIfHelpWindow);
 end;
 
 END.

@@ -15,6 +15,9 @@
 {$R-}
 unit WOAHelp;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,WUtils,WHelp;
@@ -115,13 +118,14 @@ type
         Keywords      : array[0..0] of THLPKeywordDescriptor55;
       end;
 
-      POAHelpFile = ^TOAHelpFile;
-      TOAHelpFile = object(THelpFile)
+      TOAHelpFile = class;
+      POAHelpFile = TOAHelpFile;
+      TOAHelpFile = class(THelpFile)
         Version      : THLPVersion;
         Header       : THLPFileHeader;
         Compression  : THLPCompression;
-        constructor Init(AFileName: string; AID: word);
-        destructor  Done; virtual;
+        constructor Create(AFileName: string; AID: word);
+        destructor Destroy; virtual;
       public
         function    LoadIndex: boolean; virtual;
         function    ReadTopic(T: PTopic): boolean; virtual;
@@ -146,32 +150,32 @@ procedure RegisterHelpType;
 implementation
 
 
-constructor TOAHelpFile.Init(AFileName: string; AID: word);
+constructor TOAHelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
     FS,L: longint;
     R: TRecord;
 begin
-  if inherited Init(AID)=false then Fail;
-  F:=New(PFastBufStream, Init(AFileName, stOpenRead, HelpStreamBufSize));
+  if inherited Create(AID)=false then Fail;
+  F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
-  if OK then OK:=(F^.Status=stOK);
+  if OK then OK:=(F.Status=stOK);
   if OK then
     begin
-      FS:=F^.GetSize;
+      FS:=F.GetSize;
       OK:=ReadHeader;
     end;
   while OK do
   begin
-    L:=F^.GetPos;
+    L:=F.GetPos;
     if (L>=FS) then Break;
     OK:=ReadRecord(R,false);
     if (OK=false) or (R.SClass=0) or (R.Size=0) then Break;
     case R.SClass of
-      oa_rtContext     : begin F^.Seek(L); OK:=ReadTopics; end;
+      oa_rtContext     : begin F.Seek(L); OK:=ReadTopics; end;
       oa_rtText        : {Skip};
       oa_rtKeyword     : {Skip};
       oa_rtIndex       : begin IndexTablePos:=L; {OK:=ReadIndexTable; }end;
-      oa_rtCompression : begin F^.Seek(L); OK:=ReadCompression; end;
+      oa_rtCompression : begin F.Seek(L); OK:=ReadCompression; end;
       oa_rtIndexTags   : begin IndexTagsPos:=L; {OK:=ReadIndexTags; }end;
     else
      begin
@@ -188,7 +192,7 @@ begin
      end;
     end;
     if OK then
-       begin Inc(L, SizeOf(THLPRecordHeader)); Inc(L, R.Size); F^.Seek(L); OK:=(F^.Status=stOK); end
+       begin Inc(L, SizeOf(THLPRecordHeader)); Inc(L, R.Size); F.Seek(L); OK:=(F.Status=stOK); end
   end;
   OK:=OK and (TopicsRead=true);
   if OK=false then
@@ -209,15 +213,15 @@ var S: string;
     R: TRecord;
     OK: boolean;
 begin
-  F^.Seek(0);
-  F^.Read(S[1],128); S[0]:=#255;
-  OK:=(F^.Status=stOK); P:=Pos(Signature,S);
+  F.Seek(0);
+  F.Read(S[1],128); S[0]:=#255;
+  OK:=(F.Status=stOK); P:=Pos(Signature,S);
   OK:=OK and (P>0);
   if OK then
   begin
-    F^.Seek(P+length(Signature)-1);
-    F^.Read(Version,SizeOf(Version));
-    OK:=(F^.Status=stOK) and (Version.FormatVersion>=MinFormatVersion);
+    F.Seek(P+length(Signature)-1);
+    F.Read(Version,SizeOf(Version));
+    OK:=(F.Status=stOK) and (Version.FormatVersion>=MinFormatVersion);
     if OK then
     begin
       OK:=ReadRecord(R,true);
@@ -249,7 +253,7 @@ begin
   ContextCount:=LEToN(ContextCount);
   for I:=1 to longint(ContextCount)-1 do
   begin
-    if Topics^.Count=MaxCollectionSize then Break;
+    if Topics.Count=MaxCollectionSize then Break;
     L:=GetCtxPos(Contexts[I]);
     if (L and $800000)<>0 then L:=not L;
     if (L=-1) and (Header.MainIndexScreen>0) then
@@ -278,7 +282,7 @@ begin
   FillChar(R, SizeOf(R), 0);
   LastTag:=''; CurPtr:=0;
   OK:=(IndexTablePos<>0);
-  if OK then begin F^.Seek(IndexTablePos); OK:=F^.Status=stOK; end;
+  if OK then begin F.Seek(IndexTablePos); OK:=F.Status=stOK; end;
   if OK then OK:=ReadRecord(R, true);
   if OK then
   with THLPIndexTable(R.Data^) do
@@ -326,17 +330,17 @@ var OK: boolean;
     H: THLPRecordHeader;
 begin
   FillChar(R, SizeOf(R), 0);
-  F^.Read(H,SizeOf(H));
+  F.Read(H,SizeOf(H));
   H.RecLength:=LEToN(H.RecLength);
-  OK:=F^.Status=stOK;
+  OK:=F.Status=stOK;
   if OK then
   begin
     R.SClass:=H.RecType; R.Size:=H.RecLength;
     if (R.Size>0) and ReadData then
     begin
       GetMem(R.Data,R.Size);
-      F^.Read(R.Data^,R.Size);
-      OK:=F^.Status=stOK;
+      F.Read(R.Data^,R.Size);
+      OK:=F.Status=stOK;
     end;
     if OK=false then DisposeRecord(R);
   end;
@@ -490,11 +494,11 @@ var OK: boolean;
     I: sw_word;
 begin
   OK:=T<>nil;
-  if OK and (T^.Text=nil) then
+  if OK and (T.Text=nil) then
   begin
     LinkPosCount:=0; FillChar(LinkPos,Sizeof(LinkPos),0);
     FillChar(TextR,SizeOf(TextR),0); FillChar(KeyWR,SizeOf(KeyWR),0);
-    F^.Seek(T^.FileOfs); OK:=F^.Status=stOK;
+    F.Seek(T.FileOfs); OK:=F.Status=stOK;
     if OK then OK:=ReadRecord(TextR,true);
     OK:=OK and (TextR.SClass=oa_rtText);
     if OK then OK:=ReadRecord(KeyWR,true);
@@ -508,15 +512,15 @@ begin
            begin
              UpContext:=LEToN(UpContext);
              DownContext:=LEToN(DownContext);
-             T^.LinkCount:=KeywordCount;
-             GetMem(T^.Links,T^.LinkSize);
-             if T^.LinkCount>0 then
-             for I:=0 to T^.LinkCount-1 do
+             T.LinkCount:=KeywordCount;
+             GetMem(T.Links,T.LinkSize);
+             if T.LinkCount>0 then
+             for I:=0 to T.LinkCount-1 do
              with Keywords[I] do
              begin
                KwContext:=LEToN(KwContext);
-               T^.Links^[I].Context:=KwContext;
-               T^.Links^[I].FileID:=ID;
+               T.Links^[I].Context:=KwContext;
+               T.Links^[I].FileID:=ID;
                Inc(LinkPosCount);
                with LinkPos[LinkPosCount] do
                begin
@@ -531,14 +535,14 @@ begin
              KeywordCount:=LEToN(KeywordCount);
              UpContext:=LEToN(UpContext);
              DownContext:=LEToN(DownContext);
-             T^.LinkCount:=KeywordCount;
-             GetMem(T^.Links,T^.LinkSize);
+             T.LinkCount:=KeywordCount;
+             GetMem(T.Links,T.LinkSize);
              if KeywordCount>0 then
              for I:=0 to KeywordCount-1 do
              begin
                Keywords[I].KwContext:=LEToN(Keywords[I].KwContext);
-               T^.Links^[I].Context:=Keywords[I].KwContext;
-               T^.Links^[I].FileID:=ID;
+               T.Links^[I].Context:=Keywords[I].KwContext;
+               T.Links^[I].FileID:=ID;
              end;
            end;
       end;
@@ -548,7 +552,7 @@ begin
     if OK then
       if TextR.Size>0 then
       begin
-        T^.Text:=TextR.Data; T^.TextSize:=TextR.Size;
+        T.Text:=TextR.Data; T.TextSize:=TextR.Size;
         TextR.Data:=nil; TextR.Size:=0;
       end;
 
@@ -557,15 +561,15 @@ begin
   ReadTopic:=OK;
 end;
 
-destructor TOAHelpFile.Done;
+destructor TOAHelpFile.Destroy;
 begin
-  if F<>nil then Dispose(F, Done);
-  inherited Done;
+  if F<>nil then F.Free;
+  inherited Destroy;
 end;
 
 function CreateProc(const FileName,Param: string;Index : longint): PHelpFile;
 begin
-  CreateProc:=New(POAHelpFile, Init(FileName,Index));
+  CreateProc := TOAHelpFile.Create(FileName,Index);
 end;
 
 procedure RegisterHelpType;

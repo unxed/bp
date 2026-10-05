@@ -145,7 +145,7 @@ var S: PMemoryStream;
     OK: boolean;
 begin
   PushStatus(msg_readinghistory);
-  New(S, Init(32*1024,4096));
+  S := TMemoryStream.Create(32*1024,4096);
   OK:=F^.ReadResourceEntryToStream(resHistory,langDefault,S^);
   S^.Seek(0);
   if OK then
@@ -163,7 +163,7 @@ var S: PMemoryStream;
 begin
   PushStatus(msg_storinghistory);
 
-  New(S, Init(10*1024,4096));
+  S := TMemoryStream.Create(10*1024,4096);
   StoreHistory(S^);
   S^.Seek(0);
   F^.CreateResource(resHistory,rcBinary,0);
@@ -180,7 +180,7 @@ function ReadKeys(F: PResourceFile): boolean;
 var S: PMemoryStream;
     OK: boolean;
 begin
-  New(S, Init(32*1024,4096));
+  S := TMemoryStream.Create(32*1024,4096);
   OK:=F^.ReadResourceEntryToStream(resKeys,langDefault,S^);
   S^.Seek(0);
   if OK then
@@ -195,7 +195,7 @@ function WriteKeys(F: PResourceFile): boolean;
 var S: PMemoryStream;
     OK: boolean;
 begin
-  New(S, Init(10*1024,4096));
+  S := TMemoryStream.Create(10*1024,4096);
   StoreKeys(S^);
   S^.Seek(0);
   F^.CreateResource(resKeys,rcBinary,0);
@@ -219,7 +219,7 @@ begin
   begin
     PushStatus('Storing clipboard content...');
 
-    New(S, Init(10*1024,4096));
+    S := TMemoryStream.Create(10*1024,4096);
     Clipboard^.SaveToStream(S^);
     S^.Seek(0);
     F^.CreateResource(resClipboard,rcBinary,0);
@@ -239,7 +239,7 @@ var S: PMemoryStream;
 begin
 {$ifndef NODEBUG}
   PushStatus(msg_readingwatches);
-  New(S, Init(32*1024,4096));
+  S := TMemoryStream.Create(32*1024,4096);
   OK:=F^.ReadResourceEntryToStream(resWatches,langDefault,S^);
   S^.Seek(0);
   if OK then
@@ -275,7 +275,7 @@ begin
   else
     begin
       PushStatus(msg_storingwatches);
-      New(S, Init(30*1024,4096));
+      S := TMemoryStream.Create(30*1024,4096);
       S^.Put(WatchesCollection);
       S^.Seek(0);
       F^.CreateResource(resWatches,rcBinary,0);
@@ -298,7 +298,7 @@ var S: PMemoryStream;
 begin
 {$ifndef NODEBUG}
   PushStatus(msg_readingbreakpoints);
-  New(S, Init(32*1024,4096));
+  S := TMemoryStream.Create(32*1024,4096);
   OK:=F^.ReadResourceEntryToStream(resBreakpoints,langDefault,S^);
   S^.Seek(0);
   if OK then
@@ -338,7 +338,7 @@ begin
   else
     begin
       PushStatus(msg_storingbreakpoints);
-      New(S, Init(30*1024,4096));
+      S := TMemoryStream.Create(30*1024,4096);
       S^.Put(BreakpointsCollection);
       S^.Seek(0);
       F^.CreateResource(resBreakpoints,rcBinary,0);
@@ -568,7 +568,7 @@ begin
 end;
 begin
   PushStatus(msg_readingdesktopcontents);
-  New(S, Init(32*1024,4096));
+  S := TMemoryStream.Create(32*1024,4096);
   OK:=F^.ReadResourceEntryToStream(resDesktop,langDefault,S^);
   S^.Seek(0);
   if OK then
@@ -710,7 +710,7 @@ var W: word;
 begin
   PushStatus(msg_storingdesktopcontents);
 
-  New(S, Init(30*1024,4096));
+  S := TMemoryStream.Create(30*1024,4096);
   OK:=Assigned(S);
   if OK then
   begin
@@ -774,7 +774,7 @@ var S: PMemoryStream;
     OK: boolean;
 begin
   PushStatus(msg_readingcodecompletewordlist);
-  New(S, Init(1024,1024));
+  S := TMemoryStream.Create(1024,1024);
   OK:=F^.ReadResourceEntryToStream(resCodeComplete,langDefault,S^);
   S^.Seek(0);
   if OK then
@@ -791,7 +791,7 @@ var OK: boolean;
     S: PMemoryStream;
 begin
   PushStatus(msg_storingcodecompletewordlist);
-  New(S, Init(1024,1024));
+  S := TMemoryStream.Create(1024,1024);
   OK:=StoreCodeComplete(S^);
   if OK then
   begin
@@ -811,7 +811,7 @@ var S: PMemoryStream;
     OK: boolean;
 begin
   PushStatus(msg_readingcodetemplates);
-  New(S, Init(1024,4096));
+  S := TMemoryStream.Create(1024,4096);
   OK:=F^.ReadResourceEntryToStream(resCodeTemplates,langDefault,S^);
   S^.Seek(0);
   if OK then
@@ -828,7 +828,7 @@ var OK: boolean;
     S: PMemoryStream;
 begin
   PushStatus(msg_storingcodetemplates);
-  New(S, Init(1024,4096));
+  S := TMemoryStream.Create(1024,4096);
   OK:=StoreCodeTemplates(S^);
   if OK then
   begin
@@ -890,7 +890,7 @@ begin
   if not Assigned(R) then
     exit;
   PushStatus(msg_readingsymbolinformation);
-  New(S, Init(32*1024,4096));
+  S := TMemoryStream.Create(32*1024,4096);
   OK:=F^.ReadResourceEntryToStream(resSymbols,langDefault,S^);
   S^.Seek(0);
   if OK then
@@ -912,7 +912,7 @@ begin
   begin
     PushStatus(msg_storingsymbolinformation);
 
-    New(S, Init(200*1024,4096));
+    S := TMemoryStream.Create(200*1024,4096);
     OK:=Assigned(S);
     if OK then
       OK:=StoreBrowserCol(S);

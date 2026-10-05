@@ -13,6 +13,9 @@
 
  **********************************************************************}
 unit FPRegs;
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 {$ifdef NODEBUG}
 interface
 implementation
@@ -75,26 +78,28 @@ uses
 {$endif not cpu_known}
     end;
 
-    PRegistersView = ^TRegistersView;
-    TRegistersView = object(TView)
+    TRegistersView = class;
+    PRegistersView = TRegistersView;
+    TRegistersView = class(TView)
       NewReg,OldReg : TIntRegs;
       InDraw : boolean;
       GDBCount : longint;
       first : boolean;
       LastOK : boolean;
-      constructor Init(var Bounds: TRect);
+      constructor Create(var Bounds: TRect);
       procedure   Draw;virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PRegistersWindow = ^TRegistersWindow;
-    TRegistersWindow = Object(TFPDlgWindow)
+    TRegistersWindow = class;
+  PRegistersWindow = TRegistersWindow;
+    TRegistersWindow = class(TFPDlgWindow)
       RV : PRegistersView;
-      Constructor Init;
+      constructor Create;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   Update; virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
     TFPURegs = record
@@ -120,8 +125,9 @@ uses
 {$endif not cpu_known}
     end;
 
-    PFPUView = ^TFPUView;
-    TFPUView = object(TView)
+    TFPUView = class;
+    PFPUView = TFPUView;
+    TFPUView = class(TView)
       NewReg,OldReg : TFPURegs;
       InDraw : boolean;
       GDBCount : longint;
@@ -130,19 +136,20 @@ uses
 {$endif not cpu_known}
       first : boolean;
       LastOK : boolean;
-      constructor Init(var Bounds: TRect);
+      constructor Create(var Bounds: TRect);
       procedure   Draw;virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PFPUWindow = ^TFPUWindow;
-    TFPUWindow = Object(TFPDlgWindow)
+    TFPUWindow = class;
+  PFPUWindow = TFPUWindow;
+    TFPUWindow = class(TFPDlgWindow)
       RV : PFPUView;
-      Constructor Init;
+      constructor Create;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   Update; virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
     tssereg = record
@@ -182,8 +189,9 @@ uses
     end;
 
 
-    PVectorView = ^TVectorView;
-    TVectorView = object(TView)
+    TVectorView = class;
+    PVectorView = TVectorView;
+    TVectorView = class(TView)
       NewReg,OldReg : TVectorRegs;
       InDraw : boolean;
       GDBCount : longint;
@@ -192,19 +200,20 @@ uses
 {$endif not cpu_known}
       first : boolean;
       LastOK : boolean;
-      constructor Init(var Bounds: TRect);
+      constructor Create(var Bounds: TRect);
       procedure   Draw;virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PVectorWindow = ^TVectorWindow;
-    TVectorWindow = Object(TFPDlgWindow)
+    TVectorWindow = class;
+  PVectorWindow = TVectorWindow;
+    TVectorWindow = class(TFPDlgWindow)
       RV : PVectorView;
-      Constructor Init;
+      constructor Create;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   Update; virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
 
@@ -236,6 +245,7 @@ uses
   FPDebug;
 
 
+{$ifndef NOOBJREG}
 Const
   RRegistersWindow: TStreamRec = (
      ObjType: 1711;
@@ -271,6 +281,8 @@ Const
      Load:    @TVectorView.Load;
      Store:   @TVectorView.Store
   );
+{$endif}
+
 
 {$ifdef useresstrings}
 resourcestring
@@ -301,118 +313,118 @@ const
 {$ifdef cpu_known}
 {$ifdef i386}
        GetIntRegs :=
-         Debugger^.GetIntRegister('eax', rs.eax) and
-         Debugger^.GetIntRegister('ebx', rs.ebx) and
-         Debugger^.GetIntRegister('ecx', rs.ecx) and
-         Debugger^.GetIntRegister('edx', rs.edx) and
-         Debugger^.GetIntRegister('esi', rs.esi) and
-         Debugger^.GetIntRegister('edi', rs.edi) and
-         Debugger^.GetIntRegister('ebp', rs.ebp) and
-         Debugger^.GetIntRegister('esp', rs.esp) and
-         Debugger^.GetIntRegister('eip', rs.eip) and
+         Debugger.GetIntRegister('eax', rs.eax) and
+         Debugger.GetIntRegister('ebx', rs.ebx) and
+         Debugger.GetIntRegister('ecx', rs.ecx) and
+         Debugger.GetIntRegister('edx', rs.edx) and
+         Debugger.GetIntRegister('esi', rs.esi) and
+         Debugger.GetIntRegister('edi', rs.edi) and
+         Debugger.GetIntRegister('ebp', rs.ebp) and
+         Debugger.GetIntRegister('esp', rs.esp) and
+         Debugger.GetIntRegister('eip', rs.eip) and
        { under Windows flags are on a register named ps !! PM }
-         (Debugger^.GetIntRegister('eflags', rs.eflags) or Debugger^.GetIntRegister('ps', rs.eflags)) and
-         Debugger^.GetIntRegister('cs', rs.cs) and
-         Debugger^.GetIntRegister('ds', rs.ds) and
-         Debugger^.GetIntRegister('es', rs.es) and
-         Debugger^.GetIntRegister('fs', rs.fs) and
-         Debugger^.GetIntRegister('gs', rs.gs) and
-         Debugger^.GetIntRegister('ss', rs.ss);
+         (Debugger.GetIntRegister('eflags', rs.eflags) or Debugger.GetIntRegister('ps', rs.eflags)) and
+         Debugger.GetIntRegister('cs', rs.cs) and
+         Debugger.GetIntRegister('ds', rs.ds) and
+         Debugger.GetIntRegister('es', rs.es) and
+         Debugger.GetIntRegister('fs', rs.fs) and
+         Debugger.GetIntRegister('gs', rs.gs) and
+         Debugger.GetIntRegister('ss', rs.ss);
 {$endif i386}
 {$ifdef x86_64}
        GetIntRegs :=
-         Debugger^.GetIntRegister('rax', rs.rax) and
-         Debugger^.GetIntRegister('rbx', rs.rbx) and
-         Debugger^.GetIntRegister('rcx', rs.rcx) and
-         Debugger^.GetIntRegister('rdx', rs.rdx) and
-         Debugger^.GetIntRegister('rsi', rs.rsi) and
-         Debugger^.GetIntRegister('rdi', rs.rdi) and
-         Debugger^.GetIntRegister('rbp', rs.rbp) and
-         Debugger^.GetIntRegister('rsp', rs.rsp) and
-         Debugger^.GetIntRegister('r8', rs.r8) and
-         Debugger^.GetIntRegister('r9', rs.r9) and
-         Debugger^.GetIntRegister('r10', rs.r10) and
-         Debugger^.GetIntRegister('r11', rs.r11) and
-         Debugger^.GetIntRegister('r12', rs.r12) and
-         Debugger^.GetIntRegister('r13', rs.r13) and
-         Debugger^.GetIntRegister('r14', rs.r14) and
-         Debugger^.GetIntRegister('r15', rs.r15) and
-         Debugger^.GetIntRegister('rip', rs.rip) and
+         Debugger.GetIntRegister('rax', rs.rax) and
+         Debugger.GetIntRegister('rbx', rs.rbx) and
+         Debugger.GetIntRegister('rcx', rs.rcx) and
+         Debugger.GetIntRegister('rdx', rs.rdx) and
+         Debugger.GetIntRegister('rsi', rs.rsi) and
+         Debugger.GetIntRegister('rdi', rs.rdi) and
+         Debugger.GetIntRegister('rbp', rs.rbp) and
+         Debugger.GetIntRegister('rsp', rs.rsp) and
+         Debugger.GetIntRegister('r8', rs.r8) and
+         Debugger.GetIntRegister('r9', rs.r9) and
+         Debugger.GetIntRegister('r10', rs.r10) and
+         Debugger.GetIntRegister('r11', rs.r11) and
+         Debugger.GetIntRegister('r12', rs.r12) and
+         Debugger.GetIntRegister('r13', rs.r13) and
+         Debugger.GetIntRegister('r14', rs.r14) and
+         Debugger.GetIntRegister('r15', rs.r15) and
+         Debugger.GetIntRegister('rip', rs.rip) and
        { under Windows flags are on a register named ps !! PM }
-         (Debugger^.GetIntRegister('eflags', rs.eflags) or Debugger^.GetIntRegister('ps', rs.eflags)) and
-         Debugger^.GetIntRegister('cs', rs.cs) and
-         Debugger^.GetIntRegister('ds', rs.ds) and
-         Debugger^.GetIntRegister('es', rs.es) and
-         Debugger^.GetIntRegister('fs', rs.fs) and
-         Debugger^.GetIntRegister('gs', rs.gs) and
-         Debugger^.GetIntRegister('ss', rs.ss);
+         (Debugger.GetIntRegister('eflags', rs.eflags) or Debugger.GetIntRegister('ps', rs.eflags)) and
+         Debugger.GetIntRegister('cs', rs.cs) and
+         Debugger.GetIntRegister('ds', rs.ds) and
+         Debugger.GetIntRegister('es', rs.es) and
+         Debugger.GetIntRegister('fs', rs.fs) and
+         Debugger.GetIntRegister('gs', rs.gs) and
+         Debugger.GetIntRegister('ss', rs.ss);
 {$endif x86_64}
 {$ifdef m68k}
        GetIntRegs :=
-         Debugger^.GetIntRegister('d0', rs.d0) and
-         Debugger^.GetIntRegister('d1', rs.d1) and
-         Debugger^.GetIntRegister('d2', rs.d2) and
-         Debugger^.GetIntRegister('d3', rs.d3) and
-         Debugger^.GetIntRegister('d4', rs.d4) and
-         Debugger^.GetIntRegister('d5', rs.d5) and
-         Debugger^.GetIntRegister('d6', rs.d6) and
-         Debugger^.GetIntRegister('d7', rs.d7) and
-         Debugger^.GetIntRegister('a0', rs.a0) and
-         Debugger^.GetIntRegister('a1', rs.a1) and
-         Debugger^.GetIntRegister('a2', rs.a2) and
-         Debugger^.GetIntRegister('a3', rs.a3) and
-         Debugger^.GetIntRegister('a4', rs.a4) and
-         Debugger^.GetIntRegister('a5', rs.a5) and
-         Debugger^.GetIntRegister('fp', rs.fp) and
-         Debugger^.GetIntRegister('sp', rs.sp) and
-         Debugger^.GetIntRegister('ps', rs.ps) and
-         Debugger^.GetIntRegister('pc', rs.pc);
+         Debugger.GetIntRegister('d0', rs.d0) and
+         Debugger.GetIntRegister('d1', rs.d1) and
+         Debugger.GetIntRegister('d2', rs.d2) and
+         Debugger.GetIntRegister('d3', rs.d3) and
+         Debugger.GetIntRegister('d4', rs.d4) and
+         Debugger.GetIntRegister('d5', rs.d5) and
+         Debugger.GetIntRegister('d6', rs.d6) and
+         Debugger.GetIntRegister('d7', rs.d7) and
+         Debugger.GetIntRegister('a0', rs.a0) and
+         Debugger.GetIntRegister('a1', rs.a1) and
+         Debugger.GetIntRegister('a2', rs.a2) and
+         Debugger.GetIntRegister('a3', rs.a3) and
+         Debugger.GetIntRegister('a4', rs.a4) and
+         Debugger.GetIntRegister('a5', rs.a5) and
+         Debugger.GetIntRegister('fp', rs.fp) and
+         Debugger.GetIntRegister('sp', rs.sp) and
+         Debugger.GetIntRegister('ps', rs.ps) and
+         Debugger.GetIntRegister('pc', rs.pc);
 {$endif m68k}
 {$ifdef powerpc}
        GetIntRegs := true;
        for i:=0 to 31 do
-         GetIntRegs := GetIntRegs and Debugger^.GetIntRegister('r'+inttostr(i), rs.r[i]);
+         GetIntRegs := GetIntRegs and Debugger.GetIntRegister('r'+inttostr(i), rs.r[i]);
        { other regs
          pc,ps,cr,lr,ctr,xer : dword; }
        GetIntRegs := GetIntRegs and
-         Debugger^.GetIntRegister('pc', rs.pc) and
-         Debugger^.GetIntRegister('ps', rs.ps) and
-         Debugger^.GetIntRegister('lr', rs.lr) and
-         Debugger^.GetIntRegister('ctr', rs.ctr) and
-         Debugger^.GetIntRegister('xer', rs.xer);
+         Debugger.GetIntRegister('pc', rs.pc) and
+         Debugger.GetIntRegister('ps', rs.ps) and
+         Debugger.GetIntRegister('lr', rs.lr) and
+         Debugger.GetIntRegister('ctr', rs.ctr) and
+         Debugger.GetIntRegister('xer', rs.xer);
 {$endif powerpc}
 {$ifdef sparc}
        GetIntRegs := true;
        for i:=0 to 7 do
-         GetIntRegs := GetIntRegs and Debugger^.GetIntRegister('o'+inttostr(i), rs.o[i]);
+         GetIntRegs := GetIntRegs and Debugger.GetIntRegister('o'+inttostr(i), rs.o[i]);
        for i:=0 to 7 do
          if i = 6 then
-           GetIntRegs := GetIntRegs and (Debugger^.GetIntRegister('i6', rs.i[6]) or Debugger^.GetIntRegister('fp', rs.i[6]))
+           GetIntRegs := GetIntRegs and (Debugger.GetIntRegister('i6', rs.i[6]) or Debugger.GetIntRegister('fp', rs.i[6]))
          else
-           GetIntRegs := GetIntRegs and Debugger^.GetIntRegister('i'+inttostr(i), rs.i[i]);
+           GetIntRegs := GetIntRegs and Debugger.GetIntRegister('i'+inttostr(i), rs.i[i]);
        for i:=0 to 7 do
-         GetIntRegs := GetIntRegs and Debugger^.GetIntRegister('l'+inttostr(i), rs.l[i]);
+         GetIntRegs := GetIntRegs and Debugger.GetIntRegister('l'+inttostr(i), rs.l[i]);
        for i:=0 to 7 do
-         GetIntRegs := GetIntRegs and Debugger^.GetIntRegister('g'+inttostr(i), rs.g[i]);
+         GetIntRegs := GetIntRegs and Debugger.GetIntRegister('g'+inttostr(i), rs.g[i]);
 
        GetIntRegs := GetIntRegs and
-         Debugger^.GetIntRegister('y', rs.y) and
-         Debugger^.GetIntRegister('psr', rs.psr) and
-         Debugger^.GetIntRegister('wim', rs.wim) and
-         Debugger^.GetIntRegister('tbs', rs.tbr) and
-         Debugger^.GetIntRegister('pc', rs.pc) and
-         Debugger^.GetIntRegister('npc', rs.npc) and
-         Debugger^.GetIntRegister('fsr', rs.fsr) and
-         Debugger^.GetIntRegister('csr', rs.csr);
+         Debugger.GetIntRegister('y', rs.y) and
+         Debugger.GetIntRegister('psr', rs.psr) and
+         Debugger.GetIntRegister('wim', rs.wim) and
+         Debugger.GetIntRegister('tbs', rs.tbr) and
+         Debugger.GetIntRegister('pc', rs.pc) and
+         Debugger.GetIntRegister('npc', rs.npc) and
+         Debugger.GetIntRegister('fsr', rs.fsr) and
+         Debugger.GetIntRegister('csr', rs.csr);
 {$endif sparc}
 {$else cpu_known}
-       Debugger^.Command('info registers');
-       if Debugger^.Error then
+       Debugger.Command('info registers');
+       if Debugger.Error then
          exit
        else
          begin
             i:=0;
-            po:=StrNew(Debugger^.GetOutput);
+            po:=StrNew(Debugger.GetOutput);
             p:=po;
             if assigned(p) then
               begin
@@ -444,16 +456,16 @@ const
               exit;
          end;
        { do not open a messagebox for such errors }
-       Debugger^.got_error:=false;
+       Debugger.got_error:=false;
        GetIntRegs:=true;
 {$endif cpu_known}
 {$endif not NODEBUG}
     end;
 
-  constructor TRegistersView.Init(var Bounds: TRect);
+  constructor TRegistersView.Create(var Bounds: TRect);
 
     begin
-       inherited init(Bounds);
+       inherited Create(Bounds);
        InDraw:=false;
        first:=true;
        FillChar(OldReg,Sizeof(OldReg),#0);
@@ -499,14 +511,14 @@ const
 {$ifdef NODEBUG}
        WriteStr(1,0,msg_registervaluesnotavailable,7);
 {$else NODEBUG}
-       If (not assigned(Debugger)) or (not Debugger^.IsRunning) then
+       If (not assigned(Debugger)) or (not Debugger.IsRunning) then
          begin
             WriteStr(1,0,msg_registervaluesnotavailable,7);
             exit;
          end;
        if InDraw then exit;
        InDraw:=true;
-       if GDBCount<>Debugger^.RunCount then
+       if GDBCount<>Debugger.RunCount then
          begin
            OldReg:=NewReg;
            OK:=GetIntRegs(rs);
@@ -518,7 +530,7 @@ const
                OldReg:=NewReg;
                first:=false;
              end;
-           GDBCount:=Debugger^.RunCount;
+           GDBCount:=Debugger.RunCount;
          end
        else
          begin
@@ -759,23 +771,23 @@ const
 {$endif NODEBUG}
     end;
 
-  destructor TRegistersView.Done;
+  destructor TRegistersView.Destroy;
 
     begin
-       inherited done;
+       inherited Destroy;
     end;
 
 {****************************************************************************
                          TRegistersWindow
 ****************************************************************************}
 
-  constructor TRegistersWindow.Init;
+  constructor TRegistersWindow.Create;
 
     var
        R : TRect;
 
     begin
-       Desktop^.GetExtent(R);
+       Desktop.GetExtent(R);
 {$ifdef i386}
        R.A.X:=R.B.X-28;
        R.B.Y:=R.A.Y+11;
@@ -800,7 +812,7 @@ const
        R.A.X:=R.B.X-28;
        R.B.Y:=R.A.Y+22;
 {$endif cpu_known}
-       inherited Init(R,dialog_registers, wnNoNumber);
+       inherited Create(R,dialog_registers, wnNoNumber);
        Flags:=wfClose or wfMove;
 {$ifndef cpu_known}
        Flags:=Flags or wfgrow;
@@ -808,11 +820,11 @@ const
        Palette:=wpCyanWindow;
        HelpCtx:=hcRegistersWindow;
        R.Assign(1,1,Size.X-2,Size.Y-1);
-       RV:=new(PRegistersView,init(R));
+       RV := TRegistersView.Create(R);
        Insert(RV);
        If assigned(RegistersWindow) then
-         dispose(RegistersWindow,done);
-       RegistersWindow:=@Self;
+         RegistersWindow.Free;
+       RegistersWindow:=Self;
        Update;
     end;
 
@@ -822,8 +834,8 @@ const
        inherited load(S);
        GetSubViewPtr(S,RV);
        If assigned(RegistersWindow) then
-         dispose(RegistersWindow,done);
-       RegistersWindow:=@Self;
+         RegistersWindow.Free;
+       RegistersWindow:=Self;
     end;
 
   procedure TRegistersWindow.Store(var S: TStream);
@@ -839,11 +851,11 @@ const
        ReDraw;
     end;
 
-  destructor TRegistersWindow.Done;
+  destructor TRegistersWindow.Destroy;
 
     begin
        RegistersWindow:=nil;
-       inherited done;
+       inherited Destroy;
     end;
 
 {****************************************************************************
@@ -874,21 +886,21 @@ const
 {$ifndef cpu_known}
        if UseInfoFloat then
          begin
-           Debugger^.Command('info float');
-           if Debugger^.Error then
+           Debugger.Command('info float');
+           if Debugger.Error then
              begin
                UseInfofloat:=false;
-               Debugger^.Command('info all');
+               Debugger.Command('info all');
              end;
          end
        else
 {$endif not cpu_known}
-         Debugger^.Command('info all');
-       if Debugger^.Error then
+         Debugger.Command('info all');
+       if Debugger.Error then
          exit
        else
          begin
-            po:=StrNew(Debugger^.GetOutput);
+            po:=StrNew(Debugger.GetOutput);
             p:=po;
 {$ifndef cpu_known}
             i:=0;
@@ -1011,15 +1023,15 @@ const
               exit;
          end;
        { do not open a messagebox for such errors }
-       Debugger^.got_error:=false;
+       Debugger.got_error:=false;
        GetFPURegs:=true;
 {$endif}
     end;
 
-  constructor TFPUView.Init(var Bounds: TRect);
+  constructor TFPUView.Create(var Bounds: TRect);
 
     begin
-       inherited init(Bounds);
+       inherited Create(Bounds);
        GrowMode:=gfGrowHiX or GfGrowHiY;
        InDraw:=false;
        first:=true;
@@ -1064,7 +1076,7 @@ const
 {$ifdef NODEBUG}
        WriteStr(1,0,msg_registervaluesnotavailable,7);
 {$else NODEBUG}
-       If (not assigned(Debugger)) or (not Debugger^.IsRunning) then
+       If (not assigned(Debugger)) or (not Debugger.IsRunning) then
          begin
             WriteStr(1,0,msg_registervaluesnotavailable,7);
             exit;
@@ -1072,7 +1084,7 @@ const
        if InDraw then
          exit;
        InDraw:=true;
-       if GDBCount<>Debugger^.RunCount then
+       if GDBCount<>Debugger.RunCount then
          begin
            OldReg:=NewReg;
            OK:=GetFPURegs(rs
@@ -1088,7 +1100,7 @@ const
                OldReg:=NewReg;
                first:=false;
              end;
-           GDBCount:=Debugger^.RunCount;
+           GDBCount:=Debugger.RunCount;
          end
        else
          begin
@@ -1195,23 +1207,23 @@ const
 {$endif NODEBUG}
     end;
 
-  destructor TFPUView.Done;
+  destructor TFPUView.Destroy;
 
     begin
-       inherited done;
+       inherited Destroy;
     end;
 
 {****************************************************************************
                          TFPUWindow
 ****************************************************************************}
 
-  constructor TFPUWindow.Init;
+  constructor TFPUWindow.Create;
 
     var
        R : TRect;
 
     begin
-       Desktop^.GetExtent(R);
+       Desktop.GetExtent(R);
 {$if defined(i386) or defined(x86_64)}
        R.A.X:=R.B.X-44;
        R.B.Y:=R.A.Y+14;
@@ -1232,16 +1244,16 @@ const
        R.A.X:=R.B.X-44;
        R.B.Y:=R.A.Y+33;
 {$endif cpu_known}
-       inherited Init(R,dialog_fpu, wnNoNumber);
+       inherited Create(R,dialog_fpu, wnNoNumber);
        Flags:=wfClose or wfMove or wfgrow;
        Palette:=wpCyanWindow;
        HelpCtx:=hcFPURegisters;
        R.Assign(1,1,Size.X-2,Size.Y-1);
-       RV:=new(PFPUView,init(R));
+       RV := TFPUView.Create(R);
        Insert(RV);
        If assigned(FPUWindow) then
-         dispose(FPUWindow,done);
-       FPUWindow:=@Self;
+         FPUWindow.Free;
+       FPUWindow:=Self;
        Update;
     end;
 
@@ -1251,8 +1263,8 @@ const
        inherited load(S);
        GetSubViewPtr(S,RV);
        If assigned(FPUWindow) then
-         dispose(FPUWindow,done);
-       FPUWindow:=@Self;
+         FPUWindow.Free;
+       FPUWindow:=Self;
     end;
 
   procedure TFPUWindow.Store(var S: TStream);
@@ -1268,11 +1280,11 @@ const
        ReDraw;
     end;
 
-  destructor TFPUWindow.Done;
+  destructor TFPUWindow.Destroy;
 
     begin
        FPUWindow:=nil;
-       inherited done;
+       inherited Destroy;
     end;
 
 
@@ -1304,21 +1316,21 @@ const
 {$ifndef cpu_known}
        if UseInfoVector then
          begin
-           Debugger^.Command('info vector');
-           if Debugger^.Error then
+           Debugger.Command('info vector');
+           if Debugger.Error then
              begin
                UseInfoVector:=false;
-               Debugger^.Command('info all');
+               Debugger.Command('info all');
              end;
          end
        else
 {$endif not cpu_known}
-         Debugger^.Command('info vector');
-       if Debugger^.Error then
+         Debugger.Command('info vector');
+       if Debugger.Error then
          exit
        else
          begin
-            po:=StrNew(Debugger^.GetOutput);
+            po:=StrNew(Debugger.GetOutput);
             p:=po;
 {$ifndef cpu_known}
             i:=0;
@@ -1396,15 +1408,15 @@ const
               exit;
          end;
        { do not open a messagebox for such errors }
-       Debugger^.got_error:=false;
+       Debugger.got_error:=false;
        GetVectorRegs:=true;
 {$endif}
     end;
 
-  constructor TVectorView.Init(var Bounds: TRect);
+  constructor TVectorView.Create(var Bounds: TRect);
 
     begin
-       inherited init(Bounds);
+       inherited Create(Bounds);
        GrowMode:=gfGrowHiX or GfGrowHiY;
        InDraw:=false;
        first:=true;
@@ -1449,7 +1461,7 @@ const
 {$ifdef NODEBUG}
        WriteStr(1,0,msg_registervaluesnotavailable,7);
 {$else NODEBUG}
-       If (not assigned(Debugger)) or (not Debugger^.IsRunning) then
+       If (not assigned(Debugger)) or (not Debugger.IsRunning) then
          begin
             WriteStr(1,0,msg_registervaluesnotavailable,7);
             exit;
@@ -1457,7 +1469,7 @@ const
        if InDraw then
          exit;
        InDraw:=true;
-       if GDBCount<>Debugger^.RunCount then
+       if GDBCount<>Debugger.RunCount then
          begin
            OldReg:=NewReg;
            OK:=GetVectorRegs(rs
@@ -1473,7 +1485,7 @@ const
                OldReg:=NewReg;
                first:=false;
              end;
-           GDBCount:=Debugger^.RunCount;
+           GDBCount:=Debugger.RunCount;
          end
        else
          begin
@@ -1526,23 +1538,23 @@ const
 {$endif NODEBUG}
     end;
 
-  destructor TVectorView.Done;
+  destructor TVectorView.Destroy;
 
     begin
-       inherited done;
+       inherited Destroy;
     end;
 
 {****************************************************************************
                          TVectorWindow
 ****************************************************************************}
 
-  constructor TVectorWindow.Init;
+  constructor TVectorWindow.Create;
 
     var
        R : TRect;
 
     begin
-       Desktop^.GetExtent(R);
+       Desktop.GetExtent(R);
 {$if defined(i386) or defined(x86_64)}
        R.A.X:=R.B.X-60;
        R.B.Y:=R.A.Y+20;
@@ -1563,16 +1575,16 @@ const
        R.A.X:=R.B.X-60;
        R.B.Y:=R.A.Y+33;
 {$endif cpu_known}
-       inherited Init(R,dialog_Vector, wnNoNumber);
+       inherited Create(R,dialog_Vector, wnNoNumber);
        Flags:=wfClose or wfMove or wfgrow;
        Palette:=wpCyanWindow;
        HelpCtx:=hcVectorRegisters;
        R.Assign(1,1,Size.X-2,Size.Y-1);
-       RV:=new(PVectorView,init(R));
+       RV := TVectorView.Create(R);
        Insert(RV);
        If assigned(VectorWindow) then
-         dispose(VectorWindow,done);
-       VectorWindow:=@Self;
+         VectorWindow.Free;
+       VectorWindow:=Self;
        Update;
     end;
 
@@ -1582,8 +1594,8 @@ const
        inherited load(S);
        GetSubViewPtr(S,RV);
        If assigned(VectorWindow) then
-         dispose(VectorWindow,done);
-       VectorWindow:=@Self;
+         VectorWindow.Free;
+       VectorWindow:=Self;
     end;
 
   procedure TVectorWindow.Store(var S: TStream);
@@ -1599,11 +1611,11 @@ const
        ReDraw;
     end;
 
-  destructor TVectorWindow.Done;
+  destructor TVectorWindow.Destroy;
 
     begin
        VectorWindow:=nil;
-       inherited done;
+       inherited Destroy;
     end;
 
 
@@ -1611,8 +1623,8 @@ procedure InitRegistersWindow;
 begin
   if RegistersWindow=nil then
     begin
-      new(RegistersWindow,init);
-      DeskTop^.Insert(RegistersWindow);
+      RegistersWindow := TRegistersWindow.Create;
+      DeskTop.Insert(RegistersWindow);
     end;
 end;
 
@@ -1621,7 +1633,7 @@ procedure DoneRegistersWindow;
 begin
   if assigned(RegistersWindow) then
     begin
-      DeskTop^.Delete(RegistersWindow);
+      DeskTop.Delete(RegistersWindow);
       RegistersWindow:=nil;
     end;
 end;
@@ -1631,8 +1643,8 @@ procedure InitFPUWindow;
 begin
   if FPUWindow=nil then
     begin
-      new(FPUWindow,init);
-      DeskTop^.Insert(FPUWindow);
+      FPUWindow := TFPUWindow.Create;
+      DeskTop.Insert(FPUWindow);
     end;
 end;
 
@@ -1641,7 +1653,7 @@ procedure DoneFPUWindow;
 begin
   if assigned(FPUWindow) then
     begin
-      DeskTop^.Delete(FPUWindow);
+      DeskTop.Delete(FPUWindow);
       FPUWindow:=nil;
     end;
 end;
@@ -1651,8 +1663,8 @@ procedure InitVectorWindow;
 begin
   if VectorWindow=nil then
     begin
-      new(VectorWindow,init);
-      DeskTop^.Insert(VectorWindow);
+      VectorWindow := TVectorWindow.Create;
+      DeskTop.Insert(VectorWindow);
     end;
 end;
 
@@ -1661,7 +1673,7 @@ procedure DoneVectorWindow;
 begin
   if assigned(VectorWindow) then
     begin
-      DeskTop^.Delete(VectorWindow);
+      DeskTop.Delete(VectorWindow);
       VectorWindow:=nil;
     end;
 end;
@@ -1669,11 +1681,14 @@ end;
 
 procedure RegisterFPRegsViews;
 begin
-  RegisterType(RRegistersWindow);
+  {$ifndef NOOBJREG}
+RegisterType(RRegistersWindow);
   RegisterType(RRegistersView);
   RegisterType(RFPUWindow);
   RegisterType(RFPUView);
   RegisterType(RVectorView);
+{$endif}
+
 end;
 
 end.
