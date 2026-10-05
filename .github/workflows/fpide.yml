@@ -1,0 +1,89 @@
+name: fpide
+
+# Text Mode IDE port: bootstrap reproducibility, tv3 tests, layout, compile attempt (linux64).
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - fpide/**
+      - tv/**
+      - tools/build-fpide.sh
+      - tools/fpide-env.sh
+      - tools/need-tv.sh
+      - tools/gen-shim.py
+      - tools/check-fpide-layout.sh
+      - tools/fpide-preflight.sh
+      - .github/workflows/fpide.yml
+      - .gitmodules
+  pull_request:
+    paths:
+      - fpide/**
+      - tv/**
+
+concurrency:
+  group: fpide-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reproduce IDE + compiler trees from FPC upstream
+        run: fpide/bootstrap/run.sh out/bootstrap-fpide
+      - name: Match committed IDE tree
+        run: diff -rq out/bootstrap-fpide/staging-ide fpide/src
+      - name: Match committed compiler tree
+        run: diff -rq out/bootstrap-fpide/staging-compiler fpide/fpc-compiler
+
+  layout:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - run: tools/check-fpide-layout.sh
+
+  tv:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl python3
+      - name: tv3 unit tests (memory backend)
+        run: tools/tv-test.sh
+
+  # Heavy IDE compile: manual only until local tools/fpide-preflight.sh is green
+  # and milestone 1 links. Push CI stays on bootstrap/layout/tv (+ smoke below).
+  preflight:
+    runs-on: ubuntu-24.04
+    needs: [bootstrap, layout, tv]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-base fp-units-misc python3
+      - name: Local-equivalent preflight (shims + smoke)
+        run: tools/fpide-preflight.sh
+
+  build:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    needs: [preflight]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-base fp-units-misc python3
+      - name: Build fp (linux64, GDB/MI as upstream)
+        run: tools/build-fpide.sh linux64 out/fpide/linux64
+      - name: Upload compiler log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fpide-build-log
+          path: out/fpide/linux64/obj/fp.log

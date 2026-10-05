@@ -1,0 +1,16 @@
+# Free Vision → tv3 shims (tools/gen-shim.py). Units without a tv3 mapping live in fpide/compat/.
+# Keep unit names in sync with tv/src/*.pas (TvMenus, not TvMenu).
+# manual/*.inc is included into generated shims (MaxBytes etc.).
+
+Objects:  TvGeom TvObjs
+Drivers:  TvSys TvEvents TvScreen TvCell TvColors TvDrawBuf TvText TvUtf8 TvCodePg TvUtil TvViews
+Views:    TvGeom TvColors TvCell TvKeys TvEvents TvDrawBuf TvText TvUtil TvObjs TvViews TvWindow -TDrawBuffer +SysUtils -TCollection -PCollection -TSortedCollection -PSortedCollection -TStringCollection -PStringCollection -TItemList -PItemList -kb*
+Dialogs:  TvDialog TvInput TvCluster TvList TvHist TvValid
+Menus:    TvMenus
+App:      TvApp
+MsgBox:   TvMsgBox
+StdDlg:   TvFileDlg TvChDir TvFiles
+Validate: TvValid
+HistList: TvHist
+ColorSel: TvColorSel
+Memory:   TvObjs

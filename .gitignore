@@ -1,0 +1,8 @@
+build/
+out/
+__pycache__/
+*.o
+*.ppu
+*.a
+*.exe
+fpide/bootstrap/_work/

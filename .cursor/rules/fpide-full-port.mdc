@@ -1,0 +1,14 @@
+---
+description: fpide/sp — full port fidelity; never trade features for a faster green build
+alwaysApply: true
+---
+
+# Full port, no feature cuts
+
+For the Free Pascal Text Mode IDE port (`fpide/` → tv3) and related work in this repo:
+
+- **Goal:** complete migration (Free Vision → tv3, UTF-8, objects → classes) **without breaking any functionality** versus vanilla FPC IDE (encoding-adjusted screen parity: text, color, background, the rest).
+- **Not a goal:** shipping a smaller subset sooner, green CI via stubs, or dropping debugger/compiler/UI pieces “temporarily to link”.
+- Do **not** disable, stub, or isolate the embedded compiler, debugger, editor, help, or other IDE features unless the user explicitly asks.
+- Temporary compile failures and incomplete milestones are fine; **redefining success around a thinner product is not**.
+- Prefer slower, complete progress (real FPC `compiler/`, GDB/MI as upstream, full acceptance click-through) over shortcuts that pass tests while omitting behaviour.

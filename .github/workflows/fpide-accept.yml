@@ -1,0 +1,11 @@
+name: fpide-accept
+
+# Full UI parity vs vanilla fp (bitwise screen dumps). Disabled until tools/fpide-linux-accept.py exists.
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "fpide acceptance gate — not wired yet; see fpide/PLAN.md milestone 6 and unxed/dn dn-accept.yml"

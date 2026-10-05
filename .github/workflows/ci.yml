@@ -1,0 +1,112 @@
+name: ci
+
+on:
+  workflow_dispatch: {}
+  push:
+  pull_request:
+
+jobs:
+  # fpc-utf8/: UTF-8 Everywhere (the unit is injected by -Fa); independent of Safe Pascal
+  fpc-utf8:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Free Pascal
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler
+      - name: Build test (module injected by -Fa)
+        run: |
+          fpc -iV
+          mkdir -p build
+          fpc @fpc-utf8/utf8.cfg -Fufpc-utf8 -FUbuild -FEbuild fpc-utf8/test_utf8.pas
+      - name: Run test
+        working-directory: build
+        env:
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
+        run: ./test_utf8
+
+  # Переносимый режим (Linux по умолчанию, SPEC §18): все тесты и compile-проверки,
+  # проверка «бинарник статический, без libc» и запуск в разных дистрибутивах.
+  portable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Free Pascal
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler
+      - name: Tests (no compiler options, safe.pas next to sources)
+        env:
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
+          OUT: ${{ github.workspace }}/out
+        run: bash tests/run.sh
+      - name: Audit — static, no INTERP, no NEEDED (static-everywhere Profile S)
+        run: |
+          for b in test_safe test_go test_threads test_sumtype; do
+            if readelf -lW "out/$b" | grep -q INTERP || readelf -dW "out/$b" | grep -q NEEDED; then
+              echo "FAIL $b is dynamic"; readelf -dW "out/$b"; exit 1
+            fi
+            echo "ok   $b: static, no libc"
+          done
+      - name: Same binaries on other distributions (musl and glibc, old and new)
+        run: |
+          for img in alpine:3.20 debian:12 ubuntu:16.04 centos:7; do
+            echo "== $img"
+            docker run --rm -e LANG=C -v "$PWD/out:/t:ro" "$img" \
+              sh -c 'cd /t && ./test_safe >/dev/null && ./test_go >/dev/null && ./test_threads >/dev/null && echo ok' || exit 1
+          done
+
+  # Режим с libc (-dSAFE_LIBC, аналог cgo): cwstring + cthreads.
+  libc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Free Pascal
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler
+      - name: Tests with -dSAFE_LIBC
+        env:
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
+          FPCOPTS: -dSAFE_LIBC
+          NO_COMPILE_CHECKS: 1
+        run: bash tests/run.sh
+
+  # i386 и aarch64: кросс-компиляторы FPC 3.2.2 из официальных исходников, запуск под qemu-user
+  # (i386 — ещё и нативно). Проверяет ассемблер clone в safethreads.pas на каждой архитектуре.
+  cross:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Free Pascal, qemu-user, cross binutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fp-compiler qemu-user binutils-aarch64-linux-gnu binutils-i686-linux-gnu
+      - name: Cache cross compilers
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/fpccross
+          key: fpc-3.2.2-cross-i386-aarch64-v1
+      - name: Build cross compilers (on cache miss)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sSfL -o /tmp/fpc-src.tgz https://downloads.freepascal.org/fpc/dist/3.2.2/source/fpc-3.2.2.source.tar.gz
+          tar xzf /tmp/fpc-src.tgz -C /tmp
+          cd /tmp/fpc-3.2.2
+          make crossall crossinstall CPU_TARGET=aarch64 OS_TARGET=linux BINUTILSPREFIX=aarch64-linux-gnu- FPC=/usr/bin/fpc INSTALL_PREFIX=$HOME/fpccross > /tmp/a64.log 2>&1 || { tail -50 /tmp/a64.log; exit 1; }
+          make crossall crossinstall CPU_TARGET=i386 OS_TARGET=linux BINUTILSPREFIX=i686-linux-gnu- FPC=/usr/bin/fpc INSTALL_PREFIX=$HOME/fpccross > /tmp/i386.log 2>&1 || { tail -50 /tmp/i386.log; exit 1; }
+      - name: aarch64 under qemu
+        run: |
+          I=$HOME/fpccross/lib/fpc/3.2.2
+          FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" \
+          RUN=qemu-aarch64 SKIP=test_ffi NO_COMPILE_CHECKS=1 LANG=C \
+            bash tests/run.sh
+      - name: i386 under qemu
+        run: |
+          I=$HOME/fpccross/lib/fpc/3.2.2
+          FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" \
+          RUN=qemu-i386 SKIP=test_ffi NO_COMPILE_CHECKS=1 LANG=C OUT=$PWD/out386 \
+            bash tests/run.sh
+      - name: i386 natively (same binaries)
+        run: |
+          cd out386
+          for t in test_safe test_go test_threads; do LANG=C ./$t > /dev/null || { echo "FAIL $t"; exit 1; }; echo "ok   $t"; done
