@@ -15,16 +15,21 @@
 {$i globdir.inc}
 unit WCEdit;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,Drivers,Views,
      WUtils,WEditor;
 
 type
-    PCodeEditor = ^TCodeEditor;
+    TCodeEditor = class;
+    PCodeEditor = TCodeEditor;
 
-    PIndicator = ^TIndicator;
-    TIndicator = object(TView)
+    TIndicator = class;
+    PIndicator = TIndicator;
+    TIndicator = class(TView)
       Location: TPoint;
       Modified : Boolean;
       CodeOwner : PCodeEditor;
@@ -33,15 +38,16 @@ type
       SyntaxComplete : boolean;
       UseTabs : Boolean;
 {$endif debug}
-      constructor Init(var Bounds: TRect);
+      constructor Create(var Bounds: TRect);
       procedure   Draw; virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; virtual;
       procedure   SetState(AState: Word; Enable: Boolean); virtual;
       procedure   SetValue(ALocation: TPoint; AModified: Boolean);
     end;
 
-    PLine = ^TLine;
-    TLine = object(TCustomLine)
+    TLine = class;
+    PLine = TLine;
+    TLine = class(TCustomLine)
     public { internal use only! }
       Text        : PString;
       DefaultEditorInfo : PEditorLineInfo;
@@ -51,17 +57,18 @@ type
       procedure AddEditorInfo(Index: sw_integer; AEditor: PCustomCodeEditor); virtual;
       procedure RemoveEditorInfo(AEditor: PCustomCodeEditor); virtual;
     public
-      constructor Init(AOwner: PCustomCodeEditorCore; const AText: string; AFlags: longint);
+      constructor Create(AOwner: PCustomCodeEditorCore; const AText: string; AFlags: longint);
       function    GetText: string; virtual;
       procedure   SetText(const AText: string); virtual;
       function    GetEditorInfo(Editor: PCustomCodeEditor): PEditorLineInfo; virtual;
       function    GetFlags: longint; virtual;
       procedure   SetFlags(AFlags: longint); virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PCodeEditorCore = ^TCodeEditorCore;
-    TCodeEditorCore = object(TCustomCodeEditorCore)
+    TCodeEditorCore = class;
+    PCodeEditorCore = TCodeEditorCore;
+    TCodeEditorCore = class(TCustomCodeEditorCore)
     protected
       Lines      : PLineCollection;
       CanUndo    : Boolean;
@@ -74,8 +81,8 @@ type
     public
       UndoList   : PEditorActionCollection;
       RedoList   : PEditorActionCollection;
-      constructor Init;
-      destructor  Done; virtual;
+      constructor Create;
+      destructor Destroy; virtual;
       procedure   ChangeLinesTo(ALines : PLineCollection); virtual;
       function    GetModified: boolean; virtual;
       procedure   SetModified(AModified: boolean); virtual;
@@ -124,7 +131,7 @@ type
       procedure LinesInsert(Idx: sw_integer; Line: PLine);
     end;
 
-    TCodeEditor = object(TCustomCodeEditor)
+    TCodeEditor = class(TCustomCodeEditor)
       Core       : PCodeEditorCore;
       Flags      : longint;
       Indicator  : PIndicator;
@@ -138,7 +145,7 @@ type
       IndicatorDrawCalled  : boolean;
       Folds      : PFoldCollection;
       MaxFoldLevel: sw_integer;
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore);
     public
       procedure   DrawIndicator; virtual;
@@ -168,7 +175,7 @@ type
       function    LoadFromStream(Stream: PFastBufStream): boolean; virtual;
       function    SaveToStream(Stream: PStream): boolean; virtual;
       function    SaveAreaToStream(Stream: PStream; StartP,EndP: TPoint): boolean;virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     public
 {      ChangedLine : sw_integer;}
       { Text & info storage abstraction }
@@ -223,10 +230,11 @@ type
       procedure   UnRegisterFold(AFold: PFold); virtual;
     end;
 
-    PFileEditor = ^TFileEditor;
-    TFileEditor = object(TCodeEditor)
+    TFileEditor = class;
+    PFileEditor = TFileEditor;
+    TFileEditor = class(TCodeEditor)
       FileName: string;
-      constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore; const AFileName: string);
       function    Save: Boolean; virtual;
       function    SaveAs: Boolean; virtual;
@@ -264,32 +272,13 @@ uses Dos,
      FVConsts,
      App,WViews;
 
-{$ifndef NOOBJREG}
-const
-  RIndicator: TStreamRec = (
-     ObjType: 1100;
-     VmtLink: Ofs(TypeOf(TIndicator)^);
-     Load:    @TIndicator.Load;
-     Store:   @TIndicator.Store
-  );
-  RCodeEditor: TStreamRec = (
-     ObjType: 1101;
-     VmtLink: Ofs(TypeOf(TCodeEditor)^);
-     Load:    @TCodeEditor.Load;
-     Store:   @TCodeEditor.Store
-  );
-  RFileEditor: TStreamRec = (
-     ObjType: 1102;
-     VmtLink: Ofs(TypeOf(TFileEditor)^);
-     Load:    @TFileEditor.Load;
-     Store:   @TFileEditor.Store
-  );
-{$endif}
+{ Object-style TStreamRec typed consts (Ofs(TypeOf)) are invalid for classes.
+  Load/Store for these types are currently commented out; registration deferred. }
 
-constructor TLine.Init(AOwner: PCustomCodeEditorCore; const AText: string; AFlags: longint);
+constructor TLine.Create(AOwner: PCustomCodeEditorCore; const AText: string; AFlags: longint);
 begin
-  inherited Init(AText,AFlags);
-  // New(EditorInfos, Init(10,10));
+  inherited Create(AText,AFlags);
+  // EditorInfos := TEditorLineInfoCollection.Create(10,10);
   Owner:=AOwner;
 end;
 
@@ -297,16 +286,16 @@ procedure TLine.AddEditorInfo(Index: sw_integer; AEditor: PCustomCodeEditor);
 begin
   if Index=0 then
     begin
-      DefaultEditorInfo:=New(PEditorLineInfo, Init(AEditor));
+      DefaultEditorInfo := TEditorLineInfo.Create(AEditor);
       exit;
     end;
   if not assigned(EditorInfos) then
     begin
-      New(EditorInfos, Init(10,10));
-      EditorInfos^.AtInsert(0,DefaultEditorInfo);
+      EditorInfos := TEditorLineInfoCollection.Create(10,10);
+      EditorInfos.AtInsert(0,DefaultEditorInfo);
       DefaultEditorInfo:=nil;
     end;
-  EditorInfos^.AtInsert(Index,New(PEditorLineInfo, Init(AEditor)));
+  EditorInfos.AtInsert(Index,TEditorLineInfo.Create(AEditor));
 end;
 
 procedure TLine.RemoveEditorInfo(AEditor: PCustomCodeEditor);
@@ -314,7 +303,7 @@ var E: PEditorLineInfo;
 begin
   E:=GetEditorInfo(AEditor);
   if Assigned(EditorInfos) then
-    EditorInfos^.Free(E);
+    EditorInfos.Free(E);
 end;
 
 function TLine.GetText: string;
@@ -328,15 +317,15 @@ begin
 end;
 
 function TLine.GetEditorInfo(Editor: PCustomCodeEditor): PEditorLineInfo;
-function Match(P: PEditorLineInfo): boolean;
+function Match(Item: Pointer): boolean;
 begin
-  Match:=P^.Editor=Editor;
+  Match:=PEditorLineInfo(Item).Editor=Editor;
 end;
 begin
   if not assigned(EditorInfos) then
     GetEditorInfo:=DefaultEditorInfo
   else
-    GetEditorInfo:=EditorInfos^.FirstThat(@Match);
+    GetEditorInfo:=PEditorLineInfo(EditorInfos.FirstThat(@Match));
 end;
 
 function TLine.GetFlags: longint;
@@ -348,30 +337,30 @@ procedure TLine.SetFlags(AFlags: longint);
 begin
   Flags:=AFlags;
   if Assigned(Owner) then
-    Owner^.ContentsChanged;
+    Owner.ContentsChanged;
 end;
 
-destructor TLine.Done;
+destructor TLine.Destroy;
 begin
   if Assigned(Text) then
     DisposeStr(Text);
   Text:=nil;
   if Assigned(EditorInfos) then
-    Dispose(EditorInfos, Done);
+    EditorInfos.Free;
   EditorInfos:=nil;
   if Assigned(DefaultEditorInfo) then
-    Dispose(DefaultEditorInfo, Done);
+    DefaultEditorInfo.Free;
   DefaultEditorInfo:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
-constructor TCodeEditorCore.Init;
+constructor TCodeEditorCore.Create;
 begin
-  inherited Init;
+  inherited Create;
   StoreUndo:=true;
-  new(UndoList,init(500,1000));
-  new(RedoList,init(500,1000));
-  New(Lines, Init(500,1000));
+  UndoList := TEditorActionCollection.Create(500,1000);
+  RedoList := TEditorActionCollection.Create(500,1000);
+  Lines := TLineCollection.Create(500,1000);
   TabSize:=DefaultTabSize;
   IndentSize:=DefaultIndentSize;
   OnDiskLoadTime:=0;
@@ -381,18 +370,18 @@ end;
 procedure TCodeEditorCore.ChangeLinesTo(ALines : PLineCollection);
 begin
   if assigned(lines) then
-    Dispose(Lines,Done);
+    Lines.Free;
   Lines:=ALines;
 end;
 
 function TCodeEditorCore.GetLineCount: sw_integer;
 begin
-  GetLineCount:=Lines^.Count;
+  GetLineCount:=Lines.Count;
 end;
 
 function TCodeEditorCore.GetLine(LineNo: sw_integer): PCustomLine;
 begin
-  GetLine:=Lines^.At(LineNo);
+  GetLine:=Lines.At(LineNo);
 end;
 
 function TCodeEditorCore.GetModified: boolean;
@@ -465,30 +454,34 @@ begin
   begin
     P:=GetLine(LineNo);
     if assigned(P) then
-      P^.SetFlagState(Flag,ASet);
+      P.SetFlagState(Flag,ASet);
   end;
 end;
 
 procedure TCodeEditorCore.GetContent(ALines: PUnsortedStringCollection);
-procedure AddIt(P: PCustomLine);
+procedure AddIt(Item: Pointer);
+var P: PCustomLine;
 begin
+  P := PCustomLine(Item);
   if Assigned(P) then
-    ALines^.Insert(NewStr(P^.GetText));
+    ALines.Insert(NewStr(P.GetText));
 end;
 begin
   if Assigned(Lines) then
-    Lines^.ForEach(@AddIt);
+    Lines.ForEach(@AddIt);
 end;
 
 procedure TCodeEditorCore.SetContent(ALines: PUnsortedStringCollection);
-procedure AddIt(P: PString);
+procedure AddIt(Item: Pointer);
+var P: PString;
 begin
+  P := PString(Item);
   AddLine(GetStr(P));
 end;
 begin
   DeleteAllLines;
   if Assigned(ALines) then
-    ALines^.ForEach(@AddIt);
+    ALines.ForEach(@AddIt);
   LimitsChanged;
 end;
 
@@ -524,25 +517,27 @@ var
   L : PCustomLine;
 begin
   GetLineText:='';
-  if LineNo<Lines^.Count then
+  if LineNo<Lines.Count then
    begin
-     L:=Lines^.At(LineNo);
-     GetLineText:=L^.GetText;
+     L:=Lines.At(LineNo);
+     GetLineText:=L.GetText;
    end;
 end;
 
 procedure TCodeEditorCore.LinesInsert(Idx: sw_integer; Line: PLine);
 var I: sw_integer;
-procedure RegLine(P: PEditorBinding);
+procedure RegLine(Item: Pointer);
+var P: PEditorBinding;
 begin
-  Line^.AddEditorInfo(I,P^.Editor);
+  P := PEditorBinding(Item);
+  Line.AddEditorInfo(I,P.Editor);
   Inc(I);
 end;
 begin
-  if Idx=-1 then Idx:=Lines^.Count;
+  if Idx=-1 then Idx:=Lines.Count;
   I:=0;
-  Bindings^.ForEach(@RegLine);
-  Lines^.AtInsert(Idx,Line);
+  Bindings.ForEach(@RegLine);
+  Lines.AtInsert(Idx,Line);
 end;
 
 procedure TCodeEditorCore.SetLineText(I: sw_integer;const S: string);
@@ -551,15 +546,15 @@ var
   AddCount : Sw_Integer;
 begin
   AddCount:=0;
-  while (Lines^.Count<I+1) do
+  while (Lines.Count<I+1) do
    begin
-     LinesInsert(-1,New(PLine, Init(@Self,'',0)));
+     LinesInsert(-1,TLine.Create(Self,'',0));
      Inc(AddCount);
    end;
   if AddCount>0 then
    LimitsChanged;
-  L:=Lines^.At(I);
-  L^.SetText(S);
+  L:=Lines.At(I);
+  L.SetText(S);
   ContentsChanged;
 end;
 
@@ -593,7 +588,7 @@ begin
      if not assigned(L) then
        exit;
      DF:=IGetLineFormat(Binding,LineNo);
-     DT:=L^.GetText;
+     DT:=L.GetText;
      p:=0;
      while p<length(DT) do
       begin
@@ -620,8 +615,8 @@ begin
   else
     P:=nil;
   if P=nil then LI:=nil else
-    LI:=P^.GetEditorInfo(Binding^.Editor);
-  if LI=nil then S:='' else S:=LI^.GetFormat;
+    LI:=P.GetEditorInfo(Binding.Editor);
+  if LI=nil then S:='' else S:=LI.GetFormat;
   IGetLineFormat:=S;
 end;
 
@@ -632,43 +627,43 @@ begin
   if (LineNo<GetLineCount) then
   begin
     P:=GetLine(LineNo);
-    if P=nil then LI:=nil else LI:=P^.GetEditorInfo(Binding^.Editor);
-    if Assigned(LI) then LI^.SetFormat(S);
+    if P=nil then LI:=nil else LI:=P.GetEditorInfo(Binding.Editor);
+    if Assigned(LI) then LI.SetFormat(S);
   end;
 end;
 
 procedure TCodeEditorCore.DeleteAllLines;
 begin
   if Assigned(Lines) then
-    Lines^.FreeAll;
+    Lines.FreeAll;
 end;
 
 procedure TCodeEditorCore.DeleteLine(I: sw_integer);
 var
  CP : Tpoint;
 begin
-  if I<Lines^.Count then
+  if I<Lines.Count then
     begin
       if StoreUndo then
         begin
           CP.X:=0;CP.Y:=I;
           AddAction(eaDeleteLine,CP,CP,GetLineText(I),0);
        end;
-      Lines^.AtFree(I);
+      Lines.AtFree(I);
     end;
 end;
 
 function TCodeEditorCore.InsertLine(LineNo: sw_integer; const S: string): PCustomLine;
 var L: PLine;
 begin
-  L:=New(PLine, Init(@Self,S,0));
+  L := TLine.Create(Self,S,0);
   LinesInsert(LineNo, L);
   InsertLine:=L;
 end;
 
 procedure TCodeEditorCore.AddLine(const S: string);
 begin
-  LinesInsert(-1,New(PLine, Init(@Self,S,0)));
+  LinesInsert(-1,TLine.Create(Self,S,0));
 end;
 
 procedure TCodeEditorCore.AddAction(AAction: byte; AStartPos, AEndPos: TPoint; AText: string;AFlags : longint);
@@ -679,94 +674,94 @@ var
 begin
   if (UndoList=nil) or (not StoreUndo) then Exit;
   ActionIntegrated:=false;
-  if UndoList^.count>0 then
+  if UndoList.count>0 then
     begin
-      pa:=UndoList^.At(UndoList^.count-1);
-      if (pa^.action=AAction) and
-         (pa^.EndPos.X=AStartPos.X) and
-         (pa^.EndPos.Y=AStartPos.Y) and
+      pa:=UndoList.At(UndoList.count-1);
+      if (pa.action=AAction) and
+         (pa.EndPos.X=AStartPos.X) and
+         (pa.EndPos.Y=AStartPos.Y) and
          { do not group InsertLine and DeleteLine !! }
          ((AAction=eaMoveCursor) or
           (AAction=eaInsertText) or
           (AAction=eaOverwriteText) or
           (AAction=eaDeleteText)) and
          { do not group if a new grouped_action started }
-          (not assigned(UndoList^.CurrentGroupedAction) or
-           (UndoList^.CurrentGroupedAction^.ActionCount>0))
+          (not assigned(UndoList.CurrentGroupedAction) or
+           (UndoList.CurrentGroupedAction.ActionCount>0))
          then
         begin
-          pa^.EndPos:=AEndPos;
-          S:=GetStr(pa^.text);
+          pa.EndPos:=AEndPos;
+          S:=GetStr(pa.text);
           if S<>'' then
-           DisposeStr(pa^.text);
+           DisposeStr(pa.text);
           if (AAction=eaDeleteText) and
              (AStartPos.X>AEndPos.X) then
-            pa^.text:=NewStr(AText+S)
+            pa.text:=NewStr(AText+S)
           else
-            pa^.text:=NewStr(S+AText);
+            pa.text:=NewStr(S+AText);
           ActionIntegrated:=true;
         end;
     end;
   if not ActionIntegrated then
     begin
-      UndoList^.Insert(New(PEditorAction,Init(AAction,AStartPos,AEndPos,AText,AFlags)));
-      if assigned(UndoList^.CurrentGroupedAction) then
-        Inc(UndoList^.CurrentGroupedAction^.actionCount);
+      UndoList.Insert(TEditorAction.Create(AAction,AStartPos,AEndPos,AText,AFlags));
+      if assigned(UndoList.CurrentGroupedAction) then
+        Inc(UndoList.CurrentGroupedAction.actionCount);
       UpdateUndoRedo(cmUndo,AAction);
     end;
-  if UndoList^.count>0 then
+  if UndoList.count>0 then
   begin
     UpdateUndoRedo(cmRedo,0);
-    RedoList^.FreeAll;
+    RedoList.FreeAll;
   end;
 end;
 
 procedure TCodeEditorCore.AddGroupedAction(AAction : byte);
 begin
   if (UndoList=nil) or (not StoreUndo) then Exit;
-  if Assigned(UndoList^.CurrentGroupedAction) then
-    inc(UndoList^.GroupLevel)
+  if Assigned(UndoList.CurrentGroupedAction) then
+    inc(UndoList.GroupLevel)
   else
     begin
-      UndoList^.CurrentGroupedAction:=New(PEditorAction,Init_group(AAction));
-      UndoList^.GroupLevel:=1;
+      UndoList.CurrentGroupedAction:=TEditorAction.Create_group(AAction);
+      UndoList.GroupLevel:=1;
     end;
 end;
 
 procedure TCodeEditorCore.CloseGroupedAction(AAction : byte);
 begin
   if (UndoList=nil) or (not StoreUndo) then Exit;
-  dec(UndoList^.GroupLevel);
-  if UndoList^.GroupLevel=0 then
+  dec(UndoList.GroupLevel);
+  if UndoList.GroupLevel=0 then
     begin
-      UndoList^.CurrentGroupedAction^.TimeStamp:=now;
-      UndoList^.Insert(UndoList^.CurrentGroupedAction);
-      UndoList^.CurrentGroupedAction:=nil;
+      UndoList.CurrentGroupedAction.TimeStamp:=now;
+      UndoList.Insert(UndoList.CurrentGroupedAction);
+      UndoList.CurrentGroupedAction:=nil;
       UpdateUndoRedo(cmUndo,AAction);
     end;
 end;
 
 function TCodeEditorCore.GetUndoActionCount: sw_integer;
 begin
-  GetUndoActionCount:=UndoList^.Count;
+  GetUndoActionCount:=UndoList.Count;
 end;
 
 function TCodeEditorCore.GetRedoActionCount: sw_integer;
 begin
-  GetRedoActionCount:=RedoList^.Count;
+  GetRedoActionCount:=RedoList.Count;
 end;
 
-destructor TCodeEditorCore.Done;
+destructor TCodeEditorCore.Destroy;
 begin
-  inherited Done;
-  if Assigned(Lines) then Dispose(Lines, Done); Lines:=nil;
-  if Assigned(RedoList) then Dispose(RedoList, Done); RedoList:=nil;
-  if Assigned(UndoList) then Dispose(UndoList, Done); UndoList:=nil;
+  inherited Destroy;
+  if Assigned(Lines) then Lines.Free; Lines:=nil;
+  if Assigned(RedoList) then RedoList.Free; RedoList:=nil;
+  if Assigned(UndoList) then UndoList.Free; UndoList:=nil;
 end;
 
-constructor TIndicator.Init(var Bounds: TRect);
+constructor TIndicator.Create(var Bounds: TRect);
 begin
-  inherited Init(Bounds);
+  inherited Create(Bounds);
   GrowMode := gfGrowLoY + gfGrowHiY;
 end;
 
@@ -776,53 +771,51 @@ var
   Frame: Char;
   L: array[0..1] of PtrInt;
   S: String[15];
-  B: TDrawBuffer;
+  B: TFVDrawBuffer;
 begin
   if assigned(CodeOwner) and
-     (CodeOwner^.ELockFlag>0) then
+     (CodeOwner.ELockFlag>0) then
     begin
-      CodeOwner^.IndicatorDrawCalled:=true;
+      CodeOwner.IndicatorDrawCalled:=true;
       exit;
     end;
   if (State and sfDragging = 0) and (State and sfActive <> 0) then
    begin
-     Color := GetColor(1);
+     Color := Lo(GetColorW(1));
      Frame := #205;
    end
   else
    begin
      if (State and sfDragging)<>0 then
-      Color := GetColor(2)
+      Color := Lo(GetColorW(2))
      else
-      Color := GetColor(3);
+      Color := Lo(GetColorW(3));
      Frame := #196;
    end;
   MoveChar(B, Frame, Color, Size.X);
   if State and sfActive<>0 then
    begin
      if Modified then
-       WordRec (B[0]).Lo := ord('*');
+       B[0] := (B[0] and $FF00) or Ord('*');
 {$ifdef debug}
      if StoreUndo then
-       WordRec (B[1]).Lo := ord('S');
+       B[1] := (B[1] and $FF00) or Ord('S');
      if SyntaxComplete then
-       WordRec(B[2]).lo := ord('C');
+       B[2] := (B[2] and $FF00) or Ord('C');
      if UseTabs then
-       WordRec(B[3]).lo := ord('T');
+       B[3] := (B[3] and $FF00) or Ord('T');
 {$endif debug}
      L[0] := Location.Y + 1;
      L[1] := Location.X + 1;
      FormatStr(S, ' %d:%d ', L);
      MoveStr(B[8 - Pos(':', S)], S, Color);
    end;
-  WriteBuf(0, 0, Size.X, 1, B);
+  WriteBufW(0, 0, Size.X, 1, B);
 end;
 
-function TIndicator.GetPalette: PPalette;
-const
-  P: string[Length(CIndicator)] = CIndicator;
+function TIndicator.GetPalette: TPalette;
 begin
-  GetPalette := @P;
+  Result := MakePalette(CIndicator);
 end;
 
 procedure TIndicator.SetState(AState: Word; Enable: Boolean);
@@ -862,20 +855,20 @@ end;}
                 TCodeEditor
 *****************************************************************************}
 
-constructor TCodeEditor.Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+constructor TCodeEditor.Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore);
 begin
-  inherited Init(Bounds,AHScrollBar,AVScrollBar);
-  New(Folds, Init(100,100));
-  if ACore=nil then ACore:=New(PCodeEditorCore, Init);
+  inherited Create(Bounds,AHScrollBar,AVScrollBar);
+  Folds := TFoldCollection.Create(100,100);
+  if ACore=nil then ACore:=TCodeEditorCore.Create;
   Core:=ACore;
-  Core^.BindEditor(@Self);
+  Core.BindEditor(Self);
   SetState(sfCursorVis,true);
   SetFlags(DefaultCodeEditorFlags);
   SetCurPtr(0,0);
   Indicator:=AIndicator;
   if assigned(Indicator) then
-    Indicator^.CodeOwner:=@Self;
+    Indicator.CodeOwner:=Self;
   UpdateIndicator;
   LimitsChanged;
 end;
@@ -898,79 +891,79 @@ end;
 
 function TCodeEditor.GetModified: boolean;
 begin
-  GetModified:=Core^.GetModified;
+  GetModified:=Core.GetModified;
 end;
 
 procedure TCodeEditor.SetModified(AModified: boolean);
 begin
-  Core^.SetModified(AModified);
+  Core.SetModified(AModified);
 end;
 
 function TCodeEditor.GetStoreUndo: boolean;
 begin
-  GetStoreUndo:=Core^.GetStoreUndo;
+  GetStoreUndo:=Core.GetStoreUndo;
 end;
 
 procedure TCodeEditor.SetStoreUndo(AStore: boolean);
 begin
-  Core^.SetStoreUndo(AStore);
+  Core.SetStoreUndo(AStore);
 end;
 
 procedure TCodeEditor.ClearUndoList;
 begin
-  Core^.UndoList^.FreeAll;
-  Core^.RedoList^.FreeAll;
+  Core.UndoList.FreeAll;
+  Core.RedoList.FreeAll;
 end;
 
 function TCodeEditor.GetSyntaxCompleted: boolean;
 begin
-  GetSyntaxCompleted:=Core^.GetSyntaxCompleted;
+  GetSyntaxCompleted:=Core.GetSyntaxCompleted;
 end;
 
 procedure TCodeEditor.SetSyntaxCompleted(SC : boolean);
 begin
-  Core^.SetSyntaxCompleted(SC);
+  Core.SetSyntaxCompleted(SC);
   UpdateIndicator;
 end;
 
 function TCodeEditor.GetLastSyntaxedLine: sw_integer;
 begin
-  GetLastSyntaxedLine:=Core^.GetLastSyntaxedLine;
+  GetLastSyntaxedLine:=Core.GetLastSyntaxedLine;
 end;
 
 procedure TCodeEditor.SetLastSyntaxedLine(ALine: sw_integer);
 begin
-  Core^.SetLastSyntaxedLine(ALine);
+  Core.SetLastSyntaxedLine(ALine);
 end;
 
 function TCodeEditor.GetTabSize: integer;
 begin
-  GetTabSize:=Core^.GetTabSize;
+  GetTabSize:=Core.GetTabSize;
 end;
 
 procedure TCodeEditor.SetTabSize(ATabSize: integer);
 begin
-  Core^.SetTabSize(ATabSize);
+  Core.SetTabSize(ATabSize);
 end;
 
 function TCodeEditor.GetIndentSize: integer;
 begin
-  GetIndentSize:=Core^.GetIndentSize;
+  GetIndentSize:=Core.GetIndentSize;
 end;
 
 procedure TCodeEditor.SetIndentSize(AIndentSize: integer);
 begin
-  Core^.SetIndentSize(AIndentSize);
+  Core.SetIndentSize(AIndentSize);
 end;
 
 function TCodeEditor.IsReadOnly: boolean;
 begin
-  IsReadOnly:=ReadOnly or (Core^.ReadOnly);
+  IsReadOnly:=ReadOnly or (Core.ReadOnly);
 end;
 
 function TCodeEditor.IsClipboard: Boolean;
 begin
-  IsClipboard:=Core^.IsClipboard;
+  IsClipboard:=Core.IsClipboard;
 end;
 
 function TCodeEditor.GetErrorMessage: string;
@@ -986,77 +979,77 @@ end;
 
 function TCodeEditor.GetLineCount: sw_integer;
 begin
-  GetLineCount:=Core^.GetLineCount;
+  GetLineCount:=Core.GetLineCount;
 end;
 
 function TCodeEditor.GetLine(LineNo: sw_integer): PCustomLine;
 begin
-  GetLine:=Core^.GetLine(LineNo);
+  GetLine:=Core.GetLine(LineNo);
 end;
 
 function TCodeEditor.CharIdxToLinePos(Line,CharIdx: sw_integer): sw_integer;
 begin
-  CharIdxToLinePos:=Core^.CharIdxToLinePos(Line,CharIdx);
+  CharIdxToLinePos:=Core.CharIdxToLinePos(Line,CharIdx);
 end;
 
 function TCodeEditor.LinePosToCharIdx(Line,X: sw_integer): sw_integer;
 begin
-  LinePosToCharIdx:=Core^.LinePosToCharIdx(Line,X);
+  LinePosToCharIdx:=Core.LinePosToCharIdx(Line,X);
 end;
 
 function TCodeEditor.GetLineText(I: sw_integer): string;
 begin
-  GetLineText:=Core^.GetLineText(I);
+  GetLineText:=Core.GetLineText(I);
 end;
 
 procedure TCodeEditor.SetDisplayText(I: sw_integer;const S: string);
 begin
-  Core^.SetDisplayText(I,S);
+  Core.SetDisplayText(I,S);
 end;
 
 function TCodeEditor.GetDisplayText(I: sw_integer): string;
 begin
-  GetDisplayText:=Core^.GetDisplayText(I);
+  GetDisplayText:=Core.GetDisplayText(I);
 end;
 
 procedure TCodeEditor.SetLineText(I: sw_integer;const S: string);
 begin
-  Core^.SetLineText(I,S);
+  Core.SetLineText(I,S);
 end;
 
 procedure TCodeEditor.GetDisplayTextFormat(I: sw_integer;var DT,DF:string);
 begin
-  Core^.GetDisplayTextFormat(@Self,I,DT,DF);
+  Core.GetDisplayTextFormat(Self,I,DT,DF);
 end;
 
 function TCodeEditor.GetLineFormat(I: sw_integer): string;
 begin
-  GetLineFormat:=Core^.GetLineFormat(@Self,I);
+  GetLineFormat:=Core.GetLineFormat(Self,I);
 end;
 
 procedure TCodeEditor.SetLineFormat(I: sw_integer;const S: string);
 begin
-  Core^.SetLineFormat(@Self,I,S);
+  Core.SetLineFormat(Self,I,S);
 end;
 
 procedure TCodeEditor.DeleteAllLines;
 begin
-  Core^.DeleteAllLines;
+  Core.DeleteAllLines;
 end;
 
 procedure TCodeEditor.DeleteLine(I: sw_integer);
 begin
-  Core^.DeleteLine(I);
+  Core.DeleteLine(I);
 end;
 
 function TCodeEditor.InsertLine(LineNo: sw_integer; const S: string): PCustomLine;
 begin
-  InsertLine:=Core^.InsertLine(LineNo,S);
+  InsertLine:=Core.InsertLine(LineNo,S);
 end;
 
 procedure TCodeEditor.AddLine(const S: string);
 begin
-  Core^.AddLine(S);
+  Core.AddLine(S);
 end;
 
 function TCodeEditor.GetMaxFoldLevel: sw_integer;
@@ -1069,8 +1062,8 @@ var L: sw_integer;
 begin
   if Assigned(Folds) then
   begin
-    Folds^.Insert(AFold);
-    L:=AFold^.GetLevel+1;
+    Folds.Insert(AFold);
+    L:=AFold.GetLevel+1;
     if L>MaxFoldLevel then MaxFoldLevel:=L;
   end;
 end;
@@ -1079,8 +1072,8 @@ procedure TCodeEditor.UnRegisterFold(AFold: PFold);
 begin
   if Assigned(Folds) then
   begin
-    Folds^.Delete(AFold);
-    if Folds^.Count=0 then
+    Folds.Delete(AFold);
+    if Folds.Count=0 then
       MaxFoldLevel:=0
     else
       MaxFoldLevel:=inherited GetMaxFoldLevel+1;
@@ -1089,12 +1082,12 @@ end;
 
 function TCodeEditor.GetFoldCount: sw_integer;
 begin
-  GetFoldCount:=Folds^.Count;
+  GetFoldCount:=Folds.Count;
 end;
 
 function TCodeEditor.GetFold(Index: sw_integer): PFold;
 begin
-  GetFold:=Folds^.At(Index);
+  GetFold:=Folds.At(Index);
 end;
 
 {function TCodeEditor.GetLineTextPos(Line,X: integer): integer;
@@ -1122,11 +1115,11 @@ var
   rx,i : Sw_integer;
 begin
   S:='';
-  if Line<Lines^.Count then
+  if Line<Lines.Count then
    begin
-     L:=Lines^.At(Line);
-     if assigned(L^.Text) then
-      S:=L^.Text^;
+     L:=Lines.At(Line);
+     if assigned(L.Text) then
+      S:=L.Text^;
    end;
   i:=0;
   rx:=0;
@@ -1144,17 +1137,17 @@ end;}
 
 procedure TCodeEditor.GetContent(ALines: PUnsortedStringCollection);
 begin
-  Core^.GetContent(ALines);
+  Core.GetContent(ALines);
 end;
 
 procedure TCodeEditor.SetContent(ALines: PUnsortedStringCollection);
 begin
   Lock;
   TextStart; HideSelect;
-  Core^.SetContent(ALines);
+  Core.SetContent(ALines);
   LimitsChanged;
   if IsFlagSet(efSyntaxHighlight) then
-    Core^.UpdateAttrsRange(0,Min(Delta.Y+Size.Y,GetLineCount-1),
+    Core.UpdateAttrsRange(0,Min(Delta.Y+Size.Y,GetLineCount-1),
       attrAll
 {$ifndef TEST_PARTIAL_SYNTAX}
       +attrForceFull
@@ -1204,18 +1197,18 @@ end;
 procedure TCodeEditor.DrawIndicator;
 begin
   if Assigned(Indicator) then
-    Indicator^.DrawView;
+    Indicator.DrawView;
 end;
 
 procedure TCodeEditor.Lock;
 begin
   inherited Lock;
-  Core^.Lock(@Self);
+  Core.Lock(Self);
 end;
 
 procedure TCodeEditor.UnLock;
 begin
-  Core^.UnLock(@Self);
+  Core.UnLock(Self);
   inherited UnLock;
   If (ELockFlag=0) and IndicatorDrawCalled then
     begin
@@ -1228,25 +1221,25 @@ procedure TCodeEditor.UpdateIndicator;
 begin
   if Indicator<>nil then
   begin
-    Indicator^.Location:=CurPos;
-    Indicator^.Modified:=GetModified;
+    Indicator.Location:=CurPos;
+    Indicator.Modified:=GetModified;
 {$ifdef debug}
-    Indicator^.StoreUndo:=GetStoreUndo;
+    Indicator.StoreUndo:=GetStoreUndo;
 {$ifdef TEST_PARTIAL_SYNTAX}
-    Indicator^.SyntaxComplete:=GetSyntaxCompleted and IsFlagSet(efSyntaxHighlight);
+    Indicator.SyntaxComplete:=GetSyntaxCompleted and IsFlagSet(efSyntaxHighlight);
 {$endif TEST_PARTIAL_SYNTAX}
-    Indicator^.UseTabs:=IsFlagSet(efUseTabCharacters);
+    Indicator.UseTabs:=IsFlagSet(efUseTabCharacters);
 {$endif debug}
     if Elockflag>0 then
       IndicatorDrawCalled:=true
     else
-      Indicator^.DrawView;
+      Indicator.DrawView;
   end;
 end;
 
 procedure TCodeEditor.LimitsChanged;
 begin
-  Core^.LimitsChanged;
+  Core.LimitsChanged;
 end;
 
 procedure TCodeEditor.ModifiedChanged;
@@ -1263,12 +1256,12 @@ procedure TCodeEditor.JumpToLastCursorPos;
 var
   pa : PEditorAction;
 begin
-  if (Core^.UndoList^.count>0) and (Core^.RedoList^.count=0) then
+  if (Core.UndoList.count>0) and (Core.RedoList.count=0) then
     begin
       { Or should we just call Undo ?? PM }
-      pa:=Core^.UndoList^.At(Core^.UndoList^.count-1);
-      if (pa^.action=eaMoveCursor) then
-        SetCurPtr(pa^.StartPos.X,pa^.StartPos.Y);
+      pa:=Core.UndoList.At(Core.UndoList.count-1);
+      if (pa.action=eaMoveCursor) then
+        SetCurPtr(pa.StartPos.X,pa.StartPos.Y);
     end;
 end;
 
@@ -1293,17 +1286,17 @@ var
         MaxY:=Y;
     end;
 begin
-  Core^.SetStoreUndo(False);
+  Core.SetStoreUndo(False);
   Lock;
   MinY:=-1;
   MaxY:=-1;
-  if Core^.UndoList^.count > 0 then
+  if Core.UndoList.count > 0 then
   begin
-    Last:=Core^.UndoList^.count-1;
-    if Core^.UndoList^.At(Last)^.Is_grouped_action then
+    Last:=Core.UndoList.count-1;
+    if Core.UndoList.At(Last).Is_grouped_action then
       begin
-        Count:=Core^.UndoList^.At(Last)^.ActionCount;
-        UndoTime:=Core^.UndoList^.At(Last)^.TimeStamp;
+        Count:=Core.UndoList.At(Last).ActionCount;
+        UndoTime:=Core.UndoList.At(Last).TimeStamp;
         Dec(Last);
         IsGrouped:=true;
       end
@@ -1313,7 +1306,7 @@ begin
         IsGrouped:=false;
       end;
     for Idx:=Last downto Last-Count+1 do
-      with Core^.UndoList^.At(Idx)^ do
+      with Core.UndoList.At(Idx) do
         begin
           if not IsGrouped then
             UndoTime:=TimeStamp;
@@ -1401,33 +1394,33 @@ begin
             ;
           end; { once this lot is done paste into redo and modify to suit needs }
           { move item to redo stack }
-          Core^.RedoList^.Insert(Core^.UndoList^.At(Idx));
-          UpdateUndoRedo(cmRedo,Core^.UndoList^.At(Idx)^.Action);
-          Core^.UndoList^.atDelete(Idx);
+          Core.RedoList.Insert(Core.UndoList.At(Idx));
+          UpdateUndoRedo(cmRedo,Core.UndoList.At(Idx).Action);
+          Core.UndoList.atDelete(Idx);
           If Idx>0 then
-            UpdateUndoRedo(cmUndo,Core^.UndoList^.At(Idx-1)^.Action)
+            UpdateUndoRedo(cmUndo,Core.UndoList.At(Idx-1).Action)
           else
             UpdateUndoRedo(cmUndo,0);
         end;{Idx loop for grouped actions }
       if IsGrouped then
         begin
-          Idx:=Core^.UndoList^.Count-1;
-          Core^.RedoList^.Insert(Core^.UndoList^.At(Idx));
-          UpdateUndoRedo(cmRedo,Core^.UndoList^.At(Idx)^.Action);
-          Core^.UndoList^.atDelete(Idx);
+          Idx:=Core.UndoList.Count-1;
+          Core.RedoList.Insert(Core.UndoList.At(Idx));
+          UpdateUndoRedo(cmRedo,Core.UndoList.At(Idx).Action);
+          Core.UndoList.atDelete(Idx);
           If Idx>0 then
-            UpdateUndoRedo(cmUndo,Core^.UndoList^.At(Idx-1)^.Action)
+            UpdateUndoRedo(cmUndo,Core.UndoList.At(Idx-1).Action)
           else
             UpdateUndoRedo(cmUndo,0);
         end;
-      if Core^.UndoList^.count=0 then
+      if Core.UndoList.count=0 then
         SetCmdState(UndoCmd,false);
-      if (Core^.UndoList^.count=0) or
-         ((Core^.UndoList^.count=1) and
-          (Core^.UndoList^.At(0)^.Action=eaMoveCursor)) then
+      if (Core.UndoList.count=0) or
+         ((Core.UndoList.count=1) and
+          (Core.UndoList.At(0).Action=eaMoveCursor)) then
         begin
           SetCmdState(UndoCmd,false);
-          if (UndoTime>=Core^.SystemLoadTime) or (Core^.SystemLoadTime=0) then
+          if (UndoTime>=Core.SystemLoadTime) or (Core.SystemLoadTime=0) then
             SetModified(false);
         end;
       SetCmdState(RedoCmd,true);
@@ -1436,7 +1429,7 @@ begin
         UpdateAttrsRange(MinY,MaxY,attrAll);
       DrawView;
     end;
-  Core^.SetStoreUndo(True);
+  Core.SetStoreUndo(True);
   Unlock;
 end;
 
@@ -1459,16 +1452,16 @@ var
         MaxY:=Y;
     end;
 begin
-  Core^.SetStoreUndo(False);
+  Core.SetStoreUndo(False);
   Lock;
   MinY:=-1;
   MaxY:=-1;
-  if Core^.RedoList^.count <> 0 then
+  if Core.RedoList.count <> 0 then
    begin
-    Last:=Core^.RedoList^.count-1;
-    if Core^.RedoList^.At(Last)^.Is_grouped_action then
+    Last:=Core.RedoList.count-1;
+    if Core.RedoList.At(Last).Is_grouped_action then
       begin
-        Count:=Core^.RedoList^.At(Last)^.ActionCount;
+        Count:=Core.RedoList.At(Last).ActionCount;
         Dec(Last);
         IsGrouped:=true;
       end
@@ -1478,7 +1471,7 @@ begin
         IsGrouped:=false;
       end;
     for Idx:=Last downto Last-Count+1 do
-    with Core^.RedoList^.At(Idx)^ do
+    with Core.RedoList.At(Idx) do
     begin
       case action of
         eaMoveCursor :
@@ -1558,26 +1551,26 @@ begin
         ;
       end; { once this lot is done paste back into undo and modify to suit needs }
     { move item to undo stack }
-      Core^.UndoList^.Insert(Core^.RedoList^.At(Idx));
-      UpdateUndoRedo(cmUndo,Core^.RedoList^.At(Idx)^.Action);
+      Core.UndoList.Insert(Core.RedoList.At(Idx));
+      UpdateUndoRedo(cmUndo,Core.RedoList.At(Idx).Action);
       If Idx>0 then
-        UpdateUndoRedo(cmRedo,Core^.RedoList^.At(Idx-1)^.Action)
+        UpdateUndoRedo(cmRedo,Core.RedoList.At(Idx-1).Action)
       else
         UpdateUndoRedo(cmRedo,0);
-      Core^.RedoList^.atDelete(Idx);
+      Core.RedoList.atDelete(Idx);
       end;{ Idx loop for grouped action }
       If IsGrouped then
         begin
-          Idx:=Core^.RedoList^.count-1;
-          Core^.UndoList^.Insert(Core^.RedoList^.At(Idx));
-          UpdateUndoRedo(cmUndo,Core^.RedoList^.At(Idx)^.Action);
+          Idx:=Core.RedoList.count-1;
+          Core.UndoList.Insert(Core.RedoList.At(Idx));
+          UpdateUndoRedo(cmUndo,Core.RedoList.At(Idx).Action);
           If Idx>0 then
-            UpdateUndoRedo(cmRedo,Core^.RedoList^.At(Idx-1)^.Action)
+            UpdateUndoRedo(cmRedo,Core.RedoList.At(Idx-1).Action)
           else
             UpdateUndoRedo(cmRedo,0);
-          Core^.RedoList^.atDelete(Idx);
+          Core.RedoList.atDelete(Idx);
         end;
-      if Core^.RedoList^.count=0 then
+      if Core.RedoList.count=0 then
         SetCmdState(RedoCmd,false);
       SetCmdState(UndoCmd,true);
       Message(Application,evBroadcast,cmCommandSetChanged,nil);
@@ -1585,7 +1578,7 @@ begin
         UpdateAttrsRange(MinY,MaxY,attrAll);
       DrawView;
     end;
-  Core^.SetStoreUndo(True);
+  Core.SetStoreUndo(True);
   Unlock;
 end;
 
@@ -1595,12 +1588,12 @@ var TS: PSubStream;
 begin
   inherited Load(S);
 
-  New(UndoList,init(500,1000));
-  New(RedoList,init(500,1000));
+  UndoList := TEditorActionCollection.Create(500,1000);
+  RedoList := TEditorActionCollection.Create(500,1000);
 
-  New(Lines, Init(500,1000));
+  Lines := TLineCollection.Create(500,1000);
   { we have always need at least 1 line }
-  LinesInsert(New(PLine, Init('',0)));
+  LinesInsert(TLine.Create('',0));
 
   GetPeerViewPtr(S,Indicator);
   S.Read(Flags,SizeOf(Flags));
@@ -1609,14 +1602,14 @@ begin
   if IsFlagSet(efStoreContent) then
     begin
       S.Read(TSize,SizeOf(TSize));
-      New(TS, Init(@S,S.GetPos,TSize));
+      TS := TSubStream.Create(S,S.GetPos,TSize);
 {$ifdef TEST_PARTIAL_SYNTAX}
-      Core^.SearchBinding(Editor)^.SyntaxComplete:=false;
+      Core.SearchBinding(Editor).SyntaxComplete:=false;
       { Idle necessary }
       EventMask:=EventMask or evIdle;
 {$endif TEST_PARTIAL_SYNTAX}
       LoadFromStream(TS);
-      Dispose(TS, Done);
+      TS.Free;
     end;
 
   S.Read(SelStart,SizeOf(SelStart));
@@ -1677,7 +1670,7 @@ end;*)
 function TCodeEditor.LoadFromStream(Stream: PFastBufStream): boolean;
 var OK: boolean;
 begin
-  OK:=Core^.LoadFromStream(@Self,Stream);
+  OK:=Core.LoadFromStream(Self,Stream);
   if IsFlagSet(efSyntaxHighlight) then
     UpdateAttrsRange(0,Min(Delta.Y+Size.Y,GetLineCount-1),
       attrAll
@@ -1691,57 +1684,57 @@ end;
 
 function TCodeEditor.SaveToStream(Stream: PStream): boolean;
 begin
-  SaveToStream:=Core^.SaveToStream(@Self,Stream);
+  SaveToStream:=Core.SaveToStream(Self,Stream);
 end;
 
 function TCodeEditor.SaveAreaToStream(Stream: PStream; StartP,EndP: TPoint): boolean;
 begin
-  SaveAreaToStream:=Core^.SaveAreaToStream(@Self,Stream,StartP,EndP);
+  SaveAreaToStream:=Core.SaveAreaToStream(Self,Stream,StartP,EndP);
 end;
 
 function TCodeEditor.UpdateAttrs(FromLine: sw_integer; Attrs: byte): sw_integer;
 begin
-  UpdateAttrs:=Core^.UpdateAttrs(FromLine,Attrs);
+  UpdateAttrs:=Core.UpdateAttrs(FromLine,Attrs);
 end;
 
 function TCodeEditor.UpdateAttrsRange(FromLine, ToLine: sw_integer; Attrs: byte): sw_integer;
 begin
-  UpdateAttrsRange:=Core^.UpdateAttrsRange(FromLine,ToLine,Attrs);
+  UpdateAttrsRange:=Core.UpdateAttrsRange(FromLine,ToLine,Attrs);
 end;
 
 procedure TCodeEditor.AddAction(AAction: byte; AStartPos, AEndPos: TPoint; AText: string;AFlags : longint);
 begin
-  Core^.AddAction(AAction,AStartPos,AEndPos,AText,AFlags);
+  Core.AddAction(AAction,AStartPos,AEndPos,AText,AFlags);
 end;
 
 procedure TCodeEditor.AddGroupedAction(AAction : byte);
 begin
-  Core^.AddGroupedAction(AAction);
+  Core.AddGroupedAction(AAction);
 end;
 
 procedure TCodeEditor.CloseGroupedAction(AAction : byte);
 begin
-  Core^.CloseGroupedAction(AAction);
+  Core.CloseGroupedAction(AAction);
 end;
 
 function TCodeEditor.GetUndoActionCount: sw_integer;
 begin
-  GetUndoActionCount:=Core^.GetUndoActionCount;
+  GetUndoActionCount:=Core.GetUndoActionCount;
 end;
 
 function TCodeEditor.GetRedoActionCount: sw_integer;
 begin
-  GetRedoActionCount:=Core^.GetRedoActionCount;
+  GetRedoActionCount:=Core.GetRedoActionCount;
 end;
 
-destructor TCodeEditor.Done;
+destructor TCodeEditor.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
   if Assigned(Core) then
   begin
-    Core^.UnBindEditor(@Self);
-    if Core^.CanDispose then
-      Dispose(Core, Done);
+    Core.UnBindEditor(Self);
+    if Core.CanDispose then
+      Core.Free;
   end;
   Core:=nil;
   if Assigned(CodeCompleteFrag) then
@@ -1751,17 +1744,17 @@ begin
   if Assigned(ErrorMessage) then
     DisposeStr(ErrorMessage);
   if Assigned(Folds) then
-    Dispose(Folds, Done);
+    Folds.Free;
   Folds:=nil;
 end;
 
-constructor TFileEditor.Init(var Bounds: TRect; AHScrollBar, AVScrollBar:
+constructor TFileEditor.Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
        PScrollBar; AIndicator: PIndicator;ACore: PCodeEditorCore; const AFileName: string);
 begin
-  inherited Init(Bounds,AHScrollBAr,AVScrollBAr,AIndicator,ACore);
+  inherited Create(Bounds,AHScrollBAr,AVScrollBAr,AIndicator,ACore);
   FileName:=AFileName;
   UpdateIndicator;
-  Message(@Self,evBroadcast,cmFileNameChanged,@Self);
+  Message(Self,evBroadcast,cmFileNameChanged,Self);
 end;
 
 function TFileEditor.LoadFile: boolean;
@@ -1769,21 +1762,21 @@ var OK: boolean;
     PA : Array[1..2] of pointer;
 begin
   OK:=LoadFromFile(FileName);
-  if GetModified and (Core^.GetBindingCount=1) then
+  if GetModified and (Core.GetBindingCount=1) then
     begin
       PA[1]:=@FileName;
-      Ptrint(PA[2]):=Core^.GetChangedLine;
+      Ptrint(PA[2]):=Core.GetChangedLine;
       EditorDialog(edChangedOnloading,@PA);
     end;
-  Core^.OnDiskLoadTime:=Cardinal(GetFileTime(FileName));
-  Core^.SystemLoadTime:=Core^.OnDiskLoadTime;
+  Core.OnDiskLoadTime:=Cardinal(GetFileTime(FileName));
+  Core.SystemLoadTime:=Core.OnDiskLoadTime;
   LoadFile:=OK;
 end;
 
 function TFileEditor.IsChangedOnDisk : boolean;
 begin
-  IsChangedOnDisk:=(Core^.OnDiskLoadTime<>Cardinal(GetFileTime(FileName))) and
-    (Core^.OnDiskLoadTime<>0);
+  IsChangedOnDisk:=(Core.OnDiskLoadTime<>Cardinal(GetFileTime(FileName))) and
+    (Core.OnDiskLoadTime<>0);
 end;
 
 function TFileEditor.SaveFile: boolean;
@@ -1828,8 +1821,8 @@ begin
   { don't forget to update the OnDiskLoadTime value }
   if OK then
     begin
-      Core^.OnDiskLoadTime:=Cardinal(GetFileTime(FileName));
-      Core^.SystemLoadTime:=SaveTime;
+      Core.OnDiskLoadTime:=Cardinal(GetFileTime(FileName));
+      Core.SystemLoadTime:=SaveTime;
     end;
   if not OK then
     EditorDialog(edSaveError,@FileName);
@@ -1865,8 +1858,8 @@ begin
       SetModified(false);
       ClearUndoList;
       { don't forget to update the OnDiskLoadTime value }
-      Core^.OnDiskLoadTime:=Cardinal(GetFileTime(FileName));
-      Core^.SystemLoadTime:=Core^.OnDiskLoadTime;
+      Core.OnDiskLoadTime:=Cardinal(GetFileTime(FileName));
+      Core.SystemLoadTime:=Core.OnDiskLoadTime;
       DrawView;
     end
   else
@@ -1896,13 +1889,13 @@ var
 begin
   SaveAs := False;
   SavedName:=FileName;
-  SavedDiskLoadTime:=Core^.OnDiskLoadTime;
+  SavedDiskLoadTime:=Core.OnDiskLoadTime;
   if EditorDialog(edSaveAs, @FileName) <> cmCancel then
   begin
     FileName:=FExpand(FileName);
-    Message(Owner, evBroadcast, cmUpdateTitle, @Self);
+    Message(Owner, evBroadcast, cmUpdateTitle, Self);
     { if we rename the file the OnDiskLoadTime is wrong so we reset it }
-    Core^.OnDiskLoadTime:=0;
+    Core.OnDiskLoadTime:=0;
     if SaveFile then
       begin
         SaveAs := true;
@@ -1910,11 +1903,11 @@ begin
     else
       begin
         FileName:=SavedName;
-        Core^.OnDiskLoadTime:=SavedDiskLoadTime;
-        Message(Owner, evBroadcast, cmUpdateTitle, @Self);
+        Core.OnDiskLoadTime:=SavedDiskLoadTime;
+        Message(Owner, evBroadcast, cmUpdateTitle, Self);
       end;
     if IsClipboard then FileName := '';
-    Message(Application,evBroadcast,cmFileNameChanged,@Self);
+    Message(Application,evBroadcast,cmFileNameChanged,Self);
   end;
 end;
 
@@ -1932,7 +1925,7 @@ begin
   else
    begin
      OK:=(GetModified=false);
-     if (OK=false) and (Core^.GetBindingCount>1) then
+     if (OK=false) and (Core.GetBindingCount>1) then
       OK:=true;
      if OK=false then
       begin
@@ -1946,7 +1939,7 @@ begin
                     end;
          cmCancel : begin
                       OK := False;
-                      Message(Application,evBroadcast,cmSaveCancelled,@Self);
+                      Message(Application,evBroadcast,cmSaveCancelled,Self);
                     end;
         end;
       end;
@@ -1956,7 +1949,7 @@ end;
 
 procedure TFileEditor.BindingsChanged;
 begin
-  Message(Application,evBroadcast,cmUpdateTitle,@Self);
+  Message(Application,evBroadcast,cmUpdateTitle,Self);
 end;
 
 procedure TFileEditor.HandleEvent(var Event: TEvent);
@@ -1966,16 +1959,16 @@ begin
     evBroadcast :
       case Event.Command of
    cmFileNameChanged :
-     if (Event.InfoPtr=nil) or (Event.InfoPtr=@Self) then
+     if (Event.InfoPtr=nil) or (Event.InfoPtr = Pointer(Self)) then
      begin
        B:=IsFlagSet(efSyntaxHighlight);
-       SH:=UseSyntaxHighlight(@Self);
+       SH:=UseSyntaxHighlight(Self);
        if SH<>B then
          if SH then
            SetFlags(Flags or efSyntaxHighlight)
          else
            SetFlags(Flags and not efSyntaxHighlight);
-       if UseTabsPattern(@Self) then
+       if UseTabsPattern(Self) then
          SetFlags(Flags or efUseTabCharacters);
      end;
       end;
@@ -2008,7 +2001,7 @@ begin
   if P<>nil then DisposeStr(P);
 
   UpdateIndicator;
-{  Message(@Self,evBroadcast,cmFileNameChanged,@Self);}
+{  Message(Self,evBroadcast,cmFileNameChanged,Self);}
 
   SSP:=SelStart; SEP:=SelEnd;
   CP:=CurPos;
@@ -2044,21 +2037,17 @@ end;
 
 function DefUseSyntaxHighlight(Editor: PFileEditor): boolean;
 begin
-  DefUseSyntaxHighlight:=Editor^.IsFlagSet(efSyntaxHighlight);
+  DefUseSyntaxHighlight:=Editor.IsFlagSet(efSyntaxHighlight);
 end;
 
 function DefUseTabsPattern(Editor: PFileEditor): boolean;
 begin
-  DefUseTabsPattern:=Editor^.IsFlagSet(efUseTabCharacters);
+  DefUseTabsPattern:=Editor.IsFlagSet(efUseTabCharacters);
 end;
 
 procedure RegisterWCEdit;
 begin
-{$ifndef NOOBJREG}
-  RegisterType(RIndicator);
-  RegisterType(RCodeEditor);
-  RegisterType(RFileEditor);
-{$endif}
+  { stream registration deferred until class Load/Store builders are restored }
 end;
 
 end.

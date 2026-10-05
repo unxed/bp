@@ -78,14 +78,19 @@ def parse_unit(path):
                 if not kind_is_record and depth <= 0 and re.search(r';\s*(\{.*\})?\s*$', text):
                     break
             text = re.sub(r'\{.*?\}', '', text).strip()
-            if sect == 'type' and sep == '=':
+            if sect == 'const' and sep == '=':
+                # tvkeys.pas packs several "kbX = $..;" on one line — emit each
+                chunk = name + ' = ' + text
+                for part in re.findall(r'(\w+)\s*=\s*([^;]+);', chunk):
+                    res.append(('const', part[0], part[1].strip() + ';'))
+            elif sect == 'type' and sep == '=':
                 res.append(('type', name, text))
-            elif sect == 'const' and sep == '=':
-                res.append(('const', name, text))
             elif sect in ('const', 'var') and sep == ':':
                 res.append(('var', name, text))
             elif sect == 'var':
                 res.append(('var', name, text))
+            i += 1
+            continue
         i += 1
     return res
 

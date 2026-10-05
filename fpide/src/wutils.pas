@@ -12,6 +12,9 @@
  **********************************************************************}
 unit WUtils;
 
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
+
 interface
 
 uses
@@ -51,71 +54,84 @@ type
   PByteArray = ^TByteArray;
   TByteArray = array[0..MaxBytes] of byte;
 
-  PNoDisposeCollection = ^TNoDisposeCollection;
-  TNoDisposeCollection = object(TCollection)
-    procedure FreeItem(Item: Pointer); virtual;
+  TNoDisposeCollection = class;
+  PNoDisposeCollection = TNoDisposeCollection;
+  TNoDisposeCollection = class(TCollection)
+    procedure FreeItem(Item: Pointer); override;
   end;
 
-  PUnsortedStringCollection = ^TUnsortedStringCollection;
-  TUnsortedStringCollection = object(TCollection)
-    constructor CreateFrom(ALines: PUnsortedStringCollection);
-    procedure   Assign(ALines: PUnsortedStringCollection);
+  TUnsortedStringCollection = class;
+  PUnsortedStringCollection = TUnsortedStringCollection;
+  TUnsortedStringCollection = class(TCollection)
+    constructor CreateFrom(ALines: TUnsortedStringCollection);
+    procedure   Assign(ALines: TUnsortedStringCollection);
     function    At(Index: Sw_Integer): PString;
-    procedure   FreeItem(Item: Pointer); virtual;
-    function    GetItem(var S: TStream): Pointer; virtual;
-    procedure   PutItem(var S: TStream; Item: Pointer); virtual;
+    procedure   FreeItem(Item: Pointer); override;
+    function    GetItem(S: TStream): Pointer; override;
+    procedure   PutItem(S: TStream; Item: Pointer); override;
     procedure   InsertStr(const S: string);
   end;
 
-  PNulStream = ^TNulStream;
-  TNulStream = object(TStream)
-    constructor Init;
-    function    GetPos: Longint; virtual;
-    function    GetSize: Longint; virtual;
-    procedure   Read(var Buf; Count: longint); virtual;
-    procedure   Seek(Pos: Longint); virtual;
-    procedure   Write(var Buf; Count: longint); virtual;
-  end;
-
-  PSubStream = ^TSubStream;
-  TSubStream = object(TStream)
-    constructor Init(AStream: PStream; AStartPos, ASize: longint);
-    function    GetPos: Longint; virtual;
-    function    GetSize: Longint; virtual;
-    procedure   Read(var Buf; Count: longint); virtual;
-    procedure   Seek(Pos: Longint); virtual;
-    procedure   Write(var Buf; Count: longint); virtual;
+  TNulStream = class;
+  PNulStream = TNulStream;
+  TNulStream = class(TStream)
   private
-    StartPos: longint;
-    S       : PStream;
+    Position: Int64;
+  public
+    constructor Create;
+    function    GetPos: Int64; override;
+    function    GetSize: Int64; override;
+    procedure   Read(var Buf; Count: Longint); override;
+    procedure   Seek(Pos: Int64); override;
+    procedure   Write(const Buf; Count: Longint); override;
   end;
 
-  PFastBufStream = ^TFastBufStream;
-  TFastBufStream = object(TBufStream)
-    constructor Init (FileName: FNameStr; Mode, Size: Word);
-    procedure   Seek(Pos: Longint); virtual;
-    procedure Readline(var s:string;var linecomplete,hasCR : boolean);
+  TSubStream = class;
+  PSubStream = TSubStream;
+  TSubStream = class(TStream)
   private
-    BasePos: longint;
+    StartPos: Int64;
+    StreamSize: Int64;
+    S: TStream;
+  public
+    constructor Create(AStream: TStream; AStartPos, ASize: Int64);
+    function    GetPos: Int64; override;
+    function    GetSize: Int64; override;
+    procedure   Read(var Buf; Count: Longint); override;
+    procedure   Seek(Pos: Int64); override;
+    procedure   Write(const Buf; Count: Longint); override;
   end;
 
-  PTextCollection = ^TTextCollection;
-  TTextCollection = object(TStringCollection)
-    function LookUp(const S: string; var Idx: sw_integer): string;
-    function Compare(Key1, Key2: Pointer): sw_Integer; virtual;
+  TFastBufStream = class;
+  PFastBufStream = TFastBufStream;
+  TFastBufStream = class(TBufStream)
+  private
+    BasePos: Int64;
+  public
+    constructor Create(const FileName: FNameStr; Mode: Word; Size: Longint);
+    procedure   Seek(Pos: Int64); override;
+    procedure Readline(var s: string; var linecomplete, hasCR: boolean);
   end;
 
-  PIntCollection = ^TIntCollection;
-  TIntCollection = object(TSortedCollection)
-    function  Compare(Key1, Key2: Pointer): sw_Integer; virtual;
-    procedure FreeItem(Item: Pointer); virtual;
-    procedure Add(Item: ptrint);
-    function  Contains(Item: ptrint): boolean;
-    function  AtInt(Index: sw_integer): ptrint;
+  TTextCollection = class;
+  PTextCollection = TTextCollection;
+  TTextCollection = class(TStringCollection)
+    function LookUp(const S: string; var Idx: Sw_Integer): string;
+    function Compare(Key1, Key2: Pointer): Sw_Integer; override;
   end;
 
-procedure ReadlnFromStream(Stream: PStream; var s:string;var linecomplete,hasCR : boolean);
-function eofstream(s: pstream): boolean;
+  TIntCollection = class;
+  PIntCollection = TIntCollection;
+  TIntCollection = class(TSortedCollection)
+    function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
+    procedure FreeItem(Item: Pointer); override;
+    procedure Add(Item: PtrInt);
+    function  Contains(Item: PtrInt): boolean;
+    function  AtInt(Index: Sw_Integer): PtrInt;
+  end;
+
+procedure ReadlnFromStream(Stream: TStream; var s: string; var linecomplete, hasCR: boolean);
+function EofStream(S: TStream): boolean;
 procedure ReadlnFromFile(var f : file; var S:string;
            var linecomplete,hasCR : boolean;
            BreakOnSpacesOnly : boolean);
@@ -140,6 +156,7 @@ function StrToCard(const S: string): cardinal;
 function FloatToStr(D: Double; Decimals: byte): string;
 function FloatToStrL(D: Double; Decimals: byte; MinLen: byte): string;
 function GetStr(P: PString): string;
+procedure SetStr(var P: PString; const S: string);
 function GetPChar(P: PChar): string;
 function BoolToStr(B: boolean; const TrueS, FalseS: string): string;
 function LExtendString(S: string; MinLen: byte): string;
@@ -204,30 +221,35 @@ uses
 {$IFDEF OS2}
   DosCalls,
 {$ENDIF OS2}
-  Strings;
+  Strings, Drivers;
 
-{$ifndef NOOBJREG}
 const
    SpaceStr = '                                                            '+
               '                                                            '+
               '                                                            '+
               '                                                            ' ;
 
-
-  RUnsortedStringCollection: TStreamRec = (
-     ObjType: 22500;
-     VmtLink: Ofs(TypeOf(TUnsortedStringCollection)^);
-     Load:    @TUnsortedStringCollection.Load;
-     Store:   @TUnsortedStringCollection.Store
-  );
-{$endif}
-
-function eofstream(s: pstream): boolean;
+{$ifndef NOOBJREG}
+function BuildUnsortedStringCollection(S: TStream): TStreamable;
 begin
-  eofstream:=(s^.getpos>=s^.getsize);
+  Result := TUnsortedStringCollection.Load(S);
 end;
 
-procedure ReadlnFromStream(Stream: PStream; var S:string;var linecomplete,hasCR : boolean);
+procedure StoreUnsortedStringCollection(P: TStreamable; S: TStream);
+begin
+  TUnsortedStringCollection(P).Store(S);
+end;
+
+var
+  RUnsortedStringCollection: TStreamRec;
+{$endif}
+
+function EofStream(S: TStream): boolean;
+begin
+  EofStream := (S.GetPos >= S.GetSize);
+end;
+
+procedure ReadlnFromStream(Stream: TStream; var S: string; var linecomplete, hasCR: boolean);
   var
     c : char;
     i,pos : longint;
@@ -239,9 +261,9 @@ procedure ReadlnFromStream(Stream: PStream; var S:string;var linecomplete,hasCR 
       now those lines are cutted into pieces without warning PM }
     { changed implicit 255 to High(S), so it will be automatically extended
       when longstrings eventually become default - Gabor }
-    while (not eofstream(stream)) and (c<>#10) and (i<High(S)) do
+    while (not EofStream(Stream)) and (c<>#10) and (i<High(S)) do
      begin
-       stream^.read(c,sizeof(c));
+       Stream.Read(c, SizeOf(c));
        if c<>#10 then
         begin
           inc(i);
@@ -253,19 +275,19 @@ procedure ReadlnFromStream(Stream: PStream; var S:string;var linecomplete,hasCR 
       begin
         dec(i);
       end;
-    if (c=#13) and (not eofstream(stream)) then
-      stream^.read(c,sizeof(c));
-    if (i=High(S)) and not eofstream(stream) then
+    if (c=#13) and (not EofStream(Stream)) then
+      Stream.Read(c, SizeOf(c));
+    if (i=High(S)) and not EofStream(Stream) then
       begin
-        pos:=stream^.getpos;
-        stream^.read(c,sizeof(c));
-        if (c=#13) and not eofstream(stream) then
-          stream^.read(c,sizeof(c));
+        pos:=Stream.getpos;
+        Stream.Read(c, SizeOf(c));
+        if (c=#13) and not EofStream(Stream) then
+          Stream.Read(c, SizeOf(c));
         if c<>#10 then
-          stream^.seek(pos);
+          Stream.seek(pos);
       end;
 
-    if (c=#10) or eofstream(stream) then
+    if (c=#10) or EofStream(Stream) then
       linecomplete:=true;
     if (c=#10) then
       hasCR:=true;
@@ -505,6 +527,16 @@ begin
   if P=nil then GetStr:='' else GetStr:=P^;
 end;
 
+procedure SetStr(var P: PString; const S: string);
+begin
+  if P <> nil then
+    DisposeStr(PStr(P));
+  if S = '' then
+    P := nil
+  else
+    P := PString(NewStr(S));
+end;
+
 function GetPChar(P: PChar): string;
 begin
   if P=nil then GetPChar:='' else GetPChar:=StrPas(P);
@@ -672,22 +704,23 @@ begin
   { don't do anything here }
 end;
 
-constructor TUnsortedStringCollection.CreateFrom(ALines: PUnsortedStringCollection);
+constructor TUnsortedStringCollection.CreateFrom(ALines: TUnsortedStringCollection);
 begin
-  if Assigned(ALines)=false then Fail;
-  inherited Init(ALines^.Count,ALines^.Count div 10);
+  if not Assigned(ALines) then
+    Fail;
+  inherited Create(ALines.Count, ALines.Count div 10);
   Assign(ALines);
 end;
 
-procedure TUnsortedStringCollection.Assign(ALines: PUnsortedStringCollection);
-procedure AddIt(P: PString);
-begin
-  Insert(NewStr(GetStr(P)));
-end;
+procedure TUnsortedStringCollection.Assign(ALines: TUnsortedStringCollection);
+  procedure AddIt(P: Pointer);
+  begin
+    Insert(NewStr(GetStr(PString(P))));
+  end;
 begin
   FreeAll;
   if Assigned(ALines) then
-    ALines^.ForEach(@AddIt);
+    ALines.ForEach(@AddIt);
 end;
 
 procedure TUnsortedStringCollection.InsertStr(const S: string);
@@ -705,14 +738,14 @@ begin
   if Item<>nil then DisposeStr(Item);
 end;
 
-function TUnsortedStringCollection.GetItem(var S: TStream): Pointer;
+function TUnsortedStringCollection.GetItem(S: TStream): Pointer;
 begin
-  GetItem:=S.ReadStr;
+  GetItem := S.ReadStr;
 end;
 
-procedure TUnsortedStringCollection.PutItem(var S: TStream; Item: Pointer);
+procedure TUnsortedStringCollection.PutItem(S: TStream; Item: Pointer);
 begin
-  S.WriteStr(Item);
+  S.WriteStr(PStr(Item));
 end;
 
 function TIntCollection.Contains(Item: ptrint): boolean;
@@ -747,101 +780,110 @@ begin
   { do nothing here }
 end;
 
-constructor TNulStream.Init;
+constructor TNulStream.Create;
 begin
-  inherited Init;
-  Position:=0;
+  inherited Create;
+  Position := 0;
 end;
 
-function TNulStream.GetPos: Longint;
+function TNulStream.GetPos: Int64;
 begin
-  GetPos:=Position;
+  GetPos := Position;
 end;
 
-function TNulStream.GetSize: Longint;
+function TNulStream.GetSize: Int64;
 begin
-  GetSize:=Position;
+  GetSize := Position;
 end;
 
-procedure TNulStream.Read(var Buf; Count: longint);
+procedure TNulStream.Read(var Buf; Count: Longint);
 begin
-  Error(stReadError,0);
+  Error(stReadError, 0);
 end;
 
-procedure TNulStream.Seek(Pos: Longint);
+procedure TNulStream.Seek(Pos: Int64);
 begin
-  if Pos<=Position then
-    Position:=Pos;
+  if Pos <= Position then
+    Position := Pos;
 end;
 
-procedure TNulStream.Write(var Buf; Count: longint);
+procedure TNulStream.Write(const Buf; Count: Longint);
 begin
-  Inc(Position,Count);
+  Inc(Position, Count);
 end;
 
-constructor TSubStream.Init(AStream: PStream; AStartPos, ASize: longint);
+constructor TSubStream.Create(AStream: TStream; AStartPos, ASize: Int64);
 begin
-  inherited Init;
-  if Assigned(AStream)=false then Fail;
-  S:=AStream; StartPos:=AStartPos; StreamSize:=ASize;
+  inherited Create;
+  if not Assigned(AStream) then
+    Fail;
+  S := AStream;
+  StartPos := AStartPos;
+  StreamSize := ASize;
   Seek(0);
 end;
 
-function TSubStream.GetPos: Longint;
-var Pos: longint;
+function TSubStream.GetPos: Int64;
 begin
-  Pos:=S^.GetPos; Dec(Pos,StartPos);
-  GetPos:=Pos;
+  GetPos := S.GetPos - StartPos;
 end;
 
-function TSubStream.GetSize: Longint;
+function TSubStream.GetSize: Int64;
 begin
-  GetSize:=StreamSize;
+  GetSize := StreamSize;
 end;
 
-procedure TSubStream.Read(var Buf; Count: longint);
-var Pos: longint;
-    RCount: longint;
+procedure TSubStream.Read(var Buf; Count: Longint);
+var
+  Pos, RCount: Int64;
 begin
-  Pos:=GetPos;
-  if Pos+Count>StreamSize then RCount:=StreamSize-Pos else RCount:=Count;
-  S^.Read(Buf,RCount);
-  if RCount<Count then
-    Error(stReadError,0);
-end;
-
-procedure TSubStream.Seek(Pos: Longint);
-var RPos: longint;
-begin
-  if (Pos<=StreamSize) then RPos:=Pos else RPos:=StreamSize;
-  S^.Seek(StartPos+RPos);
-end;
-
-procedure TSubStream.Write(var Buf; Count: longint);
-begin
-  S^.Write(Buf,Count);
-end;
-
-constructor TFastBufStream.Init (FileName: FNameStr; Mode, Size: Word);
-begin
-  Inherited Init(FileName,Mode,Size);
-  BasePos:=0;
-end;
-
-procedure TFastBufStream.Seek(Pos: Longint);
-var RelOfs: longint;
-begin
-  RelOfs:=Pos-BasePos;
-  if (RelOfs<0) or (RelOfs>=BufEnd) or (BufEnd=0) then
-    begin
-      inherited Seek(Pos);
-      BasePos:=Pos-BufPtr;
-    end
+  Pos := GetPos;
+  if Pos + Count > StreamSize then
+    RCount := StreamSize - Pos
   else
-    begin
-      BufPtr:=RelOfs;
-      Position:=Pos;
-    end;
+    RCount := Count;
+  S.Read(Buf, Longint(RCount));
+  if RCount < Count then
+    Error(stReadError, 0);
+end;
+
+procedure TSubStream.Seek(Pos: Int64);
+var
+  RPos: Int64;
+begin
+  if Pos <= StreamSize then
+    RPos := Pos
+  else
+    RPos := StreamSize;
+  S.Seek(StartPos + RPos);
+end;
+
+procedure TSubStream.Write(const Buf; Count: Longint);
+begin
+  S.Write(Buf, Count);
+end;
+
+constructor TFastBufStream.Create(const FileName: FNameStr; Mode: Word; Size: Longint);
+begin
+  inherited Create(FileName, Mode, Size);
+  BasePos := 0;
+end;
+
+procedure TFastBufStream.Seek(Pos: Int64);
+var
+  RelOfs: Int64;
+begin
+  RelOfs := Pos - BasePos;
+  if (RelOfs < 0) or (RelOfs >= BufLen) or (BufLen = 0) then
+  begin
+    inherited Seek(Pos);
+    BasePos := Pos - BufPos;
+  end
+  else
+  begin
+    BufPos := Longint(RelOfs);
+    Position := Pos;
+  end;
 end;
 
 procedure TFastBufStream.Readline(var s:string;var linecomplete,hasCR : boolean);
@@ -857,23 +899,23 @@ procedure TFastBufStream.Readline(var s:string;var linecomplete,hasCR : boolean)
       now those lines are cutted into pieces without warning PM }
     { changed implicit 255 to High(S), so it will be automatically extended
       when longstrings eventually become default - Gabor }
-    if (bufend-bufptr>=High(S)) and (getpos+High(S)<getsize) then
+    if (BufLen - BufPos >= High(S)) and (GetPos + High(S) < GetSize) then
       begin
         StartPos:=GetPos;
         //read(S[1],High(S));
-        system.move(buffer^[bufptr],S[1],High(S));
+        System.Move(Buffer[BufPos], S[1], High(S));
         charsInS:=true;
       end
     else
       CharsInS:=false;
 
-    while (CharsInS or not (getpos>=getsize)) and
+    while (CharsInS or not (GetPos >= GetSize)) and
           (c<>#10) and (i<High(S)) do
      begin
        if CharsInS then
          c:=s[i+1]
        else
-         read(c,sizeof(c));
+         Read(c, SizeOf(c));
        if c<>#10 then
         begin
           inc(i);
@@ -893,24 +935,24 @@ procedure TFastBufStream.Readline(var s:string;var linecomplete,hasCR : boolean)
       begin
         dec(i);
       end;
-    if (c=#13) and (not (getpos>=getsize)) then
+    if (c=#13) and (not (GetPos >= GetSize)) then
       begin
-        read(c,sizeof(c));
+        Read(c, SizeOf(c));
       end;
-    if (i=High(S)) and not (getpos>=getsize) then
+    if (i=High(S)) and not (GetPos >= GetSize) then
       begin
-        pos:=getpos;
-        read(c,sizeof(c));
-        if (c=#13) and not (getpos>=getsize) then
-          read(c,sizeof(c));
+        pos:=GetPos;
+        Read(c, SizeOf(c));
+        if (c=#13) and not (GetPos >= GetSize) then
+          Read(c, SizeOf(c));
         if c<>#10 then
-          seek(pos);
+          Seek(pos);
       end;
-    if (c=#10) or (getpos>=getsize) then
+    if (c=#10) or (GetPos >= GetSize) then
       linecomplete:=true;
     if (c=#10) then
       hasCR:=true; 
-    setlength(s,i);    
+    SetLength(s,i);    
   end;
 
 
@@ -1258,26 +1300,34 @@ begin
 end;
 
 function CopyFile(const SrcFileName, DestFileName: string): boolean;
-var SrcF,DestF: PBufStream;
-    OK: boolean;
+var
+  SrcF, DestF: TBufStream;
+  OK: boolean;
 begin
-  SrcF:=nil; DestF:=nil;
-  New(SrcF, Init(SrcFileName,stOpenRead,4096));
-  OK:=Assigned(SrcF) and (SrcF^.Status=stOK);
+  SrcF := nil;
+  DestF := nil;
+  SrcF := TBufStream.Create(SrcFileName, stOpenRead, 4096);
+  OK := Assigned(SrcF) and (SrcF.Status = stOk);
   if OK then
   begin
-    New(DestF, Init(DestFileName,stCreate,1024));
-    OK:=Assigned(DestF) and (DestF^.Status=stOK);
+    DestF := TBufStream.Create(DestFileName, stCreate, 1024);
+    OK := Assigned(DestF) and (DestF.Status = stOk);
   end;
-  if OK then DestF^.CopyFrom(SrcF^,SrcF^.GetSize);
-  if Assigned(DestF) then Dispose(DestF, Done);
-  if Assigned(SrcF) then Dispose(SrcF, Done);
-  CopyFile:=OK;
+  if OK then
+    DestF.CopyFrom(SrcF, SrcF.GetSize);
+  DestF.Free;
+  SrcF.Free;
+  CopyFile := OK;
 end;
 
 procedure RegisterWUtils;
 begin
 {$ifndef NOOBJREG}
+  RUnsortedStringCollection.ObjType := 22500;
+  RUnsortedStringCollection.VmtLink := PtrUInt(System.TClass(TUnsortedStringCollection));
+  RUnsortedStringCollection.Load := @BuildUnsortedStringCollection;
+  RUnsortedStringCollection.Store := @StoreUnsortedStringCollection;
+  RUnsortedStringCollection.Next := nil;
   RegisterType(RUnsortedStringCollection);
 {$endif}
 end;

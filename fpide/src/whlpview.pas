@@ -1148,7 +1148,7 @@ begin
   case Event.What of
     evMouseDown :
       if MouseInView(Event.Where) then
-      if (Event.Buttons=mbLeftButton) and (Event.Double) then
+      if (Event.Buttons=mbLeftButton) and (((Event.EventFlags and meDoubleClick) <> 0)) then
       begin
         inherited HandleEvent(Event);
         if CurLink<>-1 then

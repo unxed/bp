@@ -14,6 +14,9 @@
 
 unit WViews;
 
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
+
 interface
 
 uses Objects,Drivers,Views,Menus,Dialogs;
@@ -42,61 +45,70 @@ const
       cmUserBtn4             = $fee3;
 
       CPlainCluster          = #7#8#9#9;
+      CListViewer            = #$1A#$1A#$1B#$1C#$1D;
 
 type
     longstring = ansistring;
 
-    PCenterDialog = ^TCenterDialog;
-    TCenterDialog = object(TDialog)
-      constructor Init(var Bounds: TRect; ATitle: TTitleStr);
+    TCenterDialog = class;
+    PCenterDialog = TCenterDialog;
+    TCenterDialog = class(TDialog)
+      constructor Create(const Bounds: TRect; ATitle: TTitleStr);
     end;
 
-    PAdvancedMenuBox = ^TAdvancedMenuBox;
-    TAdvancedMenuBox = object(TMenuBox)
-      function NewSubView(var Bounds: TRect; AMenu: PMenu;
+    TAdvancedMenuBox = class;
+    PAdvancedMenuBox = TAdvancedMenuBox;
+    TAdvancedMenuBox = class(TMenuBox)
+      function NewSubView(const Bounds: TRect; AMenu: PMenu;
                  AParentMenu: PMenuView): PMenuView; virtual;
-      function Execute: Word; virtual;
+      function Execute: Word; override;
     end;
-
-    PAdvancedMenuPopUp = ^TAdvancedMenuPopup;
-    TAdvancedMenuPopUp = object(TMenuPopup)
-      function NewSubView(var Bounds: TRect; AMenu: PMenu;
+    TAdvancedMenuPopUp = class;
+    PAdvancedMenuPopUp = TAdvancedMenuPopUp;
+    TAdvancedMenuPopUp = class(TMenuPopup)
+      function NewSubView(const Bounds: TRect; AMenu: PMenu;
                  AParentMenu: PMenuView): PMenuView; virtual;
-      function Execute: Word; virtual;
+      function Execute: Word; override;
     end;
 
-    PAdvancedMenuBar = ^TAdvancedMenuBar;
-    TAdvancedMenuBar = object(TMenuBar)
-      constructor Init(var Bounds: TRect; AMenu: PMenu);
-      function  NewSubView(var Bounds: TRect; AMenu: PMenu;
+    TAdvancedMenuBar = class;
+    PAdvancedMenuBar = TAdvancedMenuBar;
+    TAdvancedMenuBar = class(TMenuBar)
+      constructor Create(const Bounds: TRect; AMenu: PMenu);
+      function  NewSubView(const Bounds: TRect; AMenu: PMenu;
                   AParentMenu: PMenuView): PMenuView; virtual;
-      procedure Update; virtual;
+      procedure Update; override;
       function  GetMenuItem(cm : word) : PMenuItem;
-      procedure HandleEvent(var Event: TEvent); virtual;
-      function  Execute: Word; virtual;
+      procedure HandleEvent(var Event: TEvent); override;
+      function  Execute: Word; override;
     end;
 
-    PAdvancedStaticText = ^TAdvancedStaticText;
-    TAdvancedStaticText = object(TStaticText)
+    TAdvancedStaticText = class;
+    PAdvancedStaticText = TAdvancedStaticText;
+    TAdvancedStaticText = class(TStaticText)
       procedure SetText(S: string); virtual;
     end;
 
-    PAdvancedListBox = ^TAdvancedListBox;
-    TAdvancedListBox = object(TListBox)
+    TAdvancedListBox = class;
+    PAdvancedListBox = TAdvancedListBox;
+    TAdvancedListBox = class(TListBox)
       Default: boolean;
-      procedure   FocusItem(Item: sw_integer); virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      procedure   FocusItem(Item: sw_integer); override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
     end;
 
-    PNoUpdateButton = ^TNoUpdateButton;
-    TNoUpdateButton = object(TButton)
-      procedure HandleEvent(var Event: TEvent); virtual;
+    TNoUpdateButton = class;
+    PNoUpdateButton = TNoUpdateButton;
+    TNoUpdateButton = class(TButton)
+      procedure HandleEvent(var Event: TEvent); override;
     end;
 
-    TLocalMenuListBox = object(TAdvancedListBox)
-      procedure   HandleEvent(var Event: TEvent); virtual;
+    TLocalMenuListBox = class;
+    PLocalMenuListBox = TLocalMenuListBox;
+    TLocalMenuListBox = class(TAdvancedListBox)
+      procedure   HandleEvent(var Event: TEvent); override;
       procedure   LocalMenu(P: TPoint); virtual;
       function    GetLocalMenu: PMenu; virtual;
       function    GetCommandTarget: PView; virtual;
@@ -104,64 +116,70 @@ type
       LastLocalCmd: word;
     end;
 
-    PColorStaticText = ^TColorStaticText;
-    TColorStaticText = object(TAdvancedStaticText)
+    TColorStaticText = class;
+    PColorStaticText = TColorStaticText;
+    TColorStaticText = class(TAdvancedStaticText)
       Color: word;
       DontWrap: boolean;
       Delta: TPoint;
-      constructor Init(var Bounds: TRect; AText: String; AColor: word; AWrap: boolean);
-      function    GetPalette: PPalette; virtual;
-      procedure   Draw; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Create(const Bounds: TRect; AText: String; AColor: word; AWrap: boolean);
+      function    GetPalette: TPalette; override;
+      procedure   Draw; override;
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
     end;
 
-    PHSListBox = ^THSListBox;
-    THSListBox = object(TLocalMenuListBox)
-      constructor Init(var Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar);
+    THSListBox = class;
+    PHSListBox = THSListBox;
+    THSListBox = class(TLocalMenuListBox)
+      constructor Create(const Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar);
       function    SaveToFile(const AFileName: string): boolean; virtual;
       function    SaveAs: Boolean; virtual;
     end;
 
-    PDlgWindow = ^TDlgWindow;
-    TDlgWindow = object(TDialog)
-      constructor Init(var Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer);
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure Update; virtual;
+    TDlgWindow = class;
+    PDlgWindow = TDlgWindow;
+    TDlgWindow = class(TDialog)
+      constructor Create(const Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer);
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure Update; override;
     end;
 
-    PAdvancedStatusLine = ^TAdvancedStatusLine;
-    TAdvancedStatusLine = object(TStatusLine)
+    TAdvancedStatusLine = class;
+    PAdvancedStatusLine = TAdvancedStatusLine;
+    TAdvancedStatusLine = class(TStatusLine)
       StatusText: PString;
       function    GetStatusText: string; virtual;
       procedure   SetStatusText(const S: string); virtual;
       procedure   ClearStatusText; virtual;
-      procedure   Draw; virtual;
+      procedure   Draw; override;
     end;
 
-    PDropDownListBox = ^TDropDownListBox;
+    TDropDownListBox = class;
+    PDropDownListBox = TDropDownListBox;
 
-    PDDHelperLB = ^TDDHelperLB;
-    TDDHelperLB = object(TLocalMenuListBox)
-      constructor Init(ALink: PDropDownListBox; var Bounds: TRect; ANumCols: Word; AScrollBar: PScrollBar);
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
+    TDDHelperLB = class;
+    PDDHelperLB = TDDHelperLB;
+    TDDHelperLB = class(TLocalMenuListBox)
+      constructor Create(ALink: TDropDownListBox; var Bounds: TRect; ANumCols: Word; AScrollBar: PScrollBar);
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   SelectItem(Item: Sw_Integer); virtual;
-      function    GetText(Item,MaxLen: Sw_Integer): String; virtual;
+      function    GetText(Item,MaxLen: Sw_Integer): String; override;
       function    GetLocalMenu: PMenu; virtual;
       function    GetCommandTarget: PView; virtual;
     private
-      Link : PDropDownListBox;
+      Link : TDropDownListBox;
       LastTT: longint;
       InClose: boolean;
     end;
 
-    TDropDownListBox = object(TView)
+    TDropDownListBox = class(TView)
       Text: string;
       Focused: sw_integer;
       List: PCollection;
-      constructor Init(var Bounds: TRect; ADropLineCount: Sw_integer; AList: PCollection);
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      constructor Create(const Bounds: TRect; ADropLineCount: Sw_integer; AList: PCollection);
+      procedure   HandleEvent(var Event: TEvent); override;
       function    GetText(Item: pointer; MaxLen: sw_integer): string; virtual;
       procedure   NewList(AList: PCollection); virtual;
       procedure   CreateListBox(var R: TRect);
@@ -170,10 +188,10 @@ type
       procedure   FocusItem(Item: sw_integer); virtual;
       function    LBGetLocalMenu: PMenu; virtual;
       function    LBGetCommandTarget: PView; virtual;
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
-      procedure   Draw; virtual;
-      function    GetPalette: PPalette; virtual;
-      destructor  Done; virtual;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
+      procedure   Draw; override;
+      function    GetPalette: TPalette; override;
+      destructor Destroy; virtual;
     private
       DropLineCount: Sw_integer;
       ListDropped : boolean;
@@ -181,31 +199,36 @@ type
       SB          : PScrollBar;
     end;
 
-    PGroupView = ^TGroupView;
-    TGroupView = object(TLabel)
-      constructor Init(var Bounds: TRect; AText: String; ALink: PView);
-      procedure   Draw; virtual;
+    TGroupView = class;
+    PGroupView = TGroupView;
+    TGroupView = class(TLabel)
+      constructor Create(const Bounds: TRect; AText: String; ALink: PView);
+      procedure   Draw; override;
     end;
 
-    PPlainCheckBoxes = ^TPlainCheckBoxes;
-    TPlainCheckBoxes = object(TCheckBoxes)
-      function GetPalette: PPalette; virtual;
+    TPlainCheckBoxes = class;
+    PPlainCheckBoxes = TPlainCheckBoxes;
+    TPlainCheckBoxes = class(TCheckBoxes)
+      function GetPalette: TPalette; override;
     end;
 
-    PPlainRadioButtons = ^TPlainRadioButtons;
-    TPlainRadioButtons = object(TRadioButtons)
-      function GetPalette: PPalette; virtual;
+    TPlainRadioButtons = class;
+    PPlainRadioButtons = TPlainRadioButtons;
+    TPlainRadioButtons = class(TRadioButtons)
+      function GetPalette: TPalette; override;
     end;
 
-    PPanel = ^TPanel;
-    TPanel = object(TGroup)
-      constructor Init(var Bounds: TRect);
+    TPanel = class;
+    PPanel = TPanel;
+    TPanel = class(TGroup)
+      constructor Create(const Bounds: TRect);
     end;
 
-    PAdvMessageBox = ^TAdvMessageBox;
-    TAdvMessageBox = object(TDialog)
+    TAdvMessageBox = class;
+    PAdvMessageBox = TAdvMessageBox;
+    TAdvMessageBox = class(TDialog)
       CanCancel: boolean;
-      procedure HandleEvent(var Event: TEvent); virtual;
+      procedure HandleEvent(var Event: TEvent); override;
     end;
 
 procedure InsertOK(ADialog: PDialog);
@@ -274,31 +297,40 @@ uses Mouse,
      WConsts,WUtils;
 
 {$ifndef NOOBJREG}
-const
-  RAdvancedListBox: TStreamRec = (
-     ObjType: 1120;
-     VmtLink: Ofs(TypeOf(TAdvancedListBox)^);
-     Load:    @TAdvancedListBox.Load;
-     Store:   @TAdvancedListBox.Store
-  );
-  RColorStaticText: TStreamRec = (
-     ObjType: 1121;
-     VmtLink: Ofs(TypeOf(TColorStaticText)^);
-     Load:    @TColorStaticText.Load;
-     Store:   @TColorStaticText.Store
-  );
-  RHSListBox: TStreamRec = (
-     ObjType: 1122;
-     VmtLink: Ofs(TypeOf(THSListBox)^);
-     Load:    @THSListBox.Load;
-     Store:   @THSListBox.Store
-  );
-  RDlgWindow: TStreamRec = (
-     ObjType: 1123;
-     VmtLink: Ofs(TypeOf(TDlgWindow)^);
-     Load:    @TDlgWindow.Load;
-     Store:   @TDlgWindow.Store
-  );
+function BuildAdvancedListBox(S: TStream): TStreamable;
+begin
+  Result := TAdvancedListBox.Load(S);
+end;
+procedure StoreAdvancedListBox(P: TStreamable; S: TStream);
+begin
+  TAdvancedListBox(P).Store(S);
+end;
+function BuildColorStaticText(S: TStream): TStreamable;
+begin
+  Result := TColorStaticText.Load(S);
+end;
+procedure StoreColorStaticText(P: TStreamable; S: TStream);
+begin
+  TColorStaticText(P).Store(S);
+end;
+function BuildHSListBox(S: TStream): TStreamable;
+begin
+  Result := THSListBox.Load(S);
+end;
+procedure StoreHSListBox(P: TStreamable; S: TStream);
+begin
+  THSListBox(P).Store(S);
+end;
+function BuildDlgWindow(S: TStream): TStreamable;
+begin
+  Result := TDlgWindow.Load(S);
+end;
+procedure StoreDlgWindow(P: TStreamable; S: TStream);
+begin
+  TDlgWindow(P).Store(S);
+end;
+var
+  RAdvancedListBox, RColorStaticText, RHSListBox, RDlgWindow: TStreamRec;
 {$endif}
 
 {$ifdef USERESSTRINGS}
@@ -327,16 +359,16 @@ end;
                               TCenterDialog
 *****************************************************************************}
 
-constructor TCenterDialog.Init(var Bounds: TRect; ATitle: TTitleStr);
+constructor TCenterDialog.Create(const Bounds: TRect; ATitle: TTitleStr);
 begin
-  inherited Init(Bounds,ATitle);
+  inherited Create(Bounds,ATitle);
   Options:=Options or ofCentered;
 end;
 
-function TAdvancedMenuBox.NewSubView(var Bounds: TRect; AMenu: PMenu;
+function TAdvancedMenuBox.NewSubView(const Bounds: TRect; AMenu: PMenu;
   AParentMenu: PMenuView): PMenuView;
 begin
-  NewSubView := New(PAdvancedMenuBox, Init(Bounds, AMenu, AParentMenu));
+  NewSubView := TAdvancedMenuBox.Create(Bounds, AMenu, AParentMenu);
 end;
 
 function TAdvancedMenuBox.Execute: word;
@@ -374,7 +406,7 @@ begin
   Current := Menu^.Items;
   while Current <> nil do
   begin
-    GetItemRect(Current, R);
+    R := GetItemRect(Current);
     if R.Contains(Mouse) then
     begin
       MouseActive := True;
@@ -419,10 +451,10 @@ var
   R: TRect;
 begin
   MouseInOwner := False;
-  if (ParentMenu <> nil) and (ParentMenu^.Size.Y = 1) then
+  if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu^.MakeLocal(E.Where, Mouse);
-    ParentMenu^.GetItemRect(ParentMenu^.Current, R);
+    ParentMenu.MakeLocal(E.Where, Mouse);
+    R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
 end;
@@ -432,8 +464,8 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and (P^.MouseInView(E.Where)=false) do
-        P := P^.ParentMenu;
+  while (P <> nil) and (P.MouseInView(E.Where)=false) do
+        P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
 
@@ -441,8 +473,8 @@ function TopMenu: PMenuView;
 var
   P: PMenuView;
 begin
-  P := @Self;
-  while P^.ParentMenu <> nil do P := P^.ParentMenu;
+  P := Self;
+  while P.ParentMenu <> nil do P := P.ParentMenu;
   TopMenu := P;
 end;
 
@@ -543,30 +575,30 @@ begin
           kbEsc:
             begin
               Action := DoReturn;
-              if (ParentMenu = nil) or (ParentMenu^.Size.Y <> 1) then
+              if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) then
                 ClearEvent(E);
             end;
         else
-          Target := @Self;
+          Target := Self;
           Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := E.CharCode else Target := TopMenu;
-          P := Target^.FindItem(Ch);
+          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
-            P := TopMenu^.HotKey(E.KeyCode);
+            P := TopMenu.HotKey(EventKey(E));
             if (P <> nil) and CommandEnabled(P^.Command) then
             begin
               Res := P^.Command;
               Action := DoReturn;
             end
           end else
-            if Target = @Self then
+            if Target = Self then
             begin
               if Size.Y = 1 then AutoSelect := True;
               Action := DoSelect;
               Current := P;
             end else
-              if (ParentMenu <> Target) or (ParentMenu^.Current <> P) then
+              if (ParentMenu <> Target) or (ParentMenu.Current <> P) then
                 Action := DoReturn;
         end;
       evCommand:
@@ -586,14 +618,14 @@ begin
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
-          GetItemRect(Current, R);
+          R := GetItemRect(Current);
           R.A.X := R.A.X + Origin.X;
           R.A.Y := R.B.Y + Origin.Y;
-          R.B := Owner^.Size;
+          R.B := Owner.Size;
           if Size.Y = 1 then Dec(R.A.X);
-          Target := TopMenu^.NewSubView(R, SubMenu, @Self);
-          Res := Owner^.ExecView(Target);
-          Dispose(Target, Done);
+          Target := TopMenu.NewSubView(R, SubMenu, Self);
+          Res := Owner.ExecView(Target);
+          Target.Free;
         end else if Action = DoSelect then Res := Command;
     if (Res <> 0) and CommandEnabled(Res) then
     begin
@@ -615,10 +647,10 @@ begin
   Execute := Res;
 end;
 
-function TAdvancedMenuPopup.NewSubView(var Bounds: TRect; AMenu: PMenu;
+function TAdvancedMenuPopup.NewSubView(const Bounds: TRect; AMenu: PMenu;
   AParentMenu: PMenuView): PMenuView;
 begin
-  NewSubView := New(PAdvancedMenuBox, Init(Bounds, AMenu, AParentMenu));
+  NewSubView := TAdvancedMenuBox.Create(Bounds, AMenu, AParentMenu);
 end;
 
 function TAdvancedMenuPopup.Execute: word;
@@ -652,7 +684,7 @@ begin
   Current := Menu^.Items;
   while Current <> nil do
   begin
-    GetItemRect(Current, R);
+    R := GetItemRect(Current);
     if R.Contains(Mouse) then
     begin
       MouseActive := True;
@@ -697,10 +729,10 @@ var
   R: TRect;
 begin
   MouseInOwner := False;
-  if (ParentMenu <> nil) and (ParentMenu^.Size.Y = 1) then
+  if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu^.MakeLocal(E.Where, Mouse);
-    ParentMenu^.GetItemRect(ParentMenu^.Current, R);
+    ParentMenu.MakeLocal(E.Where, Mouse);
+    R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
 end;
@@ -710,8 +742,8 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and (P^.MouseInView(E.Where)=false) do
-        P := P^.ParentMenu;
+  while (P <> nil) and (P.MouseInView(E.Where)=false) do
+        P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
 
@@ -719,8 +751,8 @@ function TopMenu: PMenuView;
 var
   P: PMenuView;
 begin
-  P := @Self;
-  while P^.ParentMenu <> nil do P := P^.ParentMenu;
+  P := Self;
+  while P.ParentMenu <> nil do P := P.ParentMenu;
   TopMenu := P;
 end;
 
@@ -793,30 +825,30 @@ begin
           kbEsc:
             begin
               Action := DoReturn;
-              if (ParentMenu = nil) or (ParentMenu^.Size.Y <> 1) then
+              if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) then
                 ClearEvent(E);
             end;
         else
-          Target := @Self;
+          Target := Self;
           Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := E.CharCode else Target := TopMenu;
-          P := Target^.FindItem(Ch);
+          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
-            P := TopMenu^.HotKey(E.KeyCode);
+            P := TopMenu.HotKey(EventKey(E));
             if (P <> nil) and CommandEnabled(P^.Command) then
             begin
               Res := P^.Command;
               Action := DoReturn;
             end
           end else
-            if Target = @Self then
+            if Target = Self then
             begin
               if Size.Y = 1 then AutoSelect := True;
               Action := DoSelect;
               Current := P;
             end else
-              if (ParentMenu <> Target) or (ParentMenu^.Current <> P) then
+              if (ParentMenu <> Target) or (ParentMenu.Current <> P) then
                 Action := DoReturn;
         end;
       evCommand:
@@ -836,14 +868,14 @@ begin
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
-          GetItemRect(Current, R);
+          R := GetItemRect(Current);
           R.A.X := R.A.X + Origin.X;
           R.A.Y := R.B.Y + Origin.Y;
-          R.B := Owner^.Size;
+          R.B := Owner.Size;
           if Size.Y = 1 then Dec(R.A.X);
-          Target := TopMenu^.NewSubView(R, SubMenu, @Self);
-          Res := Owner^.ExecView(Target);
-          Dispose(Target, Done);
+          Target := TopMenu.NewSubView(R, SubMenu, Self);
+          Res := Owner.ExecView(Target);
+          Target.Free;
         end else if Action = DoSelect then Res := Command;
     if (Res <> 0) and CommandEnabled(Res) then
     begin
@@ -865,17 +897,17 @@ begin
   Execute := Res;
 end;
 
-constructor TAdvancedMenuBar.Init(var Bounds: TRect; AMenu: PMenu);
+constructor TAdvancedMenuBar.Create(const Bounds: TRect; AMenu: PMenu);
 begin
-  inherited Init(Bounds, AMenu);
+  inherited Create(Bounds, AMenu);
   EventMask:=EventMask or evBroadcast;
   GrowMode:=gfGrowHiX;
 end;
 
-function TAdvancedMenuBar.NewSubView(var Bounds: TRect; AMenu: PMenu;
+function TAdvancedMenuBar.NewSubView(const Bounds: TRect; AMenu: PMenu;
   AParentMenu: PMenuView): PMenuView;
 begin
-  NewSubView := New(PAdvancedMenuBox, Init(Bounds, AMenu, AParentMenu));
+  NewSubView := TAdvancedMenuBox.Create(Bounds, AMenu, AParentMenu);
 end;
 
 procedure TAdvancedMenuBar.Update;
@@ -985,7 +1017,7 @@ begin
   Current := Menu^.Items;
   while Current <> nil do
   begin
-    GetItemRect(Current, R);
+    R := GetItemRect(Current);
     if R.Contains(Mouse) then
     begin
       MouseActive := True;
@@ -1027,10 +1059,10 @@ var
   R: TRect;
 begin
   MouseInOwner := False;
-  if (ParentMenu <> nil) and (ParentMenu^.Size.Y = 1) then
+  if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu^.MakeLocal(E.Where, Mouse);
-    ParentMenu^.GetItemRect(ParentMenu^.Current, R);
+    ParentMenu.MakeLocal(E.Where, Mouse);
+    R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
 end;
@@ -1040,7 +1072,7 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and not P^.MouseInView(E.Where) do P := P^.ParentMenu;
+  while (P <> nil) and not P.MouseInView(E.Where) do P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
 
@@ -1048,8 +1080,8 @@ function TopMenu: PMenuView;
 var
   P: PMenuView;
 begin
-  P := @Self;
-  while P^.ParentMenu <> nil do P := P^.ParentMenu;
+  P := Self;
+  while P.ParentMenu <> nil do P := P.ParentMenu;
   TopMenu := P;
 end;
 
@@ -1122,30 +1154,30 @@ begin
           kbEsc:
             begin
               Action := DoReturn;
-              if (ParentMenu = nil) or (ParentMenu^.Size.Y <> 1) then
+              if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) then
                 ClearEvent(E);
             end;
         else
-          Target := @Self;
+          Target := Self;
           Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := E.CharCode else Target := TopMenu;
-          P := Target^.FindItem(Ch);
+          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
-            P := TopMenu^.HotKey(E.KeyCode);
+            P := TopMenu.HotKey(EventKey(E));
             if (P <> nil) and CommandEnabled(P^.Command) then
             begin
               Res := P^.Command;
               Action := DoReturn;
             end
           end else
-            if Target = @Self then
+            if Target = Self then
             begin
               if Size.Y = 1 then AutoSelect := True;
               Action := DoSelect;
               Current := P;
             end else
-              if (ParentMenu <> Target) or (ParentMenu^.Current <> P) then
+              if (ParentMenu <> Target) or (ParentMenu.Current <> P) then
                 Action := DoReturn;
         end;
       evCommand:
@@ -1165,14 +1197,14 @@ begin
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
-          GetItemRect(Current, R);
+          R := GetItemRect(Current);
           R.A.X := R.A.X + Origin.X;
           R.A.Y := R.B.Y + Origin.Y;
-          R.B := Owner^.Size;
+          R.B := Owner.Size;
           if Size.Y = 1 then Dec(R.A.X);
-          Target := TopMenu^.NewSubView(R, SubMenu, @Self);
-          Res := Owner^.ExecView(Target);
-          Dispose(Target, Done);
+          Target := TopMenu.NewSubView(R, SubMenu, Self);
+          Res := Owner.ExecView(Target);
+          Target.Free;
         end else if Action = DoSelect then Res := Command;
     if (Res <> 0) and CommandEnabled(Res) then
     begin
@@ -1207,17 +1239,17 @@ begin
   OFocused:=Focused;
   inherited FocusItem(Item);
   if Focused<>OFocused then
-  Message(Owner,evBroadcast,cmListFocusChanged,@Self);
+  Message(Owner,evBroadcast,cmListFocusChanged, Pointer(Self));
 end;
 
 procedure TAdvancedListBox.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where) {and (Event.Double)} then
+      if MouseInView(Event.Where) {and (((Event.EventFlags and meDoubleClick) <> 0))} then
       begin
         inherited HandleEvent(Event);
-        if Event.Double then
+        if ((Event.EventFlags and meDoubleClick) <> 0) then
           if Range>Focused then
             SelectItem(Focused);
       end;
@@ -1228,22 +1260,22 @@ begin
       end;
   end;
   if assigned(VScrollBar) then
-    VScrollBar^.HandleEvent(Event);
+    VScrollBar.HandleEvent(Event);
   if assigned(HScrollBar) then
-    HScrollBar^.HandleEvent(Event);
+    HScrollBar.HandleEvent(Event);
   inherited HandleEvent(Event);
 end;
 
-constructor TColorStaticText.Init(var Bounds: TRect; AText: String; AColor: word; AWrap: boolean);
+constructor TColorStaticText.Create(const Bounds: TRect; AText: String; AColor: word; AWrap: boolean);
 begin
-  inherited Init(Bounds,AText);
+  inherited Create(Bounds,AText);
   DontWrap:=not AWrap;
   Color:=AColor;
 end;
 
-function TColorStaticText.GetPalette: PPalette;
+function TColorStaticText.GetPalette: TPalette;
 begin
-  GetPalette:=nil;
+  Result := nil;
 end;
 
 procedure TColorStaticText.Draw;
@@ -1296,7 +1328,7 @@ var
   C: word;
   Center: Boolean;
   I, J, L, P, Y: Sw_Integer;
-  B: TDrawBuffer;
+  B: TFVDrawBuffer;
   S: String;
   T: string;
   CurS: string;
@@ -1306,7 +1338,7 @@ begin
   if Size.X=0 then Exit;
   C:=Color;
   if (C and $0f)=((C and $f0) shr 4) then
-    C:=GetColor(C and $0f);
+    C:=GetColorW(C and $0f);
   if DontWrap=false then
  begin
   GetText(S);
@@ -1348,7 +1380,7 @@ begin
         if (P <= L) and (S[P] = #10) then Inc(P);
       end;
     end;
-    WriteLine(0, Y, Size.X, 1, B);
+    WriteLineW(0, Y, Size.X, 1, B);
     Inc(Y);
   end;
  end { Wrap=false } else
@@ -1370,12 +1402,12 @@ begin
     end;
     if CurS<>'' then
       MoveColorTxt(B,CurS,C);
-    WriteLine(0,Y,Size.X,1,B);
+    WriteLineW(0,Y,Size.X,1,B);
   end;
  end;
 end;
 
-constructor TColorStaticText.Load(var S: TStream);
+constructor TColorStaticText.Load(S: TStream);
 begin
   inherited Load(S);
 
@@ -1384,7 +1416,7 @@ begin
   S.Read(Delta,SizeOf(Delta));
 end;
 
-procedure TColorStaticText.Store(var S: TStream);
+procedure TColorStaticText.Store(S: TStream);
 begin
   inherited Store(S);
 
@@ -1393,14 +1425,14 @@ begin
   S.Write(Delta,SizeOf(Delta));
 end;
 
-constructor THSListBox.Init(var Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar);
+constructor THSListBox.Create(const Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar);
 begin
-  inherited Init(Bounds,ANumCols,AVScrollBar);
+  inherited Create(Bounds,ANumCols,AVScrollBar);
   HScrollBar:=AHScrollBar;
   if assigned(VScrollBar) then
-    VScrollBar^.SetStep(Bounds.B.Y-Bounds.A.Y-2,1);
+    VScrollBar.SetStep(Bounds.B.Y-Bounds.A.Y-2,1);
   if assigned(HScrollBar) then
-    HScrollBar^.SetStep(Bounds.B.X-Bounds.A.X-2,1);
+    HScrollBar.SetStep(Bounds.B.X-Bounds.A.X-2,1);
 end;
 
 function THSListBox.SaveToFile(const AFileName: string): boolean;
@@ -1409,26 +1441,26 @@ var OK: boolean;
     i, count : sw_integer;
     st : string;
 begin
-  New(S, Init(AFileName,stCreate,4096));
-  OK:=Assigned(S) and (S^.Status=stOK);
+  S := TBufStream.Create(AFileName, stCreate, 4096);
+  OK:=Assigned(S) and (S.Status=stOK);
   if OK then
     begin
       if assigned(List) then
-        Count:=List^.Count
+        Count:=List.Count
       else
         Count:=0;
       for i:=0 to Count-1 do
         begin
           st:=GetText(i,High(st));
-          S^.Write(St[1],length(St));
+          S.Write(St[1],length(St));
           if i<Count then
-          S^.Write(EOL[1],length(EOL));
-          OK:=(S^.Status=stOK);
+          S.Write(EOL[1],length(EOL));
+          OK:=(S.Status=stOK);
           if not OK then
             break;
         end;
     end;
-  if Assigned(S) then Dispose(S, Done);
+  if Assigned(S) then S.Free;
   SaveToFile:=OK;
 end;
 
@@ -1441,16 +1473,16 @@ begin
   Filename:='listbox.txt';
   DefExt:='*.txt';
   Title:='Save list box content';
-  Re:=Application^.ExecuteDialog(New(PFileDialog, Init(DefExt,
-          Title, label_name, fdOkButton, FileId)), @FileName);
+  Re:=Application.ExecuteDialog(TFileDialog.Create(DefExt,
+          Title, label_name, fdOkButton, FileId), @FileName);
   if Re <> cmCancel then
     SaveAs := SaveToFile(FileName);
 end;
 
 
-constructor TDlgWindow.Init(var Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer);
+constructor TDlgWindow.Create(const Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer);
 begin
-  inherited Init(Bounds,ATitle);
+  inherited Create(Bounds,ATitle);
   Number:=ANumber;
   Flags:=Flags or (wfMove + wfGrow + wfClose + wfZoom);
 end;
@@ -1483,15 +1515,15 @@ begin
   if M=nil then Exit;
   if LastLocalCmd<>0 then
      M^.Default:=SearchMenuItem(M,LastLocalCmd);
-  Desktop^.GetExtent(R);
-  MakeGlobal(P,R.A); {Desktop^.MakeLocal(R.A,R.A);}
-  New(MV, Init(R, M));
-  Re:=Application^.ExecView(MV);
+  Desktop.GetExtent(R);
+  MakeGlobal(P,R.A); {Desktop.MakeLocal(R.A,R.A);}
+  MV := TAdvancedMenuPopUp.Create(R, M, nil);
+  Re:=Application.ExecView(MV);
   if M^.Default=nil then LastLocalCmd:=0
      else LastLocalCmd:=M^.Default^.Command;
-  Dispose(MV, Done);
+  MV.Free;
   if Re<>0 then
-    Message(GetCommandTarget,evCommand,Re,@Self);
+    Message(GetCommandTarget,evCommand,Re, Pointer(Self));
 end;
 
 function TLocalMenuListBox.GetLocalMenu: PMenu;
@@ -1502,7 +1534,7 @@ end;
 
 function TLocalMenuListBox.GetCommandTarget: PView;
 begin
-  GetCommandTarget:=@Self;
+  GetCommandTarget:=Self;
 end;
 
 procedure TLocalMenuListBox.HandleEvent(var Event: TEvent);
@@ -1521,7 +1553,7 @@ begin
       begin
         DontClear:=false;
         case Event.KeyCode of
-          kbAltF10 : Message(@Self,evCommand,cmLocalMenu,@Self);
+          kbAltF10 : Message(Self,evCommand,cmLocalMenu, Pointer(Self));
         else DontClear:=true;
         end;
         if DontClear=false then ClearEvent(Event);
@@ -1563,17 +1595,17 @@ begin
 end;
 
 procedure TAdvancedStatusLine.Draw;
-var B: TDrawBuffer;
+var B: TFVDrawBuffer;
     C: word;
     S: string;
 begin
   S:=GetStatusText;
   if S='' then inherited Draw else
   begin
-    C:=GetColor(1);
+    C:=GetColorW(1);
     MoveChar(B,' ',C,Size.X);
     MoveStr(B[1],S,C);
-    WriteLine(0,0,Size.X,Size.Y,B);
+    WriteLineW(0,0,Size.X,Size.Y,B);
   end;
 end;
 
@@ -1678,7 +1710,7 @@ begin
     else
       begin
         if not IsSeparator(P) and
-           Application^.CommandEnabled(P^.Command) then
+           CommandEnabled(P^.Command) then
           begin
             p^.disabled:=false;
             IsEnabled:=true;
@@ -1774,16 +1806,16 @@ var R   : TRect;
     X   : Sw_integer;
     X1,X2: Sw_integer;
 begin
-  with ADialog^ do
+  with ADialog do
   begin
     GetExtent(R);
     W:=R.B.X-R.A.X; H:=(R.B.Y-R.A.Y);
     R.Assign(0,0,W,H+3); ChangeBounds(R);
     X:=W div 2; X1:=X div 2+1; X2:=X+X1-1;
     R.Assign(X1-3,H,X1+7,H+2);
-    Insert(New(PButton, Init(R, btn_OK, cmOK, bfDefault)));
+    Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
     R.Assign(X2-7,H,X2+3,H+2);
-    Insert(New(PButton, Init(R, btn_Cancel, cmCancel, bfNormal)));
+    Insert(TButton.Create(R, btn_Cancel, cmCancel, bfNormal));
     SelectNext(true);
   end;
 end;
@@ -1792,14 +1824,14 @@ procedure InsertOK(ADialog: PDialog);
 var BW: Sw_integer;
     R: TRect;
 begin
-  with ADialog^ do
+  with ADialog do
   begin
     GetBounds(R); R.Grow(0,1); Inc(R.B.Y);
     ChangeBounds(R);
     BW:=10;
     R.A.Y:=R.B.Y-2; R.B.Y:=R.A.Y+2;
     R.A.X:=R.A.X+(R.B.X-R.A.X-BW) div 2; R.B.X:=R.A.X+BW;
-    Insert(New(PButton, Init(R, btn_OK, cmOK, bfDefault)));
+    Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
     SelectNext(true);
   end;
 end;
@@ -1809,33 +1841,33 @@ var R: TRect;
     Width: Sw_integer;
 begin
   Width:=length(Msg)+4*2;
-  if Width<(Desktop^.Size.X div 2) then Width:=(Desktop^.Size.X div 2);
+  if Width<(Desktop.Size.X div 2) then Width:=(Desktop.Size.X div 2);
   R.Assign(0,0,Width,5);
-  New(MessageDialog, Init(R, ''));
-  with MessageDialog^ do
+  MessageDialog := TCenterDialog.Create(R, '');
+  with MessageDialog do
   begin
     Flags:=0;
     GetExtent(R); R.Grow(-4,-2);
     if copy(Msg,1,1)<>^C then Msg:=^C+Msg;
-    Insert(New(PStaticText, Init(R, Msg)));
+    Insert(TStaticText.Create(R, Msg));
   end;
-  Application^.Insert(MessageDialog);
+  Application.Insert(MessageDialog);
 end;
 
 procedure HideMessage;
 begin
   if MessageDialog<>nil then
     begin
-      Application^.Delete(MessageDialog);
-      Dispose(MessageDialog, Done);
+      Application.Delete(MessageDialog);
+      MessageDialog.Free;
       MessageDialog:=nil;
     end;
 end;
 
 
-constructor TDDHelperLB.Init(ALink: PDropDownListBox; var Bounds: TRect; ANumCols: Word; AScrollBar: PScrollBar);
+constructor TDDHelperLB.Create(ALink: TDropDownListBox; var Bounds: TRect; ANumCols: Word; AScrollBar: PScrollBar);
 begin
-  inherited Init(Bounds,ANumCols,AScrollBar);
+  inherited Create(Bounds,ANumCols,AScrollBar);
   EventMask:=EventMask or (evMouseMove+evIdle);
 {  Options:=Options or ofPreProcess;}
   Link:=ALink;
@@ -1847,27 +1879,27 @@ begin
 {  OState:=State;}
   inherited SetState(AState,Enable);
 {  if (((State xor OState) and sfFocused)<>0) and (GetState(sfFocused)=false) then
-    Link^.DropList(false);}
+    Link.DropList(false);}
 end;
 
 function TDDHelperLB.GetText(Item,MaxLen: Sw_Integer): String;
 var P: pointer;
     S: string;
 begin
-  P:=List^.At(Item);
+  P:=List.At(Item);
   if Link=nil then S:='' else
-    S:=Link^.GetText(P,MaxLen);
+    S:=Link.GetText(P,MaxLen);
   GetText:=S;
 end;
 
 function TDDHelperLB.GetLocalMenu: PMenu;
 begin
-  GetLocalMenu:=Link^.LBGetLocalMenu;
+  GetLocalMenu:=Link.LBGetLocalMenu;
 end;
 
 function TDDHelperLB.GetCommandTarget: PView;
 begin
-  GetCommandTarget:=Link^.LBGetCommandTarget;
+  GetCommandTarget:=Link.LBGetCommandTarget;
 end;
 
 procedure TDDHelperLB.HandleEvent(var Event: TEvent);
@@ -1882,7 +1914,11 @@ var
   MouseWhere: TPoint;
 begin
   GoSelectItem:=-1;
-  TView.HandleEvent(Event);
+  { TView.HandleEvent (static call not valid for classes) }
+  if Event.What = evMouseDown then
+    if ((State and (sfSelected or sfDisabled)) = 0) and ((Options and ofSelectable) <> 0) then
+      if (not Focus) or ((Options and ofFirstClick) = 0) then
+        ClearEvent(Event);
   case Event.What of
     evMouseDown :
       if MouseInView(Event.Where)=false then
@@ -1937,7 +1973,7 @@ begin
         until not MouseEvent(Event, evMouseMove + evMouseAuto);
         FocusItemNum(NewItem);
         DrawView;
-        if Event.Double and (Range > Focused) then SelectItem(Focused);
+        if ((Event.EventFlags and meDoubleClick) <> 0) and (Range > Focused) then SelectItem(Focused);
         ClearEvent(Event);
         GoSelectItem:=Focused;
       end;
@@ -1956,7 +1992,7 @@ begin
             GoSelectItem:=-2;
             ClearEvent(Event);
           end else
-        if ((Event.KeyCode=kbEnter) or (Event.CharCode = ' ')) and
+        if ((Event.KeyCode=kbEnter) or (Event.CharCode = Ord(' '))) and
            (Focused < Range) then
           begin
             GoSelectItem:=Focused;
@@ -1984,25 +2020,25 @@ begin
     evBroadcast :
       case Event.Command of
         cmReceivedFocus :
-          if (Event.InfoPtr<>@Self) and (InClose=false) then
+          if (Event.InfoPtr <> Pointer(Self)) and (InClose=false) then
             begin
               GoSelectItem:=-2;
             end;
       else
         if Options and ofSelectable <> 0 then
           if (Event.Command = cmScrollBarClicked) and
-             ((Event.InfoPtr = HScrollBar) or (Event.InfoPtr = VScrollBar)) then
+             ((Event.InfoPtr = Pointer(HScrollBar)) or (Event.InfoPtr = Pointer(VScrollBar))) then
             Select
           else
             if (Event.Command = cmScrollBarChanged) then
               begin
-                if (VScrollBar = Event.InfoPtr) then
+                if (Pointer(VScrollBar) = Event.InfoPtr) then
                   begin
-                    FocusItemNum(VScrollBar^.Value);
+                    FocusItemNum(VScrollBar.Value);
                     DrawView;
                   end
                 else
-                  if (HScrollBar = Event.InfoPtr) then
+                  if (Pointer(HScrollBar) = Event.InfoPtr) then
                     DrawView;
               end;
       end;
@@ -2028,7 +2064,7 @@ begin
    begin
      InClose:=true;
      if GoSelectItem=-2 then
-       Link^.DropList(false)
+       Link.DropList(false)
      else
        SelectItem(GoSelectItem);
    end;
@@ -2037,13 +2073,13 @@ end;
 procedure TDDHelperLB.SelectItem(Item: Sw_Integer);
 begin
   inherited SelectItem(Item);
-  Link^.FocusItem(Focused);
-  Link^.DropList(false);
+  Link.FocusItem(Focused);
+  Link.DropList(false);
 end;
 
-constructor TDropDownListBox.Init(var Bounds: TRect; ADropLineCount: Sw_integer; AList: PCollection);
+constructor TDropDownListBox.Create(const Bounds: TRect; ADropLineCount: Sw_integer; AList: PCollection);
 begin
-  inherited Init(Bounds);
+  inherited Create(Bounds);
   Options:=Options or (ofSelectable);
   EventMask:=EventMask or (evBroadcast);
   DropLineCount:=ADropLineCount;
@@ -2082,13 +2118,13 @@ begin
     evBroadcast :
       case Event.Command of
         cmReleasedFocus :
-          if (ListBox<>nil) and (Event.InfoPtr=ListBox) then
+          if (ListBox<>nil) and (Event.InfoPtr = Pointer(ListBox)) then
             DropList(false);
         cmListItemSelected :
-          if (ListBox<>nil) and (Event.InfoPtr=ListBox) then
+          if (ListBox<>nil) and (Event.InfoPtr = Pointer(ListBox)) then
             begin
-              FocusItem(ListBox^.Focused);
-              Text:=GetText(List^.At(Focused),High(Text));
+              FocusItem(ListBox.Focused);
+              Text:=GetText(List.At(Focused),High(Text));
               DrawView;
               DropList(false);
             end;
@@ -2112,7 +2148,7 @@ end;
 
 procedure TDropDownListBox.NewList(AList: PCollection);
 begin
-  if List<>nil then Dispose(List, Done); List:=nil;
+  if List<>nil then List.Free; List:=nil;
   List:=AList; FocusItem(0);
 end;
 
@@ -2120,9 +2156,9 @@ procedure TDropDownListBox.CreateListBox(var R: TRect);
 var R2: TRect;
 begin
   R2.Copy(R); R2.A.X:=R2.B.X-1;
-  New(SB, Init(R2));
+  SB := TScrollBar.Create(R2);
   Dec(R.B.X);
-  New(ListBox, Init(@Self,R,1,SB));
+  ListBox := TDDHelperLB.Create(Self, R, 1, SB);
 end;
 
 procedure TDropDownListBox.DropList(Drop: boolean);
@@ -2134,34 +2170,34 @@ begin
   if Drop then
     begin
       R.Assign(Origin.X+1,Origin.Y+Size.Y,Origin.X+Size.X,Origin.Y+Size.Y+DropLineCount);
-      if Owner<>nil then Owner^.Lock;
+      if Owner<>nil then Owner.Lock;
       CreateListBox(R);
       if SB<>nil then
-        Owner^.Insert(SB);
+        Owner.Insert(SB);
       if ListBox<>nil then
         begin
-          ListBox^.NewList(List);
-          ListBox^.FocusItem(Focused);
-          Owner^.Insert(ListBox);
+          ListBox.NewList(List);
+          ListBox.FocusItem(Focused);
+          Owner.Insert(ListBox);
         end;
-      if Owner<>nil then Owner^.UnLock;
+      if Owner<>nil then Owner.UnLock;
     end
   else
     begin
-      if Owner<>nil then Owner^.Lock;
+      if Owner<>nil then Owner.Lock;
       if ListBox<>nil then
         begin
-{          ListBox^.List:=nil;}
+{          ListBox.List:=nil;}
           LB:=ListBox; ListBox:=nil; { this prevents GPFs while deleting }
-          Dispose(LB, Done);
+          LB.Free;
         end;
       if SB<>nil then
         begin
-          Dispose(SB, Done);
+          SB.Free;
           SB:=nil;
         end;
       Select;
-      if Owner<>nil then Owner^.UnLock;
+      if Owner<>nil then Owner.UnLock;
     end;
 
   ListDropped:=Drop;
@@ -2172,7 +2208,7 @@ function TDropDownListBox.GetItemCount: sw_integer;
 var Count: sw_integer;
 begin
   if assigned(List)=false then Count:=0 else
-    Count:=List^.Count;
+    Count:=List.Count;
   GetItemCount:=Count;
 end;
 
@@ -2181,10 +2217,10 @@ var P: pointer;
 begin
   Focused:=Item;
   if assigned(ListBox) and (Item>=0) then
-    ListBox^.FocusItem(Item);
+    ListBox.FocusItem(Item);
   if (GetItemCount>0) and (Focused>=0) then
     begin
-      P:=List^.At(Focused);
+      P:=List.At(Focused);
       Text:=GetText(P,Size.X-4);
     end;
   DrawView;
@@ -2197,7 +2233,7 @@ end;
 
 function TDropDownListBox.LBGetCommandTarget: PView;
 begin
-  LBGetCommandTarget:=@Self;
+  LBGetCommandTarget:=Self;
 end;
 
 procedure TDropDownListBox.SetState(AState: Word; Enable: Boolean);
@@ -2207,94 +2243,91 @@ begin
 end;
 
 procedure TDropDownListBox.Draw;
-var B: TDrawBuffer;
+var B: TFVDrawBuffer;
     C,TextC: word;
     LC: char;
 begin
   if GetState(sfFocused)=false then
     begin
-      C:=GetColor(2);
-      TextC:=GetColor(2);
+      C:=GetColorW(2);
+      TextC:=GetColorW(2);
     end
   else
     begin
-      C:=GetColor(3);
-      TextC:=GetColor(3);
+      C:=GetColorW(3);
+      TextC:=GetColorW(3);
     end;
   MoveChar(B,' ',C,Size.X);
   MoveStr(B[1],copy(Text,1,Size.X-2),TextC);
   if ListDropped then LC:='^' else LC:='v';
   MoveChar(B[Size.X-2],LC,C,1);
-  WriteLine(0,0,Size.X,Size.Y,B);
+  WriteLineW(0,0,Size.X,Size.Y,B);
 end;
 
-function TDropDownListBox.GetPalette: PPalette;
-const P: string[length(CListViewer)] = CListViewer;
+function TDropDownListBox.GetPalette: TPalette;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(CListViewer);
 end;
 
-destructor TDropDownListBox.Done;
+destructor TDropDownListBox.Destroy;
 begin
   if ListDropped then DropList(false);
-  inherited Done;
+  inherited Destroy;
 end;
 
-constructor TGroupView.Init(var Bounds: TRect; AText: String; ALink: PView);
+constructor TGroupView.Create(const Bounds: TRect; AText: String; ALink: PView);
 begin
-  inherited Init(Bounds,AText,ALink);
+  inherited Create(Bounds,AText,ALink);
 end;
 
 procedure TGroupView.Draw;
-var B: TDrawBuffer;
+var B: TFVDrawBuffer;
     FrameC,LabelC: word;
 begin
-  FrameC:=GetColor(1);
+  FrameC:=GetColorW(1);
   if Light then
-    LabelC:=GetColor(2)+GetColor(4) shl 8
+    LabelC:=GetColorW(2)+GetColorW(4) shl 8
   else
-    LabelC:=GetColor(1)+GetColor(3) shl 8;
+    LabelC:=GetColorW(1)+GetColorW(3) shl 8;
   { First Line }
-  MoveChar(B[0],'Ú',FrameC,1);
-  MoveChar(B[1],'Ä',FrameC,Size.X-2);
-  MoveChar(B[Size.X-1],'¿',FrameC,1);
+  MoveChar(B[0],Char(218),FrameC,1);
+  MoveChar(B[1],Char(196),FrameC,Size.X-2);
+  MoveChar(B[Size.X-1],Char(191),FrameC,1);
   if Text<>nil then
     begin
       MoveCStr(B[1],' '+Text^+' ',LabelC);
     end;
-  WriteLine(0,0,Size.X,1,B);
+  WriteLineW(0,0,Size.X,1,B);
   { Mid Lines }
-  MoveChar(B[0],'³',FrameC,1);
+  MoveChar(B[0],Char(179),FrameC,1);
   MoveChar(B[1],' ',FrameC,Size.X-2);
-  MoveChar(B[Size.X-1],'³',FrameC,1);
-  WriteLine(0,1,Size.X,Size.Y-2,B);
+  MoveChar(B[Size.X-1],Char(179),FrameC,1);
+  WriteLineW(0,1,Size.X,Size.Y-2,B);
   { Last Line }
-  MoveChar(B[0],'À',FrameC,1);
-  MoveChar(B[1],'Ä',FrameC,Size.X-2);
-  MoveChar(B[Size.X-1],'Ù',FrameC,1);
-  WriteLine(0,Size.Y-1,Size.X,1,B);
+  MoveChar(B[0],Char(192),FrameC,1);
+  MoveChar(B[1],Char(196),FrameC,Size.X-2);
+  MoveChar(B[Size.X-1],Char(217),FrameC,1);
+  WriteLineW(0,Size.Y-1,Size.X,1,B);
 end;
 
-function TPlainCheckBoxes.GetPalette: PPalette;
-const P: string[length(CPlainCluster)] = CPlainCluster;
+function TPlainCheckBoxes.GetPalette: TPalette;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(CPlainCluster);
 end;
 
-function TPlainRadioButtons.GetPalette: PPalette;
-const P: string[length(CPlainCluster)] = CPlainCluster;
+function TPlainRadioButtons.GetPalette: TPalette;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(CPlainCluster);
 end;
 
-constructor TAdvancedListBox.Load(var S: TStream);
+constructor TAdvancedListBox.Load(S: TStream);
 begin
   inherited Load(S);
 
   S.Read(Default,SizeOf(Default));
 end;
 
-procedure TAdvancedListBox.Store(var S: TStream);
+procedure TAdvancedListBox.Store(S: TStream);
 begin
   inherited Store(S);
 
@@ -2307,9 +2340,9 @@ begin
   inherited HandleEvent(Event);
 end;
 
-constructor TPanel.Init(var Bounds: TRect);
+constructor TPanel.Create(const Bounds: TRect);
 begin
-  inherited Init(Bounds);
+  inherited Create(Bounds);
   Options:=Options or (ofSelectable+ofTopSelect);
   GrowMode:=gfGrowHiX+gfGrowHiY;
 end;
@@ -2466,7 +2499,7 @@ begin
     end;
     if length(CurLine)>MaxCols then
       MaxCols:=length(CurLine);
-{    WriteLine(0, Y, Size.X, 1, B);}
+{    WriteLineW(0, Y, Size.X, 1, B);}
     Inc(Y);
   end;
   Rows:=Y;
@@ -2488,16 +2521,16 @@ begin
     if Cols<32 then Cols:=32; if Rows=0 then Rows:=1;
     R.Assign(0,0,3+Cols+3,Rows+6);
     if (AOptions and mfInsertInApp)= 0 then
-      R.Move((Desktop^.Size.X-(R.B.X-R.A.X)) div 2,(Desktop^.Size.Y-(R.B.Y-R.A.Y)) div 2)
+      R.Move((Desktop.Size.X-(R.B.X-R.A.X)) div 2,(Desktop.Size.Y-(R.B.Y-R.A.Y)) div 2)
     else
-      R.Move((Application^.Size.X-(R.B.X-R.A.X)) div 2,(Application^.Size.Y-(R.B.Y-R.A.Y)) div 2);
+      R.Move((Application.Size.X-(R.B.X-R.A.X)) div 2,(Application.Size.Y-(R.B.Y-R.A.Y)) div 2);
   end;
-  New(Dialog,Init(R, Titles[AOptions and $3]));
-  with Dialog^ do
+  Dialog := TAdvMessageBox.Create(R, Titles[AOptions and $3]);
+  with Dialog do
    begin
      CanCancel:=(Options and mfCantCancel)=0;
      R.Assign(3,2, Size.X-2,Size.Y-3);
-     Control := New(PStaticText, Init(R, S));
+     Control := TStaticText.Create(R, S);
      Insert(Control);
      X := -2;
      ButtonCount := 0;
@@ -2506,8 +2539,8 @@ begin
        begin
          BtnName:=UserButtonName[I+1];
          R.Assign(0, 0, Max(10,length(BtnName)+2), 2);
-         Control := New(PButton, Init(R, BtnName, UserButtonCmd[I+1], bfNormal));
-         Inc(X, Control^.Size.X + 2);
+         Control := TButton.Create(R, BtnName, UserButtonCmd[I+1], bfNormal);
+         Inc(X, Control.Size.X + 2);
          ButtonList[ButtonCount] := Control;
          Inc(ButtonCount);
        end;
@@ -2515,8 +2548,8 @@ begin
       if AOptions and ($0100 shl I) <> 0 then
        begin
          R.Assign(0, 0, 10, 2);
-         Control := New(PButton, Init(R, ButtonName[I], Cmds[i], bfNormal));
-         Inc(X, Control^.Size.X + 2);
+         Control := TButton.Create(R, ButtonName[I], Cmds[i], bfNormal);
+         Inc(X, Control.Size.X + 2);
          ButtonList[ButtonCount] := Control;
          Inc(ButtonCount);
        end;
@@ -2525,24 +2558,24 @@ begin
       begin
         Control := ButtonList[I];
         Insert(Control);
-        Control^.MoveTo(X, Size.Y - 3);
-        Inc(X, Control^.Size.X + 2);
+        Control.MoveTo(X, Size.Y - 3);
+        Inc(X, Control.Size.X + 2);
       end;
      SelectNext(False);
    end;
   if AOptions and mfInsertInApp = 0 then
-    AdvMessageBoxRect := DeskTop^.ExecView(Dialog)
+    AdvMessageBoxRect := DeskTop.ExecView(Dialog)
   else
-    AdvMessageBoxRect := Application^.ExecView(Dialog);
-  Dispose(Dialog, Done);
+    AdvMessageBoxRect := Application.ExecView(Dialog);
+  Dialog.Free;
 end;
 
 procedure InitAdvMsgBox;
 begin
-  ButtonName[0] := slYes;
-  ButtonName[1] := slNo;
-  ButtonName[2] := slOk;
-  ButtonName[3] := slCancel;
+  ButtonName[0] := MsgYesText;
+  ButtonName[1] := MsgNoText;
+  ButtonName[2] := MsgOKText;
+  ButtonName[3] := MsgCancelText;
   Titles[0] := sWarning;
   Titles[1] := sError;
   Titles[2] := sInformation;
@@ -2557,9 +2590,29 @@ end;
 procedure RegisterWViews;
 begin
 {$ifndef NOOBJREG}
+  RAdvancedListBox.ObjType := 1120;
+  RAdvancedListBox.VmtLink := PtrUInt(System.TClass(TAdvancedListBox));
+  RAdvancedListBox.Load := @BuildAdvancedListBox;
+  RAdvancedListBox.Store := @StoreAdvancedListBox;
+  RAdvancedListBox.Next := nil;
   RegisterType(RAdvancedListBox);
+  RColorStaticText.ObjType := 1121;
+  RColorStaticText.VmtLink := PtrUInt(System.TClass(TColorStaticText));
+  RColorStaticText.Load := @BuildColorStaticText;
+  RColorStaticText.Store := @StoreColorStaticText;
+  RColorStaticText.Next := nil;
   RegisterType(RColorStaticText);
+  RHSListBox.ObjType := 1122;
+  RHSListBox.VmtLink := PtrUInt(System.TClass(THSListBox));
+  RHSListBox.Load := @BuildHSListBox;
+  RHSListBox.Store := @StoreHSListBox;
+  RHSListBox.Next := nil;
   RegisterType(RHSListBox);
+  RDlgWindow.ObjType := 1123;
+  RDlgWindow.VmtLink := PtrUInt(System.TClass(TDlgWindow));
+  RDlgWindow.Load := @BuildDlgWindow;
+  RDlgWindow.Store := @StoreDlgWindow;
+  RDlgWindow.Next := nil;
   RegisterType(RDlgWindow);
 {$endif}
 end;

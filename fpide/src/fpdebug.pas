@@ -3251,7 +3251,7 @@ var DontClear: boolean;
 begin
   case Event.What of
     evMouseDown : begin
-                   if Event.Double then
+                   if ((Event.EventFlags and meDoubleClick) <> 0) then
                       Message(@Self,evCommand,cmEdit,nil)
                    else
                      ClearEvent(Event);

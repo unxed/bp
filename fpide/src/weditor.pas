@@ -15,6 +15,9 @@
 {$I globdir.inc}
 unit WEditor;
 
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
+
 interface
 {tes}
 uses
@@ -206,13 +209,17 @@ const
 type
     Tcentre = (do_not_centre,do_centre);
 
-    PCustomCodeEditor = ^TCustomCodeEditor;
-    PEditorLineInfo = ^TEditorLineInfo;
-    PFoldCollection = ^TFoldCollection;
+    TCustomCodeEditor = class;
+    PCustomCodeEditor = TCustomCodeEditor;
+    TEditorLineInfo = class;
+    PEditorLineInfo = TEditorLineInfo;
+    TFoldCollection = class;
+    PFoldCollection = TFoldCollection;
 
-    PFold = ^TFold;
-    TFold = object(TObject)
-      constructor Init(AEditor: PCustomCodeEditor; AParentFold: PFold; ACollapsed: boolean);
+    TFold = class;
+    PFold = TFold;
+    TFold = class(TObject)
+      constructor Create(AEditor: PCustomCodeEditor; AParentFold: PFold; ACollapsed: boolean);
       procedure   AddReference(P: PObject);
       procedure   RemoveReference(P: PObject);
       procedure   AddLineReference(Line: PEditorLineInfo);
@@ -226,7 +233,7 @@ type
       procedure   Collapse(ACollapse: boolean);
       procedure   Changed;
       function    GetLevel: sw_integer;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     public
       ParentFold: PFold;
       Collapsed_: boolean;
@@ -236,11 +243,11 @@ type
       Childs: PFoldCollection;
     end;
 
-    TFoldCollection = object(TCollection)
+    TFoldCollection = class(TCollection)
       function At(Index: sw_Integer): PFold;
     end;
 
-    TEditorLineInfo = object(TObject)
+    TEditorLineInfo = class(TObject)
       Editor: PCustomCodeEditor;
       Format : PString;
       BeginsWithAsm,
@@ -252,8 +259,8 @@ type
       EndsWithDirective : boolean;
       BeginCommentType,EndCommentType : byte;
       Fold: PFold;
-      constructor Init(AEditor: PCustomCodeEditor);
-      destructor  Done; virtual;
+      constructor Create(AEditor: PCustomCodeEditor);
+      destructor Destroy; virtual;
       function    GetFormat: string;
       procedure   SetFormat(const AFormat: string);
       procedure   SetFold(AFold: PFold);
@@ -265,14 +272,16 @@ type
         twice isn't so much...   - Gabor }
     end;
 
-    PEditorLineInfoCollection = ^TEditorLineInfoCollection;
-    TEditorLineInfoCollection = object(TCollection)
+    TEditorLineInfoCollection = class;
+    PEditorLineInfoCollection = TEditorLineInfoCollection;
+    TEditorLineInfoCollection = class(TCollection)
       function At(Index: sw_Integer): PEditorLineInfo;
     end;
 
-    PCustomLine = ^TCustomLine;
-    TCustomLine = object(TObject)
-      constructor Init(const AText: string; AFlags: longint);
+    TCustomLine = class;
+    PCustomLine = TCustomLine;
+    TCustomLine = class(TObject)
+      constructor Create(const AText: string; AFlags: longint);
    {a}function    GetText: string; virtual;
    {a}procedure   SetText(const AText: string); virtual;
    {a}function    GetEditorInfo(Editor: PCustomCodeEditor): PEditorLineInfo; virtual;
@@ -280,19 +289,21 @@ type
    {a}procedure   SetFlags(AFlags: longint); virtual;
       function    IsFlagSet(AFlag: longint): boolean; {$ifdef USEINLINE}inline;{$endif}
       procedure   SetFlagState(AFlag: longint; ASet: boolean);
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     public { internal use only! }
    {a}procedure AddEditorInfo(Index: sw_integer; AEditor: PCustomCodeEditor); virtual;
    {a}procedure RemoveEditorInfo(AEditor: PCustomCodeEditor); virtual;
     end;
 
-    PLineCollection = ^TLineCollection;
-    TLineCollection = object(TCollection)
+    TLineCollection = class;
+    PLineCollection = TLineCollection;
+    TLineCollection = class(TCollection)
       function  At(Index: sw_Integer): PCustomLine;
     end;
 
-    PEditorAction = ^TEditorAction;
-    TEditorAction = object(TObject)
+    TEditorAction = class;
+    PEditorAction = TEditorAction;
+    TEditorAction = class(TObject)
       StartPos  : TPoint;
       EndPos    : TPoint;
       Text      : PString;
@@ -309,14 +320,15 @@ type
                              the (probably) changed line & position information,
                              so, we can still jump to the right position in the
                              editor even when it is heavily modified - Gabor }
-      constructor init(act:byte; StartP,EndP:TPoint;Txt:String;AFlags : longint);
-      constructor init_group(act:byte);
+      constructor Create(act:byte; StartP,EndP:TPoint;Txt:String;AFlags : longint);
+      constructor Create_group(act:byte);
       function is_grouped_action : boolean;
-      destructor done; virtual;
+      destructor Destroy; virtual;
     end;
 
-    PEditorActionCollection = ^TEditorActionCollection;
-    TEditorActionCollection = object(TCollection)
+    TEditorActionCollection = class;
+    PEditorActionCollection = TEditorActionCollection;
+    TEditorActionCollection = class(TCollection)
       CurrentGroupedAction : PEditorAction;
       GroupLevel           : longint;
       function At(Idx : sw_integer) : PEditorAction;
@@ -333,21 +345,24 @@ type
 
     TCompleteState = (csInactive,csOffering,csDenied);
 
-    PEditorBinding = ^TEditorBinding;
+    TEditorBinding = class;
+    PEditorBinding = TEditorBinding;
 
-    PEditorBindingCollection = ^TEditorBindingCollection;
-    TEditorBindingCollection = object(TCollection)
+    TEditorBindingCollection = class;
+    PEditorBindingCollection = TEditorBindingCollection;
+    TEditorBindingCollection = class(TCollection)
       function At(Index: sw_Integer): PEditorBinding;
     end;
 
-    TEditorBinding = object(TObject)
+    TEditorBinding = class(TObject)
       Editor : PCustomCodeEditor;
-      constructor Init(AEditor: PCustomCodeEditor);
-      destructor  Done; virtual;
+      constructor Create(AEditor: PCustomCodeEditor);
+      destructor Destroy; virtual;
     end;
 
-    PCustomCodeEditorCore = ^TCustomCodeEditorCore;
-    TCustomCodeEditorCore = object(TObject)
+    TCustomCodeEditorCore = class;
+    PCustomCodeEditorCore = TCustomCodeEditorCore;
+    TCustomCodeEditorCore = class(TObject)
     protected
       Bindings    : PEditorBindingCollection;
       LockFlag    : sw_integer;
@@ -362,7 +377,7 @@ type
       SyntaxComplete   : boolean;
 {$endif TEST_PARTIAL_SYNTAX}
     public
-      constructor Init;
+      constructor Create;
       procedure   BindEditor(AEditor: PCustomCodeEditor);
       procedure   UnBindEditor(AEditor: PCustomCodeEditor);
       function    IsEditorBound(AEditor: PCustomCodeEditor): boolean;
@@ -370,7 +385,7 @@ type
       function    GetBindingIndex(AEditor: PCustomCodeEditor): sw_integer;
       function    SearchBinding(AEditor: PCustomCodeEditor): PEditorBinding;
       function    CanDispose: boolean;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
     public
    {a}function    GetModified: boolean; virtual;
       function    GetChangedLine: sw_integer;
@@ -452,7 +467,7 @@ type
 
     TCaseAction = (caToLowerCase,caToUpperCase,caToggleCase);
 
-    TCustomCodeEditor = object(TScroller)
+    TCustomCodeEditor = class(TScroller)
       SelStart   : TPoint;
       SelEnd     : TPoint;
       Highlight  : TRect;
@@ -470,7 +485,7 @@ type
       function    GetLocalMenu: PMenu; virtual;
       function    GetCommandTarget: PView; virtual;
       function    CreateLocalMenuView(var Bounds: TRect; M: PMenu): PMenuPopup; virtual;
-      function    GetPalette: PPalette; virtual;
+      function    GetPalette: TPalette; override;
     public
       procedure   Draw; virtual;
       procedure   DrawCursor; virtual;
@@ -707,17 +722,17 @@ type
 
     TCodeEditorDialog = function(Dialog: Integer; Info: Pointer): Word;
 
-    TEditorInputLine = object(TInputLine)
+    TEditorInputLine = class(TInputLine)
          Procedure   HandleEvent(var Event : TEvent);virtual;
     end;
-    PEditorInputLine = ^TEditorInputLine;
+    PEditorInputLine = TEditorInputLine;
 
-    TSearchHelperDialog = object(TDialog)
+    TSearchHelperDialog = class(TDialog)
              OkButton: PButton;
              Procedure   HandleEvent(var Event : TEvent);virtual;
     end;
 
-    PSearchHelperDialog = ^TSearchHelperDialog;
+    PSearchHelperDialog = TSearchHelperDialog;
 
 const
      { used for ShiftDel and ShiftIns to avoid
@@ -1273,9 +1288,9 @@ end;
                             PLine,TLineCollection
 *****************************************************************************}
 
-constructor TCustomLine.Init(const AText: string; AFlags: longint);
+constructor TCustomLine.Create(const AText: string; AFlags: longint);
 begin
-  inherited Init;
+  inherited Create;
   SetText(AText);
 end;
 
@@ -1333,27 +1348,27 @@ begin
   { Abstract }
 end;
 
-destructor TCustomLine.Done;
+destructor TCustomLine.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
 end;
 
 function TLineCollection.At(Index: sw_Integer): PCustomLine;
 begin
-  At:=inherited At(Index);
+  At := PCustomLine(inherited At(Index));
 end;
 
-constructor TFold.Init(AEditor: PCustomCodeEditor; AParentFold: PFold; ACollapsed: boolean);
+constructor TFold.Create(AEditor: PCustomCodeEditor; AParentFold: PFold; ACollapsed: boolean);
 begin
-  inherited Init;
-  New(Childs, Init(10,10));
+  inherited Create;
+  Childs := TFoldCollection.Create(10,10);
   Editor:=AEditor;
   ParentFold:=AParentFold;
   if Assigned(ParentFold) then
-    ParentFold^.AddChildReference(@Self);
+    ParentFold.AddChildReference(Self);
   Collapsed_:=ACollapsed;
   if Assigned(AEditor) then
-    Editor^.RegisterFold(@Self);
+    Editor.RegisterFold(Self);
 end;
 
 procedure TFold.AddReference(P: PObject);
@@ -1382,13 +1397,13 @@ end;
 
 procedure TFold.AddChildReference(Fold: PFold);
 begin
-  Childs^.Insert(Fold);
+  Childs.Insert(Fold);
   AddReference(Fold);
 end;
 
 procedure TFold.RemoveChildReference(Fold: PFold);
 begin
-  Childs^.Delete(Fold);
+  Childs.Delete(Fold);
   RemoveReference(Fold);
 end;
 
@@ -1401,7 +1416,7 @@ function TFold.IsCollapsed: boolean;
 var C: boolean;
 begin
   C:=Collapsed_;
-  if Assigned(ParentFold) then C:=C or ParentFold^.IsCollapsed;
+  if Assigned(ParentFold) then C:=C or ParentFold.IsCollapsed;
   IsCollapsed:=C;
 end;
 
@@ -1409,19 +1424,21 @@ function TFold.IsParent(AFold: PFold): boolean;
 var P: boolean;
 begin
   P:=(ParentFold=AFold);
-  if Assigned(ParentFold) then P:=P or ParentFold^.IsParent(AFold);
+  if Assigned(ParentFold) then P:=P or ParentFold.IsParent(AFold);
   IsParent:=P;
 end;
 
 function TFold.GetLineCount: sw_integer;
 var Count: sw_integer;
-procedure AddIt(P: PFold);
+procedure AddIt(Item: Pointer);
+var P: PFold;
 begin
-  Inc(Count,P^.GetLineCount);
+  P := PFold(Item);
+  Inc(Count,P.GetLineCount);
 end;
 begin
   Count:=LineCount_;
-  if assigned(Childs) then Childs^.ForEach(@AddIt);
+  if assigned(Childs) then Childs.ForEach(@AddIt);
   GetLineCount:=Count;
 end;
 
@@ -1431,7 +1448,7 @@ begin
   begin
     Collapsed_:=ACollapse;
     if (not Collapsed_) and Assigned(ParentFold) then
-      ParentFold^.Collapse(false);
+      ParentFold.Collapse(false);
     Changed;
   end;
 end;
@@ -1439,7 +1456,7 @@ end;
 procedure TFold.Changed;
 begin
   if Assigned(Editor) then
-    Editor^.FoldChanged(@Self);
+    Editor.FoldChanged(Self);
 end;
 
 function TFold.GetLevel: sw_integer;
@@ -1447,28 +1464,28 @@ var Level: sw_integer;
 begin
   Level:=0;
   if Assigned(ParentFold) then
-    Inc(Level,1+ParentFold^.GetLevel);
+    Inc(Level,1+ParentFold.GetLevel);
   GetLevel:=Level;
 end;
 
-destructor TFold.Done;
+destructor TFold.Destroy;
 begin
   if Assigned(ParentFold) then
-    ParentFold^.RemoveChildReference(@Self);
+    ParentFold.RemoveChildReference(Self);
   if Assigned(Editor) then
-    Editor^.UnRegisterFold(@Self);
-  Childs^.DeleteAll; Dispose(Childs, Done);
-  inherited Done;
+    Editor.UnRegisterFold(Self);
+  Childs.DeleteAll; Childs.Free;
+  inherited Destroy;
 end;
 
 function TFoldCollection.At(Index: sw_Integer): PFold;
 begin
-  At:=inherited At(Index);
+  At := PFold(inherited At(Index));
 end;
 
-constructor TEditorLineInfo.Init(AEditor: PCustomCodeEditor);
+constructor TEditorLineInfo.Create(AEditor: PCustomCodeEditor);
 begin
-  inherited Init;
+  inherited Create;
   Editor:=AEditor;
 end;
 
@@ -1485,46 +1502,46 @@ end;
 procedure TEditorLineInfo.SetFold(AFold: PFold);
 begin
   if Assigned(Fold) then
-    Fold^.RemoveLineReference(@Self);
+    Fold.RemoveLineReference(Self);
   Fold:=AFold;
   if Assigned(Fold) then
-    Fold^.AddLineReference(@Self);
+    Fold.AddLineReference(Self);
 end;
 
-destructor TEditorLineInfo.Done;
+destructor TEditorLineInfo.Destroy;
 begin
   if Format<>nil then
     DisposeStr(Format);
   Format:=nil;
   SetFold(nil);
-  inherited Done;
+  inherited Destroy;
 end;
 
 function TEditorLineInfoCollection.At(Index: sw_Integer): PEditorLineInfo;
 begin
-  At:=inherited At(Index);
+  At := PEditorLineInfo(inherited At(Index));
 end;
 
 function TEditorBindingCollection.At(Index: sw_Integer): PEditorBinding;
 begin
-  At:=inherited At(Index);
+  At := PEditorBinding(inherited At(Index));
 end;
 
-constructor TEditorBinding.Init(AEditor: PCustomCodeEditor);
+constructor TEditorBinding.Create(AEditor: PCustomCodeEditor);
 begin
-  inherited Init;
+  inherited Create;
   Editor:=AEditor;
 end;
 
-destructor TEditorBinding.Done;
+destructor TEditorBinding.Destroy;
 begin
-  inherited Done;
+  inherited Destroy;
 end;
 
-constructor TCustomCodeEditorCore.Init;
+constructor TCustomCodeEditorCore.Create;
 begin
-  inherited Init;
-  New(Bindings, Init(10,10));
+  inherited Create;
+  Bindings := TEditorBindingCollection.Create(10,10);
 end;
 
 procedure TCustomCodeEditorCore.BindEditor(AEditor: PCustomCodeEditor);
@@ -1533,15 +1550,15 @@ var B: PEditorBinding;
     L: PCustomLine;
 begin
   assert(Aeditor<>nil);
-  New(B, Init(AEditor));
-  Bindings^.Insert(B);
-  Idx:=Bindings^.IndexOf(B);
+  B := TEditorBinding.Create(AEditor);
+  Bindings.Insert(B);
+  Idx:=Bindings.IndexOf(B);
   Count:=GetLineCount;
   for I:=0 to Count-1 do
   begin
     L:=GetLine(I);
     if Assigned(L) then
-      L^.AddEditorInfo(Idx,AEditor);
+      L.AddEditorInfo(Idx,AEditor);
   end;
 
   BindingsChanged;
@@ -1561,9 +1578,9 @@ begin
     begin
       L:=GetLine(I);
       if Assigned(L) then
-        L^.RemoveEditorInfo(AEditor);
+        L.RemoveEditorInfo(AEditor);
     end;
-    Bindings^.Free(B);
+    Bindings.Free(B);
 
     BindingsChanged;
   end;
@@ -1576,28 +1593,30 @@ end;
 
 function TCustomCodeEditorCore.GetBindingCount: sw_integer;
 begin
-  GetBindingCount:=Bindings^.Count;
+  GetBindingCount:=Bindings.Count;
 end;
 
 function TCustomCodeEditorCore.GetBindingIndex(AEditor: PCustomCodeEditor): sw_integer;
 var B: PEditorBinding;
 begin
   B:=SearchBinding(AEditor);
-  GetBindingIndex:=Bindings^.IndexOf(B);
+  GetBindingIndex:=Bindings.IndexOf(B);
 end;
 
 function TCustomCodeEditorCore.SearchBinding(AEditor: PCustomCodeEditor): PEditorBinding;
-function SearchEditor(P: PEditorBinding): boolean;
+function SearchEditor(Item: Pointer): boolean;
+var P: PEditorBinding;
 begin
-  SearchEditor:=P^.Editor=AEditor;
+  P := PEditorBinding(Item);
+  SearchEditor:=P.Editor=AEditor;
 end;
 begin
-  SearchBinding:=Bindings^.FirstThat(@SearchEditor);
+  SearchBinding:=PEditorBinding(Bindings.FirstThat(@SearchEditor));
 end;
 
 function TCustomCodeEditorCore.CanDispose: boolean;
 begin
-  CanDispose:=Assigned(Bindings) and (Bindings^.Count=0);
+  CanDispose:=Assigned(Bindings) and (Bindings.Count=0);
 end;
 
 function TCustomCodeEditorCore.GetModified: boolean;
@@ -1639,12 +1658,14 @@ end;
 
 
 function TCustomCodeEditorCore.IsClipboard: Boolean;
-function IsClip(P: PEditorBinding): boolean;
+function IsClip(Item: Pointer): boolean;
+var P: PEditorBinding;
 begin
-  IsClip:=(P^.Editor=Clipboard);
+  P := PEditorBinding(Item);
+  IsClip:=(P.Editor=Clipboard);
 end;
 begin
-  IsClipBoard:=Bindings^.FirstThat(@IsClip)<>nil;
+  IsClipBoard:=Bindings.FirstThat(@IsClip)<>nil;
 end;
 
 function TCustomCodeEditorCore.GetTabSize: integer;
@@ -1711,97 +1732,115 @@ end;
 
 
 procedure TCustomCodeEditorCore.BindingsChanged;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  P^.Editor^.BindingsChanged;
+  P := PEditorBinding(Item);
+  P.Editor.BindingsChanged;
 end;
 begin
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
 end;
 
 procedure TCustomCodeEditorCore.DoLimitsChanged;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  P^.Editor^.DoLimitsChanged;
+  P := PEditorBinding(Item);
+  P.Editor.DoLimitsChanged;
 end;
 begin
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
 end;
 
 procedure TCustomCodeEditorCore.DoContentsChanged;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  P^.Editor^.ContentsChanged;
+  P := PEditorBinding(Item);
+  P.Editor.ContentsChanged;
 end;
 begin
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
 end;
 
 procedure TCustomCodeEditorCore.DoModifiedChanged;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  P^.Editor^.ModifiedChanged;
+  P := PEditorBinding(Item);
+  P.Editor.ModifiedChanged;
 end;
 begin
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
 end;
 
 procedure TCustomCodeEditorCore.DoTabSizeChanged;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  P^.Editor^.TabSizeChanged;
+  P := PEditorBinding(Item);
+  P.Editor.TabSizeChanged;
 end;
 begin
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
 end;
 
 procedure TCustomCodeEditorCore.UpdateUndoRedo(cm : word; action : byte);
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  if (P^.Editor^.State and sfActive)<>0 then
+  P := PEditorBinding(Item);
+  if (P.Editor.State and sfActive)<>0 then
     begin
-      P^.Editor^.UpdateUndoRedo(cm,action);
+      P.Editor.UpdateUndoRedo(cm,action);
     if cm=cmUndo then
       begin
-        P^.Editor^.SetCmdState(UndoCmd,true);
-        P^.Editor^.SetCmdState(RedoCmd,false);
+        SetCmdState(UndoCmd,true);
+        SetCmdState(RedoCmd,false);
         Message(Application,evBroadcast,cmCommandSetChanged,nil);
       end;
     end;
 end;
 begin
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
 end;
 
 
 procedure TCustomCodeEditorCore.DoStoreUndoChanged;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  P^.Editor^.StoreUndoChanged;
+  P := PEditorBinding(Item);
+  P.Editor.StoreUndoChanged;
 end;
 begin
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
 end;
 procedure   TCustomCodeEditorCore.DoSyntaxStateChanged;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  P^.Editor^.SyntaxStateChanged;
+  P := PEditorBinding(Item);
+  P.Editor.SyntaxStateChanged;
 end;
 begin
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
 end;
 
 function TCustomCodeEditorCore.GetLastVisibleLine : sw_integer;
 var
   y : sw_integer;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 begin
-  if y < P^.Editor^.Delta.Y+P^.Editor^.Size.Y then
-    y:=P^.Editor^.Delta.Y+P^.Editor^.Size.Y;
+  P := PEditorBinding(Item);
+  if y < P.Editor.Delta.Y+P.Editor.Size.Y then
+    y:=P.Editor.Delta.Y+P.Editor.Size.Y;
 end;
 begin
   y:=0;
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
   GetLastVisibleLine:=y;
 end;
 
@@ -2042,29 +2081,33 @@ end;
 
 function TCustomCodeEditorCore.UpdateAttrs(FromLine: sw_integer; Attrs: byte): sw_integer;
 var MinLine: sw_integer;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 var I: sw_integer;
 begin
-  I:=DoUpdateAttrs(P^.Editor,FromLine,Attrs);
+  P := PEditorBinding(Item);
+  I:=DoUpdateAttrs(P.Editor,FromLine,Attrs);
   if (I<MinLine) or (MinLine=-1) then MinLine:=I;
 end;
 begin
   MinLine:=-1;
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
   UpdateAttrs:=MinLine;
 end;
 
 function TCustomCodeEditorCore.UpdateAttrsRange(FromLine, ToLine: sw_integer; Attrs: byte): sw_integer;
 var MinLine: sw_integer;
-procedure CallIt(P: PEditorBinding);
+procedure CallIt(Item: Pointer);
+var P: PEditorBinding;
 var I: sw_integer;
 begin
-  I:=DoUpdateAttrsRange(P^.Editor,FromLine,ToLine,Attrs);
+  P := PEditorBinding(Item);
+  I:=DoUpdateAttrsRange(P.Editor,FromLine,ToLine,Attrs);
   if (I<MinLine) or (MinLine=-1) then MinLine:=I;
 end;
 begin
   MinLine:=-1;
-  Bindings^.ForEach(@CallIt);
+  Bindings.ForEach(@CallIt);
   UpdateAttrsRange:=MinLine;
 end;
 
@@ -2103,10 +2146,10 @@ var
   begin
     Found:=false;
     if SymbolConcat<>'' then
-    for I:=1 to Editor^.GetSpecSymbolCount(SClass) do
+    for I:=1 to Editor.GetSpecSymbolCount(SClass) do
     begin
       SymbolIndex:=I;
-      S:=Editor^.GetSpecSymbol(SClass,I-1);
+      S:=Editor.GetSpecSymbol(SClass,I-1);
       if (length(SymbolConcat)<length(S^)) or
          ((PartialMatch=pmNone) and (length(S^)<>length(SymbolConcat)))
           then
@@ -2138,10 +2181,10 @@ var
     Found:=false;
     What:=UpcaseStr(OrigWhat);
     if What<>'' then
-    for I:=1 to Editor^.GetSpecSymbolCount(SClass) do
+    for I:=1 to Editor.GetSpecSymbolCount(SClass) do
     begin
       SymbolIndex:=I;
-      S:=Editor^.GetSpecSymbol(SClass,I-1);
+      S:=Editor.GetSpecSymbol(SClass,I-1);
       if (length(S^)<>length(What)) then
         Match:=false
       else
@@ -2281,7 +2324,7 @@ var
     if InString then C:=coStringColor else
     if InAsm then
       begin
-          if (SClass=ccAlpha) and Editor^.IsAsmReservedWord(WordS) then
+          if (SClass=ccAlpha) and Editor.IsAsmReservedWord(WordS) then
             C:=coReservedWordColor
           else
             C:=coAssemblerColor;
@@ -2303,7 +2346,7 @@ var
         C:=coSymbolColor;
       ccAlpha :
         begin
-          if Editor^.IsReservedWord(WordS) then
+          if Editor.IsReservedWord(WordS) then
             C:=coReservedWordColor
           else
             C:=coIdentifierColor;
@@ -2384,7 +2427,7 @@ var
                   { Remove (* from SymbolConcat to avoid problem with (*) PM }
                   { fixes part of bug 1617 }
                   { but removed proper directive prefix detection ... }
-                  EndComment:=Editor^.GetSpecSymbol(ssCommentSuffix,SymbolIndex);
+                  EndComment:=Editor.GetSpecSymbol(ssCommentSuffix,SymbolIndex);
                   if MatchingSymbol[length(MatchingSymbol)]=EndComment^[1] then
                     Delete(SymbolConcat,1,length(MatchingSymbol));
                 end
@@ -2411,7 +2454,7 @@ var CurLineNr: Sw_integer;
     Line,NextLine,PrevLine{,OldLine}: PCustomLine;
     PrevLI,LI,nextLI: PEditorLineInfo;
 begin
-  if (not Editor^.IsFlagSet(efSyntaxHighlight)) or (FromLine>=GetLineCount) then
+  if (not Editor.IsFlagSet(efSyntaxHighlight)) or (FromLine>=GetLineCount) then
   begin
     SetLineFormat(Editor,FromLine,'');
     DoUpdateAttrs:=GetLineCount;
@@ -2425,11 +2468,11 @@ begin
 (*    { no Idle necessary }
     EventMask:=EventMask and not evIdle;*)
 {$endif TEST_PARTIAL_SYNTAX}
-    Editor^.SyntaxStateChanged;
+    Editor.SyntaxStateChanged;
     Exit;
   end;
 {$ifdef TEST_PARTIAL_SYNTAX}
-  If Editor^.IsFlagSet(efSyntaxHighlight) and (LastSyntaxedLine<FromLine)
+  If Editor.IsFlagSet(efSyntaxHighlight) and (LastSyntaxedLine<FromLine)
      and (FromLine<GetLineCount) then
     CurLineNr:=LastSyntaxedLine
   else
@@ -2441,15 +2484,15 @@ begin
     PrevLine:=nil;
   repeat
     Line:=GetLine(CurLineNr);
-    if Assigned(PrevLine) then PrevLI:=PrevLine^.GetEditorInfo(Editor) else PrevLI:=nil;
-    if Assigned(Line) then LI:=Line^.GetEditorInfo(Editor) else LI:=nil;
+    if Assigned(PrevLine) then PrevLI:=PrevLine.GetEditorInfo(Editor) else PrevLI:=nil;
+    if Assigned(Line) then LI:=Line.GetEditorInfo(Editor) else LI:=nil;
     InSingleLineComment:=false;
     if PrevLI<>nil then
      begin
-       InAsm:=PrevLI^.EndsWithAsm;
-       InComment:=PrevLI^.EndsWithComment and not PrevLI^.EndsInSingleLineComment;
-       CurrentCommentType:=PrevLI^.EndCommentType;
-       InDirective:=PrevLI^.EndsWithDirective;
+       InAsm:=PrevLI.EndsWithAsm;
+       InComment:=PrevLI.EndsWithComment and not PrevLI.EndsInSingleLineComment;
+       CurrentCommentType:=PrevLI.EndCommentType;
+       InDirective:=PrevLI.EndsWithDirective;
      end
     else
      begin
@@ -2459,19 +2502,19 @@ begin
        InDirective:=false;
      end;
 {    OldLine:=Line;}
-    if (not Editor^.IsFlagSet(efKeepLineAttr)) then
+    if (not Editor.IsFlagSet(efKeepLineAttr)) then
       begin
-        LI^.BeginsWithAsm:=InAsm;
-        LI^.BeginsWithComment:=InComment;
-        LI^.BeginsWithDirective:=InDirective;
-        LI^.BeginCommentType:=CurrentCommentType;
+        LI.BeginsWithAsm:=InAsm;
+        LI.BeginsWithComment:=InComment;
+        LI.BeginsWithDirective:=InDirective;
+        LI.BeginCommentType:=CurrentCommentType;
       end
     else
       begin
-        InAsm:=LI^.BeginsWithAsm;
-        InComment:=LI^.BeginsWithComment;
-        InDirective:=LI^.BeginsWithDirective;
-        CurrentCommentType:=LI^.BeginCommentType;
+        InAsm:=LI.BeginsWithAsm;
+        InComment:=LI.BeginsWithComment;
+        InDirective:=LI.BeginsWithDirective;
+        CurrentCommentType:=LI.BeginCommentType;
       end;
     LineText:=GetLineText(CurLineNr);
     Format:=CharStr(chr(coTextColor),length(LineText));
@@ -2487,33 +2530,33 @@ begin
        ProcessChar(' ');
      end;
     SetLineFormat(Editor,CurLineNr,Format);
-    LI^.EndsWithAsm:=InAsm;
-    LI^.EndsWithComment:=InComment;
-    LI^.EndsInSingleLineComment:=InSingleLineComment;
-    LI^.EndCommentType:=CurrentCommentType;
-    LI^.EndsWithDirective:=InDirective;
+    LI.EndsWithAsm:=InAsm;
+    LI.EndsWithComment:=InComment;
+    LI.EndsInSingleLineComment:=InSingleLineComment;
+    LI.EndCommentType:=CurrentCommentType;
+    LI.EndsWithDirective:=InDirective;
     Inc(CurLineNr);
     if CurLineNr>=GetLineCount then
      Break;
     NextLine:=GetLine(CurLineNr);
-    if Assigned(NextLine) then NextLI:=NextLine^.GetEditorInfo(Editor) else NextLI:=nil;
+    if Assigned(NextLine) then NextLI:=NextLine.GetEditorInfo(Editor) else NextLI:=nil;
     if ((Attrs and attrForceFull)=0) then
       if (*  Why should we go
-         (InAsm=false) and (NextLI^.BeginsWithAsm=false) and
-         (InComment=false) and (NextLI^.BeginsWithComment=false) and
-         (InDirective=false) and (NextLI^.BeginsWithDirective=false) and
+         (InAsm=false) and (NextLI.BeginsWithAsm=false) and
+         (InComment=false) and (NextLI.BeginsWithComment=false) and
+         (InDirective=false) and (NextLI.BeginsWithDirective=false) and
 {          OldLine = Line so this is nonsense}
-         (PrevLI^.EndsWithComment=LI^.EndsWithComment) and
-         (PrevLI^.EndsWithAsm=LI^.EndsWithAsm) and
-         (PrevLI^.EndsWithDirective=LI^.EndsWithDirective) and *)
+         (PrevLI.EndsWithComment=LI.EndsWithComment) and
+         (PrevLI.EndsWithAsm=LI.EndsWithAsm) and
+         (PrevLI.EndsWithDirective=LI.EndsWithDirective) and *)
 {$ifdef TEST_PARTIAL_SYNTAX}
          (CurLineNr>FromLine) and
 {$endif TEST_PARTIAL_SYNTAX}
-         (NextLI^.BeginsWithAsm=LI^.EndsWithAsm) and
-         (NextLI^.BeginsWithComment=LI^.EndsWithComment) and
-         (NextLI^.BeginsWithDirective=LI^.EndsWithDirective) and
-         (NextLI^.BeginCommentType=LI^.EndCommentType) and
-         (NextLI^.Format<>nil) then
+         (NextLI.BeginsWithAsm=LI.EndsWithAsm) and
+         (NextLI.BeginsWithComment=LI.EndsWithComment) and
+         (NextLI.BeginsWithDirective=LI.EndsWithDirective) and
+         (NextLI.BeginCommentType=LI.EndCommentType) and
+         (NextLI.Format<>nil) then
        Break;
 {$ifdef TEST_PARTIAL_SYNTAX}
     if (CurLineNr<GetLineCount) and
@@ -2584,15 +2627,15 @@ begin
   GetRedoActionCount:=0;
 end;
 
-destructor TCustomCodeEditorCore.Done;
+destructor TCustomCodeEditorCore.Destroy;
 begin
 {$ifdef DEBUG}
-  if Bindings^.Count>0 then
-    ErrorBox('Internal error: there are still '+IntToStr(Bindings^.Count)+' editors '+
+  if Bindings.Count>0 then
+    ErrorBox('Internal error: there are still '+IntToStr(Bindings.Count)+' editors '+
       'registered at TCodeEditorCode.Done!!!',nil);
 {$endif}
-  if Assigned(Bindings) then Dispose(Bindings, Done); Bindings:=nil;
-  inherited Done;
+  if Assigned(Bindings) then Bindings.Free; Bindings:=nil;
+  inherited Destroy;
 end;
 
 procedure TCustomCodeEditor.Lock;
@@ -2903,7 +2946,7 @@ function TCustomCodeEditor.LoadFromFile(const AFileName: string): boolean;
 var S: PFastBufStream;
     OK: boolean;
 begin
-  New(S, Init(AFileName,stOpenRead,EditorTextBufSize));
+  S := TFastBufStream.Create(AFileName,stOpenRead,EditorTextBufSize);
   OK:=Assigned(S);
 {$ifdef TEST_PARTIAL_SYNTAX}
   SetSyntaxCompleted(false);
@@ -2911,7 +2954,7 @@ begin
   EventMask:=EventMask or evIdle;
 {$endif TEST_PARTIAL_SYNTAX}
   if OK then OK:=LoadFromStream(S);
-  if Assigned(S) then Dispose(S, Done);
+  if Assigned(S) then S.Free;
   LoadFromFile:=OK;
 end;
 
@@ -2919,10 +2962,10 @@ function TCustomCodeEditor.SaveToFile(const AFileName: string): boolean;
 var OK: boolean;
     S: PBufStream;
 begin
-  New(S, Init(AFileName,stCreate,EditorTextBufSize));
-  OK:=Assigned(S) and (S^.Status=stOK);
+  S := TFastBufStream.Create(AFileName,stCreate,EditorTextBufSize);
+  OK:=Assigned(S) and (S.Status=stOK);
   if OK then OK:=SaveToStream(S);
-  if Assigned(S) then Dispose(S, Done);
+  if Assigned(S) then S.Free;
   SaveToFile:=OK;
 end;
 
@@ -2937,7 +2980,7 @@ var OK: boolean;
     VerticalBlock: boolean;
     SEnd: TPoint;
 begin
-  if Editor^.IsFlagSet(efVerticalBlocks) then
+  if Editor.IsFlagSet(efVerticalBlocks) then
     begin
       NotImplemented;
       Exit;
@@ -2945,16 +2988,16 @@ begin
   Lock;
 
   { every data in the clipboard gets a new line }
-  if (Clipboard=@Self) and (CurPos.X>0) then
+  if (Clipboard = TCustomCodeEditor(Self)) and (CurPos.X>0) then
     InsertNewLine;
 
-  OK:=(Editor^.SelStart.X<>Editor^.SelEnd.X) or (Editor^.SelStart.Y<>Editor^.SelEnd.Y);
+  OK:=(Editor.SelStart.X<>Editor.SelEnd.X) or (Editor.SelStart.Y<>Editor.SelEnd.Y);
   if OK then
   begin
     StartPos:=CurPos; DestPos:=CurPos;
     EPos:=CurPos;
-    VerticalBlock:=Editor^.IsFlagSet(efVerticalBlocks);
-    LineDelta:=0; LineCount:=(Editor^.SelEnd.Y-Editor^.SelStart.Y)+1;
+    VerticalBlock:=Editor.IsFlagSet(efVerticalBlocks);
+    LineDelta:=0; LineCount:=(Editor.SelEnd.Y-Editor.SelStart.Y)+1;
     OK:=GetLineCount<MaxLineCount;
     OrigS:=GetLineText(DestPos.Y);
     BeforeS:=Copy(OrigS,1,LinePosToCharIdx(DestPos.Y,DestPos.X-1));
@@ -2986,24 +3029,24 @@ begin
       If LineDelta>0 then
         BeforeS:='';
       if (LineDelta=0) or VerticalBlock then
-        LineStartX:=Editor^.SelStart.X
+        LineStartX:=Editor.SelStart.X
       else
         LineStartX:=0;
 
       if (LineDelta=LineCount-1) or VerticalBlock then
-        LineEndX:=Editor^.SelEnd.X-1
+        LineEndX:=Editor.SelEnd.X-1
       else
         LineEndX:=High(S);
 
-      CharIdxStart:=Editor^.LinePosToCharIdx(Editor^.SelStart.Y+LineDelta,LineStartX);
-      CharIdxEnd:=Editor^.LinePosToCharIdx(Editor^.SelStart.Y+LineDelta,LineEndX);
+      CharIdxStart:=Editor.LinePosToCharIdx(Editor.SelStart.Y+LineDelta,LineStartX);
+      CharIdxEnd:=Editor.LinePosToCharIdx(Editor.SelStart.Y+LineDelta,LineEndX);
       if LineEndX<LineStartX then
         S:=''
       else if VerticalBlock then
-        S:=RExpand(copy(Editor^.GetLineText(Editor^.SelStart.Y+LineDelta),CharIdxStart,CharIdxEnd-CharIdxStart+1),
+        S:=RExpand(copy(Editor.GetLineText(Editor.SelStart.Y+LineDelta),CharIdxStart,CharIdxEnd-CharIdxStart+1),
                    Min(CharIdxEnd-CharIdxStart+1,High(S)))
       else
-        S:=copy(Editor^.GetLineText(Editor^.SelStart.Y+LineDelta),CharIdxStart,CharIdxEnd-CharIdxStart+1);
+        S:=copy(Editor.GetLineText(Editor.SelStart.Y+LineDelta),CharIdxStart,CharIdxEnd-CharIdxStart+1);
       if VerticalBlock=false then
         begin
           DS:=BeforeS+S;
@@ -3172,24 +3215,24 @@ begin
   begin
     L:=GetLine(Y);
     if assigned(L) then
-      EI:=L^.GetEditorInfo(@Self)
+      EI:=L.GetEditorInfo(Self)
     else
       begin
         CreateFold:=False;
         exit;
       end;
     if Y=StartY then
-      ParentF:=EI^.Fold
+      ParentF:=EI.Fold
     else
-      OK:=OK and (EI^.Fold=ParentF);
+      OK:=OK and (EI.Fold=ParentF);
     if not OK then
       Break;
   end;
   if OK then
   begin
-    New(F, Init(@Self,ParentF,Collapsed));
+    F := TFold.Create(Self,ParentF,Collapsed);
     for Y:=StartY to EndY do
-      GetLine(Y)^.GetEditorInfo(@Self)^.SetFold(F);
+      GetLine(Y).GetEditorInfo(Self).SetFold(F);
     DrawView;
   end;
   UnLock;
@@ -3203,10 +3246,10 @@ begin
   for I:=0 to GetFoldCount-1 do
   begin
     F:=GetFold(I);
-    if F^.ParentFold=Fold then
+    if F.ParentFold=Fold then
       FoldChanged(F);
   end;
-  if Fold^.IsCollapsed then
+  if Fold.IsCollapsed then
   begin
     F:=GetLineFold(CurPos.Y); I:=CurPos.Y;
     if F=Fold then
@@ -3229,8 +3272,8 @@ begin
     begin
       L:=GetLine(I);
       if not assigned(L) then exit;
-      with L^ do
-        with GetEditorInfo(@Self)^ do
+      with L do
+        with GetEditorInfo(Self) do
           SetFold(nil);
     end;
   DrawView;
@@ -3284,7 +3327,7 @@ var IsM: boolean;
 begin
   IsM:=GetState(sfModal);
   if Assigned(Owner) then
-    IsM:=IsM or Owner^.GetState(sfModal);
+    IsM:=IsM or Owner.GetState(sfModal);
   IsModal:=IsM;
 end;
 
@@ -3332,9 +3375,9 @@ var
 begin
   if Event.What = evKeyDown then
   begin
-    if (Event.KeyShift and kbShift <> 0) and
+    if (Event.ControlKeyState and kbShift <> 0) and
       (Event.ScanCode >= $47) and (Event.ScanCode <= $51) then
-      Event.CharCode := #0;
+      Event.CharCode := 0;
     Key := Event.KeyCode;
     if KeyState <> 0 then
     begin
@@ -3367,7 +3410,7 @@ begin
     exit;
   L:=GetLine(LineNo);
   if Assigned(L) then
-    with L^ do
+    with L do
       if ASet then
         SetFlags(GetFlags or Flags)
       else
@@ -3385,9 +3428,9 @@ begin
     L:=GetLine(I);
     if not assigned(L) then break;
     if I=LineNo then
-      L^.SetFlags(L^.GetFlags or Flags)
+      L.SetFlags(L.GetFlags or Flags)
     else
-      L^.SetFlags(L^.GetFlags and (not Flags));
+      L.SetFlags(L.GetFlags and (not Flags));
   end;
   UnLock;
 end;
@@ -3397,9 +3440,9 @@ var DontClear : boolean;
 
   procedure CheckScrollBar(P: PScrollBar; var D: Sw_Integer);
   begin
-    if (Event.InfoPtr = P) and (P^.Value <> D) then
+    if (Event.InfoPtr = Pointer(P)) and (P.Value <> D) then
     begin
-      D := P^.Value;
+      D := P.Value;
       DrawView;
     end;
   end;
@@ -3432,20 +3475,20 @@ begin
       (GetCompleteState<>csOffering) then
     ConvertEvent(Event);
   case Event.What of
-    evMouseDown :
+    evMouseWheel :
       if MouseInView(Event.Where) then
-       if (Event.Buttons=mbScrollWheelUp) then { mouse scroll up}
+       if (Event.Wheel=mwUp) then
          begin
            LinesScroll:=1;
-           if Event.Double then LinesScroll:=LinesScroll+4;
            ScrollTo(Delta.X, Delta.Y + LinesScroll);
          end else
-       if (Event.Buttons=mbScrollWheelDown) then  { mouse scroll down }
+       if (Event.Wheel=mwDown) then
          begin
            LinesScroll:=-1;
-           if Event.Double then LinesScroll:=LinesScroll-4;
            ScrollTo(Delta.X, Delta.Y + LinesScroll);
-         end else
+         end;
+    evMouseDown :
+      if MouseInView(Event.Where) then
        if (Event.Buttons=mbRightButton) then
          begin
            MakeLocal(Event.Where,P); Inc(P.X); Inc(P.Y);
@@ -3478,8 +3521,8 @@ begin
           source code. - Gabor }
         if InASCIIMode {and (Event.CharCode<>0)} then
           begin
-            AddChar(Event.CharCode);
-            if (GetCompleteState<>csDenied) or (Event.CharCode=#32) then
+            AddChar(Char(Event.CharCode));
+            if (GetCompleteState<>csDenied) or (Event.CharCode=32) then
               CCAction:=ccCheck
             else
               CCAction:=ccClear;
@@ -3489,14 +3532,14 @@ begin
            DontClear:=false;
            case Event.KeyCode of
              kbAltF10 :
-               Message(@Self,evCommand,cmLocalMenu,@Self);
+               Message(Self, evCommand, cmLocalMenu, Pointer(Self));
              kbEnter  :
                if IsReadOnly then
                  DontClear:=true else
                if GetCompleteState=csOffering then
                  CodeCompleteApply
                else
-                 Message(@Self,evCommand,cmNewLine,nil);
+                 Message(Self,evCommand,cmNewLine,nil);
              kbEsc :
                if GetCompleteState=csOffering then
                  CodeCompleteCancel else
@@ -3504,15 +3547,15 @@ begin
                   DontClear:=true;
            else
             case Event.CharCode of
-             #9,#32..#255 :
-               if (Event.CharCode=#9) and IsModal then
+             9,32..255 :
+               if (Event.CharCode=9) and IsModal then
                  DontClear:=true
                else
                  begin
                    NoSelect:=true;
-                   AddChar(Event.CharCode);
+                   AddChar(Char(Event.CharCode));
                    NoSelect:=false;
-                   if (GetCompleteState<>csDenied) or (Event.CharCode=#32) then
+                   if (GetCompleteState<>csDenied) or (Event.CharCode=32) then
                      CCAction:=ccCheck
                    else
                      CCAction:=ccClear;
@@ -3647,8 +3690,8 @@ begin
           cmResetDebuggerRow :
             SetLineFlagExclusive(lfDebuggerRow,-1);
           cmScrollBarChanged:
-            if (Event.InfoPtr = HScrollBar) or
-               (Event.InfoPtr = VScrollBar) then
+            if (Event.InfoPtr = Pointer(HScrollBar)) or
+               (Event.InfoPtr = Pointer(VScrollBar)) then
               begin
                 CheckScrollBar(HScrollBar, Delta.X);
                 CheckScrollBar(VScrollBar, Delta.Y);
@@ -3668,7 +3711,7 @@ end;
 procedure TCustomCodeEditor.UpdateUndoRedo(cm : word; action : byte);
 var UndoMenu : PMenuItem;
 begin
-  UndoMenu:=PAdvancedMenuBar(MenuBar)^.GetMenuItem(cm);
+  UndoMenu:=PAdvancedMenuBar(MenuBar).GetMenuItem(cm);
   if assigned(UndoMenu) then
     begin
       If assigned(UndoMenu^.Param) then
@@ -3695,13 +3738,13 @@ end;
 
 function TCustomCodeEditor.GetCommandTarget: PView;
 begin
-  GetCommandTarget:=@Self;
+  GetCommandTarget:=Self;
 end;
 
 function TCustomCodeEditor.CreateLocalMenuView(var Bounds: TRect; M: PMenu): PMenuPopup;
 var MV: PMenuPopup;
 begin
-  New(MV, Init(Bounds, M));
+  MV := TMenuPopup.Create(Bounds, M, nil);
   CreateLocalMenuView:=MV;
 end;
 
@@ -3715,15 +3758,15 @@ begin
   if M=nil then Exit;
   if LastLocalCmd<>0 then
      M^.Default:=SearchMenuItem(M,LastLocalCmd);
-  Desktop^.GetExtent(R);
-  MakeGlobal(P,R.A); {Desktop^.MakeLocal(R.A,R.A);}
+  Desktop.GetExtent(R);
+  MakeGlobal(P,R.A); {Desktop.MakeLocal(R.A,R.A);}
   MV:=CreateLocalMenuView(R,M);
-  Re:=Application^.ExecView(MV);
+  Re:=Application.ExecView(MV);
   if M^.Default=nil then LastLocalCmd:=0
      else LastLocalCmd:=M^.Default^.Command;
-  Dispose(MV, Done);
+  MV.Free;
   if Re<>0 then
-    Message(GetCommandTarget,evCommand,Re,@Self);
+    Message(GetCommandTarget, evCommand, Re, Pointer(Self));
 end;
 
 function TCustomCodeEditor.GetReservedColCount: sw_integer;
@@ -3736,13 +3779,13 @@ end;
 procedure TCustomCodeEditor.Draw;
 function GetEIFold(EI: PEditorLineInfo): PFold;
 begin
-  if Assigned(EI) then GetEIFold:=EI^.Fold else GetEIFold:=nil;
+  if Assigned(EI) then GetEIFold:=EI.Fold else GetEIFold:=nil;
 end;
 var SelectColor,
     HighlightColColor,
     HighlightRowColor,
     ErrorMessageColor  : word;
-    B: TDrawBuffer;
+    B: TFVDrawBuffer;
     X,Y,AX,AY,MaxX,LSX: sw_integer;
     PX: TPoint;
     LineCount: sw_integer;
@@ -3785,25 +3828,25 @@ begin
   if (CurPos.Y-Delta.Y)<(Size.Y div 2) then ErrorLine:=Size.Y-1
      else ErrorLine:=0;
   LineCount:=GetLineCount;
-  ColorTab[coTextColor]:=GetColor(1);
-  ColorTab[coWhiteSpaceColor]:=GetColor(2);
-  ColorTab[coCommentColor]:=GetColor(3);
-  ColorTab[coReservedWordColor]:=GetColor(4);
-  ColorTab[coIdentifierColor]:=GetColor(5);
-  ColorTab[coStringColor]:=GetColor(6);
-  ColorTab[coNumberColor]:=GetColor(7);
-  ColorTab[coAssemblerColor]:=GetColor(8);
-  ColorTab[coSymbolColor]:=GetColor(9);
-  ColorTab[coDirectiveColor]:=GetColor(13);
-  ColorTab[coHexNumberColor]:=GetColor(14);
-  ColorTab[coTabColor]:=GetColor(15);
+  ColorTab[coTextColor]:=GetColorW(1);
+  ColorTab[coWhiteSpaceColor]:=GetColorW(2);
+  ColorTab[coCommentColor]:=GetColorW(3);
+  ColorTab[coReservedWordColor]:=GetColorW(4);
+  ColorTab[coIdentifierColor]:=GetColorW(5);
+  ColorTab[coStringColor]:=GetColorW(6);
+  ColorTab[coNumberColor]:=GetColorW(7);
+  ColorTab[coAssemblerColor]:=GetColorW(8);
+  ColorTab[coSymbolColor]:=GetColorW(9);
+  ColorTab[coDirectiveColor]:=GetColorW(13);
+  ColorTab[coHexNumberColor]:=GetColorW(14);
+  ColorTab[coTabColor]:=GetColorW(15);
   { break same as error }
-  ColorTab[coBreakColor]:=GetColor(16);
-  ColorTab[coAsmReservedColor]:=GetColor(17);
-  SelectColor:=GetColor(10);
-  HighlightColColor:=GetColor(11);
-  HighlightRowColor:=GetColor(12);
-  ErrorMessageColor:=GetColor(16);
+  ColorTab[coBreakColor]:=GetColorW(16);
+  ColorTab[coAsmReservedColor]:=GetColorW(17);
+  SelectColor:=GetColorW(10);
+  HighlightColColor:=GetColorW(11);
+  HighlightRowColor:=GetColorW(12);
+  ErrorMessageColor:=GetColorW(16);
 {$ifdef TEST_PARTIAL_SYNTAX}
   If (not GetSyntaxCompleted) and (GetLastSyntaxedLine<Delta.Y+Size.Y) then
     UpdateAttrsRange(GetLastSyntaxedLine,Delta.Y+Size.Y,AttrAll);
@@ -3816,7 +3859,7 @@ begin
       begin
         MoveChar(B,' ',ErrorMessageColor,Size.X);
         MoveStr(B,ErrorMsg,ErrorMessageColor);
-        WriteLine(0,Y,Size.X,1,B);
+        WriteLineW(0,Y,Size.X,1,B);
       end
     else
       begin
@@ -3826,7 +3869,7 @@ begin
             Line:=GetLine(AY);
             if assigned(Line) then
               begin
-                IsBreak:=Line^.IsFlagSet(lfBreakpoint);
+                IsBreak:=Line.IsFlagSet(lfBreakpoint);
               end
             else
               begin
@@ -3898,7 +3941,7 @@ begin
                 FreeFormat[X]:=false;
               end;
 
-            if Assigned(Line) and Line^.IsFlagSet(lfHighlightRow) then
+            if Assigned(Line) and Line.IsFlagSet(lfHighlightRow) then
               begin
                 Color:=CombineColors(Color,HighlightRowColor);
                 FreeFormat[X]:=false;
@@ -3908,7 +3951,7 @@ begin
                 Color:=ColorTab[coBreakColor];
                 FreeFormat[X]:=false;
               end;
-            if Assigned(Line) and Line^.isFlagSet(lfDebuggerRow) then
+            if Assigned(Line) and Line.isFlagSet(lfDebuggerRow) then
               begin
                 Color:=CombineColors(Color,HighlightRowColor);
                 FreeFormat[X]:=false;
@@ -3924,7 +3967,7 @@ begin
             if FoldSuffix<>'' then
               MoveStr(B[Size.X-1-length(FoldSuffix)],FoldSuffix,ColorTab[coTextColor]);
           end;
-          WriteLine(0,Y,Size.X,1,B);
+          WriteLineW(0,Y,Size.X,1,B);
         end; { if not SkipLine ... }
       end; { not errorline }
   end; { while (Y<Size.Y) ... }
@@ -4028,7 +4071,7 @@ begin
   Max:=0;
   for I:=0 to GetFoldCount-1 do
   begin
-    L:=GetFold(I)^.GetLevel;
+    L:=GetFold(I).GetLevel;
     if L>Max then Max:=L;
   end;
   GetMaxFoldLevel:=Max;
@@ -4047,10 +4090,10 @@ begin
   F:=GetLineFold(EditorLine);
   if Assigned(F) then
   begin
-    if F^.Collapsed_ then C:=#27 else C:=#26;
-    Prefix[1+F^.GetLevel]:=C;
-    if F^.Collapsed_ then
-      Suffix:='('+IntToStr(F^.GetLineCount)+')';
+    if F.Collapsed_ then C:=#27 else C:=#26;
+    Prefix[1+F.GetLevel]:=C;
+    if F.Collapsed_ then
+      Suffix:='('+IntToStr(F.GetLineCount)+')';
   end;
 end;
 
@@ -4442,7 +4485,7 @@ begin
   if not IsFlagSet(efFolds) then Exit;
   F:=GetLineFold(CurPos.Y);
   if Assigned(F) then
-    F^.Collapse(not F^.Collapsed_);
+    F.Collapse(not F.Collapsed_);
 end;
 
 procedure TCustomCodeEditor.ExpandFold;
@@ -4451,7 +4494,7 @@ begin
   if not IsFlagSet(efFolds) then Exit;
   F:=GetLineFold(CurPos.Y);
   if Assigned(F) then
-    F^.Collapse(false);
+    F.Collapse(false);
 end;
 
 procedure TCustomCodeEditor.CollapseFold;
@@ -4460,7 +4503,7 @@ begin
   if not IsFlagSet(efFolds) then Exit;
   F:=GetLineFold(CurPos.Y);
   if Assigned(F) then
-    F^.Collapse(true);
+    F.Collapse(true);
 end;
 
 procedure TCustomCodeEditor.ChangeCaseArea(StartP,EndP: TPoint; CaseAction: TCaseAction);
@@ -4540,11 +4583,11 @@ begin
   begin
     L:=GetLine(EditorLine);
     if Assigned(L) then
-      LI:=L^.GetEditorInfo(@Self)
+      LI:=L.GetEditorInfo(Self)
     else
       LI:=nil;
     if Assigned(LI) then
-      F:=LI^.Fold;
+      F:=LI.Fold;
   end;
   GetLineFold:=F;
 end;
@@ -4562,15 +4605,15 @@ begin
       begin
         PrevF:=GetLineFold(EditorLine-1);
         FoldHeadline:=false;
-        if (PrevF<>F) and ((PrevF=nil) or (not PrevF^.IsParent(F))) then
+        if (PrevF<>F) and ((PrevF=nil) or (not PrevF.IsParent(F))) then
           FoldHeadline:=true;
         if FoldHeadline then
           begin
-            if Assigned(F^.ParentFold) and (F^.ParentFold^.IsCollapsed) then
+            if Assigned(F.ParentFold) and (F.ParentFold.IsCollapsed) then
               V:=false;
           end
         else
-          if F^.IsCollapsed then
+          if F.IsCollapsed then
             V:=false;
       end;
     end;
@@ -4745,7 +4788,7 @@ begin
         if not assigned(L) then
           EI:=nil
         else
-          EI:=L^.GetEditorInfo(@Self);
+          EI:=L.GetEditorInfo(Self);
       end
     else
       EI:=nil;
@@ -4771,13 +4814,13 @@ begin
       begin SelEnd.Y:=CurPos.Y+1; SelEnd.X:=length(GetLineText(CurPos.Y+1))-SelBack; end;*)
     UpdateAttrs(CurPos.Y,attrAll);
     SetCurPtr(Ind,CurPos.Y+1);
-    NewEI:=NewL^.GetEditorInfo(@Self);
+    NewEI:=NewL.GetEditorInfo(Self);
     if Assigned(EI) and Assigned(NewEI) then
     begin
-      NewEI^.SetFold(EI^.Fold);
-      if Assigned(EI^.Fold) then
-        if EI^.Fold^.IsCollapsed then
-          EI^.Fold^.Collapse(false);
+      NewEI.SetFold(EI.Fold);
+      if Assigned(EI.Fold) then
+        if EI.Fold.IsCollapsed then
+          EI.Fold.Collapse(false);
     end;
      SetStoreUndo(HoldUndo);
      { obsolete IndentStr is taken care of by the Flags PM }
@@ -5270,17 +5313,17 @@ begin
   Lock;
   GetExtent(R);
   AddGroupedAction(eaCopyBlock);
-  New(Temp, Init(R, nil, nil, nil,nil));
-  Temp^.InsertFrom(@Self);
-(*  Temp^.SelectAll(true);
+  Temp := TCodeEditor.Create(R, nil, nil, nil, nil);
+  Temp.InsertFrom(Self);
+(*  Temp.SelectAll(true);
   { this selects one line too much because
     we have a empty line at creation to avoid
     negative line problems so we need to decrease SelEnd.Y }
-  Dec(Temp^.SelEnd.Y);*)
+  Dec(Temp.SelEnd.Y);*)
 
 
   InsertFrom(Temp);
-  Dispose(Temp, Done);
+  Temp.Free;
   CloseGroupedAction(eaCopyBlock);
   UnLock;
 end;
@@ -5295,15 +5338,15 @@ begin
   Lock;
   AddGroupedAction(eaMoveBlock);
   GetExtent(R);
-  New(Temp, Init(R, nil, nil, nil,nil));
-  Temp^.InsertFrom(@Self);
+  Temp := TCodeEditor.Create(R, nil, nil, nil, nil);
+  Temp.InsertFrom(Self);
   OldPos:=CurPos;
   if CurPos.Y>SelStart.Y then
-    Dec(OldPos.Y,Temp^.GetLineCount-1);
+    Dec(OldPos.Y,Temp.GetLineCount-1);
   DelSelect;
   SetCurPtr(OldPos.X,OldPos.Y);
   InsertFrom(Temp);
-  Dispose(Temp, Done);
+  Temp.Free;
   CloseGroupedAction(eaMoveBlock);
   UnLock;
 end;
@@ -5492,13 +5535,13 @@ begin
   begin
     FileName := FExpand(FileName);
 
-    New(S, Init(FileName, stCreate, 4096));
-    if (S=nil) or (S^.Status<>stOK) then
+    S := TFastBufStream.Create(FileName, stCreate, 4096);
+    if (S=nil) or (S.Status<>stOK) then
       EditorDialog(edCreateError,@FileName)
     else
       if SaveAreaToStream(S,SelStart,SelEnd)=false then
         EditorDialog(edWriteError,@FileName);
-    if Assigned(S) then Dispose(S, Done);
+    if Assigned(S) then S.Free;
   end;
 end;
 
@@ -5514,25 +5557,25 @@ begin
   begin
     FileName := FExpand(FileName);
 
-    New(S, Init(FileName, stOpenRead, 4096));
-    if (S=nil) or (S^.Status<>stOK) then
+    S := TFastBufStream.Create(FileName, stOpenRead, 4096);
+    if (S=nil) or (S.Status<>stOK) then
       EditorDialog(edReadError,@FileName)
     else
       begin
         R.Assign(0,0,0,0);
-        New(E, Init(R,nil,nil,nil,nil));
+        E := TCodeEditor.Create(R, nil, nil, nil, nil);
         AddGroupedAction(eaReadBlock);
-        if E^.LoadFromStream(S)=false then
+        if E.LoadFromStream(S)=false then
           EditorDialog(edReadError,@FileName)
         else
           begin
-            E^.SelectAll(true);
+            E.SelectAll(true);
             Self.InsertFrom(E);
           end;
         CloseGroupedAction(eaReadBlock);
-        Dispose(E, Done);
+        E.Free;
       end;
-    if Assigned(S) then Dispose(S, Done);
+    if Assigned(S) then S.Free;
   end;
 end;
 
@@ -5574,12 +5617,12 @@ begin
   end;
   ShortCutInEditor:=ShortCut;
 
-  New(CodeLines, Init(10,10));
+  CodeLines := TUnsortedStringCollection.Create(10,10);
   if (ShortCut='') or (not TranslateCodeTemplate(ShortCut,CodeLines)) then
    if SelectCodeTemplate(ShortCut) then
      TranslateCodeTemplate(ShortCut,CodeLines);
 
-  if CodeLines^.Count>0 then
+  if CodeLines.Count>0 then
   begin
     LineIndent:=X;
     SetCurPtr(X,CurPos.Y);
@@ -5591,9 +5634,9 @@ begin
     else
       { restore correct position }
       SetCurPtr(X+Length(ShortCutInEditor),CurPos.Y);
-    for Y:=0 to CodeLines^.Count-1 do
+    for Y:=0 to CodeLines.Count-1 do
     begin
-      Line:=GetStr(CodeLines^.At(Y));
+      Line:=GetStr(CodeLines.At(Y));
       CanJump:=false;
       if (Y>0) then
         begin
@@ -5615,7 +5658,7 @@ begin
           CP.Y:=CurPos.Y;
         end;
       InsertText(Line);
-      if Y<CodeLines^.Count-1 then
+      if Y<CodeLines.Count-1 then
         begin
           InsertNewLine;               { line break }
           if CanJump=false then
@@ -5631,7 +5674,7 @@ begin
         end;
     end;
   end;
-  Dispose(CodeLines, Done);
+  CodeLines.Free;
 
   if (CP.X<>-1) and (CP.Y<>-1) then
     SetCurPtr(CP.X,CP.Y);
@@ -5908,17 +5951,17 @@ begin
    maybe as an Undo Paste in Clipboard !! }
   clipcopy:=false;
   showinfo:=false;
-  if (clipboard<>nil) and (clipboard<>@self) then
+  if (clipboard<>nil) and (clipboard<>Self) then
     begin
       ShowInfo:=SelEnd.Y-SelStart.Y>50;
       if ShowInfo then
         PushInfo(msg_copyingclipboard);
-      clipcopy:=Clipboard^.InsertFrom(@Self);
+      clipcopy:=Clipboard.InsertFrom(Self);
       if ShowInfo then
         PopInfo;
       {Enable paste command.}
-      CanPaste:=((Clipboard^.SelStart.X<>Clipboard^.SelEnd.X) or
-                (Clipboard^.SelStart.Y<>Clipboard^.SelEnd.Y));
+      CanPaste:=((Clipboard.SelStart.X<>Clipboard.SelEnd.X) or
+                (Clipboard.SelStart.Y<>Clipboard.SelEnd.Y));
       SetCmdState(FromClipCmds,CanPaste);
     end;
   UnLock;
@@ -5932,12 +5975,12 @@ begin
   Lock;
   AddGroupedAction(eaCut);
   DontConsiderShiftState:=true;
-  if (clipboard<>nil) and (clipboard<>@self) then
+  if (clipboard<>nil) and (clipboard<>Self) then
    begin
      ShowInfo:=SelEnd.Y-SelStart.Y>50;
      if ShowInfo then
        PushInfo(msg_cutting);
-     if Clipboard^.InsertFrom(@Self) then
+     if Clipboard.InsertFrom(Self) then
       begin
         if not IsClipBoard then
          DelSelect;
@@ -5945,8 +5988,8 @@ begin
       end;
      if ShowInfo then
        PopInfo;
-     CanPaste:=((Clipboard^.SelStart.X<>Clipboard^.SelEnd.X) or
-               (Clipboard^.SelStart.Y<>Clipboard^.SelEnd.Y));
+     CanPaste:=((Clipboard.SelStart.X<>Clipboard.SelEnd.X) or
+               (Clipboard.SelStart.Y<>Clipboard.SelEnd.Y));
      SetCmdState(FromClipCmds,CanPaste);
    end;
   CloseGroupedAction(eaCut);
@@ -5964,7 +6007,7 @@ begin
   AddGroupedAction(eaPaste);
   if Clipboard<>nil then
    begin
-     ShowInfo:=Clipboard^.SelEnd.Y-Clipboard^.SelStart.Y>50;
+     ShowInfo:=Clipboard.SelEnd.Y-Clipboard.SelStart.Y>50;
      if ShowInfo then
        PushInfo(msg_pastingclipboard);
      InsertFrom(Clipboard);
@@ -6027,7 +6070,7 @@ begin
     Scope := (FindFlags and ffmScope) shr ffsScope;
     Origin := (FindFlags and ffmOrigin) shr ffsOrigin;
     DoConf:= (FindFlags and ffPromptOnReplace)<>0;
-    FindReplaceEditor:=@self;
+    FindReplaceEditor:=Self;
     if EditorDialog(edFind, @FindRec) <> cmCancel then
     begin
       FindStr := Find;
@@ -6073,7 +6116,7 @@ begin
     Direction := (FindFlags and ffmDirection) shr ffsDirection;
     Scope := (FindFlags and ffmScope) shr ffsScope;
     Origin := (FindFlags and ffmOrigin) shr ffsOrigin;
-    FindReplaceEditor:=@self;
+    FindReplaceEditor:=Self;
     Re:=EditorDialog(edReplace, @ReplaceRec);
     FindReplaceEditor:=nil;
     if Re <> cmCancel then
@@ -6259,7 +6302,7 @@ begin
   inc(X,DX);
   CanExit:=false;
   if not DoReplace or (not Confirm and (Owner<>nil)) then
-    Owner^.Lock;
+    Owner.Lock;
   if InArea(X,Y) then
     repeat
       CurDY:=DY;
@@ -6423,7 +6466,7 @@ begin
   if (FoundCount=0) or (DoReplace) then
     SetHighlight(CurPos,CurPos);
   if (DoReplace=false) or ((Confirm=false) and (Owner<>nil)) then
-    Owner^.UnLock;
+    Owner.UnLock;
   {if (DoReplace=false) or (Confirm=false) then
     UnLock;}
   if (FoundCount=0) then
@@ -6465,7 +6508,7 @@ begin
   ShiftInEvent:=false;
   if Assigned(CurEvent) then
     if CurEvent^.What=evKeyDown then
-      ShiftInEvent:=((CurEvent^.KeyShift and kbShift)<>0);
+      ShiftInEvent:=((CurEvent^.ControlKeyState and kbShift)<>0);
   ShouldExtend:=ShiftInEvent and
     not DontConsiderShiftState;
 end;
@@ -6488,7 +6531,7 @@ begin
   begin
     F:=GetLineFold(CurPos.Y);
     if Assigned(F) then
-      F^.Collapse(false);
+      F.Collapse(false);
   end;
   if not NoSelect and ShouldExtend then
     begin
@@ -6713,11 +6756,11 @@ begin
   if ((State and sfFocused)<>0) then
     begin
       Enable:=((SelStart.X<>SelEnd.X) or (SelStart.Y<>SelEnd.Y)) and (Clipboard<>nil);
-      SetCmdState(ToClipCmds,Enable and (Clipboard<>@Self));
+      SetCmdState(ToClipCmds,Enable and (Clipboard<>TCustomCodeEditor(Self)));
       SetCmdState(NulClipCmds,Enable);
-      CanPaste:=(Clipboard<>nil) and ((Clipboard^.SelStart.X<>Clipboard^.SelEnd.X) or
-           (Clipboard^.SelStart.Y<>Clipboard^.SelEnd.Y));
-      SetCmdState(FromClipCmds,CanPaste  and (Clipboard<>@Self));
+      CanPaste:=(Clipboard<>nil) and ((Clipboard.SelStart.X<>Clipboard.SelEnd.X) or
+           (Clipboard.SelStart.Y<>Clipboard.SelEnd.Y));
+      SetCmdState(FromClipCmds,CanPaste  and (Clipboard<>TCustomCodeEditor(Self)));
       SetCmdState(UndoCmd,(GetUndoActionCount>0));
       SetCmdState(RedoCmd,(GetRedoActionCount>0));
       Message(Application,evBroadcast,cmCommandSetChanged,nil);
@@ -6733,8 +6776,8 @@ end;
 procedure TCustomCodeEditor.SetState(AState: Word; Enable: Boolean);
   procedure ShowSBar(SBar: PScrollBar);
   begin
-    if Assigned(SBar) and (SBar^.GetState(sfVisible)=false) then
-        SBar^.Show;
+    if Assigned(SBar) and (SBar.GetState(sfVisible)=false) then
+        SBar.Show;
   end;
 begin
   inherited SetState(AState,Enable);
@@ -6753,10 +6796,9 @@ begin
     end;
 end;
 
-function TCustomCodeEditor.GetPalette: PPalette;
-const P: string[length(CEditor)] = CEditor;
+function TCustomCodeEditor.GetPalette: TPalette;
 begin
-  GetPalette:=@P;
+  Result := MakePalette(CEditor);
 end;
 
 function TCustomCodeEditorCore.LoadFromStream(Editor: PCustomCodeEditor; Stream: PFastBufStream): boolean;
@@ -6766,7 +6808,7 @@ begin
   DeleteAllLines;
   ChangedLine:=-1;
   AllLinesComplete:=true;
-  OK:=(Stream^.Status=stOK);
+  OK:=(Stream.Status=stOK);
   if eofstream(Stream) then
    AddLine('')
   else
@@ -6774,11 +6816,11 @@ begin
      while OK and (eofstream(Stream)=false) and (GetLineCount<MaxLineCount) do
        begin
          if not UseOldBufStreamMethod then
-           Stream^.Readline(S,LineComplete,hasCR)
+           Stream.Readline(S,LineComplete,hasCR)
          else
            ReadlnFromStream(Stream,S,LineComplete,hasCR);
          AllLinesComplete:=AllLinesComplete and LineComplete;
-         OK:=OK and (Stream^.Status=stOK);
+         OK:=OK and (Stream.Status=stOK);
          if OK then AddLine(S);
          if not LineComplete and (ChangedLine=-1) then
            ChangedLine:=GetLineCount;
@@ -6811,29 +6853,29 @@ begin
     end
   else
     Dec(EndP.X);
-  OK:=(Stream^.Status=stOK); Line:=StartP.Y;
+  OK:=(Stream.Status=stOK); Line:=StartP.Y;
   while OK and (Line<=EndP.Y) and (Line<GetLineCount) do
   begin
     S:=GetLineText(Line);
     { Remove all traling spaces PM }
-    if not Editor^.IsFlagSet(efKeepTrailingSpaces) then
+    if not Editor.IsFlagSet(efKeepTrailingSpaces) then
       s:=RTrim(S,False); // removes trailing #0 too
     { if FlagSet(efUseTabCharacters) then
       S:=CompressUsingTabs(S,TabSize);
       }
     if Line=EndP.Y then S:=copy(S,1,LinePosToCharIdx(Line,EndP.X));
     if Line=StartP.Y then S:=copy(S,LinePosToCharIdx(Line,StartP.X),High(S));
-    Stream^.Write(S[1],length(S));
+    Stream.Write(S[1],length(S));
     if Line<EndP.Y then
-      Stream^.Write(EOL[1],length(EOL));
+      Stream.Write(EOL[1],length(EOL));
     Inc(Line);
-    OK:=OK and (Stream^.Status=stOK);
+    OK:=OK and (Stream.Status=stOK);
   end;
   SaveAreaToStream:=OK;
 end;
 
 
-constructor TEditorAction.init(act:byte; StartP,EndP:TPoint;Txt:String;AFlags : longint);
+constructor TEditorAction.Create(act:byte; StartP,EndP:TPoint;Txt:String;AFlags : longint);
 begin
   Action:=act;
   StartPos:=StartP;
@@ -6845,7 +6887,7 @@ begin
   IsGrouped:=false;
 end;
 
-constructor TEditorAction.init_group(act:byte);
+constructor TEditorAction.Create_group(act:byte);
 begin
   Action:=act;
   ActionCount:=0;
@@ -6858,10 +6900,10 @@ begin
   Is_grouped_action:=IsGrouped;
 end;
 
-destructor TEditorAction.done;
+destructor TEditorAction.Destroy;
 begin
   DisposeStr(Text);
-  inherited done;
+  inherited Destroy;
 end;
 
 
@@ -6881,16 +6923,16 @@ begin
             (CurPos = Length(Data^)) and
             Assigned(FindReplaceEditor) then
            Begin
-             s:=FindReplaceEditor^.GetDisplayText(FindReplaceEditor^.CurPos.Y);
-             s:=Copy(s,FindReplaceEditor^.CurPos.X + 1 -length(Data^),high(s));
+             s:=FindReplaceEditor.GetDisplayText(FindReplaceEditor.CurPos.Y);
+             s:=Copy(s,FindReplaceEditor.CurPos.X + 1 -length(Data^),high(s));
              i:=pos(Data^,s);
              if i>0 then
                begin
                  s:=Data^+s[i+length(Data^)];
                  If not assigned(validator) or
-                    Validator^.IsValidInput(s,False)  then
+                    Validator.IsValidInput(s,False)  then
                    Begin
-                     Event.CharCode:=s[length(s)];
+                     Event.CharCode:=Ord(s[length(s)]);
                      Event.Scancode:=0;
                      Inherited HandleEvent(Event);
                    End;
@@ -6898,27 +6940,27 @@ begin
              ClearEvent(Event);
            End
          else if (Event.KeyCode=kbShiftIns)  and
-                 Assigned(Clipboard) and (Clipboard^.ValidBlock) then
+                 Assigned(Clipboard) and (Clipboard.ValidBlock) then
            { paste from clipboard }
            begin
-             i:=Clipboard^.SelStart.Y;
-             s:=Clipboard^.GetDisplayText(i);
-             i:=Clipboard^.SelStart.X;
+             i:=Clipboard.SelStart.Y;
+             s:=Clipboard.GetDisplayText(i);
+             i:=Clipboard.SelStart.X;
              if i>0 then
               s:=copy(s,i+1,high(s));
-             if (Clipboard^.SelStart.Y=Clipboard^.SelEnd.Y) then
+             if (Clipboard.SelStart.Y=Clipboard.SelEnd.Y) then
                begin
-                 i:=Clipboard^.SelEnd.X-i;
+                 i:=Clipboard.SelEnd.X-i;
                  s:=copy(s,1,i);
                end;
              for i:=1 to length(s) do
                begin
                  s2:=Data^+s[i];
                  If not assigned(validator) or
-                    Validator^.IsValidInput(s2,False)  then
+                    Validator.IsValidInput(s2,False)  then
                    Begin
                      Event.What:=evKeyDown;
-                     Event.CharCode:=s[i];
+                     Event.CharCode := Ord(s[i]);
                      Event.Scancode:=0;
                      Inherited HandleEvent(Event);
                    End;
@@ -6931,9 +6973,9 @@ begin
            begin
              s:=GetStr(Data);
              s:=copy(s,selstart+1,selend-selstart);
-             Clipboard^.SelStart:=Clipboard^.CurPos;
-             Clipboard^.InsertText(s);
-             Clipboard^.SelEnd:=Clipboard^.CurPos;
+             Clipboard.SelStart:=Clipboard.CurPos;
+             Clipboard.InsertText(s);
+             Clipboard.SelEnd:=Clipboard.CurPos;
              ClearEvent(Event);
            end
          else if (Event.KeyCode=kbShiftDel)  and
@@ -6942,9 +6984,9 @@ begin
            begin
              s:=GetStr(Data);
              s:=copy(s,selstart+1,selend-selstart);
-             Clipboard^.SelStart:=Clipboard^.CurPos;
-             Clipboard^.InsertText(s);
-             Clipboard^.SelEnd:=Clipboard^.CurPos;
+             Clipboard.SelStart:=Clipboard.CurPos;
+             Clipboard.InsertText(s);
+             Clipboard.SelEnd:=Clipboard.CurPos;
              s2:=GetStr(Data);
              { now remove the selected part }
              Event.keyCode:=kbDel;
@@ -6967,9 +7009,9 @@ begin
            case Event.Command of
                    cminputlinelen : begin
                                       if PtrInt(Event.InfoPtr)=0 then
-                                        okbutton^.DisableCommands([cmok])
+                                        okbutton.DisableCommands([cmok])
                                       else
-                                        okbutton^.EnableCommands([cmok]);
+                                        okbutton.EnableCommands([cmok]);
                                       clearevent(event);
                                     end;
              end;
@@ -6988,68 +7030,68 @@ var R,R1,R2: TRect;
     but : PButton;
 begin
   R.Assign(0,0,56,15);
-  New(D, Init(R, dialog_find));
-  with D^ do
+  D := TSearchHelperDialog.Create(R, dialog_find);
+  with D do
   begin
     Options:=Options or ofCentered;
     GetExtent(R); R.Grow(-3,-2);
     R1.Copy(R); R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
     R2.Copy(R); R2.B.X:=R2.B.X-3;R2.A.X:=17; R2.B.Y:=R2.A.Y+1;
-    New(IL1, Init(R2, FindStrSize));
-    IL1^.Data^:=FindStr;
+    IL1 := TEditorInputLine.Create(R2, FindStrSize);
+    IL1.Data^:=FindStr;
     Insert(IL1);
-    Insert(New(PLabel, Init(R1, label_find_texttofind, IL1)));
+    Insert(TLabel.Create(R1, label_find_texttofind, IL1));
     R1.Assign(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
-    Control := New(PHistory, Init(R1, IL1, TextFindId));
+    Control := THistory.Create(R1, IL1, TextFindId);
     Insert(Control);
 
     R1.Copy(R); Inc(R1.A.Y,2); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
     R2.Copy(R1); R2.Move(0,1);
     R2.B.Y:=R2.A.Y+{$ifdef TEST_REGEXP}3{$else}2{$endif};
-    New(CB1, Init(R2,
+    CB1 := TCheckBoxes.Create(R2,
       NewSItem(label_find_casesensitive,
       NewSItem(label_find_wholewordsonly,
 {$ifdef TEST_REGEXP}
       NewSItem(label_find_useregexp,
 {$endif TEST_REGEXP}
-      nil)))){$ifdef TEST_REGEXP}){$endif TEST_REGEXP};
+      nil))){$ifdef TEST_REGEXP}){$endif TEST_REGEXP};
     Insert(CB1);
-    Insert(New(PLabel, Init(R1, label_find_options, CB1)));
+    Insert(TLabel.Create(R1, label_find_options, CB1));
 
     R1.Copy(R); Inc(R1.A.Y,2); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
     R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
-    New(RB1, Init(R2,
+    RB1 := TRadioButtons.Create(R2,
       NewSItem(label_find_forward,
       NewSItem(label_find_backward,
-      nil))));
+      nil)));
     Insert(RB1);
-    Insert(New(PLabel, Init(R1, label_find_direction, RB1)));
+    Insert(TLabel.Create(R1, label_find_direction, RB1));
 
     R1.Copy(R); Inc(R1.A.Y,6); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
     R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
-    New(RB2, Init(R2,
+    RB2 := TRadioButtons.Create(R2,
       NewSItem(label_find_global,
       NewSItem(label_find_selectedtext,
-      nil))));
+      nil)));
     Insert(RB2);
-    Insert(New(PLabel, Init(R1, label_find_scope, RB2)));
+    Insert(TLabel.Create(R1, label_find_scope, RB2));
 
     R1.Copy(R); Inc(R1.A.Y,6); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
     R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
-    New(RB3, Init(R2,
+    RB3 := TRadioButtons.Create(R2,
       NewSItem(label_find_fromcursor,
       NewSItem(label_find_entirescope,
-      nil))));
+      nil)));
     Insert(RB3);
-    Insert(New(PLabel, Init(R1, label_find_origin, RB3)));
+    Insert(TLabel.Create(R1, label_find_origin, RB3));
 
     GetExtent(R); R.Grow(-13,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
-    Okbutton:=New(PButton, Init(R, btn_OK, cmOK, bfDefault));
+    Okbutton := TButton.Create(R, btn_OK, cmOK, bfDefault);
     Insert(OkButton);
     R.Move(19,0);
-    Insert(New(PButton, Init(R, btn_Cancel, cmCancel, bfNormal)));
+    Insert(TButton.Create(R, btn_Cancel, cmCancel, bfNormal));
   end;
-  IL1^.Select;
+  IL1.Select;
   CreateFindDialog := D;
 end;
 
@@ -7063,81 +7105,81 @@ var R,R1,R2: TRect;
     RB1,RB2,RB3: PRadioButtons;
 begin
   R.Assign(0,0,56,18);
-  New(D, Init(R, dialog_replace));
-  with D^ do
+  D := TSearchHelperDialog.Create(R, dialog_replace);
+  with D do
   begin
     Options:=Options or ofCentered;
     GetExtent(R); R.Grow(-3,-2);
     R1.Copy(R); R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
     R2.Copy(R); R2.B.X:=R2.B.X-3;R2.A.X:=17; R2.B.Y:=R2.A.Y+1;
-    New(IL1, Init(R2, FindStrSize));
-    IL1^.Data^:=FindStr;
+    IL1 := TEditorInputLine.Create(R2, FindStrSize);
+    IL1.Data^:=FindStr;
     Insert(IL1);
-    Insert(New(PLabel, Init(R1, label_replace_texttofind, IL1)));
+    Insert(TLabel.Create(R1, label_replace_texttofind, IL1));
     R1.Assign(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
-    Control := New(PHistory, Init(R1, IL1, TextFindId));
+    Control := THistory.Create(R1, IL1, TextFindId);
     Insert(Control);
 
     R1.Copy(R); R1.Move(0,2); R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
     R2.Copy(R); R2.Move(0,2);R2.B.X:=R2.B.X-3;
     R2.A.X:=17; R2.B.Y:=R2.A.Y+1;
-    New(IL2, Init(R2, FindStrSize));
-    IL2^.Data^:=ReplaceStr;
+    IL2 := TEditorInputLine.Create(R2, FindStrSize);
+    IL2.Data^:=ReplaceStr;
     Insert(IL2);
-    Insert(New(PLabel, Init(R1, label_replace_newtext, IL2)));
+    Insert(TLabel.Create(R1, label_replace_newtext, IL2));
     R1.Assign(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
-    Control := New(PHistory, Init(R1, IL2, TextReplaceId));
+    Control := THistory.Create(R1, IL2, TextReplaceId);
     Insert(Control);
 
     R1.Copy(R); Inc(R1.A.Y,4); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
     R2.Copy(R1); R2.Move(0,1);
     R2.B.Y:=R2.A.Y+{$ifdef TEST_REGEXP}4{$else}3{$endif};
-    New(CB1, Init(R2,
+    CB1 := TCheckBoxes.Create(R2,
       NewSItem(label_replace_casesensitive,
       NewSItem(label_replace_wholewordsonly,
       NewSItem(label_replace_promptonreplace,
 {$ifdef TEST_REGEXP}
       NewSItem(label_find_useregexp,
 {$endif TEST_REGEXP}
-      nil))))){$ifdef TEST_REGEXP}){$endif TEST_REGEXP};
+      nil)))){$ifdef TEST_REGEXP}){$endif TEST_REGEXP};
     Insert(CB1);
-    Insert(New(PLabel, Init(R1, label_replace_options, CB1)));
+    Insert(TLabel.Create(R1, label_replace_options, CB1));
 
     R1.Copy(R); Inc(R1.A.Y,4); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
     R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
-    New(RB1, Init(R2,
+    RB1 := TRadioButtons.Create(R2,
       NewSItem(label_replace_forward,
       NewSItem(label_replace_backward,
-      nil))));
+      nil)));
     Insert(RB1);
-    Insert(New(PLabel, Init(R1, label_replace_direction, RB1)));
+    Insert(TLabel.Create(R1, label_replace_direction, RB1));
 
     R1.Copy(R); Inc(R1.A.Y,9); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
     R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
-    New(RB2, Init(R2,
+    RB2 := TRadioButtons.Create(R2,
       NewSItem(label_replace_global,
       NewSItem(label_replace_selectedtext,
-      nil))));
+      nil)));
     Insert(RB2);
-    Insert(New(PLabel, Init(R1, label_replace_scope, RB2)));
+    Insert(TLabel.Create(R1, label_replace_scope, RB2));
 
     R1.Copy(R); Inc(R1.A.Y,9); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
     R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
-    New(RB3, Init(R2,
+    RB3 := TRadioButtons.Create(R2,
       NewSItem(label_replace_fromcursor,
       NewSItem(label_replace_entirescope,
-      nil))));
+      nil)));
     Insert(RB3);
-    Insert(New(PLabel, Init(R1, label_replace_origin, RB3)));
+    Insert(TLabel.Create(R1, label_replace_origin, RB3));
 
     GetExtent(R); R.Grow(-13,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10; R.Move(-10,0);
-    Insert(New(PButton, Init(R, btn_OK, cmOK, bfDefault)));
+    Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
     R.Move(11,0); R.B.X:=R.A.X+14;
-    Insert(New(PButton, Init(R, btn_replace_changeall, cmYes, bfNormal)));
+    Insert(TButton.Create(R, btn_replace_changeall, cmYes, bfNormal));
     R.Move(15,0); R.B.X:=R.A.X+10;
-    Insert(New(PButton, Init(R, btn_Cancel, cmCancel, bfNormal)));
+    Insert(TButton.Create(R, btn_Cancel, cmCancel, bfNormal));
   end;
-  IL1^.Select;
+  IL1.Select;
   CreateReplaceDialog := D;
 end;
 
@@ -7148,28 +7190,28 @@ var D: PDialog;
     IL: PEditorInputLine;
 begin
   R.Assign(0,0,40,7);
-  New(D, Init(R, dialog_gotoline));
-  with D^ do
+  D := TSearchHelperDialog.Create(R, dialog_gotoline);
+  with D do
   begin
     Options:=Options or ofCentered;
     GetExtent(R); R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
     R1.Copy(R); R1.B.X:=27; R2.Copy(R);
     R2.B.X:=R2.B.X-3;R2.A.X:=27;
-    New(IL, Init(R2,5));
+    IL := TEditorInputLine.Create(R2,5);
     with TGotoLineDialogRec(Info^) do
-    IL^.SetValidator(New(PRangeValidator, Init(1, Lines)));
+    IL.SetValidator(TRangeValidator.Create(1, Lines));
     Insert(IL);
-    Insert(New(PLabel, Init(R1, label_gotoline_linenumber, IL)));
+    Insert(TLabel.Create(R1, label_gotoline_linenumber, IL));
     R1.Assign(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
-    Control := New(PHistory, Init(R1, IL, GotoId));
+    Control := THistory.Create(R1, IL, GotoId);
     Insert(Control);
 
     GetExtent(R); R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
-    Insert(New(PButton, Init(R, btn_OK, cmOK, bfDefault)));
+    Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
     R.Move(15,0);
-    Insert(New(PButton, Init(R, btn_Cancel, cmCancel, bfNormal)));
+    Insert(TButton.Create(R, btn_Cancel, cmCancel, bfNormal));
   end;
-  IL^.Select;
+  IL.Select;
   CreateGotoLineDialog:=D;
 end;
 
@@ -7187,19 +7229,19 @@ begin
   case Dialog of
     edOutOfMemory:
       StdEditorDialog := AdvMessageBox(msg_notenoughmemoryforthisoperation,
-   nil, mfInsertInApp+ mfError + mfOkButton);
+   nil, mfInsertInApp+ mfError + mfOKButton);
     edReadError:
       StdEditorDialog := AdvMessageBox(msg_errorreadingfile,
-   @Info, mfInsertInApp+ mfError + mfOkButton);
+   @Info, mfInsertInApp+ mfError + mfOKButton);
     edWriteError:
       StdEditorDialog := AdvMessageBox(msg_errorwritingfile,
-   @Info, mfInsertInApp+ mfError + mfOkButton);
+   @Info, mfInsertInApp+ mfError + mfOKButton);
     edSaveError:
       StdEditorDialog := AdvMessageBox(msg_errorsavingfile,
-   @Info, mfInsertInApp+ mfError + mfOkButton);
+   @Info, mfInsertInApp+ mfError + mfOKButton);
     edCreateError:
       StdEditorDialog := AdvMessageBox(msg_errorcreatingfile,
-   @Info, mfInsertInApp+ mfError + mfOkButton);
+   @Info, mfInsertInApp+ mfError + mfOKButton);
     edSaveModify:
       StdEditorDialog := AdvMessageBox(msg_filehasbeenmodifiedsave,
    @Info, mfInsertInApp+ mfInformation + mfYesNoCancel);
@@ -7261,8 +7303,8 @@ begin
             end;
         else begin Title:='???'; DefExt:=''; end;
         end;
-        Re:=Application^.ExecuteDialog(New(PFileDialog, Init(DefExt,
-          Title, label_name, fdOkButton, FileId)), @Name);
+        Re:=Application.ExecuteDialog(TFileDialog.Create(DefExt,
+          Title, label_name, fdOkButton, FileId), @Name);
         case Dialog of
           edSaveAs     :
             begin
@@ -7297,25 +7339,25 @@ begin
       end;
     edGotoLine:
       StdEditorDialog :=
-   Application^.ExecuteDialog(CreateGotoLineDialog(Info), Info);
+   Application.ExecuteDialog(CreateGotoLineDialog(Info), Info);
     edFind:
       StdEditorDialog :=
-   Application^.ExecuteDialog(CreateFindDialog, Info);
+   Application.ExecuteDialog(CreateFindDialog, Info);
     edSearchFailed:
       StdEditorDialog := AdvMessageBox(msg_searchstringnotfound,
-   nil, mfInsertInApp+ mfError + mfOkButton);
+   nil, mfInsertInApp+ mfError + mfOKButton);
     edReplace:
       StdEditorDialog :=
-   Application^.ExecuteDialog(CreateReplaceDialog, Info);
+   Application.ExecuteDialog(CreateReplaceDialog, Info);
     edReplacePrompt:
       begin
    { Avoid placing the dialog on the same line as the cursor }
    R.Assign(0, 1, 40, 8);
-   R.Move((Desktop^.Size.X - R.B.X) div 2, 0);
-   Desktop^.MakeGlobal(R.B, T);
+   R.Move((Desktop.Size.X - R.B.X) div 2, 0);
+   Desktop.MakeGlobal(R.B, T);
    Inc(T.Y);
    if PPoint(Info)^.Y <= T.Y then
-     R.Move(0, Desktop^.Size.Y - R.B.Y - 2);
+     R.Move(0, Desktop.Size.Y - R.B.Y - 2);
    StdEditorDialog := AdvMessageBoxRect(R, msg_replacethisoccourence,
      nil, mfInsertInApp+ mfYesNoCancel + mfInformation);
       end;
