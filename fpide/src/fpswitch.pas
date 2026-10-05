@@ -497,26 +497,26 @@ begin
   inherited Create(n,p,AID);
   typ:=ot_MultiString;
   for i:=low(MultiStr) to high(MultiStr) do
-    new(MultiStr[i],init(5,5));
+    MultiStr[i] := TUnsortedStringCollection.Create(5,5);
 {  Reset;}
 end;
 
 function TMultiStringItem.NeedParam:boolean;
 
 begin
-  NeedParam:=(multistr[SwitchesMode]^.count<>0);
+  NeedParam:=(multistr[SwitchesMode].count<>0);
 end;
 
 function TMultiStringItem.ParamValue(nr:sw_integer):string;
 
 begin
-  ParamValue:=MultiStr[SwitchesMode]^.at(nr)^;
+  ParamValue:=MultiStr[SwitchesMode].at(nr)^;
 end;
 
 function TMultiStringItem.ParamCount:sw_integer;
 
 begin
-  ParamCount:=Multistr[SwitchesMode]^.count;
+  ParamCount:=Multistr[SwitchesMode].count;
 end;
 
 procedure TMultiStringItem.Reset;
@@ -525,7 +525,7 @@ var i:TSwitchMode;
 
 begin
   for i:=low(multiStr) to high(multiStr) do
-    MultiStr[i]^.freeall;
+    MultiStr[i].freeall;
 end;
 
 destructor TmultiStringItem.Destroy;
@@ -611,7 +611,7 @@ end;
 
 procedure TSwitches.AddDefaultSelect(const name:string);
 begin
-  Items.Insert(New(PSelectItem,InitDefault(name)));
+  Items.Insert(TSelectItem.InitDefault(name));
 end;
 
 
@@ -930,7 +930,7 @@ begin
             PStringItem(FoundP).Str[SwitchesMode]:=Copy(s,length(FoundP.Param)+1,255);
          end;
       ot_MultiString :
-        PMultiStringItem(foundP).MultiStr[SwitchesMode]^.insert(newstr(copy(s,length(foundP.param)+1,255)));
+        PMultiStringItem(foundP).MultiStr[SwitchesMode].insert(newstr(copy(s,length(foundP.param)+1,255)));
       ot_Longint : Val(Copy(s,length(FoundP.Param)+1,255),PLongintItem(FoundP).Val[SwitchesMode],code);
      end;
      ReadItemsCfg:=true;
@@ -1109,48 +1109,48 @@ var
 begin
   if assigned(AsmOutputSwitches) then
     AsmOutputSwitches.Free;
-  New(AsmOutputSwitches,InitSelect('A'));
+  AsmOutputSwitches := TSwitches.InitSelect('A');
   with AsmOutputSwitches do
    begin
 
      AddDefaultSelect(opt_usedefaultas);
      for ta:=low(tasm) to high(tasm) do
        if assigned(asminfos[ta]) and
-         ((target_info.system in asminfos[ta]^.supported_targets) or
-         (system_any in asminfos[ta]^.supported_targets)) then
+         ((target_info.system in asminfos[ta].supported_targets) or
+         (system_any in asminfos[ta].supported_targets)) then
          begin
-           st:='Asm '+asminfos[ta]^.idtxt;
-           if asminfos[ta]^.idtxt='AS' then
+           st:='Asm '+asminfos[ta].idtxt;
+           if asminfos[ta].idtxt='AS' then
              st:=opt_usegnuas;
 {$ifdef I386}
-           if asminfos[ta]^.idtxt='NASMCOFF' then
+           if asminfos[ta].idtxt='NASMCOFF' then
              st:=opt_usenasmcoff;
-           if asminfos[ta]^.idtxt='NASMOBJ' then
+           if asminfos[ta].idtxt='NASMOBJ' then
              st:=opt_usenasmobj;
-           if asminfos[ta]^.idtxt='NASMWIN32' then
+           if asminfos[ta].idtxt='NASMWIN32' then
              st:=opt_usenasmwin32;
-           if asminfos[ta]^.idtxt='NASMWDOSX' then
+           if asminfos[ta].idtxt='NASMWDOSX' then
              st:=opt_usenasmwdosx;
-           if asminfos[ta]^.idtxt='NASMELF' then
+           if asminfos[ta].idtxt='NASMELF' then
              st:=opt_usenasmelf;
-           if asminfos[ta]^.idtxt='NASMBEOS' then
+           if asminfos[ta].idtxt='NASMBEOS' then
              st:=opt_usenasmbeos;
-           if asminfos[ta]^.idtxt='MASM' then
+           if asminfos[ta].idtxt='MASM' then
              st:=opt_usemasm;
-           if asminfos[ta]^.idtxt='TASM' then
+           if asminfos[ta].idtxt='TASM' then
              st:=opt_usetasm;
-           if asminfos[ta]^.idtxt='WASM' then
+           if asminfos[ta].idtxt='WASM' then
              st:=opt_usewasm;
-           if asminfos[ta]^.idtxt='COFF' then
+           if asminfos[ta].idtxt='COFF' then
              st:=opt_usecoff;
-           if asminfos[ta]^.idtxt='PECOFF' then
+           if asminfos[ta].idtxt='PECOFF' then
              st:=opt_usepecoff;
-           if asminfos[ta]^.idtxt='PEWDOSX' then
+           if asminfos[ta].idtxt='PEWDOSX' then
              st:=opt_usepecoffwdosx;
-           if asminfos[ta]^.idtxt='ELF' then
+           if asminfos[ta].idtxt='ELF' then
              st:=opt_useelf;
 {$endif I386}
-           AddSelectItem(st,asminfos[ta]^.idtxt,idNone);
+           AddSelectItem(st,asminfos[ta].idtxt,idNone);
          end;
    end;
 end;
@@ -1165,7 +1165,7 @@ var
   cpu : tcputype;
   st : string;
 begin
-  New(SyntaxSwitches,Init('S'));
+  SyntaxSwitches := TSwitches.Create('S');
   with SyntaxSwitches do
    begin
 //     AddBooleanItem(opt_objectpascal,'2',idNone);
@@ -1185,7 +1185,7 @@ begin
      AddBooleanItem(opt_extendedsyntax,'/',idExtendedSyntax);
      AddBooleanItem(opt_allowmmxoperations,'/',idMMXOps);  }
    end;
-  New(CompilerModeSwitches,InitSelect('M'));
+  CompilerModeSwitches := TSwitches.InitSelect('M');
   with CompilerModeSwitches do
     begin
        AddSelectItem(opt_mode_freepascal,'fpc',idNone);
@@ -1196,7 +1196,7 @@ begin
 {      GNU Pascal mode doesn't do much, better disable it
        AddSelectItem(opt_mode_gnupascal,'gpc',idNone);}
     end;
-  New(VerboseSwitches,Init('v'));
+  VerboseSwitches := TSwitches.Create('v');
   with VerboseSwitches do
    begin
      AddBooleanItem(opt_warnings,'w',idNone);
@@ -1207,7 +1207,7 @@ begin
      AddBooleanItem(opt_all,'a',idNone);
      AddBooleanItem(opt_showallprocsonerror,'b',idNone);
    end;
-  New(CodegenSwitches,Init('C'));
+  CodegenSwitches := TSwitches.Create('C');
   with CodegenSwitches do
    begin
      AddBooleanItem(opt_rangechecking,'r',idRangeChecks);
@@ -1218,7 +1218,7 @@ begin
      AddBooleanItem(opt_pic,'g',idNone);
      AddBooleanItem(opt_smart,'X',idNone);
    end;
-  New(OptimizationSwitches,Init('O'));
+  OptimizationSwitches := TSwitches.Create('O');
   with OptimizationSwitches do
    begin
      AddBooleanItem(opt_generatesmallercode,'s',idNone);
@@ -1235,7 +1235,7 @@ begin
  {$endif m68k}
 {$endif I386}
    end;
-  New(ProcessorOptimizationSwitches,InitSelect('O'));
+  ProcessorOptimizationSwitches := TSwitches.InitSelect('O');
   with ProcessorOptimizationSwitches do
    begin
      for cpu:=low(tcputype) to high(tcputype) do
@@ -1265,7 +1265,7 @@ begin
            AddSelectItem(st,'p'+cputypestr[cpu],idNone);
        end;
    end;
-  New(ProcessorCodeGenerationSwitches,InitSelect('C'));
+  ProcessorCodeGenerationSwitches := TSwitches.InitSelect('C');
   with ProcessorCodeGenerationSwitches do
    begin
      for cpu:=low(tcputype) to high(tcputype) do
@@ -1299,15 +1299,15 @@ begin
            AddSelectItem(st,'p'+cputypestr[cpu],idNone);
        end;
    end;
-  New(TargetSwitches,InitSelect('T'));
+  TargetSwitches := TSwitches.InitSelect('T');
   with TargetSwitches do
    begin
      { better, we've a correct target list without "tilded" names instead a wrong one }
      for t:=low(tsystem) to high(tsystem) do
        if assigned(targetinfos[t]) then
-         AddSelectItem(targetinfos[t]^.name,targetinfos[t]^.shortname,idNone);
+         AddSelectItem(targetinfos[t].name,targetinfos[t].shortname,idNone);
    end;
-  New(AsmReaderSwitches,InitSelect('R'));
+  AsmReaderSwitches := TSwitches.InitSelect('R');
   with AsmReaderSwitches do
    begin
 {$ifdef I386}
@@ -1322,7 +1322,7 @@ begin
      AddSelectItem(opt_motassembler,'motorola',idAsmMot);
 {$endif M68K}
    end;
-  New(AsmInfoSwitches,Init('a'));
+  AsmInfoSwitches := TSwitches.Create('a');
   with AsmInfoSwitches do
    begin
      AddBooleanItem(opt_listsource,'l',idNone);
@@ -1332,19 +1332,19 @@ begin
      AddBooleanItem(opt_useasmpipe,'p',idNone);
    end;
   UpdateAsmOutputSwitches;
-  New(BrowserSwitches,InitSelect('b'));
+  BrowserSwitches := TSwitches.InitSelect('b');
   with BrowserSwitches do
    begin
      AddSelectItem(opt_nobrowser,'-',idSymInfNone);
      AddSelectItem(opt_globalonlybrowser,'+',idSymInfGlobalOnly);
      AddSelectItem(opt_localglobalbrowser,'l',idSymInfGlobalLocal);
    end;
-  New(ConditionalSwitches,Init('d'));
+  ConditionalSwitches := TSwitches.Create('d');
   with ConditionalSwitches do
    begin
      AddStringItem(opt_conditionaldefines,'',idNone,true,false);
    end;
-  New(MemorySwitches,Init('C'));
+  MemorySwitches := TSwitches.Create('C');
   with MemorySwitches do
    begin
      AddLongintItem(opt_stacksize,'s',idStackSize);
@@ -1363,7 +1363,7 @@ begin
      AddStringItem(opt_dynamic_linker,'L',idNone,false,false);
    end;
 
-  New(LibLinkerSwitches,InitSelect('X'));
+  LibLinkerSwitches := TSwitches.InitSelect('X');
   with LibLinkerSwitches do
    begin
      AddDefaultSelect(opt_librariesdefault);
@@ -1371,13 +1371,13 @@ begin
      AddSelectItem(opt_staticlibraries,'S',idNone);
      AddSelectItem(opt_smartlibraries,'X',idNone);
    end;
-  New(OtherLinkerSwitches,Init('X'));
+  OtherLinkerSwitches := TSwitches.Create('X');
   with OtherLinkerSwitches do
    begin
      AddBooleanItem(opt_stripalldebugsymbols,'s',idNone);
      AddBooleanItem(opt_forcestaticlibs,'t',idNone);
    end;
-  New(DebugInfoSwitches,InitSelect('g'));
+  DebugInfoSwitches := TSwitches.InitSelect('g');
   with DebugInfoSwitches do
    begin
      AddSelectItem(opt_nogendebugsymbolinfo,'-',idNone);
@@ -1387,15 +1387,15 @@ begin
      { AddSelectItem('Generate ~d~bx symbol information','d');
        does not work anyhow (PM) }
    end;
-  New(LinkAfterSwitches,Init('s'));
+  LinkAfterSwitches := TSwitches.Create('s');
   LinkAfterSwitches.AddBooleanItem(opt_linkafter,'',idNone);
-  New(ProfileInfoSwitches,InitSelect('p'));
+  ProfileInfoSwitches := TSwitches.InitSelect('p');
   with ProfileInfoSwitches do
    begin
      AddSelectItem(opt_noprofileinfo,'-',idNone);
      AddSelectItem(opt_gprofinfo,'g',idNone);
    end;
-  {New(MemorySizeSwitches,Init('C'));
+  {MemorySizeSwitches := TSwitches.Create('C');
   with MemorySizeSwitches do
    begin
      AddLongIntItem('~S~tack size','s');

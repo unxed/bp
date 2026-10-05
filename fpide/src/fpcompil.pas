@@ -60,11 +60,11 @@ type
 
     PCompilerMessageWindow = ^TCompilerMessageWindow;
     TCompilerMessageWindow = class(TFPWindow)
-      constructor Init;
+      constructor Create;
       procedure   HandleEvent(var Event: TEvent); virtual;
       function    GetPalette: TPalette; virtual;
       procedure   Close;virtual;
-      destructor  Done; virtual;
+      destructor Destroy; virtual;
       procedure   SizeLimits(var Min, Max: TPoint); virtual;
       procedure   AddMessage(AClass: longint;const Msg, Module: string; Line, Column: longint);
       procedure   ClearMessages;
@@ -85,8 +85,8 @@ type
       ST    : PAdvancedStaticText;
       KeyST : PColorStaticText;
       starttime : real;
-      constructor Init;
-      destructor Done;virtual;
+      constructor Create;
+      destructor Destroy;virtual;
       procedure   Update;
       procedure SetStartTime(r : real);
     end;
@@ -256,7 +256,7 @@ var
               end
             else
               row:=0;
-            CompilerMessageWindow^.AddMessage(V_Fatal or v_lineinfo,AText
+            CompilerMessageWindow.AddMessage(V_Fatal or v_lineinfo,AText
                   ,ModuleName,row,1);
             DisplayCompilerWindow:=true;
           end;
@@ -276,7 +276,7 @@ var
             Val(Copy(st,1,pos(',',st)-1),row,cc);
             st:=Copy(st,Pos(',',st)+1,255);
             Val(Copy(st,1,pos(')',st)-1),col,cc);
-            CompilerMessageWindow^.AddMessage(_type,Copy(Text,pos(':',Text)+1,255)
+            CompilerMessageWindow.AddMessage(_type,Copy(Text,pos(':',Text)+1,255)
               ,ModuleName,row,col);
             If EnableDisplay then
               DisplayCompilerWindow:=true;
@@ -287,17 +287,17 @@ begin
   if not assigned(UserScreen) then
     exit;
   DisplayCompilerWindow:=false;
-  YMax:=UserScreen^.GetHeight;
+  YMax:=UserScreen.GetHeight;
   PushStatus('Parsing User Screen');
-  CompilerMessageWindow^.Lock;
+  CompilerMessageWindow.Lock;
   for Y:=0 to YMax do
     begin
-      UserScreen^.GetLine(Y,Text,Attr);
+      UserScreen.GetLine(Y,Text,Attr);
       if (y mod 10) = 0 then
         begin
-          CompilerMessageWindow^.Unlock;
+          CompilerMessageWindow.Unlock;
           SetStatus('Parsing User Screen line '+IntToStr(y)+'/'+IntToStr(YMax));
-          CompilerMessageWindow^.Lock;
+          CompilerMessageWindow.Lock;
         end;
       GetKeyEvent(LEvent);
       if (LEvent.What=evKeyDown) and (LEvent.KeyCode=kbEsc) then
@@ -312,12 +312,12 @@ begin
     end;
   if DisplayCompilerWindow then
     begin
-      if not CompilerMessageWindow^.GetState(sfVisible) then
-        CompilerMessageWindow^.Show;
-      CompilerMessageWindow^.MakeFirst;
-      CompilerMessageWindow^.MsgLB^.SelectFirstError;
+      if not CompilerMessageWindow.GetState(sfVisible) then
+        CompilerMessageWindow.Show;
+      CompilerMessageWindow.MakeFirst;
+      CompilerMessageWindow.MsgLB.SelectFirstError;
     end;
-  CompilerMessageWindow^.UnLock;
+  CompilerMessageWindow.UnLock;
   PopStatus;
 end;
 
@@ -389,15 +389,15 @@ end;
 procedure TCompilerMessageListBox.SelectFirstError;
   function IsError(P : PCompilerMessage) : boolean;
     begin
-      IsError:=(P^.TClass and (V_Fatal or V_Error))<>0;
+      IsError:=(P.TClass and (V_Fatal or V_Error))<>0;
     end;
   var
     P : PCompilerMessage;
 begin
-  P:=List^.FirstThat(@IsError);
+  P:=List.FirstThat(@IsError);
   If Assigned(P) then
     Begin
-      FocusItem(List^.IndexOf(P));
+      FocusItem(List.IndexOf(P));
       DrawView;
     End;
 end;
@@ -407,31 +407,31 @@ end;
                                 TCompilerMessageWindow
 *****************************************************************************}
 
-constructor TCompilerMessageWindow.Init;
+constructor TCompilerMessageWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  Desktop^.GetExtent(R);
+  Desktop.GetExtent(R);
   R.A.Y:=R.B.Y-7;
-  inherited Init(R,dialog_compilermessages,{SearchFreeWindowNo}wnNoNumber);
+  inherited Create(R,dialog_compilermessages,{SearchFreeWindowNo}wnNoNumber);
   HelpCtx:=hcCompilerMessagesWindow;
 
   AutoNumber:=true;
 
   HSB:=StandardScrollBar(sbHorizontal+sbHandleKeyboard);
-  HSB^.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY;
+  HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY;
   Insert(HSB);
   VSB:=StandardScrollBar(sbVertical+sbHandleKeyboard);
-  VSB^.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
+  VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
   Insert(VSB);
 
   GetExtent(R);
   R.Grow(-1,-1);
-  New(MsgLB, Init(R, HSB, VSB));
+  MsgLB := TCompilerMessageListBox.Create(R, HSB, VSB);
 
-  MsgLB^.GrowMode:=gfGrowHiX+gfGrowHiY;
+  MsgLB.GrowMode:=gfGrowHiX+gfGrowHiY;
   Insert(MsgLB);
-  CompilerMessageWindow:=@self;
+  CompilerMessageWindow:=Self;
 end;
 
 
@@ -439,12 +439,12 @@ procedure TCompilerMessageWindow.AddMessage(AClass: longint;const Msg, Module: s
 begin
   if (AClass and V_LineInfo)<>V_LineInfo then
     Line:=0;
-  MsgLB^.AddItem(New(PCompilerMessage,Init(AClass, Msg, MsgLB^.AddModuleName(Module), Line, Column)));
-  if (@Self=CompilerMessageWindow) and ((AClass = V_fatal) or (AClass = V_Error)) then
+  MsgLB.AddItem(TCompilerMessage.Create(AClass, Msg, MsgLB.AddModuleName(Module), Line, Column));
+  if (Self=CompilerMessageWindow) and ((AClass = V_fatal) or (AClass = V_Error)) then
     begin
       if not GetState(sfVisible) then
         Show;
-      if Desktop^.First<>PView(CompilerMessageWindow) then
+      if Desktop.First<>PView(CompilerMessageWindow) then
         MakeFirst;
     end;
 end;
@@ -452,7 +452,7 @@ end;
 
 procedure TCompilerMessageWindow.ClearMessages;
 begin
-  MsgLB^.Clear;
+  MsgLB.Clear;
   ReDraw;
 end;
 
@@ -461,16 +461,16 @@ end;
 begin
   if CompileShowed then
    begin
-     InfoST^.SetText(
+     InfoST.SetText(
        RExpand(' Main file : '#1#$7f+Copy(SmartPath(MainFile),1,39),40)+#2+
          'Total lines  : '#1#$7e+IntToStr(Status.CompiledLines)+#2#13+
-       RExpand(' Target    : '#1#$7f+KillTilde(TargetSwitches^.ItemName(TargetSwitches^.GetCurrSel)),40)+#2+
+       RExpand(' Target    : '#1#$7f+KillTilde(TargetSwitches.ItemName(TargetSwitches.GetCurrSel)),40)+#2+
          'Total errors : '#1#$7e+IntToStr(Status.ErrorCount)
      );
      if status.currentline>0 then
-      CurrST^.SetText(' Status: '#1#$7e+status.currentsource+'('+IntToStr(status.currentline)+')'#2)
+      CurrST.SetText(' Status: '#1#$7e+status.currentsource+'('+IntToStr(status.currentline)+')'#2)
      else
-      CurrST^.SetText(' Status: '#1#$7e+status.currentsource+#2);
+      CurrST.SetText(' Status: '#1#$7e+status.currentsource+#2);
    end;
   ReDraw;
 end;}
@@ -483,7 +483,7 @@ begin
       case Event.Command of
         cmListFocusChanged :
           if Event.InfoPtr=MsgLB then
-            Message(Application,evBroadcast,cmClearLineHighlights,@Self);
+            Message(Application,evBroadcast,cmClearLineHighlights,Self);
       end;
   end;
   inherited HandleEvent(Event);
@@ -521,8 +521,8 @@ end;
 
 procedure TCompilerMessageWindow.Store(var S: TStream);
 begin
-  if MsgLB^.List=nil then
-    MsgLB^.NewList(New(PCollection, Init(100,100)));
+  if MsgLB.List=nil then
+    MsgLB.NewList(TCollection.Create(100,100));
   inherited Store(S);
   PutSubViewPtr(S,MsgLB);
 end;
@@ -544,10 +544,10 @@ begin
     UpdateCommands;
 end;
 
-destructor TCompilerMessageWindow.Done;
+destructor TCompilerMessageWindow.Destroy;
 begin
   CompilerMessageWindow:=nil;
-  inherited Done;
+  inherited Destroy;
 end;
 
 
@@ -572,30 +572,30 @@ begin
 {$ENDIF USE_SYSUTILS}
 end;
 
-constructor TCompilerStatusDialog.Init;
+constructor TCompilerStatusDialog.Create;
 var R: TRect;
 begin
   R.Assign(0,0,56,11);
   ClearFormatParams; AddFormatParamStr(KillTilde(SwitchesModeName[SwitchesMode]));
-  inherited Init(R, FormatStrF(dialog_compilingwithmode, FormatParams));
+  inherited Create(R, FormatStrF(dialog_compilingwithmode, FormatParams));
   starttime:=getrealtime;
   GetExtent(R); R.B.Y:=11;
   R.Grow(-3,-2);
-  New(ST, Init(R, ''));
+  ST := TAdvancedStaticText.Create(R, '');
   Insert(ST);
   GetExtent(R); R.B.Y:=11;
   R.Grow(-1,-1); R.A.Y:=R.B.Y-1;
-  New(KeyST, Init(R, '', Blue*16+White+longint($80+Blue*16+White)*256,true));
+  KeyST := TColorStaticText.Create(R, '', Blue*16+White+longint($80+Blue*16+White)*256,true);
   Insert(KeyST);
   { Reset Status infos see bug 1585 }
   Fillchar(Status,SizeOf(Status),#0);
 end;
 
-destructor TCompilerStatusDialog.Done;
+destructor TCompilerStatusDialog.Destroy;
 begin
-  if @Self=CompilerStatusDialog then
+  if Self=CompilerStatusDialog then
     CompilerStatusDialog:=nil;
-  Inherited Done;
+  inherited Destroy;
 end;
 
 procedure TCompilerStatusDialog.SetStartTime(r : real);
@@ -663,7 +663,7 @@ begin
   AddFormatParamStr(ShrinkPath(SmartPath(MainFile),
     MaxFileNameSize-Length('Main file: %s')));
   AddFormatParamStr(StatusS);
-  AddFormatParamStr(KillTilde(TargetSwitches^.ItemName(TargetSwitches^.GetCurrSel)));
+  AddFormatParamStr(KillTilde(TargetSwitches.ItemName(TargetSwitches.GetCurrSel)));
   AddFormatParamInt(Status.CurrentLine);
   AddFormatParamInt(Status.CompiledLines);
   hstatus:=GetFPCHeapStatus;
@@ -673,7 +673,7 @@ begin
   r:=getrealtime;
   AddFormatParamInt(trunc(r-starttime));
   AddFormatParamInt(trunc(frac(r-starttime)*10));
-  ST^.SetText(
+  ST.SetText(
    FormatStrF(
     'Main file: %s'#13+
     '%s'+#13#13+
@@ -683,7 +683,7 @@ begin
     'Total errors:%6d     '+'Compile time: %8d.%1ds',
    FormatParams)
   );
-  KeyST^.SetText(^C+KeyS);
+  KeyST.SetText(^C+KeyS);
 end;
 
 
@@ -709,7 +709,7 @@ begin
 {$ifdef redircompiler}
           RedirDisableAll;
 {$endif}
-          CompilerStatusDialog^.Update;
+          CompilerStatusDialog.Update;
 {$ifdef redircompiler}
           RedirEnableAll;
 {$endif}
@@ -727,12 +727,12 @@ begin
           RedirDisableAll;
 {$endif}
      if assigned(CompilerStatusDialog) then
-      CompilerStatusDialog^.Update;
+      CompilerStatusDialog.Update;
 {$ifdef redircompiler}
           RedirEnableAll;
 {$endif}
      { update memory usage }
-     { HeapView^.Update; }
+     { HeapView.Update; }
    end;
   CompilerStatus:=false;
 end;
@@ -742,7 +742,7 @@ var t: longint;
     W: PSourceWindow;
 begin
   W:=EditorWindowFile(FExpand(filename));
-  if Assigned(W) and (W^.Editor^.GetModified) then
+  if Assigned(W) and (W.Editor.GetModified) then
     t:=Now
   else
     t:=def_getnamedfiletime(filename);
@@ -754,16 +754,16 @@ var f: tinputfile;
     W: PSourceWindow;
 begin
   if assigned(CompilingHiddenFile) and
-     (NameandExtof(filename)=CompilingHiddenFile^.Editor^.Filename) then
+     (NameandExtof(filename)=CompilingHiddenFile.Editor.Filename) then
     W:=CompilingHiddenFile
   else
     W:=EditorWindowFile(FExpand(filename));
-  if Assigned(W) and (W^.Editor^.GetModified) then
-    f:=TFPInputFile.Create(W^.Editor)
+  if Assigned(W) and (W.Editor.GetModified) then
+    f:=TFPInputFile.Create(W.Editor)
   else
     f:=def_openinputfile(filename);
   if assigned(W) then
-    W^.Editor^.CompileStamp:=CompileStamp;
+    W.Editor.CompileStamp:=CompileStamp;
   CompilerOpenInputFile:=f;
 end;
 
@@ -776,20 +776,20 @@ begin
      RedirDisableAll;
 {$endif}
 
-     if not CompilerMessageWindow^.GetState(sfVisible) then
-       CompilerMessageWindow^.Show;
-     if Desktop^.First<>PView(CompilerMessageWindow) then
-       CompilerMessageWindow^.MakeFirst;
-     CompilerMessageWindow^.AddMessage(Level,S,status.currentsourcepath+status.currentsource,
+     if not CompilerMessageWindow.GetState(sfVisible) then
+       CompilerMessageWindow.Show;
+     if Desktop.First<>PView(CompilerMessageWindow) then
+       CompilerMessageWindow.MakeFirst;
+     CompilerMessageWindow.AddMessage(Level,S,status.currentsourcepath+status.currentsource,
        status.currentline,status.currentcolumn);
      { update info messages }
      if assigned(CompilerStatusDialog) then
-      CompilerStatusDialog^.Update;
+      CompilerStatusDialog.Update;
 {$ifdef redircompiler}
       RedirEnableAll;
 {$endif}
      { update memory usage }
-     { HeapView^.Update; }
+     { HeapView.Update; }
    end;
 end;
 
@@ -806,7 +806,7 @@ var Path: string;
 begin
   Path:='';
   if DirectorySwitches<>nil then
-    with DirectorySwitches^ do
+    with DirectorySwitches do
     for I:=0 to ItemCount-1 do
       begin
         if ItemParam(I)='-FE' then
@@ -837,11 +837,11 @@ begin
         FileName:=PrimaryFileMain
       else if assigned(P) then
         begin
-          FileName:=P^.Editor^.FileName;
+          FileName:=P.Editor.FileName;
           if FileName='' then
             begin
-              P^.Editor^.SaveAsk(true);
-              FileName:=P^.Editor^.FileName;
+              P.Editor.SaveAsk(true);
+              FileName:=P.Editor.FileName;
             end;
         end
       else
@@ -861,11 +861,11 @@ procedure ResetErrorMessages;
   procedure ResetErrorLine(P: PView);
   begin
     if assigned(P) and
-       (TypeOf(P^)=TypeOf(TSourceWindow)) then
-       PSourceWindow(P)^.Editor^.SetErrorMessage('');
+       ((P is TSourceWindow)) then
+       PSourceWindow(P).Editor.SetErrorMessage('');
   end;
 begin
-  Desktop^.ForEach(@ResetErrorLine);
+  Desktop.ForEach(@ResetErrorLine);
 end;
 
 
@@ -906,10 +906,10 @@ begin
     end; }
   PushStatus('Beginning compilation...');
 { Show Compiler Messages Window }
-{  if not CompilerMessageWindow^.GetState(sfVisible) then
-   CompilerMessageWindow^.Show;
-  CompilerMessageWindow^.MakeFirst;}
-  CompilerMessageWindow^.ClearMessages;
+{  if not CompilerMessageWindow.GetState(sfVisible) then
+   CompilerMessageWindow.Show;
+  CompilerMessageWindow.MakeFirst;}
+  CompilerMessageWindow.ClearMessages;
   { Tell why we compile }
   NeedRecompile(Mode,true);
 
@@ -929,13 +929,13 @@ begin
   CompilationPhase:=cpCompiling;
   if not assigned(CompilingHiddenFile) then
     begin
-      New(CompilerStatusDialog, Init);
-      CompilerStatusDialog^.SetStartTime(getrealtime);
-      CompilerStatusDialog^.SetState(sfModal,true);
+      CompilerStatusDialog := TCompilerStatusDialog.Create;
+      CompilerStatusDialog.SetStartTime(getrealtime);
+      CompilerStatusDialog.SetState(sfModal,true);
       { disable window closing }
-      CompilerStatusDialog^.Flags:=CompilerStatusDialog^.Flags and not wfclose;
-      Application^.Insert(CompilerStatusDialog);
-      CompilerStatusDialog^.Update;
+      CompilerStatusDialog.Flags:=CompilerStatusDialog.Flags and not wfclose;
+      Application.Insert(CompilerStatusDialog);
+      CompilerStatusDialog.Update;
     end;
   { Restore dir that could be changed during debugging }
   {$I-}
@@ -971,9 +971,9 @@ begin
   {$ifndef NODEBUG}
   MustRestartDebugger:=false;
   if assigned(Debugger) then
-  if Debugger^.HasExe then
+  if Debugger.HasExe then
     begin
-      Debugger^.Reset;
+      Debugger.Reset;
       MustRestartDebugger:=true;
     end;
   {$endif NODEBUG}
@@ -981,9 +981,9 @@ begin
     FpIntF.Compile(FileName,SwitchesPath);
   except
     on ECompilerAbort do
-      CompilerMessageWindow^.AddMessage(V_error,'Error during compilation','',0,0);
+      CompilerMessageWindow.AddMessage(V_error,'Error during compilation','',0,0);
     on E:Exception do
-      CompilerMessageWindow^.AddMessage(V_error,E.Message+' during compilation','',0,0);
+      CompilerMessageWindow.AddMessage(V_error,E.Message+' during compilation','',0,0);
   end;
   SetStatus('Finished compiling...');
 
@@ -1002,7 +1002,7 @@ begin
     begin
        CompilationPhase:=cpLinking;
        if assigned(CompilerStatusDialog) then
-         CompilerStatusDialog^.Update;
+         CompilerStatusDialog.Update;
        SetStatus('Assembling and/or linking...');
 {$ifndef redircompiler}
        { At least here we want to catch output
@@ -1027,7 +1027,7 @@ begin
          begin
            Inc(status.errorCount);
            ClearFormatParams; AddFormatParamStr(ExeFile);
-           CompilerMessageWindow^.AddMessage(V_error,FormatStrF(msg_couldnotcreatefile,FormatParams),'',0,0);
+           CompilerMessageWindow.AddMessage(V_error,FormatStrF(msg_couldnotcreatefile,FormatParams),'',0,0);
          {$I-}
            Assign(ErrFile,FPErrFileName);
            Reset(ErrFile);
@@ -1039,13 +1039,13 @@ begin
              While not eof(ErrFile) and (LinkErrorCount<25) do
                begin
                  readln(ErrFile,s);
-                 CompilerMessageWindow^.AddMessage(V_error,s,'',0,0);
+                 CompilerMessageWindow.AddMessage(V_error,s,'',0,0);
                  inc(LinkErrorCount);
                end;
              if not eof(ErrFile) then
              begin
                ClearFormatParams; AddFormatParamStr(FPErrFileName);
-               CompilerMessageWindow^.AddMessage(V_error,
+               CompilerMessageWindow.AddMessage(V_error,
                  FormatStrF(msg_therearemoreerrorsinfile,FormatParams),'',0,0);
              end;
 
@@ -1075,49 +1075,49 @@ begin
   { reenable window closing }
   if assigned(CompilerStatusDialog) then
     begin
-      CompilerStatusDialog^.Flags:=CompilerStatusDialog^.Flags or wfclose;
-      CompilerStatusDialog^.Update;
-      CompilerStatusDialog^.ReDraw;
-      CompilerStatusDialog^.SetState(sfModal,false);
+      CompilerStatusDialog.Flags:=CompilerStatusDialog.Flags or wfclose;
+      CompilerStatusDialog.Update;
+      CompilerStatusDialog.ReDraw;
+      CompilerStatusDialog.SetState(sfModal,false);
       if ((CompilationPhase in [cpAborted,cpDone,cpFailed]) or (ShowStatusOnError))
         and ((Mode<>cRun) or (CompilationPhase<>cpDone)) then
        repeat
-         CompilerStatusDialog^.GetEvent(E);
+         CompilerStatusDialog.GetEvent(E);
          if IsExitEvent(E)=false then
-          CompilerStatusDialog^.HandleEvent(E);
+          CompilerStatusDialog.HandleEvent(E);
        until IsExitEvent(E) or not assigned(CompilerStatusDialog);
        {if IsExitEvent(E) then
-         Application^.PutEvent(E);}
+         Application.PutEvent(E);}
       if assigned(CompilerStatusDialog) then
         begin
-          Application^.Delete(CompilerStatusDialog);
-          Dispose(CompilerStatusDialog, Done);
+          Application.Delete(CompilerStatusDialog);
+          CompilerStatusDialog.Free;
         end;
     end;
   CompilerStatusDialog:=nil;
 { end compilation returns true if the messagewindow should be removed }
   if CompilationPhase=cpDone then
    begin
-     CompilerMessageWindow^.Hide;
+     CompilerMessageWindow.Hide;
      { This is the last compiled main file }
      PrevMainFile:=MainFile;
-     MainHasDebugInfo:=DebugInfoSwitches^.GetCurrSelParam<>'-';
+     MainHasDebugInfo:=DebugInfoSwitches.GetCurrSelParam<>'-';
    end;
 { Update the app }
   Message(Application,evCommand,cmUpdate,nil);
-  DummyView:=Desktop^.First;
-  while (DummyView<>nil) and (DummyView^.GetState(sfVisible)=false) do
+  DummyView:=Desktop.First;
+  while (DummyView<>nil) and (DummyView.GetState(sfVisible)=false) do
   begin
-    DummyView:=DummyView^.NextView;
+    DummyView:=DummyView.NextView;
   end;
-  with DummyView^ do
+  with DummyView do
    if GetState(sfVisible) then
     begin
       SetState(sfSelected,false);
       SetState(sfSelected,true);
     end;
   if Assigned(CompilerMessageWindow) then
-    with CompilerMessageWindow^ do
+    with CompilerMessageWindow do
       begin
         if GetState(sfVisible) then
           begin
@@ -1125,7 +1125,7 @@ begin
             SetState(sfSelected,true);
           end;
         if (status.errorCount>0) then
-          MsgLB^.SelectFirstError;
+          MsgLB.SelectFirstError;
       end;
   { ^^^ we need this trick to reactivate the desktop }
   EditorModified:=false;
@@ -1160,37 +1160,37 @@ begin
           if verbose then
           begin
             ClearFormatParams; AddFormatParamStr(GetMainFile(Mode));
-            CompilerMessageWindow^.AddMessage(V_info,
+            CompilerMessageWindow.AddMessage(V_info,
               FormatStrF(msg_firstcompilationof,FormatParams),
               '',0,0);
           end;
         end
       else
-        for I:=0 to SourceFiles^.Count-1 do
+        for I:=0 to SourceFiles.Count-1 do
           begin
-            SF:=SourceFiles^.At(I);
-            SourceTime:=wutils.GetFileTime(SF^.GetSourceFileName);
-            PPUTime:=wutils.GetFileTime(SF^.GetPPUFileName);
-            ObjTime:=wutils.GetFileTime(SF^.GetObjFileName);
-{            writeln('S: ',SF^.GetSourceFileName,' - ',SourceTime);
-            writeln('P: ',SF^.GetPPUFileName,' - ',PPUTime);
-            writeln('O: ',SF^.GetObjFileName,' - ',ObjTime);
+            SF:=SourceFiles.At(I);
+            SourceTime:=wutils.GetFileTime(SF.GetSourceFileName);
+            PPUTime:=wutils.GetFileTime(SF.GetPPUFileName);
+            ObjTime:=wutils.GetFileTime(SF.GetObjFileName);
+{            writeln('S: ',SF.GetSourceFileName,' - ',SourceTime);
+            writeln('P: ',SF.GetPPUFileName,' - ',PPUTime);
+            writeln('O: ',SF.GetObjFileName,' - ',ObjTime);
             writeln('------');}
             { some units don't generate object files }
-            W:=EditorWindowFile(SF^.GetSourceFileName);
+            W:=EditorWindowFile(SF.GetSourceFileName);
             if (SourceTime<>-1) then
               if ((SourceTime>PPUTime) or
                  ((SourceTime>ObjTime) and
                  (ObjTime<>-1))) or
-                 (assigned(W) and (W^.Editor^.CompileStamp<0)) then
+                 (assigned(W) and (W.Editor.CompileStamp<0)) then
                 begin
                   Need:=true;
                   if verbose then
                   begin
-                    ClearFormatParams; AddFormatParamStr(SF^.GetSourceFileName);
-                    CompilerMessageWindow^.AddMessage(V_info,
+                    ClearFormatParams; AddFormatParamStr(SF.GetSourceFileName);
+                    CompilerMessageWindow.AddMessage(V_info,
                       FormatStrF(msg_recompilingbecauseof,FormatParams),
-                      SF^.GetSourceFileName,1,1);
+                      SF.GetSourceFileName,1,1);
                   end;
                   Break;
                 end;
@@ -1205,7 +1205,7 @@ end;
 constructor TFPInputFile.Create(AEditor: PFileEditor);
 begin
   if not Assigned(AEditor) then Fail;
-  if inherited Create(AEditor^.FileName)=nil then
+  if inherited Create(AEditor.FileName)=nil then
     Fail;
   Editor:=AEditor;
 end;
@@ -1214,14 +1214,14 @@ end;
 function TFPInputFile.fileopen(const filename: ansistring): boolean;
 var OK: boolean;
 begin
-  S:=New(PMemoryStream, Init(0,0));
-  OK:=Assigned(S) and (S^.Status=stOK);
-  if OK then OK:=Editor^.SaveToStream(S);
+  S := TMemoryStream.Create(0,0);
+  OK:=Assigned(S) and (S.Status=stOK);
+  if OK then OK:=Editor.SaveToStream(S);
   if OK then
-    S^.Seek(0)
+    S.Seek(0)
   else
     begin
-      if Assigned(S) then Dispose(S, Done);
+      if Assigned(S) then S.Free;
       S:=nil;
     end;
   fileopen:=OK;
@@ -1233,9 +1233,9 @@ begin
   OK:=assigned(S);
   if OK then
   begin
-    S^.Reset;
-    S^.Seek(pos);
-    OK:=(S^.Status=stOK);
+    S.Reset;
+    S.Seek(pos);
+    OK:=(S.Status=stOK);
   end;
   fileseek:=OK;
 end;
@@ -1246,9 +1246,9 @@ var
 begin
   if not assigned(S) then size:=0 else
   begin
-    size:=min(maxsize,(S^.GetSize-S^.GetPos));
-    S^.Read(databuf,size);
-    if S^.Status<>stOK then size:=0;
+    size:=min(maxsize,(S.GetSize-S.GetPos));
+    S.Read(databuf,size);
+    if S.Status<>stOK then size:=0;
   end;
   fileread:=size;
 end;
@@ -1258,7 +1258,7 @@ var EOF: boolean;
 begin
   EOF:=not assigned(S);
   if not EOF then
-    EOF:=(S^.Status<>stOK) or (S^.GetPos=S^.GetSize);
+    EOF:=(S.Status<>stOK) or (S.GetPos=S.GetSize);
   fileeof:=EOF;
 end;
 
@@ -1268,8 +1268,8 @@ begin
   OK:=assigned(S);
   if OK then
   begin
-    S^.Reset;
-    Dispose(S, Done);
+    S.Reset;
+    S.Free;
     S:=nil;
     OK:=true;
   end;

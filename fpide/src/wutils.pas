@@ -53,6 +53,8 @@ const
 type
   PByteArray = ^TByteArray;
   TByteArray = array[0..MaxBytes] of byte;
+  PWordArray = ^TWordArray;
+  TWordArray = array[0..MaxBytes] of Word;
 
   TNoDisposeCollection = class;
   PNoDisposeCollection = TNoDisposeCollection;

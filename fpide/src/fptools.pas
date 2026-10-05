@@ -15,6 +15,9 @@
 {$I globdir.inc}
 unit FPTools;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 uses Objects,Drivers,Views,Dialogs,Validate,
@@ -371,14 +374,14 @@ end;
 procedure InitTools;
 begin
   if Tools<>nil then DoneTools;
-  New(Tools, Init(10,20));
+  Tools := TToolCollection.Create(10,20);
 end;
 
 function  GetToolCount: sw_integer;
 var Count: integer;
 begin
   if Tools=nil then Count:=0 else
-    Count:=Tools^.Count;
+    Count:=Tools.Count;
   GetToolCount:=Count;
 end;
 
@@ -394,28 +397,28 @@ function AddTool(Title, ProgramPath, Params: string; HotKey: word): sw_integer;
 var P: PTool;
 begin
   if Tools=nil then InitTools;
-  New(P, Init(Title,ProgramPath,Params,HotKey));
-  Tools^.Insert(P);
-  AddTool:=Tools^.IndexOf(P);
+  P := TTool.Create(Title,ProgramPath,Params,HotKey);
+  Tools.Insert(P);
+  AddTool:=Tools.IndexOf(P);
 end;
 
 procedure GetToolParams(Idx: sw_integer; var Title, ProgramPath, Params: string; var HotKey: word);
 var P: PTool;
 begin
-  P:=Tools^.At(Idx);
+  P:=Tools.At(Idx);
   P.GetParams(Title,ProgramPath,Params,HotKey);
 end;
 
 procedure SetToolParams(Idx: sw_integer; Title, ProgramPath, Params: string; HotKey: word);
 var P: PTool;
 begin
-  P:=Tools^.At(Idx);
+  P:=Tools.At(Idx);
   P.GetParams(Title,ProgramPath,Params,HotKey);
 end;
 
 procedure DoneTools;
 begin
-  if Tools<>nil then Dispose(Tools, Done); Tools:=nil;
+  if Tools<>nil then Tools.Free; Tools:=nil;
 end;
 
 procedure TToolParamValidator.Error;
@@ -445,26 +448,26 @@ begin
 
   GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.A.X+36;
-  New(TitleIL, Init(R, 128)); Insert(TitleIL);
-  R2.Copy(R); R2.Move(-1,-1); Insert(New(PLabel, Init(R2, label_toolprop_title, TitleIL)));
+  TitleIL := TEditorInputLine.Create(R, 128); Insert(TitleIL);
+  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_title, TitleIL));
   R.Move(0,3);
-  New(ProgramIL, Init(R, 128)); Insert(ProgramIL);
-  R2.Copy(R); R2.Move(-1,-1); Insert(New(PLabel, Init(R2, label_toolprop_programpath, ProgramIL)));
+  ProgramIL := TEditorInputLine.Create(R, 128); Insert(ProgramIL);
+  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_programpath, ProgramIL));
   R.Move(0,3);
-  New(ParamIL, Init(R, 128)); Insert(ParamIL);
-  ParamIL^.SetValidator(New(PToolParamValidator, Init));
-  R2.Copy(R); R2.Move(-1,-1); Insert(New(PLabel, Init(R2, label_toolprop_commandline, ParamIL)));
+  ParamIL := TEditorInputLine.Create(R, 128); Insert(ParamIL);
+  ParamIL.SetValidator(TToolParamValidator.Create);
+  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_commandline, ParamIL));
 
   R.Copy(R3); Inc(R.A.X,38); R.B.Y:=R.A.Y+KeyCount;
   Items:=nil;
   for I:=KeyCount-1 downto 0 do
     Items:=NewSItem(GetHotKeyNameByIdx(I), Items);
-  New(HotKeyRB, Init(R, Items));
+  HotKeyRB := TRadioButtons.Create(R, Items);
   Insert(HotKeyRB);
 
-  InsertButtons(@Self);
+  InsertButtons(Self);
 
-  TitleIL^.Select;
+  TitleIL.Select;
 end;
 
 function TToolItemDialog.Execute: Word;
@@ -473,16 +476,16 @@ var R: word;
     W: word;
     L: longint;
 begin
-  Tool^.GetParams(S1,S2,S3,W);
-  TitleIL^.SetData(S1); ProgramIL^.SetData(S2); ParamIL^.SetData(S3);
+  Tool.GetParams(S1,S2,S3,W);
+  TitleIL.SetData(S1); ProgramIL.SetData(S2); ParamIL.SetData(S3);
   L:=HotKeyToIdx(W); if L=-1 then L:=255;
-  HotKeyRB^.SetData(L);
+  HotKeyRB.SetData(L);
   R:=inherited Execute;
   if R=cmOK then
   begin
-    TitleIL^.GetData(S1); ProgramIL^.GetData(S2); ParamIL^.GetData(S3);
-    HotKeyRB^.GetData(L); W:=IdxToHotKey(L);
-    Tool^.SetParams(S1,S2,S3,W);
+    TitleIL.GetData(S1); ProgramIL.GetData(S2); ParamIL.GetData(S3);
+    HotKeyRB.GetData(L); W:=IdxToHotKey(L);
+    Tool.SetParams(S1,S2,S3,W);
   end;
   Execute:=R;
 end;
@@ -497,22 +500,22 @@ begin
   HelpCtx:=hcTools;
   GetExtent(R); R.Grow(-3,-2); Inc(R.A.Y); R3.Copy(R); Dec(R.B.X,12);
   R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
-  New(SB, Init(R2)); Insert(SB);
-  New(ToolsLB, Init(R,1,SB));
+  SB := TScrollBar.Create(R2); Insert(SB);
+  ToolsLB := TToolListBox.Create(R,1,SB);
   Insert(ToolsLB);
   R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
-  Insert(New(PLabel, Init(R2, label_tools_programtitles, ToolsLB)));
+  Insert(TLabel.Create(R2, label_tools_programtitles, ToolsLB));
 
   R.Copy(R3); R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
-  Insert(New(PButton, Init(R, button_OK, cmOK, bfNormal)));
+  Insert(TButton.Create(R, button_OK, cmOK, bfNormal));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_Edit, cmEditItem, bfDefault)));
+  Insert(TButton.Create(R, button_Edit, cmEditItem, bfDefault));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_New, cmAddItem, bfNormal)));
+  Insert(TButton.Create(R, button_New, cmAddItem, bfNormal));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_Delete, cmDeleteItem, bfNormal)));
+  Insert(TButton.Create(R, button_Delete, cmDeleteItem, bfNormal));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_Cancel, cmCancel, bfNormal)));
+  Insert(TButton.Create(R, button_Cancel, cmCancel, bfNormal));
   SelectNext(false);
 end;
 
@@ -525,9 +528,9 @@ begin
         DontClear:=false;
         case Event.KeyCode of
           kbIns  :
-            Message(@Self,evCommand,cmAddItem,nil);
+            Message(Self,evCommand,cmAddItem,nil);
           kbDel  :
-            Message(@Self,evCommand,cmDeleteItem,nil);
+            Message(Self,evCommand,cmDeleteItem,nil);
         else DontClear:=true;
         end;
         if DontClear=false then ClearEvent(Event);
@@ -536,7 +539,7 @@ begin
       case Event.Command of
         cmListItemSelected :
           if Event.InfoPtr=pointer(ToolsLB) then
-            Message(@Self,evCommand,cmEditItem,nil);
+            Message(Self,evCommand,cmEditItem,nil);
       end;
     evCommand :
       begin
@@ -560,23 +563,23 @@ var R: word;
     S1,S2,S3: string;
     W: word;
 begin
-  New(C, Init(10,20));
+  C := TToolCollection.Create(10,20);
   if Tools<>nil then
-  for I:=0 to Tools^.Count-1 do
+  for I:=0 to Tools.Count-1 do
     begin
-      Tools^.At(I)^.GetParams(S1,S2,S3,W);
-      C^.Insert(New(PTool, Init(S1,S2,S3,W)));
+      Tools.At(I).GetParams(S1,S2,S3,W);
+      C.Insert(TTool.Create(S1,S2,S3,W));
     end;
-  ToolsLB^.NewList(C);
+  ToolsLB.NewList(C);
   R:=inherited Execute;
   if R=cmOK then
     begin
-      if Tools<>nil then Dispose(Tools, Done);
+      if Tools<>nil then Tools.Free;
       Tools:=C;
       Message(Application,evBroadcast,cmUpdateTools,nil);
     end
   else
-    Dispose(C, Done);
+    C.Free;
   Execute:=R;
 end;
 
@@ -586,43 +589,43 @@ var P: PTool;
     S1,S2,S3: string;
     W: word;
 begin
-  if ToolsLB^.Range>=MaxToolCount then
+  if ToolsLB.Range>=MaxToolCount then
     begin InformationBox(msg_cantinstallmoretools,nil); Exit; end;
-  IC:=ToolsLB^.Range=0;
+  IC:=ToolsLB.Range=0;
   if IC=false then
     begin
-      P:=ToolsLB^.List.At(ToolsLB^.Focused);
+      P:=PTool(ToolsLB.List.At(ToolsLB.Focused));
       P.GetParams(S1,S2,S3,W);
     end
   else
     begin
       S1:=''; S2:=''; S3:=''; W:=0;
     end;
-  New(P, Init(S1,S2,S3,W));
-  if Application^.ExecuteDialog(New(PToolItemDialog, Init(P)), nil)=cmOK then
+  P := TTool.Create(S1,S2,S3,W);
+  if Application.ExecuteDialog(TToolItemDialog.Create(P), nil)=cmOK then
     begin
-      ToolsLB^.List.Insert(P);
-      ToolsLB^.SetRange(ToolsLB^.List.Count);
+      ToolsLB.List.Insert(P);
+      ToolsLB.SetRange(ToolsLB.List.Count);
       ReDraw;
     end
   else
-    Dispose(P, Done);
+    P.Free;
 end;
 
 procedure TToolsDialog.Edit;
 var P: PTool;
 begin
-  if ToolsLB^.Range=0 then Exit;
-  P:=ToolsLB^.List.At(ToolsLB^.Focused);
-  Application^.ExecuteDialog(New(PToolItemDialog, Init(P)), nil);
+  if ToolsLB.Range=0 then Exit;
+  P:=PTool(ToolsLB.List.At(ToolsLB.Focused));
+  Application.ExecuteDialog(TToolItemDialog.Create(P), nil);
   ReDraw;
 end;
 
 procedure TToolsDialog.Delete;
 begin
-  if ToolsLB^.Range=0 then Exit;
-  ToolsLB^.List.AtFree(ToolsLB^.Focused);
-  ToolsLB^.SetRange(ToolsLB^.List.Count);
+  if ToolsLB.Range=0 then Exit;
+  ToolsLB.List.AtFree(ToolsLB.Focused);
+  ToolsLB.SetRange(ToolsLB.List.Count);
   ReDraw;
 end;
 
@@ -864,19 +867,19 @@ begin
         S:=F.GetEntry(ViewNames[Idx],tieFileName,'');
         if S='' then S:=GenTempFileName;
         ToolTempFiles.InsertStr(S);
-        if PFPMemo(ViewPtrs[Idx])^.SaveToFile(S)=false then
+        if PFPMemo(ViewPtrs[Idx]).SaveToFile(S)=false then
           ErrorBox(FormatStrStr(msg_errorsavingfile,S),nil);
       end;
     vtInputLine :
-      S:=PInputLine(ViewPtrs[Idx])^.Data^;
+      S:=PInputLine(ViewPtrs[Idx]).Data^;
     vtCheckBox  :
-      with PCheckBoxes(ViewPtrs[Idx])^ do
+      with PCheckBoxes(ViewPtrs[Idx]) do
       begin
         if Mark(0) then Entry:=tieOnParm else Entry:=tieOffParm;
         S:=F.GetEntry(ViewNames[Idx],Entry,'');
       end;
     vtRadioButton :
-      with PRadioButtons(ViewPtrs[Idx])^ do
+      with PRadioButtons(ViewPtrs[Idx]) do
       begin
         Entry:=tieParam+IntToStr(Value+1);
         S:=F.GetEntry(ViewNames[Idx],Entry,'');
@@ -948,8 +951,8 @@ var R: TRect;
 begin
   OK:=true;
   R.Assign(0,0,DSize.X,DSize.Y);
-  New(PromptDialog, Init(R, Title));
-  with PromptDialog^ do
+  PromptDialog := TCenterDialog.Create(R, Title);
+  with PromptDialog do
   begin
     for I:=0 to ViewCount-1 do
       begin
@@ -961,35 +964,35 @@ begin
               if J=-1 then P:=nil else
                 P:=ViewPtrs[J];
               S:=F.GetEntry(ViewNames[I],tieText,'');
-              New(LV, Init(ViewBounds[I], S, P));
+              LV := TLabel.Create(ViewBounds[I], S, P);
               ViewPtrs[I]:=LV;
             end;
           vtInputLine :
             begin
               MaxLen:=F.GetIntEntry(ViewNames[I],tieMaxLen,80);
-              New(IL, Init(ViewBounds[I], MaxLen));
-              IL^.Data^:=ViewValues[I];
+              IL := TEditorInputLine.Create(ViewBounds[I], MaxLen);
+              IL.Data^:=ViewValues[I];
               ViewPtrs[I]:=IL;
             end;
           vtMemo :
             begin
 {              MaxLen:=F.GetIntEntry(ViewNames[I],tieMaxLen,80);}
-              New(Memo, Init(ViewBounds[I],nil,nil,nil));
+              Memo := TFPMemo.Create(ViewBounds[I],nil,nil,nil);
               if ViewValues[I]<>'' then
                 begin
-                  Memo^.AddLine(ViewValues[I]);
-                  Memo^.TextEnd;
+                  Memo.AddLine(ViewValues[I]);
+                  Memo.TextEnd;
                 end;
               ViewPtrs[I]:=Memo;
             end;
           vtCheckBox :
             begin
-              New(CB, Init(ViewBounds[I],
+              CB := TCheckBoxes.Create(ViewBounds[I],
                NewSItem(
                 F.GetEntry(ViewNames[I],tieName,''),
-                nil)));
+                nil));
               if StrToInt(ViewValues[I])=1 then
-                CB^.Press(0);
+                CB.Press(0);
               ViewPtrs[I]:=CB;
             end;
           vtRadioButton :
@@ -997,8 +1000,8 @@ begin
               SI:=nil;
               for J:=ViewItemCount[I] downto 1 do
                 SI:=NewSItem(F.GetEntry(ViewNames[I],tieItem+IntToStr(J),''),SI);
-              New(RB, Init(ViewBounds[I], SI));
-              RB^.Press(StrToInt(ViewValues[I]));
+              RB := TRadioButtons.Create(ViewBounds[I], SI);
+              RB.Press(StrToInt(ViewValues[I]));
               ViewPtrs[I]:=RB;
             end;
         end;
@@ -1014,13 +1017,13 @@ begin
       while (I<ViewCount) and (UpcaseStr(ViewNames[I])<>S) do
         Inc(I);
       if UpcaseStr(ViewNames[I])=S then
-        ViewPtrs[I]^.Select;
+        ViewPtrs[I].Select;
     end;
-  Re:=Desktop^.ExecView(PromptDialog);
+  Re:=Desktop.ExecView(PromptDialog);
   OK:=OK and (Re=cmOK);
   AbortTool:=(Re<>cmOK);
   if OK then OK:=ExtractPromptDialogParams(F,Params);
-  if PromptDialog<>nil then Dispose(PromptDialog, Done);
+  if PromptDialog<>nil then PromptDialog.Free;
   ExecPromptDialog:=OK;
 end;
 var OK: boolean;
@@ -1034,7 +1037,7 @@ begin
     ErrorBox('Can''t read '+Fn,nil)
   else
     begin
-      New(F, Init(Fn));
+      F := TINIFile.Create(Fn);
       OK:=F<>nil;
       if OK then
         begin
@@ -1042,7 +1045,7 @@ begin
           if OK then
             OK:=ExecPromptDialog(F);
         end;
-      if F<>nil then Dispose(F, Done);
+      if F<>nil then F.Free;
     end;
   ExecutePromptDialog:=OK;
 end;
@@ -1142,7 +1145,7 @@ begin
             if (Pass=1) then
             begin
               if W=nil then L:=0 else
-                L:=W^.Editor^.CurPos.X+1;
+                L:=W.Editor.CurPos.X+1;
               I:=I+ReplacePart(LastWordStart,I-1,IntToStr(L))-1;
             end;
           end else
@@ -1181,7 +1184,7 @@ begin
             if (Pass=1) then
             begin
               if W=nil then S:='' else
-                S:=W^.Editor^.FileName;
+                S:=W.Editor.FileName;
               I:=I+ReplacePart(LastWordStart,I-1,S)-1;
             end;
           end else
@@ -1206,7 +1209,7 @@ begin
             if (Pass=1) then
             begin
               if W=nil then L:=0 else
-                L:=W^.Editor^.CurPos.Y+1;
+                L:=W.Editor.CurPos.Y+1;
               I:=I+ReplacePart(LastWordStart,I-1,IntToStr(L))-1;
             end;
           end else
@@ -1314,7 +1317,7 @@ begin
               begin
                 I:=I+ReplacePart(LastWordStart,I-1,'')-1;
                 if W<>nil then
-                  if W^.Editor^.SaveAsk(true)=false then
+                  if W.Editor.SaveAsk(true)=false then
                     Err:=-1;
               end;
           end else
@@ -1376,9 +1379,9 @@ begin
   AddToolMessage(FileName,copy(Line,5,High(Line)),Row,Col);
 end;
 begin
-  New(S, Init(MsgFileName, stOpenRead, 4096));
-  OK:=(S<>nil) and (S^.Status=stOK);
-  if OK then S^.Read(Sign,SizeOf(Sign));
+  S := TBufStream.Create(MsgFileName, stOpenRead, 4096);
+  OK:=(S<>nil) and (S.Status=stOK);
+  if OK then S.Read(Sign,SizeOf(Sign));
   OK:=OK and (Sign=MsgFilterSign);
   Done:=false;
   InFileName:=false;
@@ -1387,8 +1390,8 @@ begin
   Line:='';
   while OK and (Done=false) do
     begin
-      S^.Read(C,SizeOf(C));
-      OK:=(S^.Status=stOK);
+      S.Read(C,SizeOf(C));
+      OK:=(S.Status=stOK);
       AddChar:=false;
       if OK then
       case C of
@@ -1417,27 +1420,27 @@ begin
         if InReference then
           Line:=Line+C;
     end;
-  if S<>nil then Dispose(S, Done);
+  if S<>nil then S.Free;
   ProcessMessageFile:=OK;
 end;
 
 procedure InitToolTempFiles;
 begin
   if not Assigned(ToolTempFiles) then
-    New(ToolTempFiles, Init(10,10));
+    ToolTempFiles := TUnsortedStringCollection.Create(10,10);
 end;
 
 procedure DoneToolTempFiles;
-procedure DeleteIt(P: PString);
+procedure DeleteIt(P: Pointer);
 begin
-  DeleteFile(GetStr(P));
+  DeleteFile(GetStr(PString(P)));
 end;
 begin
   if not Assigned(ToolTempFiles) then Exit;
 {$ifndef DEBUG}
   ToolTempFiles.ForEach(@DeleteIt);
 {$endif ndef DEBUG}
-  Dispose(ToolTempFiles, Done);
+  ToolTempFiles.Free;
   ToolTempFiles:=nil;
 end;
 
@@ -1462,18 +1465,18 @@ end;
 procedure AddToolCommand(Command: string);
 begin
   AddToolMessage('',Command,0,0);
-  LastToolMessageFocused:=ToolMessages.At(ToolMessages.Count-1);
+  LastToolMessageFocused:=PToolMessage(ToolMessages.At(ToolMessages.Count-1));
 end;
 
 procedure AddToolMessage(ModuleName, Text: string; Row, Col: longint);
 var MN: PString;
 begin
   if ToolMessages=nil then
-    New(ToolMessages, Init(500,1000));
+    ToolMessages := TCollection.Create(500,1000);
   if ToolModuleNames=nil then
-    New(ToolModuleNames, Init(50,100));
-  MN:=ToolModuleNames^.Add(ModuleName);
-  ToolMessages.Insert(New(PToolMessage, Init(MN,Text,Row,Col)));
+    ToolModuleNames := TStoreCollection.Create(50,100);
+  MN:=ToolModuleNames.Add(ModuleName);
+  ToolMessages.Insert(TToolMessage.Create(MN,Text,Row,Col));
 end;
 
 procedure ClearToolMessages;
@@ -1481,7 +1484,7 @@ begin
   If assigned(ToolMessages) then
     ToolMessages.FreeAll;
   If assigned(ToolModuleNames) then
-    ToolModuleNames^.FreeAll;
+    ToolModuleNames.FreeAll;
   LastToolMessageFocused:=nil;
   LongestTool:=0;
 end;
@@ -1490,12 +1493,12 @@ procedure DoneToolMessages;
 begin
   If assigned(ToolMessages) then
     begin
-      Dispose(ToolMessages,Done);
+      ToolMessages.Free;
       ToolMessages:=nil;
     end;
   If assigned(ToolModuleNames) then
     begin
-      Dispose(ToolModuleNames,Done);
+      ToolModuleNames.Free;
       ToolModuleNames:=nil;
     end;
   LastToolMessageFocused:=nil;
@@ -1515,7 +1518,7 @@ begin
   P:=LastToolMessageFocused;
   NewList(ToolMessages);
   if assigned(HScrollBar) then
-    HScrollbar^.SetRange(0,LongestTool);
+    HScrollbar.SetRange(0,LongestTool);
   if (Range>0) and (P<>nil) then
     begin
       Idx:=List.IndexOf(P);
@@ -1539,7 +1542,7 @@ procedure TToolMessageListBox.Clear;
 begin
   ClearToolMessages;
   Update;
-  Message(Application,evBroadcast,cmClearLineHighlights,@Self);
+  Message(Application,evBroadcast,cmClearLineHighlights,Self);
 end;
 
 function TToolMessageListBox.GetPalette: TPalette;
@@ -1558,11 +1561,11 @@ procedure TToolMessageListBox.Store(var S: TStream);
 var OL: PCollection;
 begin
   OL:=List;
-  New(List, Init(1,1));
+  List := TCollection.Create(1,1);
 
   inherited Store(S);
 
-  Dispose(List, Done);
+  List.Free;
   List:=OL;
 end;
 
@@ -1577,17 +1580,17 @@ constructor TMessagesWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  Desktop^.GetExtent(R); R.A.Y:=R.B.Y-7;
+  Desktop.GetExtent(R); R.A.Y:=R.B.Y-7;
   inherited Create(R,dialog_messages,SearchFreeWindowNo);
   HelpCtx:=hcMessagesWindow;
 
   HSB:=StandardScrollBar(sbHorizontal+sbHandleKeyboard); Insert(HSB);
   VSB:=StandardScrollBar(sbVertical+sbHandleKeyboard); Insert(VSB);
 
-  VSB^.SetStep(R.B.Y-R.A.Y-2,1);
-  HSB^.SetStep(R.B.X-R.A.X-2,1);
+  VSB.SetStep(R.B.Y-R.A.Y-2,1);
+  HSB.SetStep(R.B.X-R.A.X-2,1);
   GetExtent(R); R.Grow(-1,-1);
-  New(MsgLB, Init(R, HSB, VSB));
+  MsgLB := TToolMessageListBox.Create(R, HSB, VSB);
   Insert(MsgLB);
 
   Update;
@@ -1597,12 +1600,12 @@ end;
 
 procedure TMessagesWindow.Update;
 begin
-  MsgLB^.Update;
+  MsgLB.Update;
 end;
 
 procedure TMessagesWindow.FocusItem(i : sw_integer);
 begin
-  MsgLB^.FocusItem(i);
+  MsgLB.FocusItem(i);
 end;
 
 procedure TMessagesWindow.HandleEvent(var Event: TEvent);
@@ -1611,10 +1614,10 @@ begin
     evBroadcast :
       case Event.Command of
         cmListFocusChanged :
-          if Event.InfoPtr=MsgLB then
+          if Event.InfoPtr=Pointer(MsgLB) then
             begin
-              LastToolMessageFocused:=MsgLB^.List.At(MsgLB^.Focused);
-              Message(Application,evBroadcast,cmClearLineHighlights,@Self);
+              LastToolMessageFocused:=PToolMessage(MsgLB.List.At(MsgLB.Focused));
+              Message(Application,evBroadcast,cmClearLineHighlights,Self);
             end;
       end;
   end;

@@ -98,6 +98,10 @@ type
         FilePos  : longint;
       end;
 
+      TContainerItemEnumProc = procedure(P: PContainerItemRec) is nested;
+      TTopicLineEnumProc = procedure(P: PString) is nested;
+      TLinkEnumProc = procedure(P: PLinkRec) is nested;
+
       TNGHelpFile = class;
       PNGHelpFile = TNGHelpFile;
       TNGHelpFile = class(THelpFile)
@@ -113,8 +117,8 @@ type
         IndexLoaded: boolean;
 {        NextHelpCtx: longint;}
         function ReadHeader: boolean;
-        function ReadContainer(EnumProc: pointer): boolean;
-        function ReadTopicRec(LineEnumProc: pointer; LinkEnumProc: pointer): boolean;
+        function ReadContainer(EnumProc: TContainerItemEnumProc): boolean;
+        function ReadTopicRec(LineEnumProc: TTopicLineEnumProc; LinkEnumProc: TLinkEnumProc): boolean;
         function ReadRecord(var R: TRecord; ReadData: boolean): boolean;
       end;
 
@@ -206,7 +210,7 @@ end;
 constructor TNGHelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
-  if inherited Create(AID)=false then Fail;
+  inherited Create(AID);
   F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
   if OK then OK:=(F.Status=stOK);
@@ -218,7 +222,6 @@ begin
     end;
   if OK=false then
   begin
-    Done;
     Fail;
   end;
 end;
@@ -232,7 +235,7 @@ begin
   ReadHeader:=OK;
 end;
 
-function TNGHelpFile.ReadContainer(EnumProc: pointer): boolean;
+function TNGHelpFile.ReadContainer(EnumProc: TContainerItemEnumProc): boolean;
 var OK: boolean;
     R: TRecord;
     I: longint;
@@ -255,7 +258,7 @@ begin
         Name:=NGDecompressStr(StrPas(P));
         FilePos:=SubItemsOfs;
       end;
-      CallPointerLocal(EnumProc,get_caller_frame(get_frame,get_pc_addr),@CIR);
+      EnumProc(@CIR);
       Inc(I);
     end;
   end;
@@ -263,7 +266,7 @@ begin
   ReadContainer:=OK;
 end;
 
-function TNGHelpFile.ReadTopicRec(LineEnumProc, LinkEnumProc: pointer): boolean;
+function TNGHelpFile.ReadTopicRec(LineEnumProc: TTopicLineEnumProc; LinkEnumProc: TLinkEnumProc): boolean;
 var OK: boolean;
     R: TRecord;
     I: sw_integer;
@@ -284,21 +287,21 @@ begin
     begin
       S:=StrPas(LineP);
       ParamS:=NGDecompressStr(S);
-      CallPointerLocal(LineEnumProc,get_caller_frame(get_frame,get_pc_addr),@ParamS);
+      LineEnumProc(@ParamS);
       Inc(Ptrint(LineP),length(S)+1);
     end;
     if Assigned(LinkEnumProc) and (SeeAlsoOfs>0) then
     begin
       SeeAlso:=@PByteArray(R.Data)^[NGMinRecordSize-sizeof(TNGRecordHeader)+SeeAlsoOfs];
-      NextLinkOfsPtr:=@SeeAlso.Entries;
-      NextLinkNamePtr:=@PByteArray(NextLinkOfsPtr)^[SeeAlso.EntryCount*4];
-      for I:=1 to SeeAlso.EntryCount do
+      NextLinkOfsPtr:=@SeeAlso^.Entries;
+      NextLinkNamePtr:=@PByteArray(NextLinkOfsPtr)^[SeeAlso^.EntryCount*4];
+      for I:=1 to SeeAlso^.EntryCount do
       begin
         FillChar(LR,sizeof(LR),0);
         S:=StrPas(NextLinkNamePtr);
         LR.Name:=S;
         Move(NextLinkOfsPtr^,LR.FilePos,4);
-        CallPointerLocal(LinkEnumProc,get_caller_frame(get_frame,get_pc_addr),@LR);
+        LinkEnumProc(@LR);
         Inc(Ptrint(NextLinkNamePtr),length(S)+1);
         Inc(Ptrint(NextLinkOfsPtr),4);
       end;
@@ -357,14 +360,14 @@ end;}
 procedure AddToIndex(P: PContainerItemRec);
 var S: string;
 begin
-  S:=Trim(P.Name);
+  S:=Trim(P^.Name);
   S:=TranslateStr(S);
   S:=Trim({FormatAlias}(S));
-  if (S<>'') and (P.FilePos<>-1) then
+  if (S<>'') and (P^.FilePos<>-1) then
     begin
 {      Inc(NextHelpCtx);}
-      AddIndexEntry(S,P.FilePos);
-      AddTopic(P.FilePos,P.FilePos,'',nil,0);
+      AddIndexEntry(S,P^.FilePos);
+      AddTopic(P^.FilePos,P^.FilePos,'',nil,0);
     end;
 end;
 var OK: boolean;
@@ -450,8 +453,8 @@ begin
 end;
 procedure AddToTopic(P: PContainerItemRec);
 begin
-  AddLine(hscLink+Trim(P.Name)+hscLink);
-  AddLinkToTopic(T,ID,P.FilePos);
+  AddLine(hscLink+Trim(P^.Name)+hscLink);
+  AddLinkToTopic(T,ID,P^.FilePos);
 end;
 procedure AddTopicLine(P: PString);
 begin
@@ -466,33 +469,33 @@ begin
     AddLine('');
     AddLine(' See also :');
   end;
-  AddLine('  '+hscLink+Trim(P.Name)+hscLink);
-  AddLinkToTopic(T,ID,P.FilePos);
+  AddLine('  '+hscLink+Trim(P^.Name)+hscLink);
+  AddLinkToTopic(T,ID,P^.FilePos);
 end;
 var OK: boolean;
     R: TRecord;
 begin
   LinkCount:=0;
   Lines := TUnsortedStringCollection.Create(100,100);
-  F.Seek(T.FileOfs); OK:=F.Status=stOK;
+  F.Seek(T^.FileOfs); OK:=F.Status=stOK;
   if OK then OK:=ReadRecord(R,false);
   case R.SClass of
       ng_rtContainer :
         begin
-          F.Seek(T.FileOfs);
+          F.Seek(T^.FileOfs);
           AddLine('');
           OK:=ReadContainer(@AddToTopic);
           RenderTopic(Lines,T);
         end;
       ng_rtTopic     :
         begin
-          F.Seek(T.FileOfs);
+          F.Seek(T^.FileOfs);
           AddLine('');
           OK:=ReadTopicRec(@AddTopicLine,@AddLink);
           TranslateLines(Lines);
           AddLine('');
           { include copyright info }
-{          AddLine(CharStr('Ä',80));
+{          AddLine(CharStr('ï¿½',80));
           AddLine(ExtractStr(Header.GuideName,sizeof(Header.GuideName)));
           AddLine(ExtractStr(Header.Credits,sizeof(Header.Credits)));}
           RenderTopic(Lines,T);

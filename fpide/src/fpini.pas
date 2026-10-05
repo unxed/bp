@@ -13,6 +13,9 @@
 
  **********************************************************************}
 unit FPIni;
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 {$i globdir.inc}
@@ -251,10 +254,10 @@ begin
      else
        begin
          INI := TINIFile.Create(CurDir+DirInfoName);
-         INI^.SetEntry(MainSectionName,'Comment','Do NOT delete this file!!!');
-         if INI^.Update=false then
-           ErrorBox(FormatStrStr(msg_errorwritingfile,INI^.GetFileName),nil);
-         Dispose(INI, Done);
+         INI.SetEntry(MainSectionName,'Comment','Do NOT delete this file!!!');
+         if INI.Update=false then
+           ErrorBox(FormatStrStr(msg_errorwritingfile,INI.GetFileName),nil);
+         INI.Free;
        end;
 end;
 
@@ -306,10 +309,10 @@ var
   S  : String;
 begin
   Str(I,S);
-  PW:=WatchesCollection^.At(I);
-  With PW^ do
+  PW:=PWatch(WatchesCollection.At(I));
+  With PW do
     begin
-      INIFile^.SetEntry(secWatches,ieWatchName+S,GetStr(expr));
+      INIFile.SetEntry(secWatches,ieWatchName+S,GetStr(expr));
     end;
 end;
 
@@ -318,23 +321,23 @@ var PB : PBreakpoint;
     S : String;
 begin
   Str(I,S);
-  PB:=BreakpointsCollection^.At(I);
+  PB:=PBreakpoint(BreakpointsCollection.At(I));
   If assigned(PB) then
-   With PB^ do
+   With PB do
     Begin
-      INIFile^.SetEntry(secBreakpoint,ieBreakpointTyp+S,BreakpointTypeStr[typ]);
-      INIFile^.SetEntry(secBreakpoint,ieBreakpointState+S,BreakpointStateStr[state]);
+      INIFile.SetEntry(secBreakpoint,ieBreakpointTyp+S,BreakpointTypeStr[typ]);
+      INIFile.SetEntry(secBreakpoint,ieBreakpointState+S,BreakpointStateStr[state]);
       if typ=bt_file_line then
         begin
-          INIFile^.SetEntry(secBreakpoint,ieBreakpointFile+S,FileName^);
-          INIFile^.SetIntEntry(secBreakpoint,ieBreakpointLine+S,Line);
+          INIFile.SetEntry(secBreakpoint,ieBreakpointFile+S,FileName^);
+          INIFile.SetIntEntry(secBreakpoint,ieBreakpointLine+S,Line);
         end
       else
-        INIFile^.SetEntry(secBreakpoint,ieBreakpointName+S,Name^);
+        INIFile.SetEntry(secBreakpoint,ieBreakpointName+S,Name^);
       if assigned(Conditions) then
-        INIFile^.SetEntry(secBreakpoint,ieBreakpointCond+S,Conditions^)
+        INIFile.SetEntry(secBreakpoint,ieBreakpointCond+S,Conditions^)
       else
-        INIFile^.SetEntry(secBreakpoint,ieBreakpointCond+S,'');
+        INIFile.SetEntry(secBreakpoint,ieBreakpointCond+S,'');
     end;
 end;
 
@@ -344,8 +347,8 @@ var
   S  : String;
 begin
   Str(I,S);
-  PW:=new(PWatch,Init(INIFile^.GetEntry(secWatches,ieWatchName+S,'')));
-  WatchesCollection^.Insert(PW);
+  PW := TWatch.Create(INIFile.GetEntry(secWatches,ieWatchName+S,''));
+  WatchesCollection.Insert(PW);
 end;
 
 procedure ReadOneBreakPointEntry(i : longint;INIFile : PINIFile);
@@ -358,38 +361,38 @@ var PB : PBreakpoint;
 begin
   Str(I,S2);
   typ:=bt_invalid;
-  S:=INIFile^.GetEntry(secBreakpoint,ieBreakpointTyp+S2,BreakpointTypeStr[typ]);
+  S:=INIFile.GetEntry(secBreakpoint,ieBreakpointTyp+S2,BreakpointTypeStr[typ]);
   for typ:=low(BreakpointType) to high(BreakpointType) do
     If pos(BreakpointTypeStr[typ],S)>0 then break;
   state:=bs_deleted;
-  S:=INIFile^.GetEntry(secBreakpoint,ieBreakpointState+S2,BreakpointStateStr[state]);
+  S:=INIFile.GetEntry(secBreakpoint,ieBreakpointState+S2,BreakpointStateStr[state]);
   for state:=low(BreakpointState) to high(BreakpointState) do
     If pos(BreakpointStateStr[state],S)>0 then break;
   case typ of
      bt_invalid :;
      bt_file_line :
        begin
-         S:=INIFile^.GetEntry(secBreakpoint,ieBreakpointFile+S2,'');
-         Line:=INIFile^.GetIntEntry(secBreakpoint,ieBreakpointLine+S2,0);
+         S:=INIFile.GetEntry(secBreakpoint,ieBreakpointFile+S2,'');
+         Line:=INIFile.GetIntEntry(secBreakpoint,ieBreakpointLine+S2,0);
        end;
      else
        begin
-         S:=INIFile^.GetEntry(secBreakpoint,ieBreakpointName+S2,'');
+         S:=INIFile.GetEntry(secBreakpoint,ieBreakpointName+S2,'');
        end;
      end;
-   SC:=INIFile^.GetEntry(secBreakpoint,ieBreakpointCond+S2,'');
+   SC:=INIFile.GetEntry(secBreakpoint,ieBreakpointCond+S2,'');
    if (typ=bt_function) and (S<>'') then
-     new(PB,init_function(S))
+     PB := TBreakpoint.init_function(S)
    else if (typ=bt_file_line) and (S<>'') then
-     new(PB,init_file_line(S,Line))
+     PB := TBreakpoint.init_file_line(S,Line)
    else
-     new(PB,init_type(typ,S));
+     PB := TBreakpoint.init_type(typ,S);
    If assigned(PB) then
      begin
-       PB^.state:=state;
+       PB.state:=state;
        If SC<>'' then
-         PB^.conditions:=NewStr(SC);
-       BreakpointsCollection^.Insert(PB);
+         PB.conditions:=NewStr(SC);
+       BreakpointsCollection.Insert(PB);
      end;
 end;
 {$endif NODEBUG}
@@ -409,11 +412,11 @@ begin
  begin
   INIFile := TINIFile.Create(IniFileName);
   { Files }
-  OpenExts:=INIFile^.GetEntry(secFiles,ieOpenExts,OpenExts);
+  OpenExts:=INIFile.GetEntry(secFiles,ieOpenExts,OpenExts);
   RecentFileCount:=High(RecentFiles);
   for I:=Low(RecentFiles) to High(RecentFiles) do
     begin
-      S:=INIFile^.GetEntry(secFiles,ieRecentFile+IntToStr(I),'');
+      S:=INIFile.GetEntry(secFiles,ieRecentFile+IntToStr(I),'');
       if (S='') and (RecentFileCount>I-1) then RecentFileCount:=I-1;
       with RecentFiles[I] do
       begin
@@ -426,31 +429,31 @@ begin
       end;
     end;
   { Run }
-  SetRunDir(INIFile^.GetEntry(secRun,ieRunDir,GetRunDir));
-  SetRunParameters(INIFile^.GetEntry(secRun,ieRunParameters,GetRunParameters));
-  SetPrinterDevice(INIFile^.GetEntry(secFiles,iePrinterDevice,GetPrinterDevice));
+  SetRunDir(INIFile.GetEntry(secRun,ieRunDir,GetRunDir));
+  SetRunParameters(INIFile.GetEntry(secRun,ieRunParameters,GetRunParameters));
+  SetPrinterDevice(INIFile.GetEntry(secFiles,iePrinterDevice,GetPrinterDevice));
   { First read the primary file, which can also set the parameters which can
     be overruled with the parameter loading }
-  SetPrimaryFile(INIFile^.GetEntry(secCompile,iePrimaryFile,PrimaryFile));
+  SetPrimaryFile(INIFile.GetEntry(secCompile,iePrimaryFile,PrimaryFile));
 {$ifndef GDB_WINDOWS_ALWAYS_USE_ANOTHER_CONSOLE}
-  DebuggeeTTY := INIFile^.GetEntry(secRun,ieDebuggeeRedir,DebuggeeTTY);
+  DebuggeeTTY := INIFile.GetEntry(secRun,ieDebuggeeRedir,DebuggeeTTY);
 {$endif not GDB_WINDOWS_ALWAYS_USE_ANOTHER_CONSOLE}
 {$ifdef SUPPORT_REMOTE}
-  RemoteMachine :=INIFile^.GetEntry(secRun,ieRemoteMachine,RemoteMachine);
-  RemotePort :=INIFile^.GetEntry(secRun,ieRemotePort,RemotePort);
-  RemotePuttySession :=INIFile^.GetEntry(secRun,ieRemotePuttySession,RemotePuttySession);
-  RemoteSendCommand :=INIFile^.GetEntry(secRun,ieRemoteSendCommand,RemoteSendCommand);
-  RemoteExecCommand :=INIFile^.GetEntry(secRun,ieRemoteExecCommand,RemoteExecCommand);
-  RemoteSshExecCommand :=INIFile^.GetEntry(secRun,ieRemoteSshExecCommand,RemoteSshExecCommand);
-  RemoteConfig :=INIFile^.GetEntry(secRun,ieRemoteConfig,RemoteConfig);
-  RemoteIdent :=INIFile^.GetEntry(secRun,ieRemoteIdent,RemoteIdent);
-  RemoteDir :=INIFile^.GetEntry(secRun,ieRemoteDirectory,RemoteDir);
-  RemoteGDBServer :=INIFile^.GetEntry(secRun,ieRemoteGDBServer,RemoteGDBServer);
-  RemoteCopy :=INIFile^.GetEntry(secRun,ieRemoteCopy,RemoteCopy);
-  RemoteShell :=INIFile^.GetEntry(secRun,ieRemoteShell,RemoteShell);
+  RemoteMachine :=INIFile.GetEntry(secRun,ieRemoteMachine,RemoteMachine);
+  RemotePort :=INIFile.GetEntry(secRun,ieRemotePort,RemotePort);
+  RemotePuttySession :=INIFile.GetEntry(secRun,ieRemotePuttySession,RemotePuttySession);
+  RemoteSendCommand :=INIFile.GetEntry(secRun,ieRemoteSendCommand,RemoteSendCommand);
+  RemoteExecCommand :=INIFile.GetEntry(secRun,ieRemoteExecCommand,RemoteExecCommand);
+  RemoteSshExecCommand :=INIFile.GetEntry(secRun,ieRemoteSshExecCommand,RemoteSshExecCommand);
+  RemoteConfig :=INIFile.GetEntry(secRun,ieRemoteConfig,RemoteConfig);
+  RemoteIdent :=INIFile.GetEntry(secRun,ieRemoteIdent,RemoteIdent);
+  RemoteDir :=INIFile.GetEntry(secRun,ieRemoteDirectory,RemoteDir);
+  RemoteGDBServer :=INIFile.GetEntry(secRun,ieRemoteGDBServer,RemoteGDBServer);
+  RemoteCopy :=INIFile.GetEntry(secRun,ieRemoteCopy,RemoteCopy);
+  RemoteShell :=INIFile.GetEntry(secRun,ieRemoteShell,RemoteShell);
 {$endif SUPPORT_REMOTE}
   { Compile }
-  S:=INIFile^.GetEntry(secCompile,ieCompileMode,'');
+  S:=INIFile.GetEntry(secCompile,ieCompileMode,'');
   for ts:=low(TSwitchMode) to high(TSwitchMode) do
     begin
       if SwitchesModeStr[ts]=S then
@@ -458,37 +461,37 @@ begin
     end;
   { Help }
   { Reading single string with help-file names }
-  S:=INIFile^.GetEntry(secHelp,ieHelpFiles,'');
+  S:=INIFile.GetEntry(secHelp,ieHelpFiles,'');
   repeat
     P:=Pos(';',S); if P=0 then P:=length(S)+1;
     PS:=copy(S,1,P-1);
-    if PS<>'' then HelpFiles^.Insert(NewStr(PS));
+    if PS<>'' then HelpFiles.Insert(NewStr(PS));
     Delete(S,1,P);
   until S='';
   { Reading separate strings with help-file names }
   I:=1;
   repeat
-    S:=INIFile^.GetEntry(secHelp,ieHelpFile + IntToStr(I),'');
+    S:=INIFile.GetEntry(secHelp,ieHelpFile + IntToStr(I),'');
     inc(I);
-    if S<>'' then HelpFiles^.Insert(NewStr(S));
+    if S<>'' then HelpFiles.Insert(NewStr(S));
   until S='';
   { Editor }
-  DefaultTabSize:=INIFile^.GetIntEntry(secEditor,ieDefaultTabSize,DefaultTabSize);
-  DefaultIndentSize:=INIFile^.GetIntEntry(secEditor,ieDefaultIndentSize,DefaultIndentSize);
-  DefaultCodeEditorFlags:=INIFile^.GetIntEntry(secEditor,ieDefaultEditorFlags,DefaultCodeEditorFlags);
-  DefaultSaveExt:=INIFile^.GetEntry(secEditor,ieDefaultSaveExt,DefaultSaveExt);
+  DefaultTabSize:=INIFile.GetIntEntry(secEditor,ieDefaultTabSize,DefaultTabSize);
+  DefaultIndentSize:=INIFile.GetIntEntry(secEditor,ieDefaultIndentSize,DefaultIndentSize);
+  DefaultCodeEditorFlags:=INIFile.GetIntEntry(secEditor,ieDefaultEditorFlags,DefaultCodeEditorFlags);
+  DefaultSaveExt:=INIFile.GetEntry(secEditor,ieDefaultSaveExt,DefaultSaveExt);
   { Highlight }
-  HighlightExts:=INIFile^.GetEntry(secHighlight,ieHighlightExts,HighlightExts);
-  TabsPattern:=INIFile^.GetEntry(secHighlight,ieTabsPattern,TabsPattern);
+  HighlightExts:=INIFile.GetEntry(secHighlight,ieHighlightExts,HighlightExts);
+  TabsPattern:=INIFile.GetEntry(secHighlight,ieTabsPattern,TabsPattern);
   { SourcePath }
-  SourceDirs:=INIFile^.GetEntry(secSourcePath,ieSourceList,SourceDirs);
+  SourceDirs:=INIFile.GetEntry(secSourcePath,ieSourceList,SourceDirs);
   { Mouse }
-  DoubleDelay:=INIFile^.GetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
-  MouseReverse:=boolean(INIFile^.GetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse)));
-  AltMouseAction:=INIFile^.GetIntEntry(secMouse,ieAltClickAction,AltMouseAction);
-  CtrlMouseAction:=INIFile^.GetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
+  DoubleDelay:=INIFile.GetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
+  MouseReverse:=boolean(INIFile.GetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse)));
+  AltMouseAction:=INIFile.GetIntEntry(secMouse,ieAltClickAction,AltMouseAction);
+  CtrlMouseAction:=INIFile.GetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
   {Keyboard}
-  S:=upcase(INIFile^.GetEntry(secKeyboard,ieEditKeys,''));
+  S:=upcase(INIFile.GetEntry(secKeyboard,ieEditKeys,''));
   crcv := UpdateCrc32(0,s[1],Length(s)) ;
   case crcv of
     $795B3767  : {crc32 for 'MICROSOFT'}
@@ -500,13 +503,13 @@ begin
       EditKeys:=ekm_default;
   end;
   { Search }
-  FindFlags:=INIFile^.GetIntEntry(secSearch,ieFindFlags,FindFlags);
+  FindFlags:=INIFile.GetIntEntry(secSearch,ieFindFlags,FindFlags);
   { Breakpoints }
 {$ifndef NODEBUG}
-  BreakpointCount:=INIFile^.GetIntEntry(secBreakpoint,ieBreakpointCount,0);
+  BreakpointCount:=INIFile.GetIntEntry(secBreakpoint,ieBreakpointCount,0);
   for i:=1 to BreakpointCount do
     ReadOneBreakPointEntry(i-1,INIFile);
-  WatchesCount:=INIFile^.GetIntEntry(secWatches,ieWatchCount,0);
+  WatchesCount:=INIFile.GetIntEntry(secWatches,ieWatchCount,0);
   for i:=1 to WatchesCount do
     ReadOneWatchEntry(i-1,INIFile);
 {$endif}
@@ -514,28 +517,28 @@ begin
   for I:=1 to MaxToolCount do
     begin
       S:=IntToStr(I);
-      S1:=INIFile^.GetEntry(secTools,ieToolName+S,'');
+      S1:=INIFile.GetEntry(secTools,ieToolName+S,'');
       if S1='' then Break; { !!! }
-      S2:=INIFile^.GetEntry(secTools,ieToolProgram+S,'');
-      S3:=INIFile^.GetEntry(secTools,ieToolParams+S,'');
-      W:=Max(0,Min(65535,INIFile^.GetIntEntry(secTools,ieToolHotKey+S,0)));
+      S2:=INIFile.GetEntry(secTools,ieToolProgram+S,'');
+      S3:=INIFile.GetEntry(secTools,ieToolParams+S,'');
+      W:=Max(0,Min(65535,INIFile.GetIntEntry(secTools,ieToolHotKey+S,0)));
       AddTool(S1,S2,S3,W);
     end;
   { Colors }
   S:=AppPalette;
-  PS:=StrToPalette(INIFile^.GetEntry(secColors,iePalette+'_1_40',PaletteToStr(copy(S,1,40))));
-  PS:=PS+StrToPalette(INIFile^.GetEntry(secColors,iePalette+'_41_80',PaletteToStr(copy(S,41,40))));
-  PS:=PS+StrToPalette(INIFile^.GetEntry(secColors,iePalette+'_81_120',PaletteToStr(copy(S,81,40))));
-  PS:=PS+StrToPalette(INIFile^.GetEntry(secColors,iePalette+'_121_160',PaletteToStr(copy(S,121,40))));
-  PS:=PS+StrToPalette(INIFile^.GetEntry(secColors,iePalette+'_161_200',PaletteToStr(copy(S,161,40))));
-  PS:=PS+StrToPalette(INIFile^.GetEntry(secColors,iePalette+'_201_240',PaletteToStr(copy(S,201,40))));
+  PS:=StrToPalette(INIFile.GetEntry(secColors,iePalette+'_1_40',PaletteToStr(copy(S,1,40))));
+  PS:=PS+StrToPalette(INIFile.GetEntry(secColors,iePalette+'_41_80',PaletteToStr(copy(S,41,40))));
+  PS:=PS+StrToPalette(INIFile.GetEntry(secColors,iePalette+'_81_120',PaletteToStr(copy(S,81,40))));
+  PS:=PS+StrToPalette(INIFile.GetEntry(secColors,iePalette+'_121_160',PaletteToStr(copy(S,121,40))));
+  PS:=PS+StrToPalette(INIFile.GetEntry(secColors,iePalette+'_161_200',PaletteToStr(copy(S,161,40))));
+  PS:=PS+StrToPalette(INIFile.GetEntry(secColors,iePalette+'_201_240',PaletteToStr(copy(S,201,40))));
   if length(PS)<length(CIDEAppColor) then
     PS:=PS+copy(CIDEAppColor,length(PS)+1,255);
   AppPalette:=PS;
 (*  { Open files }
-  for I:=INIFile^.GetIntEntry(secFiles,ieOpenFileCount,0) downto 1 do
+  for I:=INIFile.GetIntEntry(secFiles,ieOpenFileCount,0) downto 1 do
     begin
-      S:=INIFile^.GetEntry(secFiles,ieOpenFile+IntToStr(I),'');
+      S:=INIFile.GetEntry(secFiles,ieOpenFile+IntToStr(I),'');
       if (S='') then
         break;
       P:=Pos(',',S); if P=0 then P:=length(S)+1;
@@ -569,20 +572,20 @@ begin
       else
         TryToOpenFile(nil,S1,X,Y,false);
       { remove it because otherwise we allways keep old files }
-      INIFile^.DeleteEntry(secFiles,ieOpenFile+IntToStr(I));
+      INIFile.DeleteEntry(secFiles,ieOpenFile+IntToStr(I));
     end;
 *)
   { Desktop }
-  DesktopFileFlags:=INIFile^.GetIntEntry(secPreferences,ieDesktopFlags,DesktopFileFlags);
+  DesktopFileFlags:=INIFile.GetIntEntry(secPreferences,ieDesktopFlags,DesktopFileFlags);
   { Debugger }
-  IniCenterDebuggerRow:=tcentre(INIFile^.GetIntEntry(secPreferences,ieCenterDebuggerRow,1));
+  IniCenterDebuggerRow:=tcentre(INIFile.GetIntEntry(secPreferences,ieCenterDebuggerRow,1));
   { Preferences }
-  AutoSaveOptions:=INIFile^.GetIntEntry(secPreferences,ieAutoSave,AutoSaveOptions);
-  MiscOptions:=INIFile^.GetIntEntry(secPreferences,ieMiscOptions,MiscOptions);
-  DesktopLocation:=INIFile^.GetIntEntry(secPreferences,ieDesktopLocation,DesktopLocation);
+  AutoSaveOptions:=INIFile.GetIntEntry(secPreferences,ieAutoSave,AutoSaveOptions);
+  MiscOptions:=INIFile.GetIntEntry(secPreferences,ieMiscOptions,MiscOptions);
+  DesktopLocation:=INIFile.GetIntEntry(secPreferences,ieDesktopLocation,DesktopLocation);
   { Misc }
-  ShowReadme:=INIFile^.GetIntEntry(secMisc,ieShowReadme,{integer(ShowReadme)}1)<>0;
-  Dispose(INIFile, Done);
+  ShowReadme:=INIFile.GetIntEntry(secMisc,ieShowReadme,{integer(ShowReadme)}1)<>0;
+  INIFile.Free;
  end;
   ReadINIFile:=OK;
 end;
@@ -616,15 +619,15 @@ begin
   INIFile := TINIFile.Create(IniFileName);
   { Files }
   { avoid keeping old files }
-  INIFile^.DeleteSection(secFiles);
-  INIFile^.SetEntry(secFiles,ieOpenExts,EscapeIniText(OpenExts));
+  INIFile.DeleteSection(secFiles);
+  INIFile.SetEntry(secFiles,ieOpenExts,EscapeIniText(OpenExts));
   for I:=1 to High(RecentFiles) do
     begin
       if I<=RecentFileCount then
          with RecentFiles[I] do S:=FileName+','+IntToStr(LastPos.X)+','+IntToStr(LastPos.Y)
       else
          S:='';
-      INIFile^.SetEntry(secFiles,ieRecentFile+IntToStr(I),S);
+      INIFile.SetEntry(secFiles,ieRecentFile+IntToStr(I),S);
     end;
 
 (*
@@ -633,100 +636,100 @@ begin
     I:=1;
     while assigned(PW) do
       begin
-        If PW^.HelpCtx=hcSourceWindow then
+        If PW.HelpCtx=hcSourceWindow then
           begin
-            With PW^.editor^ do
+            With PW.editor^ do
               S:=FileName+','+IntToStr(CurPos.X)+','+IntToStr(CurPos.Y);
-            PW^.GetBounds(R);
+            PW.GetBounds(R);
             S:=S+','+IntToStr(R.A.X)+','+IntToStr(R.A.Y)+','+
               IntToStr(R.B.X)+','+IntToStr(R.B.Y);
-            INIFile^.SetEntry(secFiles,ieOpenFile+IntToStr(I),S);
+            INIFile.SetEntry(secFiles,ieOpenFile+IntToStr(I),S);
             Inc(I);
             OpenFileCount:=I-1;
           end;
 
-        PW:=PSourceWindow(PW^.next);
-        While assigned(PW) and (PW<>PPW) and (PW^.HelpCtx<>hcSourceWindow) do
-          PW:=PSourceWindow(PW^.next);
+        PW:=PSourceWindow(PW.next);
+        While assigned(PW) and (PW<>PPW) and (PW.HelpCtx<>hcSourceWindow) do
+          PW:=PSourceWindow(PW.next);
         If PW=PPW then
           break;
       end;
 
-  INIFile^.SetIntEntry(secFiles,ieOpenFileCount,OpenFileCount);
+  INIFile.SetIntEntry(secFiles,ieOpenFileCount,OpenFileCount);
 *)
   { Run }
-  INIFile^.SetEntry(secRun,ieRunDir,GetRunDir);
-  INIFile^.SetEntry(secRun,ieRunParameters,GetRunParameters);
-  INIFile^.SetEntry(secFiles,iePrinterDevice,GetPrinterDevice);
+  INIFile.SetEntry(secRun,ieRunDir,GetRunDir);
+  INIFile.SetEntry(secRun,ieRunParameters,GetRunParameters);
+  INIFile.SetEntry(secFiles,iePrinterDevice,GetPrinterDevice);
 {$ifndef GDB_WINDOWS_ALWAYS_USE_ANOTHER_CONSOLE}
   { If DebuggeeTTY<>'' then }
-    INIFile^.SetEntry(secRun,ieDebuggeeRedir,DebuggeeTTY);
+    INIFile.SetEntry(secRun,ieDebuggeeRedir,DebuggeeTTY);
 {$endif not GDB_WINDOWS_ALWAYS_USE_ANOTHER_CONSOLE}
 {$ifdef SUPPORT_REMOTE}
-    INIFile^.SetEntry(secRun,ieRemoteMachine,RemoteMachine);
-    INIFile^.SetEntry(secRun,ieRemotePort,RemotePort);
-    INIFile^.SetEntry(secRun,ieRemotePuttySession,RemotePuttySession);
-    INIFile^.SetEntry(secRun,ieRemoteSendCommand,RemoteSendCommand);
-    INIFile^.SetEntry(secRun,ieRemoteConfig,RemoteConfig);
-    INIFile^.SetEntry(secRun,ieRemoteIdent,RemoteIdent);
-    INIFile^.SetEntry(secRun,ieRemoteDirectory,RemoteDir);
-    INIFile^.SetEntry(secRun,ieRemoteExecCommand,RemoteExecCommand);
-    INIFile^.SetEntry(secRun,ieRemoteSshExecCommand,RemoteSshExecCommand);
-    INIFile^.SetEntry(secRun,ieRemoteConfig,RemoteConfig);
-    INIFile^.SetEntry(secRun,ieRemoteIdent,RemoteIdent);
-    INIFile^.SetEntry(secRun,ieRemoteDirectory,RemoteDir);
-    INIFile^.SetEntry(secRun,ieRemoteGDBServer,RemoteGDBServer);
-    INIFile^.SetEntry(secRun,ieRemoteCopy,RemoteCopy);
-    INIFile^.SetEntry(secRun,ieRemoteShell,RemoteShell);
+    INIFile.SetEntry(secRun,ieRemoteMachine,RemoteMachine);
+    INIFile.SetEntry(secRun,ieRemotePort,RemotePort);
+    INIFile.SetEntry(secRun,ieRemotePuttySession,RemotePuttySession);
+    INIFile.SetEntry(secRun,ieRemoteSendCommand,RemoteSendCommand);
+    INIFile.SetEntry(secRun,ieRemoteConfig,RemoteConfig);
+    INIFile.SetEntry(secRun,ieRemoteIdent,RemoteIdent);
+    INIFile.SetEntry(secRun,ieRemoteDirectory,RemoteDir);
+    INIFile.SetEntry(secRun,ieRemoteExecCommand,RemoteExecCommand);
+    INIFile.SetEntry(secRun,ieRemoteSshExecCommand,RemoteSshExecCommand);
+    INIFile.SetEntry(secRun,ieRemoteConfig,RemoteConfig);
+    INIFile.SetEntry(secRun,ieRemoteIdent,RemoteIdent);
+    INIFile.SetEntry(secRun,ieRemoteDirectory,RemoteDir);
+    INIFile.SetEntry(secRun,ieRemoteGDBServer,RemoteGDBServer);
+    INIFile.SetEntry(secRun,ieRemoteCopy,RemoteCopy);
+    INIFile.SetEntry(secRun,ieRemoteShell,RemoteShell);
 {$endif SUPPORT_REMOTE}
   { Compile }
-  INIFile^.SetEntry(secCompile,iePrimaryFile,PrimaryFile);
-  INIFile^.SetEntry(secCompile,ieCompileMode,SwitchesModeStr[SwitchesMode]);
+  INIFile.SetEntry(secCompile,iePrimaryFile,PrimaryFile);
+  INIFile.SetEntry(secCompile,ieCompileMode,SwitchesModeStr[SwitchesMode]);
   { Deleting single string with help-files list }
-  INIFile^.DeleteEntry(secHelp, ieHelpFiles);
+  INIFile.DeleteEntry(secHelp, ieHelpFiles);
   { Saving help-files as separate strings }
   { Will it produce compatibility problems? }
-  HelpFileCount:=HelpFiles^.Count;
+  HelpFileCount:=HelpFiles.Count;
   for I := 1 to HelpFileCount do
     begin
-      S:=HelpFiles^.At(I-1)^;
-      INIFile^.SetEntry(secHelp, ieHelpFile + IntToStr(I), EscapeIniText(S));
+      S:=HelpFiles.At(I-1)^;
+      INIFile.SetEntry(secHelp, ieHelpFile + IntToStr(I), EscapeIniText(S));
     end;
   { Editor }
-  INIFile^.SetIntEntry(secEditor,ieDefaultTabSize,DefaultTabSize);
-  INIFile^.SetIntEntry(secEditor,ieDefaultIndentSize,DefaultIndentSize);
-  INIFile^.SetIntEntry(secEditor,ieDefaultEditorFlags,DefaultCodeEditorFlags);
-  INIFile^.SetEntry(secEditor,ieDefaultSaveExt,DefaultSaveExt);
+  INIFile.SetIntEntry(secEditor,ieDefaultTabSize,DefaultTabSize);
+  INIFile.SetIntEntry(secEditor,ieDefaultIndentSize,DefaultIndentSize);
+  INIFile.SetIntEntry(secEditor,ieDefaultEditorFlags,DefaultCodeEditorFlags);
+  INIFile.SetEntry(secEditor,ieDefaultSaveExt,DefaultSaveExt);
   { Highlight }
-  INIFile^.SetEntry(secHighlight,ieHighlightExts,EscapeIniText(HighlightExts));
-  INIFile^.SetEntry(secHighlight,ieTabsPattern,EscapeIniText(TabsPattern));
+  INIFile.SetEntry(secHighlight,ieHighlightExts,EscapeIniText(HighlightExts));
+  INIFile.SetEntry(secHighlight,ieTabsPattern,EscapeIniText(TabsPattern));
   { SourcePath }
-  INIFile^.SetEntry(secSourcePath,ieSourceList,EscapeIniText(SourceDirs));
+  INIFile.SetEntry(secSourcePath,ieSourceList,EscapeIniText(SourceDirs));
   { Mouse }
-  INIFile^.SetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
-  INIFile^.SetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse));
-  INIFile^.SetIntEntry(secMouse,ieAltClickAction,AltMouseAction);
-  INIFile^.SetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
+  INIFile.SetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
+  INIFile.SetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse));
+  INIFile.SetIntEntry(secMouse,ieAltClickAction,AltMouseAction);
+  INIFile.SetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
   { Keyboard }
   if EditKeys=ekm_microsoft then
-    INIFile^.SetEntry(secKeyboard,ieEditKeys,'microsoft')
+    INIFile.SetEntry(secKeyboard,ieEditKeys,'microsoft')
   else
-    INIFile^.SetEntry(secKeyboard,ieEditKeys,'borland');
+    INIFile.SetEntry(secKeyboard,ieEditKeys,'borland');
   { Search }
-  INIFile^.SetIntEntry(secSearch,ieFindFlags,FindFlags);
+  INIFile.SetIntEntry(secSearch,ieFindFlags,FindFlags);
   { Breakpoints }
 {$ifndef NODEBUG}
-  BreakPointCount:=BreakpointsCollection^.Count;
-  INIFile^.SetIntEntry(secBreakpoint,ieBreakpointCount,BreakpointCount);
+  BreakPointCount:=BreakpointsCollection.Count;
+  INIFile.SetIntEntry(secBreakpoint,ieBreakpointCount,BreakpointCount);
   for i:=1 to BreakpointCount do
     WriteOneBreakPointEntry(I-1,INIFile);
-  WatchesCount:=WatchesCollection^.Count;
-  INIFile^.SetIntEntry(secWatches,ieWatchCount,WatchesCount);
+  WatchesCount:=WatchesCollection.Count;
+  INIFile.SetIntEntry(secWatches,ieWatchCount,WatchesCount);
   for i:=1 to WatchesCount do
     WriteOneWatchEntry(I-1,INIFile);
 {$endif}
   { Tools }
-  INIFile^.DeleteSection(secTools);
+  INIFile.DeleteSection(secTools);
   for I:=1 to GetToolCount do
     begin
       S:=IntToStr(I);
@@ -734,10 +737,10 @@ begin
       if S1<>'' then S1:=EscapeIniText(S1);
       if S2<>'' then S2:=EscapeIniText(S2);
       if S3<>'' then S3:=EscapeIniText(S3);
-      INIFile^.SetEntry(secTools,ieToolName+S,S1);
-      INIFile^.SetEntry(secTools,ieToolProgram+S,S2);
-      INIFile^.SetEntry(secTools,ieToolParams+S,S3);
-      INIFile^.SetIntEntry(secTools,ieToolHotKey+S,W);
+      INIFile.SetEntry(secTools,ieToolName+S,S1);
+      INIFile.SetEntry(secTools,ieToolProgram+S,S2);
+      INIFile.SetEntry(secTools,ieToolParams+S,S3);
+      INIFile.SetIntEntry(secTools,ieToolHotKey+S,W);
     end;
   { Colors }
   if AppPalette<>CIDEAppColor then
@@ -746,24 +749,24 @@ begin
       then changed back to match the default, this will not update it in the
       ini file, eg. the original (non-default) will be left unmodified... }
     S:=AppPalette;
-    INIFile^.SetEntry(secColors,iePalette+'_1_40',PaletteToStr(copy(S,1,40)));
-    INIFile^.SetEntry(secColors,iePalette+'_41_80',PaletteToStr(copy(S,41,40)));
-    INIFile^.SetEntry(secColors,iePalette+'_81_120',PaletteToStr(copy(S,81,40)));
-    INIFile^.SetEntry(secColors,iePalette+'_121_160',PaletteToStr(copy(S,121,40)));
-    INIFile^.SetEntry(secColors,iePalette+'_161_200',PaletteToStr(copy(S,161,40)));
-    INIFile^.SetEntry(secColors,iePalette+'_201_240',PaletteToStr(copy(S,201,40)));
+    INIFile.SetEntry(secColors,iePalette+'_1_40',PaletteToStr(copy(S,1,40)));
+    INIFile.SetEntry(secColors,iePalette+'_41_80',PaletteToStr(copy(S,41,40)));
+    INIFile.SetEntry(secColors,iePalette+'_81_120',PaletteToStr(copy(S,81,40)));
+    INIFile.SetEntry(secColors,iePalette+'_121_160',PaletteToStr(copy(S,121,40)));
+    INIFile.SetEntry(secColors,iePalette+'_161_200',PaletteToStr(copy(S,161,40)));
+    INIFile.SetEntry(secColors,iePalette+'_201_240',PaletteToStr(copy(S,201,40)));
   end;
   { Desktop }
-  INIFile^.SetIntEntry(secPreferences,ieDesktopFlags,DesktopFileFlags);
-  INIFile^.SetIntEntry(secPreferences,ieCenterDebuggerRow,byte(IniCenterDebuggerRow));
+  INIFile.SetIntEntry(secPreferences,ieDesktopFlags,DesktopFileFlags);
+  INIFile.SetIntEntry(secPreferences,ieCenterDebuggerRow,byte(IniCenterDebuggerRow));
   { Preferences }
-  INIFile^.SetIntEntry(secPreferences,ieAutoSave,AutoSaveOptions);
-  INIFile^.SetIntEntry(secPreferences,ieMiscOptions,MiscOptions);
-  INIFile^.SetIntEntry(secPreferences,ieDesktopLocation,DesktopLocation);
+  INIFile.SetIntEntry(secPreferences,ieAutoSave,AutoSaveOptions);
+  INIFile.SetIntEntry(secPreferences,ieMiscOptions,MiscOptions);
+  INIFile.SetIntEntry(secPreferences,ieDesktopLocation,DesktopLocation);
   { Misc }
-  INIFile^.SetIntEntry(secMisc,ieShowReadme,integer(ShowReadme));
-  OK:=INIFile^.Update;
-  Dispose(INIFile, Done);
+  INIFile.SetIntEntry(secMisc,ieShowReadme,integer(ShowReadme));
+  OK:=INIFile.Update;
+  INIFile.Free;
   WriteINIFile:=OK;
 end;
 

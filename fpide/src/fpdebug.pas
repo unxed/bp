@@ -13,6 +13,9 @@
 
  **********************************************************************}
 unit FPDebug;
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 {$ifdef NODEBUG}
 interface
 implementation
@@ -228,7 +231,7 @@ type
       procedure rename(s : string);
       procedure Get_new_value;
       procedure Force_new_value;
-      destructor done;virtual;
+      destructor Destroy;virtual;
     private
       GDBRunCount : longint;
     end;
@@ -284,7 +287,7 @@ type
   PWatchesWindow = TWatchesWindow;
     TWatchesWindow = class(TFPDlgWindow)
       WLB : PWatchesListBox;
-      Constructor Init;
+      constructor Create;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   Update; virtual;
@@ -307,7 +310,7 @@ type
   PStackWindow = TStackWindow;
     TStackWindow = class(TFPDlgWindow)
       FLB : PFramesListBox;
-      Constructor Init;
+      constructor Create;
       constructor Load(var S: TStream);
       procedure   Store(var S: TStream);
       procedure   Update; virtual;
@@ -652,9 +655,9 @@ procedure UpdateDebugViews;
         Debugger.isRemoteDebugging then
        PushStatus(msg_getting_info_on+RemoteMachine);
 {$endif SUPPORT_REMOTE}
-     DeskTop^.Lock;
+     DeskTop.Lock;
      If assigned(StackWindow) then
-       StackWindow^.Update;
+       StackWindow.Update;
      If assigned(RegistersWindow) then
        RegistersWindow.Update;
 {$ifndef NODEBUG}
@@ -665,7 +668,7 @@ procedure UpdateDebugViews;
        FPUWindow.Update;
      If assigned(VectorWindow) then
        VectorWindow.Update;
-     DeskTop^.UnLock;
+     DeskTop.UnLock;
 {$ifdef SUPPORT_REMOTE}
      if assigned(Debugger) and
         Debugger.isRemoteDebugging then
@@ -675,7 +678,7 @@ procedure UpdateDebugViews;
 
 {$ifndef NODEBUG}
 
-constructor TDebugController.Init;
+constructor TDebugController.Create;
 begin
   inherited Create;
   CenterDebuggerRow:=IniCenterDebuggerRow;
@@ -786,7 +789,7 @@ end;
 procedure TDebugController.InsertBreakpoints;
   procedure DoInsert(PB : PBreakpoint);
   begin
-    PB^.Insert;
+    PB.Insert;
   end;
 
 begin
@@ -798,33 +801,33 @@ procedure TDebugController.ReadWatches;
 
   procedure DoRead(PB : PWatch);
   begin
-    PB^.Get_new_value;
+    PB.Get_new_value;
   end;
 
 begin
   WatchesCollection.ForEach(@DoRead);
   If Assigned(WatchesWindow) then
-    WatchesWindow^.Update;
+    WatchesWindow.Update;
 end;
 
 procedure TDebugController.RereadWatches;
 
   procedure DoRead(PB : PWatch);
   begin
-    PB^.Force_new_value;
+    PB.Force_new_value;
   end;
 
 begin
   WatchesCollection.ForEach(@DoRead);
   If Assigned(WatchesWindow) then
-    WatchesWindow^.Update;
+    WatchesWindow.Update;
 end;
 
 
 procedure TDebugController.RemoveBreakpoints;
   procedure DoDelete(PB : PBreakpoint);
     begin
-      PB^.Remove;
+      PB.Remove;
     end;
 begin
    BreakpointsCollection.ForEach(@DoDelete);
@@ -833,7 +836,7 @@ end;
 procedure TDebugController.ResetBreakpointsValues;
   procedure DoResetVal(PB : PBreakpoint);
     begin
-      PB^.ResetValues;
+      PB.ResetValues;
     end;
 begin
    BreakpointsCollection.ForEach(@DoResetVal);
@@ -1053,11 +1056,11 @@ begin
     begin
       { We should do something special for errors !! }
       If StrLen(GetError)>0 then
-        GDBWindow^.WriteErrorText(GetError);
-      GDBWindow^.WriteOutputText(GetOutput);
+        GDBWindow.WriteErrorText(GetError);
+      GDBWindow.WriteOutputText(GetOutput);
     end;
   if assigned(GDBWindow) then
-    GDBWindow^.WriteString(S);
+    GDBWindow.WriteString(S);
 end;
 
 function TDebugController.Query(question : pchar; args : pchar) : longint;
@@ -1081,13 +1084,13 @@ begin
         query:=0;
       exit;
     end;
-  if assigned(Application^.Current) and
-     ((Application^.Current^.State and sfModal)<>0) then
+  if assigned(Application.Current) and
+     ((Application.Current.State and sfModal)<>0) then
     begin
       WasModal:=true;
-      ModalView:=Application^.Current;
-      ModalView^.SetState(sfModal, false);
-      ModalView^.Hide;
+      ModalView:=Application.Current;
+      ModalView.SetState(sfModal, false);
+      ModalView.Hide;
     end
   else
     WasModal:=false;
@@ -1100,9 +1103,9 @@ begin
     Query:=0;
   if WasModal then
     begin
-      ModalView^.Show;
-      ModalView^.SetState(sfModal, true);
-      ModalView^.Draw;
+      ModalView.Show;
+      ModalView.SetState(sfModal, true);
+      ModalView.Draw;
     end;
 end;
 
@@ -1112,7 +1115,7 @@ begin
     begin
       If StrLen(GetError)>0 then
         begin
-          GDBWindow^.WriteErrorText(GetError);
+          GDBWindow.WriteErrorText(GetError);
           if in_command=0 then
             gdberrorbuf.reset;
         end;
@@ -1120,14 +1123,14 @@ begin
 {$ifdef GDB_RAW_OUTPUT}
       If StrLen(GetRaw)>0 then
         begin
-          GDBWindow^.WriteOutputText(GetRaw);
+          GDBWindow.WriteOutputText(GetRaw);
           if in_command=0 then
             gdbrawbuf.reset;
         end;
 {$endif GDB_RAW_OUTPUT}
       If StrLen(GetOutput)>0 then
         begin
-          GDBWindow^.WriteOutputText(GetOutput);
+          GDBWindow.WriteOutputText(GetOutput);
           { Keep output for command results }
           if in_command=0 then
             gdboutputbuf.reset;
@@ -1144,13 +1147,13 @@ begin
     begin
       { We should do something special for errors !! }
       If StrLen(GetError)>0 then
-        GDBWindow^.WriteErrorText(GetError);
+        GDBWindow.WriteErrorText(GetError);
 {$ifdef GDB_RAW_OUTPUT}
       If StrLen(GetRaw)>0 then
-        GDBWindow^.WriteOutputText(GetRaw);
+        GDBWindow.WriteOutputText(GetRaw);
 {$endif GDB_RAW_OUTPUT}
-      GDBWindow^.WriteOutputText(GetOutput);
-      GDBWindow^.Editor^.TextEnd;
+      GDBWindow.WriteOutputText(GetOutput);
+      GDBWindow.Editor.TextEnd;
     end;
 end;
 
@@ -1183,12 +1186,12 @@ procedure TDebugController.ResetDebuggerRows;
   procedure ResetDebuggerRow(P: PView);
   begin
     if assigned(P) and
-       (TypeOf(P^)=TypeOf(TSourceWindow)) then
-       PSourceWindow(P)^.Editor^.SetLineFlagExclusive(lfDebuggerRow,-1);
+       ((P is TSourceWindow)) then
+       PSourceWindow(P).Editor.SetLineFlagExclusive(lfDebuggerRow,-1);
   end;
 
 begin
-  Desktop^.ForEach(@ResetDebuggerRow);
+  Desktop.ForEach(@ResetDebuggerRow);
 end;
 
 procedure TDebugController.Reset;
@@ -1347,7 +1350,7 @@ var
   i,ExitCode : longint;
   ExitAddr,ExitFrame : CORE_ADDR;
 begin
-  Desktop^.Lock;
+  Desktop.Lock;
   { 0 based line count in Editor }
   if Line>0 then
     dec(Line);
@@ -1380,28 +1383,28 @@ begin
       end
       else
       begin
-        Desktop^.Unlock;
+        Desktop.Unlock;
         DoSelectSourceLine := False;
         exit;
       end;
     end;
   { Update Disassembly position }
   if Assigned(DisassemblyWindow) then
-    DisassemblyWindow^.SetCurAddress(stop_addr);
+    DisassemblyWindow.SetCurAddress(stop_addr);
 
   if (fn=LastFileName) then
     begin
       W:=PSourceWindow(LastSource);
       if assigned(W) then
         begin
-          W^.Editor^.SetCurPtr(0,Line);
-          W^.Editor^.TrackCursor(CenterDebuggerRow);
-          W^.Editor^.SetLineFlagExclusive(lfDebuggerRow,Line);
+          W.Editor.SetCurPtr(0,Line);
+          W.Editor.TrackCursor(CenterDebuggerRow);
+          W.Editor.SetLineFlagExclusive(lfDebuggerRow,Line);
           UpdateDebugViews;
 
-          {if Not assigned(GDBWindow) or not GDBWindow^.GetState(sfActive) then
+          {if Not assigned(GDBWindow) or not GDBWindow.GetState(sfActive) then
             handled by SelectInDebugSession}
-          W^.SelectInDebugSession;
+          W.SelectInDebugSession;
           InvalidSourceLine:=false;
         end
       else
@@ -1415,25 +1418,25 @@ begin
         W:=TryToOpenFile(nil,s,0,Line,false);
       if assigned(W) then
         begin
-          W^.Editor^.SetLineFlagExclusive(lfDebuggerRow,Line);
-          W^.Editor^.TrackCursor(CenterDebuggerRow);
+          W.Editor.SetLineFlagExclusive(lfDebuggerRow,Line);
+          W.Editor.TrackCursor(CenterDebuggerRow);
           UpdateDebugViews;
-          {if Not assigned(GDBWindow) or not GDBWindow^.GetState(sfActive) then
+          {if Not assigned(GDBWindow) or not GDBWindow.GetState(sfActive) then
             handled by SelectInDebugSession}
-          W^.SelectInDebugSession;
+          W.SelectInDebugSession;
           LastSource:=W;
           InvalidSourceLine:=false;
         end
         { only search a file once }
       else
        begin
-         Desktop^.UnLock;
+         Desktop.UnLock;
          if s='' then
            Found:=false
          else
          { it is easier to handle with a * at the end }
            Found:=IDEApp.OpenSearch(s+'*');
-         Desktop^.Lock;
+         Desktop.Lock;
          if not Found then
            begin
              InvalidSourceLine:=true;
@@ -1441,25 +1444,25 @@ begin
              { Show the stack in that case }
              InitStackWindow;
              UpdateDebugViews;
-             StackWindow^.MakeFirst;
+             StackWindow.MakeFirst;
            end
          else
            begin
              { should now be open }
               W:=TryToOpenFile(nil,s,0,Line,true);
-              W^.Editor^.SetLineFlagExclusive(lfDebuggerRow,Line);
-              W^.Editor^.TrackCursor(CenterDebuggerRow);
+              W.Editor.SetLineFlagExclusive(lfDebuggerRow,Line);
+              W.Editor.TrackCursor(CenterDebuggerRow);
               UpdateDebugViews;
-              {if Not assigned(GDBWindow) or not GDBWindow^.GetState(sfActive) then
+              {if Not assigned(GDBWindow) or not GDBWindow.GetState(sfActive) then
                 handled by SelectInDebugSession}
-              W^.SelectInDebugSession;
+              W.SelectInDebugSession;
               LastSource:=W;
               InvalidSourceLine:=false;
            end;
        end;
     end;
   LastFileName:=s;
-  Desktop^.UnLock;
+  Desktop.UnLock;
   if BreakIndex>0 then
     begin
       PB:=BreakpointsCollection.GetGDB(BreakIndex);
@@ -1482,28 +1485,28 @@ begin
             TbreakNumber:=0;
         end
       { For watch we should get old and new value !! }
-      else if (Not assigned(GDBWindow) or not GDBWindow^.GetState(sfActive)) and
-         (PB^.typ<>bt_file_line) and (PB^.typ<>bt_function) and
-         (PB^.typ<>bt_address) then
+      else if (Not assigned(GDBWindow) or not GDBWindow.GetState(sfActive)) and
+         (PB.typ<>bt_file_line) and (PB.typ<>bt_function) and
+         (PB.typ<>bt_address) then
         begin
-           S:=PrintCommand(GetStr(PB^.Name));
+           S:=PrintCommand(GetStr(PB.Name));
            got_error:=false;
-           if Assigned(PB^.OldValue) then
-             DisposeStr(PB^.OldValue);
-           PB^.OldValue:=PB^.CurrentValue;
-           PB^.CurrentValue:=NewStr(S);
-           If PB^.typ=bt_function then
+           if Assigned(PB.OldValue) then
+             DisposeStr(PB.OldValue);
+           PB.OldValue:=PB.CurrentValue;
+           PB.CurrentValue:=NewStr(S);
+           If PB.typ=bt_function then
              WarningBox(#3'GDB stopped due to'#13+
-               #3+BreakpointTypeStr[PB^.typ]+' '+GetStr(PB^.Name),nil)
-           else if (GetStr(PB^.OldValue)<>S) then
+               #3+BreakpointTypeStr[PB.typ]+' '+GetStr(PB.Name),nil)
+           else if (GetStr(PB.OldValue)<>S) then
              WarningBox(#3'GDB stopped due to'#13+
-               #3+BreakpointTypeStr[PB^.typ]+' '+GetStr(PB^.Name)+#13+
-               #3+'Old value = '+GetStr(PB^.OldValue)+#13+
-               #3+'New value = '+GetStr(PB^.CurrentValue),nil)
+               #3+BreakpointTypeStr[PB.typ]+' '+GetStr(PB.Name)+#13+
+               #3+'Old value = '+GetStr(PB.OldValue)+#13+
+               #3+'New value = '+GetStr(PB.CurrentValue),nil)
            else
              WarningBox(#3'GDB stopped due to'#13+
-               #3+BreakpointTypeStr[PB^.typ]+' '+GetStr(PB^.Name)+#13+
-               #3+' value = '+GetStr(PB^.CurrentValue),nil);
+               #3+BreakpointTypeStr[PB.typ]+' '+GetStr(PB.Name)+#13+
+               #3+' value = '+GetStr(PB.CurrentValue),nil);
         end;
     end;
   DoSelectSourceLine := True;
@@ -1570,7 +1573,7 @@ begin
    ChangeDebuggeeWindowTitleTo(Stopped_State);
 {$endif Windows}
   If assigned(GDBWindow) then
-    GDBWindow^.Editor^.UnLock;
+    GDBWindow.Editor.UnLock;
 end;
 
 
@@ -1612,7 +1615,7 @@ begin
 {$endif Windows}
   { Don't try to print GDB messages while in User Screen mode }
   If assigned(GDBWindow) then
-    GDBWindow^.Editor^.Lock;
+    GDBWindow.Editor.Lock;
 end;
 
 {$endif NODEBUG}
@@ -1628,7 +1631,7 @@ function  ActiveBreakpoints : boolean;
 
   procedure TestActive(PB : PBreakpoint);
     begin
-        If PB^.state=bs_enabled then
+        If PB.state=bs_enabled then
           IsActive:=true;
     end;
 begin
@@ -1925,7 +1928,7 @@ begin
             b:=true
           else
             b:=false;
-          W^.Editor^.SetLineFlagState(Line-1,lfBreakpoint,b);
+          W.Editor.SetLineFlagState(Line-1,lfBreakpoint,b);
         end;
     end;
 end;
@@ -1951,7 +1954,7 @@ end;
 
 function TBreakpointCollection.At(Index: Integer): PBreakpoint;
 begin
-  At:=inherited At(Index);
+  At := PBreakpoint(inherited At(Index));
 end;
 
 
@@ -1965,14 +1968,14 @@ begin
     end;
 {$endif NODEBUG}
   if assigned(BreakpointsWindow) then
-    BreakpointsWindow^.Update;
+    BreakpointsWindow.Update;
 end;
 
 function  TBreakpointCollection.GetGDB(index : longint) : PBreakpoint;
 
   function IsNum(P : PBreakpoint) : boolean;
   begin
-    IsNum:=P^.GDBIndex=index;
+    IsNum:=P.GDBIndex=index;
   end;
 
 begin
@@ -1986,9 +1989,9 @@ procedure TBreakpointCollection.ShowBreakpoints(W : PFPWindow);
 
   procedure SetInSource(P : PBreakpoint);
   begin
-    If assigned(P^.FileName) and
-      (OSFileName(P^.FileName^)=OSFileName(FExpand(PSourceWindow(W)^.Editor^.FileName))) then
-      PSourceWindow(W)^.Editor^.SetLineFlagState(P^.Line-1,lfBreakpoint,P^.state=bs_enabled);
+    If assigned(P.FileName) and
+      (OSFileName(P.FileName^)=OSFileName(FExpand(PSourceWindow(W).Editor.FileName))) then
+      PSourceWindow(W).Editor.SetLineFlagState(P.Line-1,lfBreakpoint,P.state=bs_enabled);
   end;
 
   procedure SetInDisassembly(P : PBreakpoint);
@@ -1999,28 +2002,28 @@ procedure TBreakpointCollection.ShowBreakpoints(W : PFPWindow);
       HAddr : PtrInt;
       code : integer;
   begin
-    for i:=0 to PDisassemblyWindow(W)^.Editor^.GetLineCount-1 do
+    for i:=0 to PDisassemblyWindow(W).Editor.GetLineCount-1 do
       begin
-        PDL:=PDisasLine(PDisassemblyWindow(W)^.Editor^.GetLine(i));
-        if PDL^.Address=0 then
+        PDL:=PDisasLine(PDisassemblyWindow(W).Editor.GetLine(i));
+        if PDL.Address=0 then
           begin
-            if (P^.typ=bt_file_line) then
+            if (P.typ=bt_file_line) then
               begin
-                S:=PDisassemblyWindow(W)^.Editor^.GetDisplayText(i);
+                S:=PDisassemblyWindow(W).Editor.GetDisplayText(i);
                 ps:=pos(':',S);
                 qs:=pos(' ',copy(S,ps+1,High(S)));
-                if (GDBFileName(P^.FileName^)=GDBFileName(FExpand(Copy(S,1,ps-1)))) and
-                   (StrToInt(copy(S,ps+1,qs-1))=P^.line) then
-                  PDisassemblyWindow(W)^.Editor^.SetLineFlagState(i,lfBreakpoint,P^.state=bs_enabled);
+                if (GDBFileName(P.FileName^)=GDBFileName(FExpand(Copy(S,1,ps-1)))) and
+                   (StrToInt(copy(S,ps+1,qs-1))=P.line) then
+                  PDisassemblyWindow(W).Editor.SetLineFlagState(i,lfBreakpoint,P.state=bs_enabled);
               end;
           end
         else
           begin
-            if assigned(P^.Name) then
+            if assigned(P.Name) then
               begin
-                Val('$'+P^.Name^,HAddr,code);
-                If (P^.typ=bt_address) and (PDL^.Address=HAddr) then
-                  PDisassemblyWindow(W)^.Editor^.SetLineFlagState(i,lfBreakpoint,P^.state=bs_enabled);
+                Val('$'+P.Name^,HAddr,code);
+                If (P.typ=bt_address) and (PDL.Address=HAddr) then
+                  PDisassemblyWindow(W).Editor.SetLineFlagState(i,lfBreakpoint,P.state=bs_enabled);
               end;
           end;
       end;
@@ -2038,24 +2041,24 @@ procedure TBreakpointCollection.AdaptBreakpoints(Editor : PSourceEditor; Pos, Ch
 
   procedure AdaptInSource(P : PBreakpoint);
   begin
-    If assigned(P^.FileName) and
-       (P^.FileName^=OSFileName(FExpand(Editor^.FileName))) then
+    If assigned(P.FileName) and
+       (P.FileName^=OSFileName(FExpand(Editor.FileName))) then
         begin
-          if P^.state=bs_enabled then
-            Editor^.SetLineFlagState(P^.Line-1,lfBreakpoint,false);
-          if P^.Line-1>=Pos then
+          if P.state=bs_enabled then
+            Editor.SetLineFlagState(P.Line-1,lfBreakpoint,false);
+          if P.Line-1>=Pos then
             begin
-              if (Change>0) or (P^.Line-1>=Pos-Change) then
-                P^.line:=P^.Line+Change
+              if (Change>0) or (P.Line-1>=Pos-Change) then
+                P.line:=P.Line+Change
               else
                 begin
                   { removing inside a ForEach call leads to problems }
                   { so we do that after PM }
-                  P^.state:=bs_delete_after;
+                  P.state:=bs_delete_after;
                 end;
             end;
-          if P^.state=bs_enabled then
-            Editor^.SetLineFlagState(P^.Line-1,lfBreakpoint,true);
+          if P.state=bs_enabled then
+            Editor.SetLineFlagState(P.Line-1,lfBreakpoint,true);
         end;
   end;
 
@@ -2066,7 +2069,7 @@ begin
   I:=Count-1;
   While (I>=0) do
     begin
-      if At(I)^.state=bs_delete_after then
+      if At(I).state=bs_delete_after then
         AtFree(I);
       Dec(I);
     end;
@@ -2076,9 +2079,9 @@ function TBreakpointCollection.FindBreakpointAt(Editor : PSourceEditor; Line : l
 
   function IsAtLine(P : PBreakpoint) : boolean;
   begin
-    If assigned(P^.FileName) and
-       (P^.FileName^=OSFileName(FExpand(Editor^.FileName))) and
-       (Line=P^.Line) then
+    If assigned(P.FileName) and
+       (P.FileName^=OSFileName(FExpand(Editor.FileName))) and
+       (Line=P.Line) then
       IsAtLine:=true
     else
       IsAtLine:=false;
@@ -2094,11 +2097,11 @@ procedure TBreakpointCollection.ShowAllBreakpoints;
     var
       W : PSourceWindow;
   begin
-    If assigned(P^.FileName) then
+    If assigned(P.FileName) then
       begin
-        W:=SearchOnDesktop(P^.FileName^,false);
+        W:=SearchOnDesktop(P.FileName^,false);
         if assigned(W) then
-          W^.Editor^.SetLineFlagState(P^.Line-1,lfBreakpoint,P^.state=bs_enabled);
+          W.Editor.SetLineFlagState(P.Line-1,lfBreakpoint,P.state=bs_enabled);
       end;
   end;
 
@@ -2110,7 +2113,7 @@ function TBreakpointCollection.GetType(typ : BreakpointType;Const s : String) : 
 
   function IsThis(P : PBreakpoint) : boolean;
   begin
-    IsThis:=(P^.typ=typ) and (GetStr(P^.Name)=S);
+    IsThis:=(P.typ=typ) and (GetStr(P.Name)=S);
   end;
 
 begin
@@ -2122,8 +2125,8 @@ function TBreakpointCollection.ToggleFileLine(FileName: String;LineNr : Longint)
 
   function IsThere(P : PBreakpoint) : boolean;
   begin
-    IsThere:=(P^.typ=bt_file_line) and assigned(P^.FileName) and
-      (OSFileName(P^.FileName^)=FileName) and (P^.Line=LineNr);
+    IsThere:=(P.typ=bt_file_line) and assigned(P.FileName) and
+      (OSFileName(P.FileName^)=FileName) and (P.Line=LineNr);
   end;
 
 var
@@ -2135,18 +2138,18 @@ begin
     If Assigned(PB) then
       begin
         { delete it form source window }
-        PB^.state:=bs_disabled;
-        PB^.UpdateSource;
+        PB.state:=bs_disabled;
+        PB.UpdateSource;
         { remove from collection }
         BreakpointsCollection.free(PB);
       end
     else
       begin
-        PB:= New(PBreakpoint,Init_file_line(FileName,LineNr));
+        PB:= TBreakpoint.Init_file_line(FileName,LineNr);
         if assigned(PB) then
           Begin
             Insert(PB);
-            PB^.UpdateSource;
+            PB.UpdateSource;
             ToggleFileLine:=true;
           End;
       end;
@@ -2168,7 +2171,7 @@ end;
 function TBreakpointItem.GetText(MaxLen: Sw_integer): string;
 var S: string;
 begin
- with Breakpoint^ do
+ with Breakpoint do
    begin
      S:=BreakpointTypeStr[typ];
      While Length(S)<10 do
@@ -2209,8 +2212,8 @@ end;
 
 function TBreakpointItem.GetModuleName: string;
 begin
-  if breakpoint^.typ=bt_file_line then
-    GetModuleName:=GetStr(breakpoint^.FileName)
+  if breakpoint.typ=bt_file_line then
+    GetModuleName:=GetStr(breakpoint.FileName)
   else
     GetModuleName:='';
 end;
@@ -2229,7 +2232,7 @@ end;
 function TBreakpointsListBox.GetLocalMenu: PMenu;
 var M: PMenu;
 begin
-  if (Owner<>nil) and (Owner^.GetState(sfModal)) then M:=nil else
+  if (Owner<>nil) and (Owner.GetState(sfModal)) then M:=nil else
   M:=NewMenu(
     NewItem(menu_bplocal_gotosource,'',kbNoKey,cmMsgGotoSource,hcMsgGotoSource,
     NewItem(menu_bplocal_editbreakpoint,'',kbNoKey,cmEditBreakpoint,hcEditBreakpoint,
@@ -2249,15 +2252,15 @@ begin
         DontClear:=false;
         case Event.KeyCode of
           kbEnd :
-            FocusItem(List^.Count-1);
+            FocusItem(List.Count-1);
           kbHome :
             FocusItem(0);
           kbEnter :
-            Message(@Self,evCommand,cmMsgGotoSource,nil);
+            Message(Self,evCommand,cmMsgGotoSource,nil);
           kbIns :
-            Message(@Self,evCommand,cmNewBreakpoint,nil);
+            Message(Self,evCommand,cmNewBreakpoint,nil);
           kbDel :
-            Message(@Self,evCommand,cmDeleteBreakpoint,nil);
+            Message(Self,evCommand,cmDeleteBreakpoint,nil);
         else
           DontClear:=true;
         end;
@@ -2267,8 +2270,8 @@ begin
     evBroadcast :
       case Event.Command of
         cmListItemSelected :
-          if Event.InfoPtr=@Self then
-            Message(@Self,evCommand,cmEditBreakpoint,nil);
+          if Event.InfoPtr=Self then
+            Message(Self,evCommand,cmEditBreakpoint,nil);
       end;
     evCommand :
       begin
@@ -2300,19 +2303,19 @@ end;
 procedure TBreakpointsListBox.AddBreakpoint(P: PBreakpointItem);
 var W : integer;
 begin
-  if List=nil then New(List, Init(20,20));
-  W:=length(P^.GetText(255));
+  if List=nil then List := TCollection.Create(20,20);
+  W:=length(P.GetText(255));
   if W>MaxWidth then
   begin
     MaxWidth:=W;
     if HScrollBar<>nil then
-       HScrollBar^.SetRange(0,MaxWidth);
+       HScrollBar.SetRange(0,MaxWidth);
   end;
-  List^.Insert(P);
-  SetRange(List^.Count);
-  if Focused=List^.Count-1-1 then
-     FocusItem(List^.Count-1);
-  P^.Breakpoint^.UpdateSource;
+  List.Insert(P);
+  SetRange(List.Count);
+  if Focused=List.Count-1-1 then
+     FocusItem(List.Count-1);
+  P.Breakpoint.UpdateSource;
   DrawView;
 end;
 
@@ -2320,19 +2323,19 @@ function TBreakpointsListBox.GetText(Item,MaxLen: Sw_Integer): String;
 var P: PBreakpointItem;
     S: string;
 begin
-  P:=List^.At(Item);
-  S:=P^.GetText(MaxLen);
+  P:=List.At(Item);
+  S:=P.GetText(MaxLen);
   GetText:=copy(S,1,MaxLen);
 end;
 
 procedure TBreakpointsListBox.Clear;
 begin
   if assigned(List) then
-    Dispose(List, Done);
+    List.Free;
   List:=nil;
   MaxWidth:=0;
   SetRange(0); DrawView;
-  Message(Application,evBroadcast,cmClearLineHighlights,@Self);
+  Message(Application,evBroadcast,cmClearLineHighlights,Self);
 end;
 
 procedure TBreakpointsListBox.TrackSource;
@@ -2340,32 +2343,32 @@ var W: PSourceWindow;
     P: PBreakpointItem;
     R: TRect;
 begin
-  (*Message(Application,evBroadcast,cmClearLineHighlights,@Self);
+  (*Message(Application,evBroadcast,cmClearLineHighlights,Self);
   if Range=0 then Exit;*)
-  P:=List^.At(Focused);
-  if P^.GetModuleName='' then Exit;
-  Desktop^.Lock;
+  P:=List.At(Focused);
+  if P.GetModuleName='' then Exit;
+  Desktop.Lock;
   GetNextEditorBounds(R);
-  R.B.Y:=Owner^.Origin.Y;
-  W:=EditorWindowFile(P^.GetModuleName);
+  R.B.Y:=Owner.Origin.Y;
+  W:=EditorWindowFile(P.GetModuleName);
   if assigned(W) then
     begin
-      W^.GetExtent(R);
-      R.B.Y:=Owner^.Origin.Y;
-      W^.ChangeBounds(R);
-      W^.Editor^.SetCurPtr(1,P^.Breakpoint^.Line);
+      W.GetExtent(R);
+      R.B.Y:=Owner.Origin.Y;
+      W.ChangeBounds(R);
+      W.Editor.SetCurPtr(1,P.Breakpoint.Line);
     end
   else
-    W:=TryToOpenFile(@R,P^.GetModuleName,1,P^.Breakpoint^.Line,true);
+    W:=TryToOpenFile(@R,P.GetModuleName,1,P.Breakpoint.Line,true);
   if W<>nil then
     begin
-      W^.Select;
-      W^.Editor^.TrackCursor(do_centre);
-      W^.Editor^.SetLineFlagExclusive(lfHighlightRow,P^.Breakpoint^.Line);
+      W.Select;
+      W.Editor.TrackCursor(do_centre);
+      W.Editor.SetLineFlagExclusive(lfHighlightRow,P.Breakpoint.Line);
     end;
   if Assigned(Owner) then
-    Owner^.Select;
-  Desktop^.UnLock;
+    Owner.Select;
+  Desktop.UnLock;
 end;
 
 procedure TBreakpointsListBox.ToggleCurrent;
@@ -2373,13 +2376,13 @@ var
   P: PBreakpointItem;
 begin
   if Range=0 then Exit;
-  P:=List^.At(Focused);
+  P:=List.At(Focused);
   if P=nil then Exit;
-  if P^.Breakpoint^.state=bs_enabled then
-    P^.Breakpoint^.state:=bs_disabled
-  else if P^.Breakpoint^.state=bs_disabled then
-    P^.Breakpoint^.state:=bs_enabled;
-  P^.Breakpoint^.UpdateSource;
+  if P.Breakpoint.state=bs_enabled then
+    P.Breakpoint.state:=bs_disabled
+  else if P.Breakpoint.state=bs_disabled then
+    P.Breakpoint.state:=bs_enabled;
+  P.Breakpoint.UpdateSource;
   BreakpointsCollection.Update;
 end;
 
@@ -2388,10 +2391,10 @@ var
   P: PBreakpointItem;
 begin
   if Range=0 then Exit;
-  P:=List^.At(Focused);
+  P:=List.At(Focused);
   if P=nil then Exit;
-  Application^.ExecuteDialog(New(PBreakpointItemDialog,Init(P^.Breakpoint)),nil);
-  P^.Breakpoint^.UpdateSource;
+  Application.ExecuteDialog(TBreakpointItemDialog.Create(P.Breakpoint),nil);
+  P.Breakpoint.UpdateSource;
   BreakpointsCollection.Update;
 end;
 
@@ -2400,13 +2403,13 @@ var
   P: PBreakpointItem;
 begin
   if Range=0 then Exit;
-  P:=List^.At(Focused);
+  P:=List.At(Focused);
   if P=nil then Exit;
   { delete it form source window }
-  P^.Breakpoint^.state:=bs_disabled;
-  P^.Breakpoint^.UpdateSource;
-  BreakpointsCollection.free(P^.Breakpoint);
-  List^.free(P);
+  P.Breakpoint.state:=bs_disabled;
+  P.Breakpoint.UpdateSource;
+  BreakpointsCollection.free(P.Breakpoint);
+  List.free(P);
   BreakpointsCollection.Update;
 end;
 
@@ -2414,15 +2417,15 @@ procedure TBreakpointsListBox.EditNew;
 var
   P: PBreakpoint;
 begin
-  P:=New(PBreakpoint,Init_Empty);
-  if Application^.ExecuteDialog(New(PBreakpointItemDialog,Init(P)),nil)<>cmCancel then
+  P:=TBreakpoint.Init_Empty;
+  if Application.ExecuteDialog(TBreakpointItemDialog.Create(P),nil)<>cmCancel then
     begin
-      P^.UpdateSource;
+      P.UpdateSource;
       BreakpointsCollection.Insert(P);
       BreakpointsCollection.Update;
     end
   else
-    dispose(P,Done);
+    P.Free;
 end;
 
 procedure TBreakpointsListBox.Draw;
@@ -2436,7 +2439,7 @@ var
   TC: byte;
 procedure MT(var C: word); begin if TC<>0 then C:=(C and $ff0f) or (TC and $f0); end;
 begin
-  if (Owner<>nil) then TC:=ord(Owner^.GetColorW(6)) else TC:=0;
+  if (Owner<>nil) then TC:=ord(Owner.GetColorW(6)) else TC:=0;
   if State and (sfSelected + sfActive) = (sfSelected + sfActive) then
   begin
     NormalColor := GetColorW(1);
@@ -2451,7 +2454,7 @@ begin
     begin MT(NormalColor); MT(SelectedColor); end;
   if NoSelection then
      SelectedColor:=NormalColor;
-  if HScrollBar <> nil then Indent := HScrollBar^.Value
+  if HScrollBar <> nil then Indent := HScrollBar.Value
   else Indent := 0;
   ColWidth := Size.X div NumCols + 1;
   for I := 0 to Size.Y - 1 do
@@ -2507,11 +2510,11 @@ begin
   OL:=List;
   OldR:=Range;
   Range:=0;
-  New(List, Init(1,1));
+  List := TCollection.Create(1,1);
 
   inherited Store(S);
 
-  Dispose(List, Done);
+  List.Free;
   Range:=OldR;
   List:=OL;
   { ^^^ nasty trick - has anyone a better idea how to avoid storing the
@@ -2523,14 +2526,14 @@ end;
 destructor TBreakpointsListBox.Destroy;
 begin
   inherited Destroy;
-  if List<>nil then Dispose(List, Done);
+  if List<>nil then List.Free;
 end;
 
 {****************************************************************************
                          TBreakpointsWindow
 ****************************************************************************}
 
-constructor TBreakpointsWindow.Init;
+constructor TBreakpointsWindow.Create;
 var R,R2: TRect;
     HSB,VSB: PScrollBar;
     ST: PStaticText;
@@ -2540,30 +2543,30 @@ var R,R2: TRect;
 const
   NumButtons = 5;
 begin
-  Desktop^.GetExtent(R); R.A.Y:=R.B.Y-18;
+  Desktop.GetExtent(R); R.A.Y:=R.B.Y-18;
   inherited Create(R, dialog_breakpointlist, wnNoNumber);
 
   HelpCtx:=hcBreakpointListWindow;
 
   GetExtent(R); R.Grow(-1,-1); R.B.Y:=R.A.Y+1;
   S:=label_breakpointpropheader;
-  New(ST, Init(R,S));
-  ST^.GrowMode:=gfGrowHiX;
+  ST := TStaticText.Create(R,S);
+  ST.GrowMode:=gfGrowHiX;
   Insert(ST);
   GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,1); R.B.Y:=R.A.Y+1;
-  New(ST, Init(R, CharStr('Ä', MaxViewWidth)));
-  ST^.GrowMode:=gfGrowHiX;
+  ST := TStaticText.Create(R, CharStr('ï¿½', MaxViewWidth));
+  ST.GrowMode:=gfGrowHiX;
   Insert(ST);
   GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,2);Dec(R.B.Y,5);
   R2.Copy(R); Inc(R2.B.Y); R2.A.Y:=R2.B.Y-1;
-  New(HSB, Init(R2)); HSB^.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX; Insert(HSB);
-  HSB^.SetStep(R.B.X-R.A.X-2,1);
+  HSB := TScrollBar.Create(R2); HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX; Insert(HSB);
+  HSB.SetStep(R.B.X-R.A.X-2,1);
   R2.Copy(R); Inc(R2.B.X); R2.A.X:=R2.B.X-1;
-  New(VSB, Init(R2)); VSB^.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  VSB^.SetStep(R.B.Y-R.A.Y-2,1);
-  New(BreakLB, Init(R,HSB,VSB));
-  BreakLB^.GrowMode:=gfGrowHiX+gfGrowHiY;
-  BreakLB^.Transparent:=true;
+  VSB := TScrollBar.Create(R2); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
+  VSB.SetStep(R.B.Y-R.A.Y-2,1);
+  BreakLB := TBreakpointsListBox.Create(R,HSB,VSB);
+  BreakLB.GrowMode:=gfGrowHiX+gfGrowHiY;
+  BreakLB.Transparent:=true;
   Insert(BreakLB);
   GetExtent(R);R.Grow(-1,-1);
   Dec(R.B.Y);
@@ -2571,30 +2574,30 @@ begin
   X:=(R.B.X-R.A.X) div NumButtons;
   X1:=R.A.X+(X div 2);
   R.A.X:=X1-3;R.B.X:=X1+7;
-  New(Btn, Init(R, button_Close, cmClose, bfDefault));
-  Btn^.GrowMode:=gfGrowLoY+gfGrowHiY;
+  Btn := TButton.Create(R, button_Close, cmClose, bfDefault);
+  Btn.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Btn);
   X1:=X1+X;
   R.A.X:=X1-3;R.B.X:=X1+7;
-  New(Btn, Init(R, button_New, cmNewBreakpoint, bfNormal));
-  Btn^.GrowMode:=gfGrowLoY+gfGrowHiY;
+  Btn := TButton.Create(R, button_New, cmNewBreakpoint, bfNormal);
+  Btn.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Btn);
   X1:=X1+X;
   R.A.X:=X1-3;R.B.X:=X1+7;
-  New(Btn, Init(R, button_Edit, cmEditBreakpoint, bfNormal));
-  Btn^.GrowMode:=gfGrowLoY+gfGrowHiY;
+  Btn := TButton.Create(R, button_Edit, cmEditBreakpoint, bfNormal);
+  Btn.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Btn);
   X1:=X1+X;
   R.A.X:=X1-3;R.B.X:=X1+7;
-  New(Btn, Init(R, button_ToggleButton, cmToggleBreakInList, bfNormal));
-  Btn^.GrowMode:=gfGrowLoY+gfGrowHiY;
+  Btn := TButton.Create(R, button_ToggleButton, cmToggleBreakInList, bfNormal);
+  Btn.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Btn);
   X1:=X1+X;
   R.A.X:=X1-3;R.B.X:=X1+7;
-  New(Btn, Init(R, button_Delete, cmDeleteBreakpoint, bfNormal));
-  Btn^.GrowMode:=gfGrowLoY+gfGrowHiY;
+  Btn := TButton.Create(R, button_Delete, cmDeleteBreakpoint, bfNormal);
+  Btn.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Btn);
-  BreakLB^.Select;
+  BreakLB.Select;
   Update;
   BreakpointsWindow:=Self;
 end;
@@ -2613,19 +2616,19 @@ end;
 
 procedure TBreakpointsWindow.AddBreakpoint(ABreakpoint : PBreakpoint);
 begin
-  BreakLB^.AddBreakpoint(New(PBreakpointItem, Init(ABreakpoint)));
+  BreakLB.AddBreakpoint(TBreakpointItem.Create(ABreakpoint));
 end;
 
 procedure TBreakpointsWindow.ClearBreakpoints;
 begin
-  BreakLB^.Clear;
+  BreakLB.Clear;
   ReDraw;
 end;
 
 procedure TBreakpointsWindow.ReloadBreakpoints;
   procedure InsertInBreakLB(P : PBreakpoint);
   begin
-    BreakLB^.AddBreakpoint(New(PBreakpointItem, Init(P)));
+    BreakLB.AddBreakpoint(TBreakpointItem.Create(P));
   end;
 begin
   If not assigned(BreakpointsCollection) then
@@ -2662,13 +2665,13 @@ begin
        DontClear:=False;
        case Event.Command of
          cmNewBreakpoint :
-           BreakLB^.EditNew;
+           BreakLB.EditNew;
          cmEditBreakpoint :
-           BreakLB^.EditCurrent;
+           BreakLB.EditCurrent;
          cmDeleteBreakpoint :
-           BreakLB^.DeleteCurrent;
+           BreakLB.DeleteCurrent;
          cmToggleBreakInList :
-           BreakLB^.ToggleCurrent;
+           BreakLB.ToggleCurrent;
          cmClose :
            Hide;
           else
@@ -2690,11 +2693,11 @@ procedure TBreakpointsWindow.Update;
 var
   StoreFocus : longint;
 begin
-  StoreFocus:=BreakLB^.Focused;
+  StoreFocus:=BreakLB.Focused;
   ClearBreakpoints;
   ReloadBreakpoints;
-  If StoreFocus<BreakLB^.Range then
-    BreakLB^.FocusItem(StoreFocus);
+  If StoreFocus<BreakLB.Range then
+    BreakLB.FocusItem(StoreFocus);
 end;
 
 destructor TBreakpointsWindow.Destroy;
@@ -2721,42 +2724,42 @@ begin
 
   GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.B.X-3;
-  New(NameIL, Init(R, 255)); Insert(NameIL);
+  NameIL := TEditorInputLine.Create(R, 255); Insert(NameIL);
   R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
-  Insert(New(PHistory, Init(R2, NameIL, hidBreakPointDialogName)));
+  Insert(THistory.Create(R2, NameIL, hidBreakPointDialogName));
   R.Copy(R3); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
   R2.Copy(R); R2.Move(-1,-1);
-  Insert(New(PLabel, Init(R2, label_breakpoint_name, NameIL)));
+  Insert(TLabel.Create(R2, label_breakpoint_name, NameIL));
   R.Move(0,3);
   R.B.X:=R.B.X-3;
-  New(ConditionsIL, Init(R, 255)); Insert(ConditionsIL);
+  ConditionsIL := TEditorInputLine.Create(R, 255); Insert(ConditionsIL);
   R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
-  Insert(New(PHistory, Init(R2, ConditionsIL, hidBreakPointDialogCond)));
-  R2.Copy(R); R2.Move(-1,-1); Insert(New(PLabel, Init(R2, label_breakpoint_conditions, ConditionsIL)));
+  Insert(THistory.Create(R2, ConditionsIL, hidBreakPointDialogCond));
+  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_conditions, ConditionsIL));
   R.Move(0,3); R.B.X:=R.A.X+36;
-  New(LineIL, Init(R, 128)); Insert(LineIL);
-  LineIL^.SetValidator(New(PRangeValidator, Init(0,MaxInt)));
-  R2.Copy(R); R2.Move(-1,-1); Insert(New(PLabel, Init(R2, label_breakpoint_line, LineIL)));
+  LineIL := TEditorInputLine.Create(R, 128); Insert(LineIL);
+  LineIL.SetValidator(TRangeValidator.Create(0,MaxInt));
+  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_line, LineIL));
   R.Move(0,3);
-  New(IgnoreIL, Init(R, 128)); Insert(IgnoreIL);
-  IgnoreIL^.SetValidator(New(PRangeValidator, Init(0,MaxInt)));
-  R2.Copy(R); R2.Move(-1,-1); Insert(New(PLabel, Init(R2, label_breakpoint_ignorecount, IgnoreIL)));
+  IgnoreIL := TEditorInputLine.Create(R, 128); Insert(IgnoreIL);
+  IgnoreIL.SetValidator(TRangeValidator.Create(0,MaxInt));
+  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_ignorecount, IgnoreIL));
 
   R.Copy(R3); Inc(R.A.X,38); Inc(R.A.Y,7); R.B.Y:=R.A.Y+KeyCount;
   Items:=nil;
   { don't use invalid type }
   for I:=pred(high(BreakpointType)) downto low(BreakpointType) do
     Items:=NewSItem(BreakpointTypeStr[I], Items);
-  New(TypeRB, Init(R, Items));
+  TypeRB := TRadioButtons.Create(R, Items);
 
   R2.Copy(R); R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
-  Insert(New(PLabel, Init(R2, label_breakpoint_type, TypeRB)));
+  Insert(TLabel.Create(R2, label_breakpoint_type, TypeRB));
 
   Insert(TypeRB);
 
-  InsertButtons(@Self);
+  InsertButtons(Self);
 
-  NameIL^.Select;
+  NameIL.Select;
 end;
 
 function TBreakpointItemDialog.Execute: Word;
@@ -2765,65 +2768,65 @@ var R: sw_word;
     err: word;
     L: longint;
 begin
-  R:=sw_word(Breakpoint^.typ);
-  TypeRB^.SetData(R);
+  R:=sw_word(Breakpoint.typ);
+  TypeRB.SetData(R);
 
-  If Breakpoint^.typ=bt_file_line then
-    S1:=GetStr(Breakpoint^.FileName)
+  If Breakpoint.typ=bt_file_line then
+    S1:=GetStr(Breakpoint.FileName)
   else
-    S1:=GetStr(Breakpoint^.name);
-  NameIL^.SetData(S1);
+    S1:=GetStr(Breakpoint.name);
+  NameIL.SetData(S1);
 
-  If Breakpoint^.typ=bt_file_line then
-    S1:=IntToStr(Breakpoint^.Line)
+  If Breakpoint.typ=bt_file_line then
+    S1:=IntToStr(Breakpoint.Line)
   else
     S1:='0';
-  LineIL^.SetData(S1);
+  LineIL.SetData(S1);
 
-  S1:=IntToStr(Breakpoint^.IgnoreCount);
-  IgnoreIL^.SetData(S1);
-  S1:=GetStr(Breakpoint^.Conditions);
-  ConditionsIL^.SetData(S1);
+  S1:=IntToStr(Breakpoint.IgnoreCount);
+  IgnoreIL.SetData(S1);
+  S1:=GetStr(Breakpoint.Conditions);
+  ConditionsIL.SetData(S1);
 
   if assigned(FirstEditorWindow) then
-    FindReplaceEditor:=FirstEditorWindow^.Editor;
+    FindReplaceEditor:=FirstEditorWindow.Editor;
 
   R:=inherited Execute;
 
   FindReplaceEditor:=nil;
   if R=cmOK then
   begin
-    TypeRB^.GetData(R);
+    TypeRB.GetData(R);
     L:=R;
-    Breakpoint^.typ:=BreakpointType(L);
+    Breakpoint.typ:=BreakpointType(L);
 
-    NameIL^.GetData(S1);
-    If Breakpoint^.typ=bt_file_line then
+    NameIL.GetData(S1);
+    If Breakpoint.typ=bt_file_line then
       begin
-        If assigned(Breakpoint^.FileName) then
-          DisposeStr(Breakpoint^.FileName);
-        Breakpoint^.FileName:=NewStr(S1);
+        If assigned(Breakpoint.FileName) then
+          DisposeStr(Breakpoint.FileName);
+        Breakpoint.FileName:=NewStr(S1);
       end
     else
       begin
-        If assigned(Breakpoint^.Name) then
-          DisposeStr(Breakpoint^.Name);
-        Breakpoint^.name:=NewStr(S1);
+        If assigned(Breakpoint.Name) then
+          DisposeStr(Breakpoint.Name);
+        Breakpoint.name:=NewStr(S1);
       end;
-    If Breakpoint^.typ=bt_file_line then
+    If Breakpoint.typ=bt_file_line then
       begin
-        LineIL^.GetData(S1);
+        LineIL.GetData(S1);
         Val(S1,L,err);
-        Breakpoint^.Line:=L;
+        Breakpoint.Line:=L;
       end;
-    IgnoreIL^.GetData(S1);
+    IgnoreIL.GetData(S1);
     Val(S1,L,err);
-    Breakpoint^.IgnoreCount:=L;
+    Breakpoint.IgnoreCount:=L;
 
-    ConditionsIL^.GetData(S1);
-    If assigned(Breakpoint^.Conditions) then
-      DisposeStr(Breakpoint^.Conditions);
-    Breakpoint^.Conditions:=NewStr(S1);
+    ConditionsIL.GetData(S1);
+    If assigned(Breakpoint.Conditions) then
+      DisposeStr(Breakpoint.Conditions);
+    Breakpoint.Conditions:=NewStr(S1);
   end;
   Execute:=R;
 end;
@@ -2989,21 +2992,21 @@ destructor TWatch.Destroy;
       strdispose(last_value);
     if assigned(current_value) then
       strdispose(current_value);
-    inherited done;
+    inherited Destroy;
   end;
 
 {****************************************************************************
                          TWatchesCollection
 ****************************************************************************}
 
-      constructor TWatchesCollection.Init;
+      constructor TWatchesCollection.Create;
         begin
           inherited Create(10,10);
         end;
 
       procedure TWatchesCollection.Insert(Item: Pointer);
        begin
-         PWatch(Item)^.Get_new_value;
+         PWatch(Item).Get_new_value;
          Inherited Insert(Item);
          Update;
        end;
@@ -3014,10 +3017,10 @@ destructor TWatch.Destroy;
 
          procedure GetMax(P : PWatch);
            begin
-              if assigned(P^.Current_value) then
-                W1:=StrLen(P^.Current_value)+3+Length(GetStr(P^.expr))
+              if assigned(P.Current_value) then
+                W1:=StrLen(P.Current_value)+3+Length(GetStr(P.expr))
               else
-                W1:=2+Length(GetStr(P^.expr));
+                W1:=2+Length(GetStr(P.expr));
               if W1>W then
                 W:=W1;
            end;
@@ -3027,7 +3030,7 @@ destructor TWatch.Destroy;
           ForEach(@GetMax);
           MaxW:=W;
           If assigned(WatchesWindow) then
-            WatchesWindow^.WLB^.Update(MaxW);
+            WatchesWindow.WLB.Update(MaxW);
         end;
 
       function  TWatchesCollection.At(Index: Integer): PWatch;
@@ -3043,7 +3046,7 @@ constructor TWatchesListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: 
   begin
     inherited Create(Bounds,1,AHScrollBar,AVScrollBar);
     If assigned(List) then
-      dispose(list,done);
+      list.Free;
     List:=WatchesCollection;
   end;
 
@@ -3053,21 +3056,21 @@ begin
   GetExtent(R);
   MaxWidth:=AMaxWidth;
   if (HScrollBar<>nil) and (R.B.X-R.A.X<MaxWidth) then
-    HScrollBar^.SetRange(0,MaxWidth-(R.B.X-R.A.X))
+    HScrollBar.SetRange(0,MaxWidth-(R.B.X-R.A.X))
   else
-    HScrollBar^.SetRange(0,0);
+    HScrollBar.SetRange(0,0);
   if R.B.X-R.A.X>MaxWidth then
-    HScrollBar^.Hide
+    HScrollBar.Hide
   else
-    HScrollBar^.Show;
-  SetRange(List^.Count+1);
+    HScrollBar.Show;
+  SetRange(List.Count+1);
   if R.B.Y-R.A.Y>Range then
-    VScrollBar^.Hide
+    VScrollBar.Hide
   else
-    VScrollBar^.Show;
+    VScrollBar.Show;
 
-  {if Focused=List^.Count-1-1 then
-     FocusItem(List^.Count-1);
+  {if Focused=List.Count-1-1 then
+     FocusItem(List.Count-1);
      What was that for ?? PM }
   DrawView;
 end;
@@ -3086,34 +3089,34 @@ begin
     end;
 
   PW:=WatchesCollection.At(Item);
-  ValOffset:=Length(GetStr(PW^.Expr))+2;
-  if not assigned(PW^.expr) then
+  ValOffset:=Length(GetStr(PW.Expr))+2;
+  if not assigned(PW.expr) then
     GetIndentedText:=''
   else if Indent<ValOffset then
     begin
-      S:=GetStr(PW^.Expr);
+      S:=GetStr(PW.Expr);
       if Indent=0 then
         S:=' '+S
       else
         S:=Copy(S,Indent,High(S));
-      if not assigned(PW^.current_value) then
+      if not assigned(PW.current_value) then
         S:=S+' <Unknown value>'
       else
-        S:=S+' '+GetPChar(PW^.Current_value);
+        S:=S+' '+GetPChar(PW.Current_value);
       GetIndentedText:=Copy(S,1,MaxLen);
     end
   else
    begin
-      if not assigned(PW^.Current_value) or
-         (StrLen(PW^.Current_value)<Indent-Valoffset) then
+      if not assigned(PW.Current_value) or
+         (StrLen(PW.Current_value)<Indent-Valoffset) then
         S:=''
       else
-        S:=GetPchar(@(PW^.Current_Value[Indent-Valoffset]));
+        S:=GetPchar(@(PW.Current_Value[Indent-Valoffset]));
       GetIndentedText:=Copy(S,1,MaxLen);
    end;
-   if assigned(PW^.current_value) and
-      assigned(PW^.last_value) and
-      (strcomp(PW^.Last_value,PW^.Current_value)<>0) then
+   if assigned(PW.current_value) and
+      assigned(PW.last_value) and
+      (strcomp(PW.Last_value,PW.Current_value)<>0) then
      Modified:=true;
 end;
 
@@ -3125,8 +3128,8 @@ begin
   if Focused<WatchesCollection.Count then
     P:=WatchesCollection.At(Focused)
   else
-    P:=New(PWatch,Init(''));
-  Application^.ExecuteDialog(New(PWatchItemDialog,Init(P)),nil);
+    P := TWatch.Create('');
+  Application.ExecuteDialog(TWatchItemDialog.Create(P),nil);
   WatchesCollection.Update;
 end;
 
@@ -3157,18 +3160,18 @@ begin
   if Focused<WatchesCollection.Count then
     begin
       P:=WatchesCollection.At(Focused);
-      S:=GetStr(P^.expr);
+      S:=GetStr(P.expr);
     end
   else
     S:='';
-  P:=New(PWatch,Init(S));
-  if Application^.ExecuteDialog(New(PWatchItemDialog,Init(P)),nil)<>cmCancel then
+  P := TWatch.Create(S);
+  if Application.ExecuteDialog(TWatchItemDialog.Create(P),nil)<>cmCancel then
     begin
       WatchesCollection.AtInsert(Focused,P);
       WatchesCollection.Update;
     end
   else
-    dispose(P,Done);
+    P.Free;
 end;
 
 procedure   TWatchesListBox.Draw;
@@ -3186,7 +3189,7 @@ var
       if TC<>0 then C:=(C and $ff0f) or (TC and $f0);
     end;
 begin
-  if (Owner<>nil) then TC:=ord(Owner^.GetColorW(6)) else TC:=0;
+  if (Owner<>nil) then TC:=ord(Owner.GetColorW(6)) else TC:=0;
   if State and (sfSelected + sfActive) = (sfSelected + sfActive) then
   begin
     NormalColor := GetColorW(1);
@@ -3201,7 +3204,7 @@ begin
     begin MT(NormalColor); MT(SelectedColor); end;
   (* if NoSelection then
      SelectedColor:=NormalColor;*)
-  if HScrollBar <> nil then Indent := HScrollBar^.Value
+  if HScrollBar <> nil then Indent := HScrollBar.Value
   else Indent := 0;
   ColWidth := Size.X div NumCols + 1;
   for I := 0 to Size.Y - 1 do
@@ -3255,7 +3258,7 @@ end;
 function TWatchesListBox.GetLocalMenu: PMenu;
 var M: PMenu;
 begin
-  if (Owner<>nil) and (Owner^.GetState(sfModal)) then M:=nil else
+  if (Owner<>nil) and (Owner.GetState(sfModal)) then M:=nil else
   M:=NewMenu(
     NewItem(menu_watchlocal_edit,'',kbNoKey,cmEdit,hcNoContext,
     NewItem(menu_watchlocal_new,'',kbNoKey,cmNew,hcNoContext,
@@ -3272,7 +3275,7 @@ begin
   case Event.What of
     evMouseDown : begin
                    if ((Event.EventFlags and meDoubleClick) <> 0) then
-                      Message(@Self,evCommand,cmEdit,nil)
+                      Message(Self,evCommand,cmEdit,nil)
                    else
                      ClearEvent(Event);
                   end;
@@ -3281,11 +3284,11 @@ begin
         DontClear:=false;
         case Event.KeyCode of
           kbEnter :
-            Message(@Self,evCommand,cmEdit,nil);
+            Message(Self,evCommand,cmEdit,nil);
           kbIns :
-            Message(@Self,evCommand,cmNew,nil);
+            Message(Self,evCommand,cmNew,nil);
           kbDel :
-            Message(@Self,evCommand,cmDelete,nil);
+            Message(Self,evCommand,cmDelete,nil);
         else
           DontClear:=true;
         end;
@@ -3295,8 +3298,8 @@ begin
     evBroadcast :
       case Event.Command of
         cmListItemSelected :
-          if Event.InfoPtr=@Self then
-            Message(@Self,evCommand,cmEdit,nil);
+          if Event.InfoPtr=Self then
+            Message(Self,evCommand,cmEdit,nil);
       end;
     evCommand :
       begin
@@ -3322,10 +3325,10 @@ end;
         begin
           inherited Load(S);
           If assigned(List) then
-            dispose(list,done);
+            list.Free;
           List:=WatchesCollection;
           { we must set Range PM }
-          SetRange(List^.count+1);
+          SetRange(List.count+1);
         end;
 
       procedure   TWatchesListBox.Store(var S: TStream);
@@ -3335,9 +3338,9 @@ end;
           OL:=List;
           OldRange:=Range;
           Range:=0;
-          New(List, Init(1,1));
+          List := TCollection.Create(1,1);
           inherited Store(S);
-          Dispose(List, Done);
+          List.Free;
           List:=OL;
           { ^^^ nasty trick - has anyone a better idea how to avoid storing the
             collection? Pasting here a modified version of TListBox.Store+
@@ -3356,12 +3359,12 @@ end;
                          TWatchesWindow
 ****************************************************************************}
 
-  Constructor TWatchesWindow.Init;
+  Constructor TWatchesWindow.Create;
     var
       HSB,VSB: PScrollBar;
       R,R2 : trect;
     begin
-      Desktop^.GetExtent(R);
+      Desktop.GetExtent(R);
       R.A.Y:=R.B.Y-7;
       inherited Create(R, dialog_watches,SearchFreeWindowNo);
       Palette:=wpCyanWindow;
@@ -3371,22 +3374,22 @@ end;
       R2.Copy(R);
       Inc(R2.B.Y);
       R2.A.Y:=R2.B.Y-1;
-      New(HSB, Init(R2));
-      HSB^.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX;
-      HSB^.SetStep(R.B.X-R.A.X,1);
+      HSB := TScrollBar.Create(R2);
+      HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX;
+      HSB.SetStep(R.B.X-R.A.X,1);
       Insert(HSB);
       R2.Copy(R);
       Inc(R2.B.X);
       R2.A.X:=R2.B.X-1;
-      New(VSB, Init(R2));
-      VSB^.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
+      VSB := TScrollBar.Create(R2);
+      VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
       Insert(VSB);
-      New(WLB,Init(R,HSB,VSB));
-      WLB^.GrowMode:=gfGrowHiX+gfGrowHiY;
-      WLB^.Transparent:=true;
+      WLB := TWatchesListBox.Create(R,HSB,VSB);
+      WLB.GrowMode:=gfGrowHiX+gfGrowHiY;
+      WLB.Transparent:=true;
       Insert(WLB);
       If assigned(WatchesWindow) then
-        dispose(WatchesWindow,done);
+        WatchesWindow.Free;
       WatchesWindow:=Self;
       Update;
     end;
@@ -3402,7 +3405,7 @@ end;
       inherited Load(S);
       GetSubViewPtr(S,WLB);
       If assigned(WatchesWindow) then
-        dispose(WatchesWindow,done);
+        WatchesWindow.Free;
       WatchesWindow:=Self;
     end;
 
@@ -3415,8 +3418,8 @@ end;
   Destructor TWatchesWindow.Destroy;
     begin
       WatchesWindow:=nil;
-      Dispose(WLB,done);
-      inherited done;
+      WLB.Free;
+      inherited Destroy;
     end;
 
 
@@ -3433,46 +3436,46 @@ begin
 
   GetExtent(R); R.Grow(-3,-2);
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.A.X+36;
-  New(NameIL, Init(R, 255)); Insert(NameIL);
+  NameIL := TEditorInputLine.Create(R, 255); Insert(NameIL);
   R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
-  Insert(New(PHistory, Init(R2, NameIL, hidWatchDialog)));
+  Insert(THistory.Create(R2, NameIL, hidWatchDialog));
   R2.Copy(R); R2.Move(-1,-1);
-  Insert(New(PLabel, Init(R2, label_watch_expressiontowatch, NameIL)));
+  Insert(TLabel.Create(R2, label_watch_expressiontowatch, NameIL));
   GetExtent(R);
   R.Grow(-3,-1);
   R.A.Y:=R.A.Y+3;
-  TextST:=New(PAdvancedStaticText, Init(R, label_watch_values));
+  TextST := TAdvancedStaticText.Create(R, label_watch_values);
   Insert(TextST);
 
-  InsertButtons(@Self);
+  InsertButtons(Self);
 
-  NameIL^.Select;
+  NameIL.Select;
 end;
 
 function TWatchItemDialog.Execute: Word;
 var R: word;
     S1,S2: string;
 begin
-  S1:=GetStr(Watch^.expr);
-  NameIL^.SetData(S1);
+  S1:=GetStr(Watch.expr);
+  NameIL.SetData(S1);
 
-  S1:=GetPChar(Watch^.Current_value);
-  S2:=GetPChar(Watch^.Last_value);
+  S1:=GetPChar(Watch.Current_value);
+  S2:=GetPChar(Watch.Last_value);
 
   ClearFormatParams;
   AddFormatParamStr(S1);
   AddFormatParamStr(S2);
-  if assigned(Watch^.Last_value) and
-     assigned(Watch^.Current_value) and
-     (strcomp(Watch^.Last_value,Watch^.Current_value)=0) then
+  if assigned(Watch.Last_value) and
+     assigned(Watch.Current_value) and
+     (strcomp(Watch.Last_value,Watch.Current_value)=0) then
     S1:=FormatStrF(msg_watch_currentvalue,FormatParams)
   else
     S1:=FormatStrF(msg_watch_currentandpreviousvalue,FormatParams);
 
-  TextST^.SetText(S1);
+  TextST.SetText(S1);
 
   if assigned(FirstEditorWindow) then
-    FindReplaceEditor:=FirstEditorWindow^.Editor;
+    FindReplaceEditor:=FirstEditorWindow.Editor;
 
   R:=inherited Execute;
 
@@ -3480,8 +3483,8 @@ begin
 
   if R=cmOK then
   begin
-    NameIL^.GetData(S1);
-    Watch^.Rename(S1);
+    NameIL.GetData(S1);
+    Watch.Rename(S1);
 {$ifndef NODEBUG}
     If assigned(Debugger) then
        Debugger.ReadWatches;
@@ -3496,7 +3499,7 @@ end;
 
   constructor TFramesListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
     begin
-      Inherited Init(Bounds,AHScrollBar,AVScrollBar);
+      inherited Create(Bounds,AHScrollBar,AVScrollBar);
     end;
 
   procedure TFramesListBox.Update;
@@ -3509,7 +3512,7 @@ end;
       { call backtrace command }
       If not assigned(Debugger) then
         exit;
-      DeskTop^.Lock;
+      DeskTop.Lock;
       Clear;
 
       Debugger.Backtrace;
@@ -3520,17 +3523,17 @@ end;
           with Debugger.frames[i]^ do
             begin
               if assigned(file_name) then
-                AddItem(new(PMessageItem,init(0,GetPChar(function_name)+GetPChar(args),
-                  AddModuleName(GetPChar(file_name)),line_number,1)))
+                AddItem(TMessageItem.Create(0,GetPChar(function_name)+GetPChar(args),
+                  AddModuleName(GetPChar(file_name),line_number,1)))
               else
-                AddItem(new(PMessageItem,init(0,HexStr(address,SizeOf(address)*2)+' '+GetPChar(function_name)+GetPChar(args),
-                  AddModuleName(''),line_number,1)));
+                AddItem(TMessageItem.Create(0,HexStr(address,SizeOf(address)*2)+' '+GetPChar(function_name)+GetPChar(args),
+                  AddModuleName(''),line_number,1));
               W:=SearchOnDesktop(GetPChar(file_name),false);
               { First reset all Debugger rows }
               If assigned(W) then
                 begin
-                  W^.Editor^.SetLineFlagExclusive(lfDebuggerRow,-1);
-                  W^.Editor^.DebuggerRow:=-1;
+                  W.Editor.SetLineFlagExclusive(lfDebuggerRow,-1);
+                  W.Editor.DebuggerRow:=-1;
                 end;
             end;
         end;
@@ -3542,17 +3545,17 @@ end;
               W:=SearchOnDesktop(GetPChar(file_name),false);
               If assigned(W) then
                 begin
-                  If W^.Editor^.DebuggerRow=-1 then
+                  If W.Editor.DebuggerRow=-1 then
                     begin
-                      W^.Editor^.SetLineFlagState(line_number-1,lfDebuggerRow,true);
-                      W^.Editor^.DebuggerRow:=line_number-1;
+                      W.Editor.SetLineFlagState(line_number-1,lfDebuggerRow,true);
+                      W.Editor.DebuggerRow:=line_number-1;
                     end;
                 end;
             end;
         end;
-      if Assigned(list) and (List^.Count > 0) then
+      if Assigned(list) and (List.Count > 0) then
         FocusItem(0);
-      DeskTop^.Unlock;
+      DeskTop.Unlock;
 {$endif NODEBUG}
     end;
 
@@ -3587,10 +3590,10 @@ end;
 {$endif}
       { goto source/assembly mixture }
       InitDisassemblyWindow;
-      DisassemblyWindow^.LoadFunction('');
+      DisassemblyWindow.LoadFunction('');
 {$ifndef NODEBUG}
-      DisassemblyWindow^.SetCurAddress(Debugger.frames[Focused]^.address);
-      DisassemblyWindow^.SelectInDebugSession;
+      DisassemblyWindow.SetCurAddress(Debugger.frames[Focused].address);
+      DisassemblyWindow.SelectInDebugSession;
 {$endif NODEBUG}
     end;
 
@@ -3605,15 +3608,15 @@ end;
 
   destructor  TFramesListBox.Destroy;
     begin
-      Inherited Done;
+      inherited Destroy;
     end;
 
-  Constructor TStackWindow.Init;
+  Constructor TStackWindow.Create;
     var
       HSB,VSB: PScrollBar;
       R,R2 : trect;
     begin
-      Desktop^.GetExtent(R);
+      Desktop.GetExtent(R);
       R.A.Y:=R.B.Y-5;
       inherited Create(R, dialog_callstack, wnNoNumber);
       Palette:=wpCyanWindow;
@@ -3623,27 +3626,27 @@ end;
       R2.Copy(R);
       Inc(R2.B.Y);
       R2.A.Y:=R2.B.Y-1;
-      New(HSB, Init(R2));
-      HSB^.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX;
+      HSB := TScrollBar.Create(R2);
+      HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX;
       Insert(HSB);
       R2.Copy(R);
       Inc(R2.B.X);
       R2.A.X:=R2.B.X-1;
-      New(VSB, Init(R2));
-      VSB^.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
+      VSB := TScrollBar.Create(R2);
+      VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
       Insert(VSB);
-      New(FLB,Init(R,HSB,VSB));
-      FLB^.GrowMode:=gfGrowHiX+gfGrowHiY;
+      FLB := TFramesListBox.Create(R,HSB,VSB);
+      FLB.GrowMode:=gfGrowHiX+gfGrowHiY;
       Insert(FLB);
       If assigned(StackWindow) then
-        dispose(StackWindow,done);
+        StackWindow.Free;
       StackWindow:=Self;
       Update;
     end;
 
   procedure TStackWindow.Update;
     begin
-      FLB^.Update;
+      FLB.Update;
       DrawView;
     end;
 
@@ -3652,7 +3655,7 @@ end;
       inherited Load(S);
       GetSubViewPtr(S,FLB);
       If assigned(StackWindow) then
-        dispose(StackWindow,done);
+        StackWindow.Free;
       StackWindow:=Self;
     end;
 
@@ -3665,8 +3668,8 @@ end;
   Destructor TStackWindow.Destroy;
     begin
       StackWindow:=nil;
-      Dispose(FLB,done);
-      inherited done;
+      FLB.Free;
+      inherited Destroy;
     end;
 
 
@@ -3769,10 +3772,10 @@ begin
 
   NeedRecompileExe:=false;
 {$ifndef SUPPORT_REMOTE}
-  if UpCaseStr(TargetSwitches^.GetCurrSelParam)<>UpCaseStr(GetGDBTargetShortName) then
+  if UpCaseStr(TargetSwitches.GetCurrSelParam)<>UpCaseStr(GetGDBTargetShortName) then
     begin
      ClearFormatParams;
-     AddFormatParamStr(TargetSwitches^.GetCurrSelParam);
+     AddFormatParamStr(TargetSwitches.GetCurrSelParam);
      AddFormatParamStr(GetGDBTargetShortName);
      cm:=ConfirmBox(msg_cantdebugchangetargetto,@FormatParams,true);
      if cm=cmCancel then
@@ -3782,9 +3785,9 @@ begin
          { force recompilation }
          PrevMainFile:='';
          NeedRecompileExe:=true;
-         TargetSwitches^.SetCurrSelParam(GetGDBTargetShortName);
-         If DebugInfoSwitches^.GetCurrSelParam='-' then
-           DebugInfoSwitches^.SetCurrSelParam('l');
+         TargetSwitches.SetCurrSelParam(GetGDBTargetShortName);
+         If DebugInfoSwitches.GetCurrSelParam='-' then
+           DebugInfoSwitches.SetCurrSelParam('l');
          IDEApp.UpdateTarget;
        end;
     end;
@@ -3803,7 +3806,7 @@ begin
          { force recompilation }
          PrevMainFile:='';
          NeedRecompileExe:=true;
-         DebugInfoSwitches^.SetCurrSelParam('l');
+         DebugInfoSwitches.SetCurrSelParam('l');
        end;
     end;
   if NeedRecompileExe then
@@ -3820,7 +3823,7 @@ begin
   if not assigned(Debugger) then
     begin
       PushStatus(msg_startingdebugger);
-      new(Debugger,Init);
+      Debugger := TDebugController.Create;
       PopStatus;
     end;
   Debugger.SetExe(ExeFile);
@@ -3842,12 +3845,12 @@ begin
 {$endif}
 {$ifndef NODEBUG}
   if assigned(Debugger) then
-   dispose(Debugger,Done);
+   Debugger.Free;
   Debugger:=nil;
 {$endif NODEBUG}
 {$ifdef DOS}
   If assigned(UserScreen) then
-    PDosScreen(UserScreen)^.FreeGraphBuffer;
+    PDosScreen(UserScreen).FreeGraphBuffer;
 {$endif DOS}
 {$ifdef DEBUG}
   If Use_gdb_file then
@@ -3879,9 +3882,9 @@ var
 begin
   if GDBWindow=nil then
     begin
-      DeskTop^.GetExtent(R);
-      new(GDBWindow,init(R));
-      DeskTop^.Insert(GDBWindow);
+      DeskTop.GetExtent(R);
+      GDBWindow := TGDBWindow.Create(R);
+      DeskTop.Insert(GDBWindow);
     end;
 end;
 
@@ -3890,7 +3893,7 @@ begin
   If IDEApp.IsRunning and
      assigned(GDBWindow) then
     begin
-      DeskTop^.Delete(GDBWindow);
+      DeskTop.Delete(GDBWindow);
     end;
   GDBWindow:=nil;
 end;
@@ -3901,9 +3904,9 @@ var
 begin
   if DisassemblyWindow=nil then
     begin
-      DeskTop^.GetExtent(R);
-      new(DisassemblyWindow,init(R));
-      DeskTop^.Insert(DisassemblyWindow);
+      DeskTop.GetExtent(R);
+      DisassemblyWindow := TDisassemblyWindow.Create(R);
+      DeskTop.Insert(DisassemblyWindow);
     end;
 end;
 
@@ -3911,8 +3914,8 @@ procedure DoneDisassemblyWindow;
 begin
   if assigned(DisassemblyWindow) then
     begin
-      DeskTop^.Delete(DisassemblyWindow);
-      Dispose(DisassemblyWindow,Done);
+      DeskTop.Delete(DisassemblyWindow);
+      DisassemblyWindow.Free;
       DisassemblyWindow:=nil;
     end;
 end;
@@ -3921,8 +3924,8 @@ procedure InitStackWindow;
 begin
   if StackWindow=nil then
     begin
-      new(StackWindow,init);
-      DeskTop^.Insert(StackWindow);
+      StackWindow := TStackWindow.Create;
+      DeskTop.Insert(StackWindow);
     end;
 end;
 
@@ -3930,30 +3933,30 @@ procedure DoneStackWindow;
 begin
   if assigned(StackWindow) then
     begin
-      DeskTop^.Delete(StackWindow);
+      DeskTop.Delete(StackWindow);
       StackWindow:=nil;
     end;
 end;
 
 procedure InitBreakpoints;
 begin
-  New(BreakpointsCollection,init(10,10));
+  BreakpointsCollection := TBreakpointCollection.Create(10,10);
 end;
 
 procedure DoneBreakpoints;
 begin
-  Dispose(BreakpointsCollection,Done);
+  BreakpointsCollection.Free;
   BreakpointsCollection:=nil;
 end;
 
 procedure InitWatches;
 begin
-  New(WatchesCollection,init);
+  WatchesCollection := TwatchesCollection.Create;
 end;
 
 procedure DoneWatches;
 begin
-  Dispose(WatchesCollection,Done);
+  WatchesCollection.Free;
   WatchesCollection:=nil;
 end;
 

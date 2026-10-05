@@ -14,6 +14,9 @@
  **********************************************************************}
 unit FPDesk;
 
+
+{$mode objfpc}{$H-}
+{$modeswitch nestedprocvars}
 interface
 
 const
@@ -146,11 +149,11 @@ var S: PMemoryStream;
 begin
   PushStatus(msg_readinghistory);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F^.ReadResourceEntryToStream(resHistory,langDefault,S^);
-  S^.Seek(0);
+  OK:=F.ReadResourceEntryToStream(resHistory,langDefault,S^);
+  S.Seek(0);
   if OK then
     LoadHistory(S^);
-  Dispose(S, Done);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorloadinghistory,nil);
   PopStatus;
@@ -165,10 +168,10 @@ begin
 
   S := TMemoryStream.Create(10*1024,4096);
   StoreHistory(S^);
-  S^.Seek(0);
-  F^.CreateResource(resHistory,rcBinary,0);
-  OK:=F^.AddResourceEntryFromStream(resHistory,langDefault,0,S^,S^.GetSize);
-  Dispose(S, Done);
+  S.Seek(0);
+  F.CreateResource(resHistory,rcBinary,0);
+  OK:=F.AddResourceEntryFromStream(resHistory,langDefault,0,S^,S.GetSize);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorstoringhistory,nil);
   PopStatus;
@@ -181,11 +184,11 @@ var S: PMemoryStream;
     OK: boolean;
 begin
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F^.ReadResourceEntryToStream(resKeys,langDefault,S^);
-  S^.Seek(0);
+  OK:=F.ReadResourceEntryToStream(resKeys,langDefault,S^);
+  S.Seek(0);
   if OK then
     LoadKeys(S^);
-  Dispose(S, Done);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorloadingkeys,nil);
   ReadKeys:=OK;
@@ -197,10 +200,10 @@ var S: PMemoryStream;
 begin
   S := TMemoryStream.Create(10*1024,4096);
   StoreKeys(S^);
-  S^.Seek(0);
-  F^.CreateResource(resKeys,rcBinary,0);
-  OK:=F^.AddResourceEntryFromStream(resKeys,langDefault,0,S^,S^.GetSize);
-  Dispose(S, Done);
+  S.Seek(0);
+  F.CreateResource(resKeys,rcBinary,0);
+  OK:=F.AddResourceEntryFromStream(resKeys,langDefault,0,S^,S.GetSize);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorstoringkeys,nil);
   WriteKeys:=OK;
@@ -220,11 +223,11 @@ begin
     PushStatus('Storing clipboard content...');
 
     S := TMemoryStream.Create(10*1024,4096);
-    Clipboard^.SaveToStream(S^);
-    S^.Seek(0);
-    F^.CreateResource(resClipboard,rcBinary,0);
-    F^.AddResourceEntryFromStream(resClipboard,langDefault,0,S^,S^.GetSize);
-    Dispose(S, Done);
+    Clipboard.SaveToStream(S^);
+    S.Seek(0);
+    F.CreateResource(resClipboard,rcBinary,0);
+    F.AddResourceEntryFromStream(resClipboard,langDefault,0,S^,S.GetSize);
+    S.Free;
     PopStatus;
   end;
   WriteClipboard:=true;
@@ -240,22 +243,22 @@ begin
 {$ifndef NODEBUG}
   PushStatus(msg_readingwatches);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F^.ReadResourceEntryToStream(resWatches,langDefault,S^);
-  S^.Seek(0);
+  OK:=F.ReadResourceEntryToStream(resWatches,langDefault,S^);
+  S.Seek(0);
   if OK then
     begin
       OWC:=WatchesCollection;
-      WatchesCollection:=PWatchesCollection(S^.Get);
-      OK:=(S^.Status=stOK);
+      WatchesCollection:=PWatchesCollection(S.Get);
+      OK:=(S.Status=stOK);
       if OK and assigned(OWC) and assigned(WatchesCollection) then
-        Dispose(OWC,Done)
+        OWC.Free
       else if assigned(OWC) then
         WatchesCollection:=OWC;
     end;
   if OK=false then
     ErrorBox(msg_errorloadingwatches,nil);
   ReadWatches:=OK;
-  Dispose(S, Done);
+  S.Free;
   PopStatus;
 {$else NODEBUG}
   ReadWatches:=true;
@@ -276,11 +279,11 @@ begin
     begin
       PushStatus(msg_storingwatches);
       S := TMemoryStream.Create(30*1024,4096);
-      S^.Put(WatchesCollection);
-      S^.Seek(0);
-      F^.CreateResource(resWatches,rcBinary,0);
-      OK:=F^.AddResourceEntryFromStream(resWatches,langDefault,0,S^,S^.GetSize);
-      Dispose(S, Done);
+      S.Put(WatchesCollection);
+      S.Seek(0);
+      F.CreateResource(resWatches,rcBinary,0);
+      OK:=F.AddResourceEntryFromStream(resWatches,langDefault,0,S^,S.GetSize);
+      S.Free;
       if OK=false then
         ErrorBox(msg_errorstoringwatches,nil);
       PopStatus;
@@ -299,18 +302,18 @@ begin
 {$ifndef NODEBUG}
   PushStatus(msg_readingbreakpoints);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F^.ReadResourceEntryToStream(resBreakpoints,langDefault,S^);
-  S^.Seek(0);
+  OK:=F.ReadResourceEntryToStream(resBreakpoints,langDefault,S^);
+  S.Seek(0);
   if OK then
     begin
       OBC:=BreakpointsCollection;
-      BreakpointsCollection:=PBreakpointCollection(S^.get);
-      OK:=(S^.Status=stOK);
+      BreakpointsCollection:=PBreakpointCollection(S.get);
+      OK:=(S.Status=stOK);
 
       If OK and assigned(OBC) and assigned(BreakpointsCollection) then
         Begin
-          Dispose(OBC,Done);
-          BreakpointsCollection^.ShowAllBreakpoints;
+          OBC.Free;
+          BreakpointsCollection.ShowAllBreakpoints;
         end
       else if assigned(OBC) then
         BreakpointsCollection:=OBC;
@@ -318,7 +321,7 @@ begin
   if OK=false then
     ErrorBox(msg_errorloadingbreakpoints,nil);
   ReadBreakpoints:=OK;
-  Dispose(S, Done);
+  S.Free;
   PopStatus;
 {$else NODEBUG}
   ReadBreakpoints:=true;
@@ -339,11 +342,11 @@ begin
     begin
       PushStatus(msg_storingbreakpoints);
       S := TMemoryStream.Create(30*1024,4096);
-      S^.Put(BreakpointsCollection);
-      S^.Seek(0);
-      F^.CreateResource(resBreakpoints,rcBinary,0);
-      OK:=F^.AddResourceEntryFromStream(resBreakpoints,langDefault,0,S^,S^.GetSize);
-      Dispose(S, Done);
+      S.Put(BreakpointsCollection);
+      S.Seek(0);
+      F.CreateResource(resBreakpoints,rcBinary,0);
+      OK:=F.AddResourceEntryFromStream(resBreakpoints,langDefault,0,S^,S.GetSize);
+      S.Free;
       if OK=false then
         ErrorBox(msg_errorstoringbreakpoints,nil);
       WriteBreakPoints:=OK;
@@ -356,8 +359,8 @@ end;
 function DeskUseSyntaxHighlight(Editor: PFileEditor): boolean;
 var b : boolean;
 begin
-  b:= (*(Editor^.IsFlagSet(efSyntaxHighlight)) and *) ((Editor^.FileName='') or
-      MatchesMaskList(NameAndExtOf(Editor^.FileName),HighlightExts));
+  b:= (*(Editor.IsFlagSet(efSyntaxHighlight)) and *) ((Editor.FileName='') or
+      MatchesMaskList(NameAndExtOf(Editor.FileName),HighlightExts));
   DeskUseSyntaxHighlight:=b;
 end;
 
@@ -391,7 +394,7 @@ var W: PWindow;
     Len : Byte;
 begin
   XDataOfs:=0;
-  Desktop^.Lock;
+  Desktop.Lock;
   W:=SearchWindow(Title);
   case WI.HelpCtx of
     hcSourceWindow :
@@ -404,22 +407,22 @@ begin
           begin
             ClearFormatParams;
             AddFormatParamStr(St);
-            Desktop^.Unlock;
+            Desktop.Unlock;
             ErrorBox(msg_cantopenfile,@FormatParams);
-            Desktop^.Lock;
+            Desktop.Lock;
           end
         else
         begin
           GetData(L,sizeof(L));
-          If DeskUseSyntaxHighlight(SW^.Editor) Then
+          If DeskUseSyntaxHighlight(SW.Editor) Then
             L:=L or efSyntaxHighlight
           else
             L:=L and not efSyntaxHighlight;
-          SW^.Editor^.SetFlags(L);
+          SW.Editor.SetFlags(L);
           GetData(TP,sizeof(TP)); GetData(TP2,sizeof(TP2));
-          SW^.Editor^.SetSelection(TP,TP2);
-          GetData(TP,sizeof(TP)); SW^.Editor^.SetCurPtr(TP.X,TP.Y);
-          GetData(TP,sizeof(TP)); SW^.Editor^.ScrollTo(TP.X,TP.Y);
+          SW.Editor.SetSelection(TP,TP2);
+          GetData(TP,sizeof(TP)); SW.Editor.SetCurPtr(TP.X,TP.Y);
+          GetData(TP,sizeof(TP)); SW.Editor.ScrollTo(TP.X,TP.Y);
         end;
       end;
      hcClipboardWindow:
@@ -429,7 +432,7 @@ begin
      hcMessagesWindow:
        begin
          if MessagesWindow=nil then
-           Desktop^.Insert(New(PMessagesWindow, Init));
+           Desktop.Insert(TMessagesWindow.Create);
          W:=MessagesWindow;
        end;
      hcCompilerMessagesWindow:
@@ -449,8 +452,8 @@ begin
        begin
          if WatchesWindow=nil then
            begin
-             New(WatchesWindow,Init);
-             Desktop^.Insert(WatchesWindow);
+             WatchesWindow := TWatchesWindow.Create;
+             Desktop.Insert(WatchesWindow);
            end;
          W:=WatchesWindow;
        end;
@@ -458,8 +461,8 @@ begin
        begin
          if StackWindow=nil then
            begin
-             New(StackWindow,Init);
-             Desktop^.Insert(StackWindow);
+             StackWindow := TStackWindow.Create;
+             Desktop.Insert(StackWindow);
            end;
          W:=StackWindow;
        end;
@@ -467,8 +470,8 @@ begin
        begin
          if FPUWindow=nil then
            begin
-             New(FPUWindow,Init);
-             Desktop^.Insert(FPUWindow);
+             FPUWindow := TFPUWindow.Create;
+             Desktop.Insert(FPUWindow);
            end;
          W:=FPUWindow;
        end;
@@ -476,8 +479,8 @@ begin
        begin
          if VectorWindow=nil then
            begin
-             New(VectorWindow,Init);
-             Desktop^.Insert(VectorWindow);
+             VectorWindow := TVectorWindow.Create;
+             Desktop.Insert(VectorWindow);
            end;
          W:=VectorWindow;
        end;
@@ -485,8 +488,8 @@ begin
        begin
          if RegistersWindow=nil then
            begin
-             New(RegistersWindow,Init);
-             Desktop^.Insert(RegistersWindow);
+             RegistersWindow := TRegistersWindow.Create;
+             Desktop.Insert(RegistersWindow);
            end;
          W:=RegistersWindow;
        end;
@@ -494,8 +497,8 @@ begin
        begin
          if BreakpointsWindow=nil then
            begin
-             New(BreakpointsWindow,Init);
-             Desktop^.Insert(BreakpointsWindow);
+             BreakpointsWindow := TBreakpointsWindow.Create;
+             Desktop.Insert(BreakpointsWindow);
            end;
          W:=BreakpointsWindow;
        end;
@@ -504,44 +507,44 @@ begin
        begin
          if ASCIIChart=nil then
            begin
-             New(ASCIIChart, Init);
-             Desktop^.Insert(ASCIIChart);
+             ASCIIChart := TASCIIChart.Create;
+             Desktop.Insert(ASCIIChart);
            end;
          W:=ASCIIChart;
          if DV>=$A then
            begin
              GetData(ch,sizeof(char));
-             AsciiChart^.Report^.AsciiChar:=ord(ch);
-             AsciiChart^.Table^.SetCursor(
-               ord(ch) mod AsciiChart^.Table^.Size.X,
-               ord(ch) div AsciiChart^.Table^.Size.X);
+             AsciiChart.Report.AsciiChar:=ord(ch);
+             AsciiChart.Table.SetCursor(
+               ord(ch) mod AsciiChart.Table.Size.X,
+               ord(ch) div AsciiChart.Table.Size.X);
            end;
       end;
   end;
   if W=nil then
     begin
-      Desktop^.Unlock;
+      Desktop.Unlock;
       Exit;
     end;
-  W^.GetBounds(R);
+  W.GetBounds(R);
   if (R.A.X<>WI.Bounds.A.X) or (R.A.Y<>WI.Bounds.A.Y) then
     R.Move(WI.Bounds.A.X-R.A.X,WI.Bounds.A.Y-R.A.Y);
-  if (W^.Flags and wfGrow)<>0 then
+  if (W.Flags and wfGrow)<>0 then
     begin
       R.B.X:=R.A.X+(WI.Bounds.B.X-WI.Bounds.A.X);
       R.B.Y:=R.A.Y+(WI.Bounds.B.Y-WI.Bounds.A.Y);
     end;
-  W^.Locate(R);
-  if W^.GetState(sfVisible)<>WI.Visible then
+  W.Locate(R);
+  if W.GetState(sfVisible)<>WI.Visible then
     if WI.Visible then
       begin
-        W^.Show;
-        W^.MakeFirst;
+        W.Show;
+        W.MakeFirst;
       end
     else
-      W^.Hide;
+      W.Hide;
   ZZ:=0;
-  Desktop^.GetExtent(Z);
+  Desktop.GetExtent(Z);
   if R.A.Y>Z.B.Y-7 then
     begin
       R.A.Y:=Z.B.Y-7;
@@ -562,18 +565,18 @@ begin
       R.A.X:=0;
       ZZ:=1;
     end;
-  if ZZ<>0 then W^.MoveTo(R.A.X,R.A.Y);
-  W^.Number:=WI.WinNb;
-  Desktop^.Unlock;
+  if ZZ<>0 then W.MoveTo(R.A.X,R.A.Y);
+  W.Number:=WI.WinNb;
+  Desktop.Unlock;
 end;
 begin
   PushStatus(msg_readingdesktopcontents);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F^.ReadResourceEntryToStream(resDesktop,langDefault,S^);
-  S^.Seek(0);
+  OK:=F.ReadResourceEntryToStream(resDesktop,langDefault,S^);
+  S.Seek(0);
   if OK then
   begin
-    S^.Read(DV,SizeOf(DV));
+    S.Read(DV,SizeOf(DV));
     OK:=(DV=DesktopVersion) or (DV>=MinDesktopVersion);
     if OK=false then
       ErrorBox(msg_invaliddesktopversionlayoutlost,nil);
@@ -582,29 +585,29 @@ begin
     begin
       XDataOfs:=0;
       repeat
-        S^.Read(WI,sizeof(WI));
-        if S^.Status=stOK then
+        S.Read(WI,sizeof(WI));
+        if S.Status=stOK then
         begin
           SetLength(Title,WI.TitleLen);
-          S^.Read(Title[1],WI.TitleLen);
+          S.Read(Title[1],WI.TitleLen);
           if WI.ExtraDataSize>0 then
-          S^.Read(XData,WI.ExtraDataSize);
+          S.Read(XData,WI.ExtraDataSize);
           ProcessWindowInfo;
         end;
-      until (S^.Status<>stOK) or (S^.GetPos=S^.GetSize);
-(*      TempDesk:=PFPDesktop(S^.Get);
+      until (S.Status<>stOK) or (S.GetPos=S.GetSize);
+(*      TempDesk:=PFPDesktop(S.Get);
       OK:=Assigned(TempDesk);
       if OK then
         begin
-          Dispose(Desktop, Done);
+          Desktop.Free;
           Desktop:=TempDesk;
 
-          with Desktop^ do
+          with Desktop do
           begin
             GetSubViewPtr(S^,CompilerMessageWindow);
             GetSubViewPtr(S^,CompilerStatusDialog);
             GetSubViewPtr(S^,ClipboardWindow);
-            if Assigned(ClipboardWindow) then Clipboard:=ClipboardWindow^.Editor;
+            if Assigned(ClipboardWindow) then Clipboard:=ClipboardWindow.Editor;
             GetSubViewPtr(S^,CalcWindow);
             GetSubViewPtr(S^,GDBWindow);
             GetSubViewPtr(S^,BreakpointsWindow);
@@ -613,17 +616,17 @@ begin
             GetSubViewPtr(S^,ASCIIChart);
             GetSubViewPtr(S^,MessagesWindow); LastToolMessageFocused:=nil;
           end;
-          Application^.GetExtent(R);
+          Application.GetExtent(R);
           Inc(R.A.Y);Dec(R.B.Y);
-          DeskTop^.Locate(R);
-          Application^.Insert(Desktop);
-          Desktop^.ReDraw;
+          DeskTop.Locate(R);
+          Application.Insert(Desktop);
+          Desktop.ReDraw;
           Message(Application,evBroadcast,cmUpdate,nil);
         end;*)
       if OK=false then
         ErrorBox(msg_errorloadingdesktop,nil);
     end;
-  Dispose(S, Done);
+  S.Free;
   PopStatus;
   ReadOpenWindows:=OK;
 end;
@@ -649,60 +652,60 @@ end;
 begin
   XDataOfs:=0;
   W:=nil;
-  if (P^.HelpCtx=hcSourceWindow) or
-     (P^.HelpCtx=hcHelpWindow) or
-     (P^.HelpCtx=hcClipboardWindow) or
-     (P^.HelpCtx=hcCalcWindow) or
-     (P^.HelpCtx=hcInfoWindow) or
-     (P^.HelpCtx=hcBrowserWindow) or
-     (P^.HelpCtx=hcMessagesWindow) or
-     (P^.HelpCtx=hcCompilerMessagesWindow) or
-     (P^.HelpCtx=hcGDBWindow) or
-     (P^.HelpCtx=hcDisassemblyWindow) or
-     (P^.HelpCtx=hcStackWindow) or
-     (P^.HelpCtx=hcRegistersWindow) or
-     (P^.HelpCtx=hcFPURegisters) or
-     (P^.HelpCtx=hcVectorRegisters) or
-     (P^.HelpCtx=hcWatchesWindow) or
-     (P^.HelpCtx=hcBreakpointListWindow) or
-     (P^.HelpCtx=hcASCIITableWindow)
+  if (P.HelpCtx=hcSourceWindow) or
+     (P.HelpCtx=hcHelpWindow) or
+     (P.HelpCtx=hcClipboardWindow) or
+     (P.HelpCtx=hcCalcWindow) or
+     (P.HelpCtx=hcInfoWindow) or
+     (P.HelpCtx=hcBrowserWindow) or
+     (P.HelpCtx=hcMessagesWindow) or
+     (P.HelpCtx=hcCompilerMessagesWindow) or
+     (P.HelpCtx=hcGDBWindow) or
+     (P.HelpCtx=hcDisassemblyWindow) or
+     (P.HelpCtx=hcStackWindow) or
+     (P.HelpCtx=hcRegistersWindow) or
+     (P.HelpCtx=hcFPURegisters) or
+     (P.HelpCtx=hcVectorRegisters) or
+     (P.HelpCtx=hcWatchesWindow) or
+     (P.HelpCtx=hcBreakpointListWindow) or
+     (P.HelpCtx=hcASCIITableWindow)
    then
      W:=PWindow(P);
 
-  if Assigned(W) and (P^.HelpCtx=hcSourceWindow) then
-    if SW^.Editor^.FileName='' then
+  if Assigned(W) and (P.HelpCtx=hcSourceWindow) then
+    if SW.Editor.FileName='' then
       W:=nil;
 
   if W=nil then Exit;
   FillChar(WI,sizeof(WI),0);
-  Title:=W^.GetTitle(255);
-  WI.HelpCtx:=W^.HelpCtx;
-  W^.GetBounds(WI.Bounds);
-  WI.Visible:=W^.GetState(sfVisible);
-  WI.WinNb:=W^.Number;
+  Title:=W.GetTitle(255);
+  WI.HelpCtx:=W.HelpCtx;
+  W.GetBounds(WI.Bounds);
+  WI.Visible:=W.GetState(sfVisible);
+  WI.WinNb:=W.Number;
   case WI.HelpCtx of
     hcSourceWindow :
       begin
-        St:=SW^.Editor^.FileName; AddData(St,length(St)+1);
-        L:=SW^.Editor^.GetFlags; AddData(L,sizeof(L));
-        TP:=SW^.Editor^.SelStart; AddData(TP,sizeof(TP));
-        TP:=SW^.Editor^.SelEnd; AddData(TP,sizeof(TP));
-        TP:=SW^.Editor^.CurPos; AddData(TP,sizeof(TP));
-        TP:=SW^.Editor^.Delta; AddData(TP,sizeof(TP));
+        St:=SW.Editor.FileName; AddData(St,length(St)+1);
+        L:=SW.Editor.GetFlags; AddData(L,sizeof(L));
+        TP:=SW.Editor.SelStart; AddData(TP,sizeof(TP));
+        TP:=SW.Editor.SelEnd; AddData(TP,sizeof(TP));
+        TP:=SW.Editor.CurPos; AddData(TP,sizeof(TP));
+        TP:=SW.Editor.Delta; AddData(TP,sizeof(TP));
       end;
     hcAsciiTableWindow :
       begin
-        ch:=chr(PFPAsciiChart(P)^.Report^.AsciiChar);
+        ch:=chr(PFPAsciiChart(P).Report.AsciiChar);
         AddData(ch,sizeof(char));
       end;
   end;
 
   WI.TitleLen:=length(Title);
   WI.ExtraDataSize:=XDataOfs;
-  S^.Write(WI,sizeof(WI));
-  S^.Write(Title[1],WI.TitleLen);
+  S.Write(WI,sizeof(WI));
+  S.Write(Title[1],WI.TitleLen);
   if WI.ExtraDataSize>0 then
-    S^.Write(XData,WI.ExtraDataSize);
+    S.Write(XData,WI.ExtraDataSize);
 end;
 var W: word;
     OK: boolean;
@@ -715,9 +718,9 @@ begin
   if OK then
   begin
     W:=DesktopVersion;
-    S^.Write(W,SizeOf(W));
-{    S^.Put(Desktop);
-    with Desktop^ do
+    S.Write(W,SizeOf(W));
+{    S.Put(Desktop);
+    with Desktop do
     begin
       PutSubViewPtr(S^,CompilerMessageWindow);
       PutSubViewPtr(S^,CompilerStatusDialog);
@@ -730,26 +733,26 @@ begin
       PutSubViewPtr(S^,ASCIIChart);
       PutSubViewPtr(S^,MessagesWindow);
     end;}
-{    PV:=Application^.Last;
+{    PV:=Application.Last;
     while PV<>nil do
     begin
       CollectInfo(PV);
-      PV:=PV^.PrevView;
+      PV:=PV.PrevView;
     end;}
-    PV:=Desktop^.Last;
+    PV:=Desktop.Last;
     while PV<>nil do
     begin
       CollectInfo(PV);
-      PV:=PV^.PrevView;
+      PV:=PV.PrevView;
     end;
-    OK:=(S^.Status=stOK);
+    OK:=(S.Status=stOK);
     if OK then
     begin
-      S^.Seek(0);
-      OK:=F^.CreateResource(resDesktop,rcBinary,0);
-      OK:=OK and F^.AddResourceEntryFromStream(resDesktop,langDefault,0,S^,S^.GetSize);
+      S.Seek(0);
+      OK:=F.CreateResource(resDesktop,rcBinary,0);
+      OK:=OK and F.AddResourceEntryFromStream(resDesktop,langDefault,0,S^,S.GetSize);
     end;
-    Dispose(S, Done);
+    S.Free;
   end;
   if OK=false then
     ErrorBox(msg_errorstoringdesktop,nil);
@@ -761,8 +764,8 @@ function WriteFlags(F: PResourceFile): boolean;
 var
     OK: boolean;
 begin
-  F^.CreateResource(resDesktopFlags,rcBinary,0);
-  OK:=F^.AddResourceEntry(resDesktopFlags,langDefault,0,DesktopFileFlags,
+  F.CreateResource(resDesktopFlags,rcBinary,0);
+  OK:=F.AddResourceEntry(resDesktopFlags,langDefault,0,DesktopFileFlags,
     SizeOf(DesktopFileFlags));
   if OK=false then
     ErrorBox(msg_errorwritingflags,nil);
@@ -775,11 +778,11 @@ var S: PMemoryStream;
 begin
   PushStatus(msg_readingcodecompletewordlist);
   S := TMemoryStream.Create(1024,1024);
-  OK:=F^.ReadResourceEntryToStream(resCodeComplete,langDefault,S^);
-  S^.Seek(0);
+  OK:=F.ReadResourceEntryToStream(resCodeComplete,langDefault,S^);
+  S.Seek(0);
   if OK then
     OK:=LoadCodeComplete(S^);
-  Dispose(S, Done);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorloadingcodecompletewordlist,nil);
   PopStatus;
@@ -795,11 +798,11 @@ begin
   OK:=StoreCodeComplete(S^);
   if OK then
   begin
-    S^.Seek(0);
-    F^.CreateResource(resCodeComplete,rcBinary,0);
-    OK:=F^.AddResourceEntryFromStream(resCodeComplete,langDefault,0,S^,S^.GetSize);
+    S.Seek(0);
+    F.CreateResource(resCodeComplete,rcBinary,0);
+    OK:=F.AddResourceEntryFromStream(resCodeComplete,langDefault,0,S^,S.GetSize);
   end;
-  Dispose(S, Done);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorstoringcodecompletewordlist,nil);
   PopStatus;
@@ -812,11 +815,11 @@ var S: PMemoryStream;
 begin
   PushStatus(msg_readingcodetemplates);
   S := TMemoryStream.Create(1024,4096);
-  OK:=F^.ReadResourceEntryToStream(resCodeTemplates,langDefault,S^);
-  S^.Seek(0);
+  OK:=F.ReadResourceEntryToStream(resCodeTemplates,langDefault,S^);
+  S.Seek(0);
   if OK then
     OK:=LoadCodeTemplates(S^);
-  Dispose(S, Done);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorloadingcodetemplates,nil);
   PopStatus;
@@ -832,11 +835,11 @@ begin
   OK:=StoreCodeTemplates(S^);
   if OK then
   begin
-    S^.Seek(0);
-    F^.CreateResource(resCodeTemplates,rcBinary,0);
-    OK:=F^.AddResourceEntryFromStream(resCodeTemplates,langDefault,0,S^,S^.GetSize);
+    S.Seek(0);
+    F.CreateResource(resCodeTemplates,rcBinary,0);
+    OK:=F.AddResourceEntryFromStream(resCodeTemplates,langDefault,0,S^,S.GetSize);
   end;
-  Dispose(S, Done);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorstoringcodetemplates,nil);
   PopStatus;
@@ -847,7 +850,7 @@ function ReadFlags(F: PResourceFile): boolean;
 var
   OK: boolean;
 begin
-  OK:=F^.ReadResourceEntry(resDesktopFlags,langDefault,DesktopFileFlags,
+  OK:=F.ReadResourceEntry(resDesktopFlags,langDefault,DesktopFileFlags,
     sizeof(DesktopFileFlags));
   if OK=false then
     ErrorBox(msg_errorreadingflags,nil);
@@ -858,8 +861,8 @@ function WriteVideoMode(F: PResourceFile): boolean;
 var
     OK: boolean;
 begin
-  F^.CreateResource(resVideo,rcBinary,0);
-  OK:=F^.AddResourceEntry(resVideo,langDefault,0,ScreenMode,
+  F.CreateResource(resVideo,rcBinary,0);
+  OK:=F.AddResourceEntry(resVideo,langDefault,0,ScreenMode,
     SizeOf(TVideoMode));
   if OK=false then
     ErrorBox(msg_errorstoringvideomode,nil);
@@ -870,7 +873,7 @@ function ReadVideoMode(F: PResourceFile;var NewScreenMode : TVideoMode): boolean
 var
   OK,test : boolean;
 begin
-  test:=F^.ReadResourceEntry(resVideo,langDefault,NewScreenMode,
+  test:=F.ReadResourceEntry(resVideo,langDefault,NewScreenMode,
     sizeof(NewScreenMode));
   if not test then
     NewScreenMode:=ScreenMode;
@@ -886,16 +889,16 @@ var S: PMemoryStream;
     R: PResource;
 begin
   ReadSymbols:=false;  { if no symbols stored ... no problems }
-  R:=F^.FindResource(resSymbols);
+  R:=F.FindResource(resSymbols);
   if not Assigned(R) then
     exit;
   PushStatus(msg_readingsymbolinformation);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F^.ReadResourceEntryToStream(resSymbols,langDefault,S^);
-  S^.Seek(0);
+  OK:=F.ReadResourceEntryToStream(resSymbols,langDefault,S^);
+  S.Seek(0);
   if OK then
     OK:=LoadBrowserCol(S);
-  Dispose(S, Done);
+  S.Free;
   if OK=false then
     ErrorBox(msg_errorloadingsymbolinformation,nil);
   PopStatus;
@@ -918,11 +921,11 @@ begin
       OK:=StoreBrowserCol(S);
     if OK then
       begin
-        S^.Seek(0);
-        F^.CreateResource(resSymbols,rcBinary,0);
-        OK:=F^.AddResourceEntryFromStream(resSymbols,langDefault,0,S^,S^.GetSize);
+        S.Seek(0);
+        F.CreateResource(resSymbols,rcBinary,0);
+        OK:=F.AddResourceEntryFromStream(resSymbols,langDefault,0,S^,S.GetSize);
       end;
-    Dispose(S, Done);
+    S.Free;
     if OK=false then
       ErrorBox(msg_errorstoringsymbolinformation,nil);
     PopStatus;
@@ -936,7 +939,7 @@ var OK,VOK: boolean;
     VM : TVideoMode;
 begin
   PushStatus(msg_readingdesktopfile);
-  New(F, LoadFile(DesktopPath));
+  F := TResourceFile.LoadFile(DesktopPath);
 
   OK:=false;
 
@@ -948,7 +951,7 @@ begin
        (VM.Row<>ScreenMode.Row) or (VM.Color<>ScreenMode.Color)) then
       begin
         if Assigned(Application) then
-          Application^.SetScreenVideoMode(VM);
+          Application.SetScreenVideoMode(VM);
       end;
     if ((DesktopFileFlags and dfHistoryLists)<>0) then
       OK:=ReadHistory(F) and OK;
@@ -968,7 +971,7 @@ begin
 {$ifdef Unix}
     OK:=ReadKeys(F) and OK;
 {$endif Unix}
-    Dispose(F, Done);
+    F.Free;
   end;
 
   PopStatus;
@@ -982,13 +985,13 @@ var OK: boolean;
 begin
   TempPath:=DirOf(DesktopPath)+DesktopTempName;
   PushStatus(msg_writingdesktopfile);
-  New(F, CreateFile(TempPath));
+  F := TResourceFile.CreateFile(TempPath);
 
   if Assigned(Clipboard) then
     if (DesktopFileFlags and dfClipboardContent)<>0 then
-      Clipboard^.SetFlags(Clipboard^.GetFlags or efStoreContent)
+      Clipboard.SetFlags(Clipboard.GetFlags or efStoreContent)
     else
-      Clipboard^.SetFlags(Clipboard^.GetFlags and not efStoreContent);
+      Clipboard.SetFlags(Clipboard.GetFlags and not efStoreContent);
   OK:=false;
 
   if Assigned(F) then
@@ -1013,7 +1016,7 @@ begin
 {$ifdef Unix}
       OK:=OK and WriteKeys(F);
 {$endif Unix}
-      Dispose(F, Done);
+      F.Free;
     end;
   if OK then
     begin
@@ -1034,12 +1037,12 @@ begin
   WriteSymbolsFile:=false;
   If not assigned(Modules) then
     exit;
-  New(F, CreateFile(FileName));
+  F := TResourceFile.CreateFile(FileName);
   OK:=Assigned(F);
   if OK and ((DesktopFileFlags and dfSymbolInformation)<>0) then
     OK:=OK and WriteSymbols(F);
   if assigned(F) then
-    Dispose(F,Done);
+    F.Free;
   WriteSymbolsFile:=OK;
 end;
 
@@ -1051,12 +1054,12 @@ begin
   { Don't read again !! }
   If assigned(Modules) then
     exit;
-  New(F, LoadFile(FileName));
+  F := TResourceFile.LoadFile(FileName);
   OK:=Assigned(F);
   if OK and ((DesktopFileFlags and dfSymbolInformation)<>0) then
       OK:=OK and ReadSymbols(F);
   if assigned(F) then
-    Dispose(F,Done);
+    F.Free;
   ReadSymbolsFile:=OK;
 end;
 

@@ -22,8 +22,10 @@ unit fpevalw;
 
 uses fpdebug,dialogs,views,objects,fpconst,drivers;
 
-type  Pevaluate_dialog = Tevaluate_dialog;
-      Tevaluate_dialog=class(Tdialog)
+type
+  Tevaluate_dialog = class;
+  Pevaluate_dialog = Tevaluate_dialog;
+  Tevaluate_dialog = class(Tdialog)
         watch:Pwatch;
         expr_input,expr_output:Pinputline;
         constructor Create(var bounds:Trect);
@@ -48,30 +50,30 @@ begin
   {watch is auto initialized to nil.}
 
   r.assign(2,3,size.x-20,4);
-  new(expr_input,init(r,255));
+  expr_input := Tinputline.Create(r,255);
   insert(expr_input);
 
   r.assign(size.x-20,3,size.x-18,4);
   Insert(Thistory.Create(r,expr_input,hidEvaluate));
 
   r.assign(2,2,size.x-20,3);
-  new(l,init(r,'E~x~pression:',expr_input));
+  l := Tlabel.Create(r,'E~x~pression:',expr_input);
   insert(l);
 
   r.assign(2,6,size.x-20,7);
-  new(expr_output,init(r,255));
+  expr_output := Tinputline.Create(r,255);
   insert(expr_output);
 
   r.assign(2,5,size.x-20,6);
-  new(l,init(r,'~R~esult:',expr_output));
+  l := Tlabel.Create(r,'~R~esult:',expr_output);
   insert(l);
 
   r.assign(size.x-14,3,size.x-3,5);
-  new(b,init(r,'~E~valuate',cmEvaluate,bfDefault));
+  b := Tbutton.Create(r,'~E~valuate',cmEvaluate,bfDefault);
   insert(b);
 
   //r.assign(size.x-14,6,size.x-3,8);
-  //new(b,init(r,'Help',cmHelp,bfNormal));
+  //b := Tbutton.Create(r,'Help',cmHelp,bfNormal);
   //insert(b);
 
   expr_input.select;
@@ -82,7 +84,7 @@ procedure Tevaluate_dialog.evaluate;
 begin
   if watch<>nil then
     watch.Free;
-  new(watch,init(expr_input.data^));
+  watch := Twatch.Create(expr_input.data^);
   expr_output.data^:=strpas(watch.current_value);
   expr_output.drawview;
 end;

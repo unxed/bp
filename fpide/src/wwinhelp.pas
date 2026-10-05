@@ -283,7 +283,7 @@ end;
 constructor TWinHelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
-  if inherited Create(AID)=false then Fail;
+  inherited Create(AID);
   Thrases.Create(1000,1000);
   F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
@@ -294,7 +294,6 @@ begin
     end;
   if OK=false then
   begin
-    Done;
     Fail;
   end;
 end;
@@ -1413,8 +1412,8 @@ begin
         Move(P.LinkData2^,S[1],ord(S[0]));
         if S<>'' then
         begin
-          EmitText('  '+S+' Ü'+hscLineBreak);
-          EmitText(' '+CharStr('ß',length(S)+3)+hscLineBreak);
+          EmitText('  '+S+' ï¿½'+hscLineBreak);
+          EmitText(' '+CharStr('ï¿½',length(S)+3)+hscLineBreak);
         end;
       end;
     $20,$23 :
@@ -1483,7 +1482,7 @@ begin
           if (P.TopicPos=(TH.ScrollRgnOfs and $3fff)) then
             begin
               EmitText(hscLineBreak);
-              EmitText(CharStr('Ä',80));
+              EmitText(CharStr('ï¿½',80));
               EmitText(hscLineBreak);
             end;
 }
@@ -1645,7 +1644,7 @@ begin
   OK:=(TopicFileStart<>0) and (T<>nil);
   if OK then
   begin
-    ExtractTopicOffset(T.FileOfs,BlockNo,BlockOfs);
+    ExtractTopicOffset(T^.FileOfs,BlockNo,BlockOfs);
     TopicStartPos:=-1; GotIt:=false;
     OK:=ProcessTopicBlock(BlockNo,@SearchTopicStart);
     OK:=OK and GotIt and (TopicStartPos<>-1);

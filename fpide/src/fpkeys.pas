@@ -175,27 +175,27 @@ begin
       R.B.X:=R.A.X + 10;
       St:=WantedKeysLabels[i]+' key';
       KeyOK[i]:=false;
-      New(PSTL[i],Init(R,St,nil));
+      PSTL[i] := TLabel.Create(R,St,nil);
       Insert(PSTL[i]);
       R.A.X:=R.B.X+1;
       R.B.X:=R.B.X+11;
-      New(PL[i],Init(R,20));
+      PL[i] := TInputLine.Create(R,20);
       St:=NiceEscape(KeyEscape[i]);
-      PL[i]^.SetData(St);
+      PL[i].SetData(St);
       Insert(PL[i]);
-      PSTL[i]^.Link:=PL[i];
+      PSTL[i].Link:=PL[i];
     end;
   GetExtent(R);
   R.Grow(-1,-1);
   Dec(R.B.Y);
   R.A.Y:=R.B.Y-1;
-  TST.Create(R,'Press all listed keys');
+  PST := TAdvancedStaticText.Create(R,'Press all listed keys');
   Insert(PST);
   GetExtent(R);
   R.Grow(-1,-1);
   R.A.Y:=R.B.Y-1;
-  TST2.Create(R,'Alt prefix "'+NiceEscape(chr(AltPrefix)+'" Shift prefix = "'+
-    NiceEscape(chr(ShiftPrefix))+'" Ctrl prefix = "'+NiceEscape(chr(CtrlPrefix))+'"'));
+  PST2 := TAdvancedStaticText.Create(R,'Alt prefix "'+NiceEscape(chr(AltPrefix))+'" Shift prefix = "'+
+    NiceEscape(chr(ShiftPrefix))+'" Ctrl prefix = "'+NiceEscape(chr(CtrlPrefix))+'"');
   Insert(PST2);
   InsertButtons(Self);
 end;
@@ -214,10 +214,10 @@ begin
   repeat
     EndState := 0;
     repeat
-    if TypeOf(Current^)=Typeof(TInputLine) then
+    if Current is TInputLine then
       APL:=PInputLine(Current)
-    else if TypeOf(Current^)=Typeof(TLabel) then
-      APL:=PInputLine(Plabel(Current).Link)
+    else if Current is TLabel then
+      APL:=PInputLine(PLabel(Current).Link)
     else
       APL:=nil;
     FillChar(E,SizeOf(E),#0);
@@ -260,13 +260,13 @@ begin
         for i:=1 to NumWantedKeys do
           if E.Keycode=WantedKeys[i] then
             begin
-              DisposeStr(PSTL[i]^.Text);
-              PSTL[i]^.Text:=NewStr(WantedKeysLabels[i]+' OK ');
+              DisposeStr(PSTL[i].Text);
+              PSTL[i].Text:=NewStr(WantedKeysLabels[i]+' OK ');
               keyFound:=true;
               keyOK[i]:=true;
               KeyEscape[i]:=St;
               St:=NiceEscape(St);
-              PL[i]^.SetData(St);
+              PL[i].SetData(St);
               ClearEvent(E);
               ReDraw;
             end;
@@ -295,7 +295,7 @@ begin
                             'Change it to '+WantedKeysLabels[j],nil,true)=cmYes then
                             begin
                               KeyEscape[i]:='';
-                              PL[i]^.SetData(KeyEscape[i]);
+                              PL[i].SetData(KeyEscape[i]);
                             end
                           else
                             begin

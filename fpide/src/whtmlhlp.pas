@@ -381,8 +381,8 @@ begin
             begin
               for k:=CurEl.TextBegin+GlobalOffset to
                      CurEl.TextEnd+GlobalOffset do
-                if Renderer.Topic^.Text^[k]=ord(hscLineBreak) then
-                  Renderer.Topic^.Text^[k]:=ord(' ');
+                if Renderer.Topic.Text^[k]=ord(hscLineBreak) then
+                  Renderer.Topic.Text^[k]:=ord(' ');
             end;
 
           CurEl:=CurEl.NextEl;
@@ -419,7 +419,7 @@ begin
               TextBegin:=CurEl.TextBegin;
               TextEnd:=CurEl.TextEnd;
               {While (TextEnd>TextBegin) and
-                    (Renderer.Topic^.Text^[TextEnd+GlobalOffset]=ord(hscLineBreak)) do
+                    (Renderer.Topic.Text^[TextEnd+GlobalOffset]=ord(hscLineBreak)) do
                 dec(TextEnd); }
               Length:=CurEl.TextLength;
               Align:=CurEl.Alignment;
@@ -627,8 +627,8 @@ begin
       { render topic title here }
       if TopicTitle<>'' then
         begin
-          AddText('  '+TopicTitle+' Ü'); DocBreak;
-          AddText(' '+CharStr('ß',length(TopicTitle)+3)); DocBreak;
+          AddText('  '+TopicTitle+' ï¿½'); DocBreak;
+          AddText(' '+CharStr('ï¿½',length(TopicTitle)+3)); DocBreak;
         end;
     end;
   InTitle:=Entered;
@@ -653,7 +653,7 @@ begin
           Name:='';
       if Name<>'' then
         begin
-          Topic^.NamedMarks.InsertStr(Name);
+          Topic.NamedMarks.InsertStr(Name);
 {$IFDEF WDEBUG}
           DebugMessageS({$i %file%},' Adding Name "'+Name+'"',{$i %line%},'1',0,0);
 {$endif WDEBUG}
@@ -749,7 +749,7 @@ begin
               DebugMessageS({$i %file%},' htmlresolve "'+HRef+'"',{$i %line%},'1',0,0);
 {$ENDIF WDEBUG}
 
-  Afileid:=Topic^.FileId;
+  Afileid:=Topic.FileId;
   ALinkId:=TopicLinks.AddItem(HRef);
 end;
 
@@ -1045,7 +1045,7 @@ begin
     exit;
   if AnyCharsInLine then
     DocBreak;
-  AddText('þ'+hscLineStart);
+  AddText('ï¿½'+hscLineStart);
 end;
 
 procedure THTMLTopicRenderer.DocDefList(Entered: boolean);
@@ -1174,7 +1174,7 @@ begin
       NewEl.NumNL:=0;
       for i:=NewEl.TextBegin to TextPtr do
         begin
-          if Topic^.Text^[i]=ord(hscLineBreak) then
+          if Topic.Text^[i]=ord(hscLineBreak) then
             inc(NewEl.NumNL);
         end;
     end;
@@ -1193,7 +1193,7 @@ begin
   OAlign:=PAlign;
   if AnyCharsInLine then DocBreak;
   PAlign:=paCenter;
-  DocAddText(' '+CharStr('Ä',60)+' ');
+  DocAddText(' '+CharStr('ï¿½',60)+' ');
   DocBreak;
   PAlign:=OAlign;
 end;
@@ -1201,7 +1201,7 @@ end;
 procedure THTMLTopicRenderer.AddChar(C: char);
 begin
   if (Topic=nil) or (TextPtr=MaxBytes) or SuppressOutput then Exit;
-  Topic^.Text^[TextPtr]:=ord(C);
+  Topic.Text^[TextPtr]:=ord(C);
   Inc(TextPtr);
   if (C>#15) and ((C<>' ') or (InPreFormatted=true)) then
     AnyCharsInLine:=true;
@@ -1214,9 +1214,9 @@ begin
     AtPtr:=TextPtr
   else
     begin
-      Move(Topic^.Text^[AtPtr],Topic^.Text^[AtPtr+1],TextPtr-AtPtr);
+      Move(Topic.Text^[AtPtr],Topic.Text^[AtPtr+1],TextPtr-AtPtr);
     end;
-  Topic^.Text^[AtPtr]:=ord(C);
+  Topic.Text^[AtPtr]:=ord(C);
   Inc(TextPtr);
 end;
 
@@ -1235,7 +1235,7 @@ begin
   while i<= TEnd-1 do
     begin
       inc(tot);
-      case chr(Topic^.Text^[i]) of
+      case chr(Topic.Text^[i]) of
       hscLink,hscCode,
       hscCenter,hscRight,
       hscNamedMark,hscNormText :
@@ -1270,11 +1270,11 @@ begin
   else
     begin
       len:=TextPtr-AtPtr;
-      Move(Topic^.Text^[AtPtr],Topic^.Text^[AtPtr+slen],len);
+      Move(Topic.Text^[AtPtr],Topic.Text^[AtPtr+slen],len);
     end;
   for i:=1 to slen do
     begin
-      Topic^.Text^[AtPtr]:=ord(S[i]);
+      Topic.Text^[AtPtr]:=ord(S[i]);
       Inc(TextPtr);
       inc(AtPtr);
       if (TextPtr=MaxBytes) then Exit;
@@ -1298,13 +1298,13 @@ begin
   OK:=Assigned(Topic) and Assigned(HTMLFile) and Assigned(TopicLinks);
   if OK then
     begin
-      if (Topic^.TextSize<>0) and Assigned(Topic^.Text) then
+      if (Topic.TextSize<>0) and Assigned(Topic.Text) then
         begin
-          FreeMem(Topic^.Text,Topic^.TextSize);
-          Topic^.TextSize:=0; Topic^.Text:=nil;
+          FreeMem(Topic.Text,Topic.TextSize);
+          Topic.TextSize:=0; Topic.Text:=nil;
         end;
-      Topic^.TextSize:=MaxHelpTopicSize;
-      GetMem(Topic^.Text,Topic^.TextSize);
+      Topic.TextSize:=MaxHelpTopicSize;
+      GetMem(Topic.Text,Topic.TextSize);
 
       TopicTitle:='';
       InTitle:=false; InBody:={false}true; InAnchor:=false;
@@ -1321,33 +1321,33 @@ begin
       if OK then
         begin
           { --- topic links --- }
-          if (Topic^.Links<>nil) and (Topic^.LinkSize>0) then
+          if (Topic.Links<>nil) and (Topic.LinkSize>0) then
             begin
-              FreeMem(Topic^.Links,Topic^.LinkSize);
-              Topic^.Links:=nil; Topic^.LinkCount:=0;
+              FreeMem(Topic.Links,Topic.LinkSize);
+              Topic.Links:=nil; Topic.LinkCount:=0;
             end;
-          Topic^.LinkCount:=LinkPtr{TopicLinks.Count}; { <- eeeeeek! }
-          GetMem(Topic^.Links,Topic^.LinkSize);
-          if Topic^.LinkCount>0 then { FP causes numeric RTE 215 without this }
-          for I:=0 to Min(Topic^.LinkCount-1,High(LinkIndexes)-1) do
+          Topic.LinkCount:=LinkPtr{TopicLinks.Count}; { <- eeeeeek! }
+          GetMem(Topic.Links,Topic.LinkSize);
+          if Topic.LinkCount>0 then { FP causes numeric RTE 215 without this }
+          for I:=0 to Min(Topic.LinkCount-1,High(LinkIndexes)-1) do
             begin
               {$IFDEF WDEBUG}
                 DebugMessageS({$i %file%},' Indexing links ('+inttostr(i)+')'+topiclinks.at(linkindexes[i])^+' '+inttostr(i)+' '+inttostr(linkindexes[i]),{$i %line%},'1',0,0);
               {$endif WDEBUG}
-              Topic^.Links^[I].FileID:=FileIDLinkIndexes[i];
-              Topic^.Links^[I].Context:=EncodeHTMLCtx(FileIDLinkIndexes[i],LinkIndexes[I]+1);
+              Topic.Links^[I].FileID:=FileIDLinkIndexes[i];
+              Topic.Links^[I].Context:=EncodeHTMLCtx(FileIDLinkIndexes[i],LinkIndexes[I]+1);
             end;
          {$IFDEF WDEBUG}
           if Topic.Linkcount>High(linkindexes) then
-           DebugMessageS({$i %file%},' Maximum links exceeded ('+inttostr(Topic^.LinkCount)+') '+URL,{$i %line%},'1',0,0);
+           DebugMessageS({$i %file%},' Maximum links exceeded ('+inttostr(Topic.LinkCount)+') '+URL,{$i %line%},'1',0,0);
          {$endif WDEBUG}
 
 
           { --- topic text --- }
           GetMem(TP,TextPtr);
-          Move(Topic^.Text^,TP^,TextPtr);
-          FreeMem(Topic^.Text,Topic^.TextSize);
-          Topic^.Text:=TP; Topic^.TextSize:=TextPtr;
+          Move(Topic.Text^,TP^,TextPtr);
+          FreeMem(Topic.Text,Topic.TextSize);
+          Topic.Text:=TP; Topic.TextSize:=TextPtr;
         end
       else
         begin
@@ -1387,7 +1387,7 @@ begin
        DebugMessageS({$i %file%},' chmresolve not resolved "'+HRef+'"',{$i %line%},'1',0,0);
     {$ENDIF WDEBUG}
 
-      Afileid:=Topic^.FileId;
+      Afileid:=Topic.FileId;
       ALinkId:=TopicLinks.AddItem(HRef);
     end;
 end;
@@ -1403,7 +1403,7 @@ end;
 function TCustomHTMLHelpFile.SearchTopic(HelpCtx: THelpCtx): PTopic;
 function MatchCtx(Item: Pointer): boolean;
 begin
-  MatchCtx:=PTopic(Item)^.HelpCtx=HelpCtx;
+  MatchCtx:=PTopic(Item).HelpCtx=HelpCtx;
 end;
 var FileID,LinkNo: word;
     P: PTopic;
@@ -1442,14 +1442,14 @@ begin
   OK:=T<>nil;
   if OK then
     begin
-      if T^.HelpCtx=0 then
+      if T.HelpCtx=0 then
         begin
           Name:=DefaultFileName;
           P:=0;
         end
       else
         begin
-          Link:=TopicLinks.At((T^.HelpCtx and $ffff)-1)^;
+          Link:=TopicLinks.At((T.HelpCtx and $ffff)-1)^;
 {$IFDEF WDEBUG}
           DebugMessageS({$i %file%},'(Topicinfo) Link before formatpath "'+link+'"',{$i %line%},'1',0,0);
 {$ENDIF WDEBUG}
@@ -1483,14 +1483,14 @@ begin
   OK:=T<>nil;
   if OK then
     begin
-      if T^.HelpCtx=0 then
+      if T.HelpCtx=0 then
         begin
           Name:=DefaultFileName;
           P:=0;
         end
       else
         begin
-          Link:=TopicLinks.At((T^.HelpCtx and $ffff)-1)^;
+          Link:=TopicLinks.At((T.HelpCtx and $ffff)-1)^;
 {$IFDEF WDEBUG}
           DebugMessageS({$i %file%},'(ReadTopic) Link before formatpath "'+link+'"',{$i %line%},'1',0,0);
 {$ENDIF WDEBUG}
@@ -1552,15 +1552,15 @@ begin
         end;
       if HTMLFile<>nil then HTMLFile.Free;
       if BookMark='' then
-        T^.StartNamedMark:=0
+        T.StartNamedMark:=0
       else
         begin
-          P:=T^.GetNamedMarkIndex(BookMark);
+          P:=T.GetNamedMarkIndex(BookMark);
 {$IFDEF WDEBUG}
           if p=-1 then
             DebugMessage(Name,Link+'#'+Bookmark+' bookmark not found',1,1);
 {$endif WDEBUG}
-          T^.StartNamedMark:=P+1;
+          T.StartNamedMark:=P+1;
         end;
     end;
   ReadTopic:=OK;
@@ -1674,7 +1674,7 @@ end;
 function TChmHelpFile.SearchTopic(HelpCtx: THelpCtx): PTopic;
 function MatchCtx(Item: Pointer): boolean;
 begin
-  MatchCtx:=PTopic(Item)^.HelpCtx=HelpCtx;
+  MatchCtx:=PTopic(Item).HelpCtx=HelpCtx;
 end;
 var FileID,LinkNo: word;
     P: PTopic;
@@ -1708,14 +1708,14 @@ begin
   OK:=T<>nil;
   if OK then
     begin
-      if T^.HelpCtx=0 then
+      if T.HelpCtx=0 then
         begin
           Name:=DefaultFileName;
           P:=0;
         end
       else
         begin
-          Link:=TopicLinks.At((T^.HelpCtx and $ffff)-1)^;
+          Link:=TopicLinks.At((T.HelpCtx and $ffff)-1)^;
           Link:=FormatPath(Link);
 {$IFDEF WDEBUG}
           DebugMessageS({$i %file%},' Looking for  "'+Link+'"',{$i %line%},'1',0,0);
@@ -1745,14 +1745,14 @@ begin
   OK:=T<>nil;
   if OK then
     begin
-      if T^.HelpCtx=0 then
+      if T.HelpCtx=0 then
         begin
           Name:=DefaultFileName;
           P:=0;
         end
       else
         begin
-          Link:=TopicLinks.At((T^.HelpCtx and $ffff)-1)^;
+          Link:=TopicLinks.At((T.HelpCtx and $ffff)-1)^;
 {$IFDEF WDEBUG}
           DebugMessageS({$i %file%},' Looking for  "'+Link+'"',{$i %line%},'1',0,0);
 {$endif WDEBUG}
@@ -1817,15 +1817,15 @@ begin
         end;
       if HTMLFile<>nil then HTMLFile.Free;
       if BookMark='' then
-        T^.StartNamedMark:=0
+        T.StartNamedMark:=0
       else
         begin
-          P:=T^.GetNamedMarkIndex(BookMark);
+          P:=T.GetNamedMarkIndex(BookMark);
 {$IFDEF WDEBUG}
           if p=-1 then
             DebugMessage(Name,Link+'#'+Bookmark+' bookmark not found',1,1);
 {$endif WDEBUG}
-          T^.StartNamedMark:=P+1;
+          T.StartNamedMark:=P+1;
         end;
     end;
   ReadTopic:=OK;

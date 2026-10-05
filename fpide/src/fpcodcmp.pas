@@ -28,7 +28,7 @@ type
 
     PCodeCompleteDialog = ^TCodeCompleteDialog;
     TCodeCompleteDialog = class(TCenterDialog)
-      constructor Init;
+      constructor Create;
       function    Execute: Word; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
     private
@@ -116,12 +116,12 @@ begin
   OK:=Assigned(CodeCompleteWords);
   if OK then
   begin
-    Text:=CodeCompleteWords^.Lookup(WordS,CIndex);
+    Text:=CodeCompleteWords.Lookup(WordS,CIndex);
     OK:=(CIndex<>-1) and (length(Text)<>length(WordS));
     Index:=-1;
-    if OK and ShowOnlyUnique and (CIndex<CodeCompleteWords^.Count-1) then
+    if OK and ShowOnlyUnique and (CIndex<CodeCompleteWords.Count-1) then
       begin
-        St:=PString(CodeCompleteWords^.At(CIndex+1))^;
+        St:=PString(CodeCompleteWords.At(CIndex+1))^;
         if (UpCaseStr(Copy(St,1,length(WordS)))=UpWordS) then
           begin
             {if UpCase(st[Length(UpWordS)+1])<>Upcase(Text[Length(UpWordS)+1]) then}
@@ -143,11 +143,11 @@ begin
   end;
   if (ShowOnlyUnique or not OK) and Assigned(UnitsCodeCompleteWords) then
   begin
-    Text:=UnitsCodeCompleteWords^.Lookup(WordS,Index);
+    Text:=UnitsCodeCompleteWords.Lookup(WordS,Index);
     OK:=(Index<>-1) and (length(Text)<>length(WordS));
-    if ShowOnlyUnique and (Index<UnitsCodeCompleteWords^.Count-1) then
+    if ShowOnlyUnique and (Index<UnitsCodeCompleteWords.Count-1) then
       begin
-        St:=PString(UnitsCodeCompleteWords^.At(Index+1))^;
+        St:=PString(UnitsCodeCompleteWords.At(Index+1))^;
         if UpCaseStr(Copy(St,1,length(WordS)))=UpWordS then
           begin
             {if UpCase(st[Length(UpWordS)+1])<>Upcase(Text[Length(UpWordS)+1]) then}
@@ -170,7 +170,7 @@ begin
 
   if ShowOnlyUnique and (Index<>-1) and (CIndex<>-1) then
     begin
-      {St:=PString(CodeCompleteWords^.At(CIndex+1))^;
+      {St:=PString(CodeCompleteWords.At(CIndex+1))^;
        Was wrong, CIndex+1 could be above count => collection.error
        generated RTE 213
       if UpCase(st[Length(UpWordS)+1])<>Upcase(Text[Length(UpWordS)+1]) then}
@@ -202,13 +202,13 @@ var I:integer;
     S: string;
 begin
   if Assigned(CodeCompleteWords) then
-    Dispose(CodeCompleteWords, Done);
-  New(CodeCompleteWords, Init(10,10));
+    CodeCompleteWords.Free;
+  CodeCompleteWords := TCodeCompleteWordList.Create(10,10);
   for I:=0 to GetReservedWordCount-1 do
     begin
       S:=LowCaseStr(GetReservedWord(I));
       if length(S)>=CodeCompleteMinLen then
-        CodeCompleteWords^.Insert(NewStr(S));
+        CodeCompleteWords.Insert(NewStr(S));
     end;
   {
     there should be also a user front-end for customizing CodeComplete !
@@ -230,32 +230,32 @@ var
     procedure InsertItemsInS(P: PSymbolCollection);
     var I: Sw_integer;
     begin
-      for I:=0 to P^.Count-1 do
-        InsertInS(P^.At(I));
+      for I:=0 to P.Count-1 do
+        InsertInS(P.At(I));
     end;
   Var
     st : string;
     CIndex : sw_integer;
   begin
     Inc(level);
-    if UnitsCodeCompleteWords^.Count=MaxCollectionSize then
+    if UnitsCodeCompleteWords.Count=MaxCollectionSize then
        begin Overflow:=true; Exit; end;
-    st:=P^.GetName;
+    st:=P.GetName;
     if Length(st)>=CodeCompleteMinLen then
       if not ((level=1) and OnlyStandard and (st=UpCaseStr(CodeCompleteUnitName))) then
         begin
           st:=Lowcasestr(st);
-          UnitsCodeCompleteWords^.LookUp(st,CIndex);
+          UnitsCodeCompleteWords.LookUp(st,CIndex);
           if CIndex<>-1 then
-          UnitsCodeCompleteWords^.Insert(NewStr(st));
+          UnitsCodeCompleteWords.Insert(NewStr(st));
         end;
     { this is wrong because it inserted args or locals of proc
       in the globals list !! PM}
-    if (P^.Items<>nil) and (level=1) and
-        ((not OnlyStandard or (Pos(P^.GetName+',',UpStandardUnits)>0) or
+    if (P.Items<>nil) and (level=1) and
+        ((not OnlyStandard or (Pos(P.GetName+',',UpStandardUnits)>0) or
         { don't exclude system unit ... }
-        (Pos('SYS',P^.GetName)>0))) then
-      InsertItemsInS(P^.Items);
+        (Pos('SYS',P.GetName)>0))) then
+      InsertItemsInS(P.Items);
     Dec(level);
   end;
 
@@ -266,14 +266,14 @@ begin
     begin
       if Assigned(UnitsCodeCompleteWords) then
         begin
-          Dispose(UnitsCodeCompleteWords,done);
+          UnitsCodeCompleteWords.Free;
           UnitsCodeCompleteWords:=nil;
         end;
 
-      New(UnitsCodeCompleteWords, Init(10,10));
+      UnitsCodeCompleteWords := TCodeCompleteWordList.Create(10,10);
       level:=0;
       Overflow:=false;
-      BrowCol.Modules^.ForEach(@InsertInS);
+      BrowCol.Modules.ForEach(@InsertInS);
       { if Overflow then
         WarningBox(msg_toomanysymbolscantdisplayall,nil); }
     end;
@@ -285,14 +285,14 @@ var
   R : TRect;
   StoreBrowserSwitchesConfig : string;
 begin
-  Desktop^.GetExtent(R);
-  New(HiddenSource,init(R,'*'));
-  HiddenSource^.NoNameCount:=0;
-  HiddenSource^.UpdateTitle;
-  HiddenSource^.Hide;
+  Desktop.GetExtent(R);
+  HiddenSource := TSourceWindow.Create(R,'*');
+  HiddenSource.NoNameCount:=0;
+  HiddenSource.UpdateTitle;
+  HiddenSource.Hide;
   CompilingHiddenFile:=HiddenSource;
   { compile a dummy file to get symbol info }
-  with HiddenSource^.Editor^ do
+  with HiddenSource.Editor^ do
     begin
       FileName:=CodeCompleteUnitName+'.pp';
       Addline('unit '+CodeCompleteUnitName+';');
@@ -308,14 +308,14 @@ begin
       SetModified(true);
       // SaveFile;
     end;
-  StoreBrowserSwitchesConfig:=BrowserSwitches^.GetCurrSelParam;
-  BrowserSwitches^.ReadItemsCfg('+');
+  StoreBrowserSwitchesConfig:=BrowserSwitches.GetCurrSelParam;
+  BrowserSwitches.ReadItemsCfg('+');
   DoCompile(cCompile);
-  BrowserSwitches^.SetCurrSelParam(StoreBrowserSwitchesConfig);
+  BrowserSwitches.SetCurrSelParam(StoreBrowserSwitchesConfig);
   AddAvailableUnitsToCodeComplete(true);
   { Now add the interface declarations to the Code Complete list }
   CompilingHiddenFile:=nil;
-  Dispose(HiddenSource,Done);
+  HiddenSource.Free;
 end;
 
 function LoadCodeComplete(var S: TStream): boolean;
@@ -328,11 +328,11 @@ var C: PCodeCompleteWordList;
     NewCodeCompleteCase : TCodeCompleteCase;
     StPtr : PString;
 begin
-  New(C, Load(S));
+  C := TCodeCompleteWordList.Load(S);
   OK:=Assigned(C) and (S.Status=stOk);
   if OK then
     begin
-      if Assigned(CodeCompleteWords) then Dispose(CodeCompleteWords, Done);
+      if Assigned(CodeCompleteWords) then CodeCompleteWords.Free;
       CodeCompleteWords:=C;
       S.Read(NewCodeCompleteCase,Sizeof(TCodeCompleteCase));
       OK:=(S.Status=stOk);
@@ -373,7 +373,7 @@ begin
     end
   else
     if Assigned(C) then
-      Dispose(C, Done);
+      C.Free;
   LoadCodeComplete:=OK;
 end;
 
@@ -383,7 +383,7 @@ begin
   OK:=Assigned(CodeCompleteWords);
   if OK then
   begin
-    CodeCompleteWords^.Store(S);
+    CodeCompleteWords.Store(S);
     S.Write(CodeCompleteCase,Sizeof(TCodeCompleteCase));
     { New fields added }
     S.Write(UseStandardUnitsInCodeComplete,Sizeof(UseStandardUnitsInCodeComplete));
@@ -400,34 +400,34 @@ procedure DoneCodeComplete;
 begin
   if Assigned(CodeCompleteWords) then
     begin
-      Dispose(CodeCompleteWords, Done);
+      CodeCompleteWords.Free;
       CodeCompleteWords:=nil;
     end;
   if Assigned(UnitsCodeCompleteWords) then
     begin
-      Dispose(UnitsCodeCompleteWords,done);
+      UnitsCodeCompleteWords.Free;
       UnitsCodeCompleteWords:=nil;
     end;
 end;
 
-constructor TCodeCompleteDialog.Init;
+constructor TCodeCompleteDialog.Create;
 var R,R2,R3: TRect;
     Items: PSItem;
     SB: PScrollBar;
 begin
   R.Assign(0,0,50,22);
-  inherited Init(R,dialog_codecomplete);
+  inherited Create(R,dialog_codecomplete);
   HelpCtx:=hcCodeCompleteOptions;
 
   { name list dialog }
   GetExtent(R); R.Grow(-3,-2); Inc(R.A.Y); R3.Copy(R); Dec(R.B.X,12);
   Dec(R.B.Y,7);
   R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
-  New(SB, Init(R2)); Insert(SB);
-  New(CodeCompleteLB, Init(R,1,SB));
+  SB := TScrollBar.Create(R2); Insert(SB);
+  CodeCompleteLB := TAdvancedListBox.Create(R,1,SB);
   Insert(CodeCompleteLB);
   R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
-  Insert(New(PLabel, Init(R2, label_codecomplete_keywords, CodeCompleteLB)));
+  Insert(TLabel.Create(R2, label_codecomplete_keywords, CodeCompleteLB));
 
   { Case choice }
   R.Copy(R3); Dec(R.B.Y,2); R.A.Y:=R.B.Y-4; Inc(R.A.X); R.B.X:=R.A.X+15;
@@ -435,19 +435,19 @@ begin
            NewSItem('~L~ower',
            NewSItem('~U~pper',
            NewSItem('~M~ixed',nil))));
-  RB:=New(PRadioButtons,Init(R,Items));
-  RB^.SetData(ord(CodeCompleteCase));
+  RB := TRadioButtons.Create(R,Items);
+  RB.SetData(ord(CodeCompleteCase));
   R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
-  Insert(New(PLabel, Init(R2, 'Case handling', RB)));
+  Insert(TLabel.Create(R2, 'Case handling', RB));
   Insert(RB);
 
   { Mininum length inputline }
   R.Copy(R3); R.A.Y:=R.B.Y-7;R.B.Y:=R.A.Y+1; Dec(R.B.X); R.A.X:=R.B.X -5;
-  New(MinInputL, Init(R,5));
-  MinInputL^.SetValidator(New(PRangeValidator, Init(1,255)));
+  MinInputL := TEditorInputLine.Create(R,5);
+  MinInputL.SetValidator(TRangeValidator.Create(1,255));
   Insert(MinInputL);
   R2.Copy(R); R2.A.X:=20;Dec(R2.B.X,5);
-  Insert(New(PLabel, Init(R2, 'Min. length', MinInputL)));
+  Insert(TLabel.Create(R2, 'Min. length', MinInputL));
 
   { Standard/all units booleans }
   Items:=nil;
@@ -455,36 +455,36 @@ begin
   Items:=NewSItem('Add all units', Items);
   Items:=NewSItem('Show only unique', Items);
   R.Copy(R3); R.A.Y:=R.B.Y-5;R.B.Y:=R.A.Y+3; Inc(R.A.X,18); Dec(R.B.X);
-  New(CB, Init(R, Items));
+  CB := TCheckBoxes.Create(R, Items);
   Insert(CB);
   R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
-  Insert(New(PLabel, Init(R2, 'Unit handling', CB)));
+  Insert(TLabel.Create(R2, 'Unit handling', CB));
   R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1;
   If ShowOnlyUnique then
-    CB^.Press(0);
+    CB.Press(0);
   If UseAllUnitsInCodeComplete then
-    CB^.Press(1);
+    CB.Press(1);
   If UseStandardUnitsInCodeComplete then
-    CB^.Press(2);
+    CB.Press(2);
 
   { Standard unit name boolean }
   R.Copy(R3); R.A.Y:=R.B.Y-1; Inc(R.A.X); Dec(R.B.X);
-  New(InputL,Init(R,255));
+  InputL := TEditorInputLine.Create(R,255);
   Insert(InputL);
-  InputL^.SetValidator(New(PFilterValidator,Init(NumberChars+AlphaChars+[','])));
+  InputL.SetValidator(TFilterValidator.Create(NumberChars+AlphaChars+[',']));
   R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);R2.B.X:=R2.A.X+25;
-  Insert(New(PLabel, Init(R2, '~S~tandard unit list', InputL)));
+  Insert(TLabel.Create(R2, '~S~tandard unit list', InputL));
 
   R.Copy(R3); R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
-  Insert(New(PButton, Init(R, button_OK, cmOK, bfNormal)));
+  Insert(TButton.Create(R, button_OK, cmOK, bfNormal));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_Edit, cmEditItem, bfDefault)));
+  Insert(TButton.Create(R, button_Edit, cmEditItem, bfDefault));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_New, cmAddItem, bfNormal)));
+  Insert(TButton.Create(R, button_New, cmAddItem, bfNormal));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_Delete, cmDeleteItem, bfNormal)));
+  Insert(TButton.Create(R, button_Delete, cmDeleteItem, bfNormal));
   R.Move(0,2);
-  Insert(New(PButton, Init(R, button_Cancel, cmCancel, bfNormal)));
+  Insert(TButton.Create(R, button_Cancel, cmCancel, bfNormal));
   SelectNext(false);
 end;
 
@@ -497,9 +497,9 @@ begin
         DontClear:=false;
         case Event.KeyCode of
           kbIns  :
-            Message(@Self,evCommand,cmAddItem,nil);
+            Message(Self,evCommand,cmAddItem,nil);
           kbDel  :
-            Message(@Self,evCommand,cmDeleteItem,nil);
+            Message(Self,evCommand,cmDeleteItem,nil);
         else DontClear:=true;
         end;
         if DontClear=false then ClearEvent(Event);
@@ -508,7 +508,7 @@ begin
       case Event.Command of
         cmListItemSelected :
           if Event.InfoPtr=pointer(CodeCompleteLB) then
-            Message(@Self,evCommand,cmEditItem,nil);
+            Message(Self,evCommand,cmEditItem,nil);
       end;
     evCommand :
       begin
@@ -531,41 +531,41 @@ var R: word;
     NewVal, I: integer;
     NewValStr : string;
 begin
-  New(C, Init(10,20));
+  C := TCodeCompleteWordList.Create(10,20);
   if Assigned(CodeCompleteWords) then
-  for I:=0 to CodeCompleteWords^.Count-1 do
-    C^.Insert(NewStr(GetStr(CodeCompleteWords^.At(I))));
-  CodeCompleteLB^.NewList(C);
-  InputL^.SetData(StandardUnits);
+  for I:=0 to CodeCompleteWords.Count-1 do
+    C.Insert(NewStr(GetStr(CodeCompleteWords.At(I))));
+  CodeCompleteLB.NewList(C);
+  InputL.SetData(StandardUnits);
   NewValStr:=IntToStr(CodeCompleteMinLen);
-  MinInputL^.SetData(NewValStr);
+  MinInputL.SetData(NewValStr);
   R:=inherited Execute;
   if R=cmOK then
     begin
-      if Assigned(CodeCompleteWords) then Dispose(CodeCompleteWords, Done);
+      if Assigned(CodeCompleteWords) then CodeCompleteWords.Free;
       CodeCompleteWords:=C;
-      CodeCompleteCase:=TCodeCompleteCase(RB^.Value);
-      MinInputL^.GetData(NewValStr);
+      CodeCompleteCase:=TCodeCompleteCase(RB.Value);
+      MinInputL.GetData(NewValStr);
       NewVal:=StrToInt(NewValStr);
       if (NewVal>0) and (NewVal<>CodeCompleteMinLen) then
         begin
           CodeCompleteMinLen:=NewVal;
           InitCodeComplete;
         end;
-      ShowOnlyUnique:=CB^.Mark(0);
-      UseAllUnitsInCodeComplete:=CB^.Mark(1);
-      UseStandardUnitsInCodeComplete:=CB^.Mark(2);
+      ShowOnlyUnique:=CB.Mark(0);
+      UseAllUnitsInCodeComplete:=CB.Mark(1);
+      UseStandardUnitsInCodeComplete:=CB.Mark(2);
       if UseStandardUnitsInCodeComplete and (not UseAllUnitsInCodeComplete or not assigned(UnitsCodeCompleteWords)) and
-         ((StandardUnits<>GetStr(InputL^.Data)) or not assigned(UnitsCodeCompleteWords)) then
+         ((StandardUnits<>GetStr(InputL.Data)) or not assigned(UnitsCodeCompleteWords)) then
         begin
-          InputL^.GetData(StandardUnits);
+          InputL.GetData(StandardUnits);
           AddStandardUnitsToCodeComplete;
         end
       else
-        InputL^.GetData(StandardUnits);
+        InputL.GetData(StandardUnits);
     end
   else
-    Dispose(C, Done);
+    C.Free;
   Execute:=R;
 end;
 
@@ -577,9 +577,9 @@ var IC: boolean;
     CanExit: boolean;
     I: sw_integer;
 begin
-  IC:=CodeCompleteLB^.Range=0;
+  IC:=CodeCompleteLB.Range=0;
   if IC=false then
-    S:=GetStr(CodeCompleteLB^.List^.At(CodeCompleteLB^.Focused))
+    S:=GetStr(CodeCompleteLB.List.At(CodeCompleteLB.Focused))
   else
     S:='';
 
@@ -588,7 +588,7 @@ begin
     CanExit:=Cmd<>cmOK;
     if CanExit=false then
       begin
-        CanExit:=PCodeCompleteWordList(CodeCompleteLB^.List)^.Search(@S,I)=false;
+        CanExit:=PCodeCompleteWordList(CodeCompleteLB.List).Search(@S,I)=false;
         if CanExit=false then
         begin
           ClearFormatParams; AddFormatParamStr(S);
@@ -600,10 +600,10 @@ begin
   if Cmd=cmOK then
     begin
       P:=NewStr(S);
-      with CodeCompleteLB^ do
+      with CodeCompleteLB do
       begin
-        List^.Insert(P);
-        SetRange(List^.Count);
+        List.Insert(P);
+        SetRange(List.Count);
         SetFocusedItem(P);
       end;
       ReDraw;
@@ -617,15 +617,15 @@ var S: string;
     CanExit: boolean;
     P: PString;
 begin
-  if CodeCompleteLB^.Range=0 then Exit;
-  I:=CodeCompleteLB^.Focused;
-  S:=GetStr(CodeCompleteLB^.List^.At(I));
+  if CodeCompleteLB.Range=0 then Exit;
+  I:=CodeCompleteLB.Focused;
+  S:=GetStr(CodeCompleteLB.List.At(I));
   repeat
     Cmd:=InputBox(dialog_codecomplete_edit,label_codecomplete_edit_keyword,S,255);
     CanExit:=Cmd<>cmOK;
     if CanExit=false then
       begin
-        CanExit:=PCodeCompleteWordList(CodeCompleteLB^.List)^.Search(@S,T)=false;
+        CanExit:=PCodeCompleteWordList(CodeCompleteLB.List).Search(@S,T)=false;
         CanExit:=CanExit or (T=I);
         if CanExit=false then
         begin
@@ -638,10 +638,10 @@ begin
   if Cmd=cmOK then
     begin
       P:=NewStr(S);
-      with CodeCompleteLB^ do
+      with CodeCompleteLB do
       begin
-        List^.AtFree(I);
-        List^.Insert(P);
+        List.AtFree(I);
+        List.Insert(P);
         SetFocusedItem(P);
       end;
       ReDraw;
@@ -650,9 +650,9 @@ end;
 
 procedure TCodeCompleteDialog.Delete;
 begin
-  if CodeCompleteLB^.Range=0 then Exit;
-  CodeCompleteLB^.List^.AtFree(CodeCompleteLB^.Focused);
-  CodeCompleteLB^.SetRange(CodeCompleteLB^.List^.Count);
+  if CodeCompleteLB.Range=0 then Exit;
+  CodeCompleteLB.List.AtFree(CodeCompleteLB.Focused);
+  CodeCompleteLB.SetRange(CodeCompleteLB.List.Count);
   ReDraw;
 end;
 

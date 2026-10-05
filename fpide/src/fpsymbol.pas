@@ -301,13 +301,13 @@ procedure CloseAllBrowsers;
   procedure SendCloseIfBrowser(P: PView);
   begin
     if assigned(P) and
-       ((TypeOf(P^)=TypeOf(TBrowserWindow)) or
-       (TypeOf(P^)=TypeOf(TSymbolView)) or
-       (TypeOf(P^)=TypeOf(TSymbolScopeView)) or
-       (TypeOf(P^)=TypeOf(TSymbolReferenceView)) or
-       (TypeOf(P^)=TypeOf(TSymbolMemInfoView)) or
-       (TypeOf(P^)=TypeOf(TSymbolInheritanceView)) or
-       (TypeOf(P^)=TypeOf(TSymbolMemoView))) then
+       (((P is TBrowserWindow)) or
+       ((P is TSymbolView)) or
+       ((P is TSymbolScopeView)) or
+       ((P is TSymbolReferenceView)) or
+       ((P is TSymbolMemInfoView)) or
+       ((P is TSymbolInheritanceView)) or
+       ((P is TSymbolMemoView))) then
       Message(P,evCommand,cmClose,nil);
   end;
 
@@ -1482,7 +1482,7 @@ begin
 end;
 begin
   NormColor:=GetColorW(1); SelColor:=GetColorW(2);
-  MoveChar(B,'Ä',SelColor,Size.X);
+  MoveChar(B,'ï¿½',SelColor,Size.X);
   CurX:=0; Count:=0;
   for I:=0 to GetItemCount-1 do
     if (Flags and (1 shl I))<>0 then
@@ -1490,13 +1490,13 @@ begin
       Inc(Count);
       if Current=I then C:=SelColor
                    else C:=NormColor;
-      if Count=1 then MoveChar(B[CurX],'´',SelColor,1)
-                 else MoveChar(B[CurX],'³',SelColor,1);
+      if Count=1 then MoveChar(B[CurX],'ï¿½',SelColor,1)
+                 else MoveChar(B[CurX],'ï¿½',SelColor,1);
       MoveCStr(B[CurX+1],' '+Names(I)+' ',C);
       Inc(CurX,4);
     end;
   if Count>0 then
-    MoveChar(B[CurX],'Ã',SelColor,1);
+    MoveChar(B[CurX],'ï¿½',SelColor,1);
   WriteLineW(0,0,Size.X,Size.Y,B);
 end;
 
@@ -1663,7 +1663,7 @@ begin
       Insert(MemInfoView);
       MemInfoView.MyBW:=Self;
     end;
-  if Assigned(Asym) and (TypeOf(ASym^)=TypeOf(TModuleSymbol)) then
+  if Assigned(Asym) and ((ASym is TModuleSymbol)) then
   with PModuleSymbol(Sym)^ do
     begin
       UnitInfo := TUnitInfoPanel.Create(R);
@@ -1699,7 +1699,7 @@ begin
       if Assigned(UsedUnits) then
       begin
         Inc(R2.A.Y,R2.B.Y-R2.A.Y); R2.B.Y:=R2.A.Y+1;
-        CST := TColorStaticText.Create(R2,'´ Used units Ã'+CharStr('Ä',255),ColorIndex(12),false);
+        CST := TColorStaticText.Create(R2,'ï¿½ Used units ï¿½'+CharStr('ï¿½',255),ColorIndex(12),false);
         CST.GrowMode:=gfGrowHiX;
         UnitInfo.Insert(CST);
 
@@ -1719,7 +1719,7 @@ begin
       if Assigned(DependentUnits) then
       begin
         Inc(R2.A.Y,R2.B.Y-R2.A.Y); R2.B.Y:=R2.A.Y+1;
-        CST := TColorStaticText.Create(R2,'´ Dependent units Ã'+CharStr('Ä',255),ColorIndex(12),false);
+        CST := TColorStaticText.Create(R2,'ï¿½ Dependent units ï¿½'+CharStr('ï¿½',255),ColorIndex(12),false);
         CST.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY;
         UnitInfo.Insert(CST);
 

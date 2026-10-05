@@ -155,7 +155,7 @@ var OK: boolean;
     FS,L: longint;
     R: TRecord;
 begin
-  if inherited Create(AID)=false then Fail;
+  inherited Create(AID);
   F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
   if OK then OK:=(F.Status=stOK);
@@ -197,7 +197,6 @@ begin
   OK:=OK and (TopicsRead=true);
   if OK=false then
     Begin
-      Done;
       Fail;
     End;
 end;
@@ -494,11 +493,11 @@ var OK: boolean;
     I: sw_word;
 begin
   OK:=T<>nil;
-  if OK and (T.Text=nil) then
+  if OK and (T^.Text=nil) then
   begin
     LinkPosCount:=0; FillChar(LinkPos,Sizeof(LinkPos),0);
     FillChar(TextR,SizeOf(TextR),0); FillChar(KeyWR,SizeOf(KeyWR),0);
-    F.Seek(T.FileOfs); OK:=F.Status=stOK;
+    F.Seek(T^.FileOfs); OK:=F.Status=stOK;
     if OK then OK:=ReadRecord(TextR,true);
     OK:=OK and (TextR.SClass=oa_rtText);
     if OK then OK:=ReadRecord(KeyWR,true);
@@ -512,15 +511,15 @@ begin
            begin
              UpContext:=LEToN(UpContext);
              DownContext:=LEToN(DownContext);
-             T.LinkCount:=KeywordCount;
-             GetMem(T.Links,T.LinkSize);
-             if T.LinkCount>0 then
-             for I:=0 to T.LinkCount-1 do
+             T^.LinkCount:=KeywordCount;
+             GetMem(T^.Links,T^.LinkSize);
+             if T^.LinkCount>0 then
+             for I:=0 to T^.LinkCount-1 do
              with Keywords[I] do
              begin
                KwContext:=LEToN(KwContext);
-               T.Links^[I].Context:=KwContext;
-               T.Links^[I].FileID:=ID;
+               T^.Links^[I].Context:=KwContext;
+               T^.Links^[I].FileID:=ID;
                Inc(LinkPosCount);
                with LinkPos[LinkPosCount] do
                begin
@@ -535,14 +534,14 @@ begin
              KeywordCount:=LEToN(KeywordCount);
              UpContext:=LEToN(UpContext);
              DownContext:=LEToN(DownContext);
-             T.LinkCount:=KeywordCount;
-             GetMem(T.Links,T.LinkSize);
+             T^.LinkCount:=KeywordCount;
+             GetMem(T^.Links,T^.LinkSize);
              if KeywordCount>0 then
              for I:=0 to KeywordCount-1 do
              begin
                Keywords[I].KwContext:=LEToN(Keywords[I].KwContext);
-               T.Links^[I].Context:=Keywords[I].KwContext;
-               T.Links^[I].FileID:=ID;
+               T^.Links^[I].Context:=Keywords[I].KwContext;
+               T^.Links^[I].FileID:=ID;
              end;
            end;
       end;
@@ -552,7 +551,7 @@ begin
     if OK then
       if TextR.Size>0 then
       begin
-        T.Text:=TextR.Data; T.TextSize:=TextR.Size;
+        T^.Text:=TextR.Data; T^.TextSize:=TextR.Size;
         TextR.Data:=nil; TextR.Size:=0;
       end;
 

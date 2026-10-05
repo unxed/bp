@@ -240,8 +240,8 @@ function NewLink(FileID: longint; Topic: THelpCtx; StartP, EndP: TPoint): PHelpL
 var P: PHelpLink;
 begin
   New(P); FillChar(P^, SizeOf(P^), 0);
-  P^.FileID:=FileID;
-  P^.Context:=Topic; P^.Bounds.A:=StartP; P^.Bounds.B:=EndP;
+  P.FileID:=FileID;
+  P.Context:=Topic; P.Bounds.A:=StartP; P.Bounds.B:=EndP;
   NewLink:=P;
 end;
 
@@ -254,8 +254,8 @@ function NewColorArea(Color, AttrMask: byte; StartP, EndP: TPoint): PHelpColorAr
 var P: PHelpColorArea;
 begin
   New(P); FillChar(P^, SizeOf(P^), 0);
-  P^.Color:=Color; P^.AttrMask:=AttrMask;
-  P^.Bounds.A:=StartP; P^.Bounds.B:=EndP;
+  P.Color:=Color; P.AttrMask:=AttrMask;
+  P.Bounds.A:=StartP; P.Bounds.B:=EndP;
   NewColorArea:=P;
 end;
 
@@ -268,7 +268,7 @@ function NewKeyword(Index: sw_integer; KWord: string): PHelpKeyword;
 var P: PHelpKeyword;
 begin
   New(P); FillChar(P^, SizeOf(P^), 0);
-  P^.Index:=Index; P^.KWord:=NewStr(KWord);
+  P.Index:=Index; P.KWord:=NewStr(KWord);
   NewKeyword:=P;
 end;
 
@@ -276,7 +276,7 @@ procedure DisposeKeyword(P: PHelpKeyword);
 begin
   if P<>nil then
   begin
-    if P^.KWord<>nil then DisposeStr(P^.KWord);
+    if P.KWord<>nil then DisposeStr(P.KWord);
     Dispose(P);
   end;
 end;
@@ -307,7 +307,7 @@ var R: sw_integer;
     K2: PHelpKeyword absolute Key2;
     S1,S2: string;
 begin
-  S1:=UpcaseStr(K1^.KWord^); S2:=UpcaseStr(K2^.KWord^);
+  S1:=UpcaseStr(K1.KWord^); S2:=UpcaseStr(K2.KWord^);
   if S1<S2 then R:=-1 else
   if S1>S2 then R:=1 else
   R:=0;
@@ -555,9 +555,9 @@ begin
     ZeroLevel:=0;
     LineAlign:=laLeft;
     FirstLink:=0; LastLink:=0; NextByte:=nbNormal;
-    while (TextPos<Topic^.TextSize) or InImage do
+    while (TextPos<Topic.TextSize) or InImage do
     begin
-      C:=chr(PByteArray(Topic^.Text)^[TextPos]);
+      C:=chr(PByteArray(Topic.Text)^[TextPos]);
       case NextByte of
         nbAreaColor :
           begin
@@ -591,13 +591,13 @@ begin
                       begin
                         if CurWord<>'' then AddWord(CurWord); CurWord:='';
                         LinkEnd:=CurPos; Dec(LinkEnd.X);
-                        if Topic^.Links<>nil then
+                        if Topic.Links<>nil then
                           begin
-                            if LinkNo<Topic^.LinkCount then
+                            if LinkNo<Topic.LinkCount then
                               begin
                                 Inc(LastLink);
-                                Links.Insert(NewLink(Topic^.Links^[LinkNo].FileID,
-                                  Topic^.Links^[LinkNo].Context,LinkStart,LinkEnd));
+                                Links.Insert(NewLink(Topic.Links^[LinkNo].FileID,
+                                  Topic.Links^[LinkNo].Context,LinkStart,LinkEnd));
                               end;
                             Inc(LinkNo);
                           end;
@@ -626,8 +626,8 @@ begin
                    LineAlign:=laRight{was laCenter, typo error ? PM };
               hscNamedMark :
                    begin
-                     if NamedMarkNo<Topic^.NamedMarks.Count then
-                       NamedMarks.Add(GetStr(Topic^.NamedMarks.At(NamedMarkNo)),CurPos);
+                     if NamedMarkNo<Topic.NamedMarks.Count then
+                       NamedMarks.Add(GetStr(Topic.NamedMarks.At(NamedMarkNo)),CurPos);
                      Inc(NamedMarkNo);
                    end;
               hscTextAttr,hscTextColor :
@@ -687,21 +687,21 @@ procedure THelpTopic.GetLinkBounds(Index: sw_integer; var R: TRect);
 var P: PHelpLink;
 begin
   P:=Links.At(Index);
-  R:=P^.Bounds;
+  R:=P.Bounds;
 end;
 
 function THelpTopic.GetLinkFileID(Index: sw_integer): word;
 var P: PHelpLink;
 begin
   P:=Links.At(Index);
-  GetLinkFileID:=P^.FileID;
+  GetLinkFileID:=P.FileID;
 end;
 
 function THelpTopic.GetLinkContext(Index: sw_integer): THelpCtx;
 var P: PHelpLink;
 begin
   P:=Links.At(Index);
-  GetLinkContext:=P^.Context;
+  GetLinkContext:=P.Context;
 end;
 
 function THelpTopic.GetColorAreaCount: sw_integer;
@@ -713,21 +713,21 @@ procedure THelpTopic.GetColorAreaBounds(Index: sw_integer; var R: TRect);
 var P: PHelpColorArea;
 begin
   P:=ColorAreas.At(Index);
-  R:=P^.Bounds;
+  R:=P.Bounds;
 end;
 
 function THelpTopic.GetColorAreaColor(Index: sw_integer): word;
 var P: PHelpColorArea;
 begin
   P:=ColorAreas.At(Index);
-  GetColorAreaColor:=P^.Color;
+  GetColorAreaColor:=P.Color;
 end;
 
 function THelpTopic.GetColorAreaMask(Index: sw_integer): word;
 var P: PHelpColorArea;
 begin
   P:=ColorAreas.At(Index);
-  GetColorAreaMask:=P^.AttrMask;
+  GetColorAreaMask:=P.AttrMask;
 end;
 
 destructor THelpTopic.Destroy;
@@ -765,7 +765,7 @@ begin
     prop:=0;
   inherited ChangeBounds(Bounds);
   if (HelpTopic<>nil) and (HelpTopic.Topic<>nil) and
-     (HelpTopic.Topic^.FileID<>0) then
+     (HelpTopic.Topic.FileID<>0) then
     Begin
       LinePos:=HelpTopic.LinesPos.At(CurPos.Y)+CurPos.X;
       RenderTopic;
@@ -999,8 +999,8 @@ begin
        Move(History[1],History[0],SizeOf(History)-SizeOf(History[0]));
     with History[HistoryPtr] do
     begin
-      {SourceTopic_:=SourceTopic; }Context_:=HelpTopic.Topic^.HelpCtx;
-      FileID_:=HelpTopic.Topic^.FileID;
+      {SourceTopic_:=SourceTopic; }Context_:=HelpTopic.Topic.HelpCtx;
+      FileID_:=HelpTopic.Topic.FileID;
       Delta_:=Delta; CurPos_:=CurPos; CurLink_:=CurLink;
     end;
     if HistoryFull=false then Inc(HistoryPtr);
@@ -1058,10 +1058,10 @@ begin
   BuildTopicWordList;
   Lookup('');
   if Assigned(Topic) then
-  if Topic^.StartNamedMark>0 then
-   if Topic^.NamedMarks.Count>=Topic^.StartNamedMark then
+  if Topic.StartNamedMark>0 then
+   if Topic.NamedMarks.Count>=Topic.StartNamedMark then
     begin
-      Bookmark:=GetStr(Topic^.NamedMarks.At(Topic^.StartNamedMark-1));
+      Bookmark:=GetStr(Topic.NamedMarks.At(Topic.StartNamedMark-1));
       if HelpTopic.NamedMarks.GetMarkPos(Bookmark,P) then
       begin
         SetCurPtr(P.X,P.Y);
@@ -1105,9 +1105,9 @@ begin
     while (Index=-1) and (I<WordList.Count) do
       begin
         P:=WordList.At(I);
-        if P^.KWord<>nil then
+        if P.KWord<>nil then
           begin
-            W:=UpcaseStr(Trim(P^.KWord^));
+            W:=UpcaseStr(Trim(P.KWord^));
             if copy(W,1,length(S))=S then Index:=I;
           end;
 {        if W>S then Break else}
@@ -1115,7 +1115,7 @@ begin
       end;
     if Index<>-1 then
     begin
-      W:=Trim(WordList.At(Index)^.KWord^);
+      W:=Trim(WordList.At(Index).KWord^);
       LookupWord:=copy(W,1,length(S));
     end;
   end;
@@ -1126,11 +1126,11 @@ begin
     begin
       if Owner<>nil then Owner.Lock;
       P:=WordList.At(Index);
-      S:=GetLinkText(P^.Index);
+      S:=GetLinkText(P.Index);
       I:=Pos(LookupWord,S); if I=0 then I:=1;
-      GetLinkBounds(P^.Index,R);
+      GetLinkBounds(P.Index,R);
       SetCurPtr(R.A.X+(I-1)+length(Lookupword),R.A.Y);
-      CurLink:=P^.Index; DrawView;
+      CurLink:=P.Index; DrawView;
       TrackCursor(do_centre);
       if Owner<>nil then Owner.UnLock;
     end;

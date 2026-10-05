@@ -42,15 +42,23 @@ def convert(text: str) -> str:
     text = re.sub(r"\bDispose\s*\(\s*([^,\n]+)\s*,\s*Destroy\s*\)", r"\1.Free", text, flags=re.I)
     text = re.sub(r"\bDispose\s*\(\s*([^,\n]+)\s*,\s*Done\s*\)", r"\1.Free", text, flags=re.I)
 
-    # Forward class decls before PFoo = TFoo
+    # Forward class decls before PFoo = TFoo (including "type PFoo = TFoo")
     lines = text.splitlines(True)
     seen: set[str] = set()
     out: list[str] = []
     for line in lines:
-        m = re.match(r"^(\s*)(P\w+)\s*=\s*(T\w+)\s*;\s*$", line)
+        m = re.match(r"^(\s*)(type\s+)?(P\w+)\s*=\s*(T\w+)\s*;\s*$", line, flags=re.I)
         if m:
-            indent, _pn, tn = m.groups()
+            indent, typekw, _pn, tn = m.groups()
             if tn not in seen:
+                prefix = f"{indent}type " if typekw else indent
+                # If line already has type keyword, emit forward then P=T under same type block
+                if typekw:
+                    out.append(f"{indent}type\n")
+                    out.append(f"{indent}  {tn} = class;\n")
+                    out.append(f"{indent}  {_pn} = {tn};\n")
+                    seen.add(tn)
+                    continue
                 out.append(f"{indent}{tn} = class;\n")
                 seen.add(tn)
         m2 = re.match(r"^(\s*)(T\w+)\s*=\s*class", line)
@@ -64,52 +72,82 @@ def convert(text: str) -> str:
         aliases.setdefault(f"P{base}", f"T{base}")
 
     def ins_new(m: re.Match[str]) -> str:
-        pt, args = m.group(1), m.group(2)
-        return f"Insert({aliases.get(pt, 'T' + pt[1:])}.Create({args}))"
+        pt, ctor, args = m.group(1), m.group(2), m.group(3)
+        method = "Create" if ctor.lower() == "init" else ctor
+        return f"Insert({aliases.get(pt, 'T' + pt[1:])}.{method}({args}))"
 
     text = re.sub(
-        r"\bInsert\s*\(\s*New\s*\(\s*(P\w+)\s*,\s*Init\s*\((.*?)\)\s*\)\s*\)",
+        r"\bInsert\s*\(\s*New\s*\(\s*(P\w+)\s*,\s*(\w+)\s*\((.*?)\)\s*\)\s*\)",
         ins_new,
         text,
         flags=re.S | re.I,
     )
 
     def asg_new(m: re.Match[str]) -> str:
-        var, pt, args = m.group(1), m.group(2), m.group(3)
-        return f"{var} := {aliases.get(pt, 'T' + pt[1:])}.Create({args})"
+        var, pt, ctor, args = m.group(1), m.group(2), m.group(3), m.group(4)
+        method = "Create" if ctor.lower() == "init" else ctor
+        return f"{var} := {aliases.get(pt, 'T' + pt[1:])}.{method}({args})"
 
     text = re.sub(
-        r"\b(\w+)\s*:=\s*New\s*\(\s*(P\w+)\s*,\s*Init\s*\((.*?)\)\s*\)",
+        r"\b(\w+)\s*:=\s*New\s*\(\s*(P\w+)\s*,\s*(\w+)\s*\((.*?)\)\s*\)",
         asg_new,
         text,
         flags=re.S | re.I,
     )
-    # Build var/field -> type map from declarations in this unit
-    vartypes: dict[str, str] = {}
-    for m in re.finditer(
-        r"\b([A-Za-z_]\w*)\s*:\s*(P\w+)\b",
-        text,
-    ):
-        vartypes[m.group(1)] = m.group(2)
+    # Nearest preceding "Name: PType" wins (file-global last-wins pollutes short names like P).
+    vardecls: list[tuple[int, str, str]] = [
+        (m.start(), m.group(1), m.group(2))
+        for m in re.finditer(r"\b([A-Za-z_]\w*)\s*:\s*(P\w+)\b", text)
+    ]
 
-    def new_init(m: re.Match[str]) -> str:
-        target, args = m.group(1), m.group(2)
-        if target.startswith("P") and target[1:2].isupper():
-            # New(PFoo, Init(...)) without assignment — orphan Create
+    def nearest_ptype(name: str, pos: int) -> str | None:
+        pt = None
+        for dpos, dname, dtype in vardecls:
+            if dpos >= pos:
+                break
+            if dname == name:
+                pt = dtype
+        return pt
+
+    def new_ctor(m: re.Match[str]) -> str:
+        target, ctor, args = m.group(1), m.group(2), m.group(3)
+        method = "Create" if ctor.lower() == "init" else ctor
+        # New(PFoo, Ctor(...)) type form
+        bare = re.match(r"^(P\w+)$", target)
+        if bare and len(target) > 1 and target[1:2].isupper() and nearest_ptype(target, m.start()) is None:
             tn = aliases.get(target, "T" + target[1:])
-            return f"{tn}.Create({args})"
-        pt = vartypes.get(target)
+            return f"{tn}.{method}({args})"
+        # strip index for type lookup: ReservedWords[I] -> ReservedWords
+        base = re.sub(r"\[.*\]$", "", target)
+        pt = nearest_ptype(base, m.start())
         if pt:
             tn = aliases.get(pt, "T" + pt[1:] if pt.startswith("P") else pt)
-            return f"{target} := {tn}.Create({args})"
-        # Fallback: leave a clear marker Create on unknown
-        return f"{target} := {target}.Create({args})  {{ TODO: New Init type }}"
+            return f"{target} := {tn}.{method}({args})"
+        return f"{target} := {target}.{method}({args})  {{ TODO: New ctor type }}"
 
     text = re.sub(
-        r"\bNew\s*\(\s*([A-Za-z_]\w*)\s*,\s*Init\s*\((.*?)\)\s*\)",
-        new_init,
+        r"\bNew\s*\(\s*([A-Za-z_]\w*(?:\[[^\]]+\])?)\s*,\s*(\w+)\s*\((.*?)\)\s*\)",
+        new_ctor,
         text,
         flags=re.S | re.I,
+    )
+
+    def new_ctor_noargs(mm: re.Match[str]) -> str:
+        target, ctor = mm.group(1), mm.group(2)
+        method = "Create" if ctor.lower() == "init" else ctor
+        if target.startswith("P") and len(target) > 1 and target[1:2].isupper() and nearest_ptype(target, mm.start()) is None:
+            return f"{aliases.get(target, 'T' + target[1:])}.{method}"
+        pt = nearest_ptype(target, mm.start())
+        if pt:
+            tn = aliases.get(pt, "T" + pt[1:] if pt.startswith("P") else pt)
+            return f"{target} := {tn}.{method}"
+        return f"{target} := {target}.{method}  {{ TODO: New ctor type }}"
+
+    text = re.sub(
+        r"\bNew\s*\(\s*([A-Za-z_]\w*)\s*,\s*(\w+)\s*\)",
+        new_ctor_noargs,
+        text,
+        flags=re.I,
     )
 
     text = text.replace("GetPalette: PPalette", "GetPalette: TPalette")
@@ -172,13 +210,16 @@ def main() -> int:
         else:
             print("skip", path, "encoding")
             continue
+        # Allow re-run on partially migrated units (classes already, New/Dispose left).
         if "object(" not in text and "object (" not in text:
-            print("skip", path.name, "(no object()")
-            continue
+            if "New(" not in text and "Dispose(" not in text:
+                print("skip", path.name, "(no object()/New/Dispose)")
+                continue
         new = convert(text)
         path.write_bytes(new.encode(enc))
         left = len(re.findall(r"\bobject\s*\(", new))
-        print("converted", path.name, "object( left:", left)
+        news = len(re.findall(r"\bNew\s*\(", new))
+        print("converted", path.name, "object( left:", left, "New( left:", news)
     return 0
 
 

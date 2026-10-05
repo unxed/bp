@@ -342,15 +342,15 @@ function NewTopic(FileID: byte; HelpCtx: THelpCtx; Pos: longint; Param: string;
 var P: PTopic;
 begin
   New(P); FillChar(P^,SizeOf(P^), 0);
-  P^.HelpCtx:=HelpCtx; P^.FileOfs:=Pos; P^.FileID:=FileID;
-  P^.Param:=NewStr(Param);
+  P.HelpCtx:=HelpCtx; P.FileOfs:=Pos; P.FileID:=FileID;
+  P.Param:=NewStr(Param);
   if Assigned(ExtData) and (ExtDataSize>0) then
   begin
-    P^.ExtDataSize:=ExtDataSize;
-    GetMem(P^.ExtData,ExtDataSize);
-    Move(ExtData^,P^.ExtData^,ExtDataSize);
+    P.ExtDataSize:=ExtDataSize;
+    GetMem(P.ExtData,ExtDataSize);
+    Move(ExtData^,P.ExtData^,ExtDataSize);
   end;
-  P^.NamedMarks := TUnsortedStringCollection.Create(100,100);
+  P.NamedMarks := TUnsortedStringCollection.Create(100,100);
   NewTopic:=P;
 end;
 
@@ -358,16 +358,16 @@ procedure DisposeTopic(P: PTopic);
 begin
   if P<>nil then
   begin
-    if (P^.TextSize>0) and (P^.Text<>nil) then
-       FreeMem(P^.Text,P^.TextSize);
-    P^.Text:=nil;
-    if {(P^.LinkCount>0) and }(P^.Links<>nil) then
-       FreeMem(P^.Links,P^.LinkSize);
-    P^.Links:=nil;
-    if P^.Param<>nil then DisposeStr(P^.Param); P^.Param:=nil;
-    if Assigned(P^.ExtData) then
-      FreeMem(P^.ExtData);
-    if Assigned(P^.NamedMarks) then P^.NamedMarks.Free; P^.NamedMarks:=nil;
+    if (P.TextSize>0) and (P.Text<>nil) then
+       FreeMem(P.Text,P.TextSize);
+    P.Text:=nil;
+    if {(P.LinkCount>0) and }(P.Links<>nil) then
+       FreeMem(P.Links,P.LinkSize);
+    P.Links:=nil;
+    if P.Param<>nil then DisposeStr(P.Param); P.Param:=nil;
+    if Assigned(P.ExtData) then
+      FreeMem(P.ExtData);
+    if Assigned(P.NamedMarks) then P.NamedMarks.Free; P.NamedMarks:=nil;
     Dispose(P);
   end;
 end;
@@ -376,30 +376,30 @@ function CloneTopic(T: PTopic): PTopic;
 var NT: PTopic;
 procedure CloneMark(Item: Pointer);
 begin
-  NT^.NamedMarks.InsertStr(GetStr(PString(Item)));
+  NT.NamedMarks.InsertStr(GetStr(PString(Item)));
 end;
 begin
   New(NT);
   Move(T^,NT^,SizeOf(NT^));
-  if NT^.Text<>nil then
-     begin GetMem(NT^.Text,NT^.TextSize); Move(T^.Text^,NT^.Text^,NT^.TextSize); end;
-  if NT^.Links<>nil then
+  if NT.Text<>nil then
+     begin GetMem(NT.Text,NT.TextSize); Move(T^.Text^,NT.Text^,NT.TextSize); end;
+  if NT.Links<>nil then
      begin
-       GetMem(NT^.Links,NT^.LinkSize);
-       Move(T^.Links^,NT^.Links^,NT^.LinkSize);
+       GetMem(NT.Links,NT.LinkSize);
+       Move(T^.Links^,NT.Links^,NT.LinkSize);
      end;
-  if NT^.Param<>nil then
-     NT^.Param:=NewStr(T^.Param^);
+  if NT.Param<>nil then
+     NT.Param:=NewStr(T^.Param^);
   if Assigned(T^.NamedMarks) then
   begin
-    NT^.NamedMarks := TUnsortedStringCollection.Create(T^.NamedMarks.Count,10);
+    NT.NamedMarks := TUnsortedStringCollection.Create(T^.NamedMarks.Count,10);
     T^.NamedMarks.ForEach(@CloneMark);
   end;
-  NT^.ExtDataSize:=T^.ExtDataSize;
+  NT.ExtDataSize:=T^.ExtDataSize;
   if Assigned(T^.ExtData) and (T^.ExtDataSize>0) then
   begin
-    GetMem(NT^.ExtData,NT^.ExtDataSize);
-    Move(T^.ExtData^,NT^.ExtData^,NT^.ExtDataSize);
+    GetMem(NT.ExtData,NT.ExtDataSize);
+    Move(T^.ExtData^,NT.ExtData^,NT.ExtDataSize);
   end;
   CloneTopic:=NT;
 end;
@@ -488,7 +488,7 @@ function NewIndexEntry(Tag: string; FileID: word; HelpCtx: THelpCtx): PIndexEntr
 var P: PIndexEntry;
 begin
   New(P); FillChar(P^,SizeOf(P^), 0);
-  P^.Tag:=NewStr(Tag); P^.FileID:=FileID; P^.HelpCtx:=HelpCtx;
+  P.Tag:=NewStr(Tag); P.FileID:=FileID; P.HelpCtx:=HelpCtx;
   NewIndexEntry:=P;
 end;
 
@@ -496,7 +496,7 @@ procedure DisposeIndexEntry(P: PIndexEntry);
 begin
   if P<>nil then
   begin
-    if P^.Tag<>nil then DisposeStr(P^.Tag);
+    if P.Tag<>nil then DisposeStr(P.Tag);
     Dispose(P);
   end;
 end;
@@ -535,8 +535,8 @@ var K1: PTopic absolute Key1;
     K2: PTopic absolute Key2;
     R: Sw_integer;
 begin
-  if K1^.HelpCtx<K2^.HelpCtx then R:=-1 else
-  if K1^.HelpCtx>K2^.HelpCtx then R:= 1 else
+  if K1.HelpCtx<K2.HelpCtx then R:=-1 else
+  if K1.HelpCtx>K2.HelpCtx then R:= 1 else
   R:=0;
   Compare:=R;
 end;
@@ -547,7 +547,7 @@ var T: TTopic;
     Index: sw_integer;
 begin
   FillChar(T, SizeOf(T), 0);
-  T.HelpCtx:=AHelpCtx;
+  T^.HelpCtx:=AHelpCtx;
   if Search(@T,Index) then
     P:=At(Index)
   else
@@ -582,7 +582,7 @@ var K1: PIndexEntry absolute Key1;
     S1,S2: string;
     T1,T2 : PTopic;
 begin
-  S1:=UpcaseStr(K1^.Tag^); S2:=UpcaseStr(K2^.Tag^);
+  S1:=UpcaseStr(K1.Tag^); S2:=UpcaseStr(K2.Tag^);
   if S1<S2 then
     begin
       Compare:=-1;
@@ -596,8 +596,8 @@ begin
   (* if assigned(HelpFacility) then
     begin
       { Try to read the title of the topic }
-      T1:=HelpFacility.LoadTopic(K1^.FileID,K1^.HelpCtx);
-      T2:=HelpFacility.LoadTopic(K2^.FileID,K2^.HelpCtx);
+      T1:=HelpFacility.LoadTopic(K1.FileID,K1.HelpCtx);
+      T2:=HelpFacility.LoadTopic(K2.FileID,K2.HelpCtx);
       if assigned(T1.Text) and assigned(T2.Text) then
         r:=strcomp(pchar(T1.Text),pchar(T2.Text))
       else
@@ -613,11 +613,11 @@ begin
           exit;
         end;
     end; *)
-  if K1^.FileID<K2^.FileID then R:=-1
-  else if K1^.FileID>K2^.FileID then R:= 1
-  else if K1^.HelpCtx<K2^.HelpCtx then
+  if K1.FileID<K2.FileID then R:=-1
+  else if K1.FileID>K2.FileID then R:= 1
+  else if K1.HelpCtx<K2.HelpCtx then
     r:=-1
-  else if K1^.HelpCtx>K2^.HelpCtx then
+  else if K1.HelpCtx>K2.HelpCtx then
     r:=1
   else
     R:=0;
@@ -694,13 +694,13 @@ procedure CountThem(Item: Pointer);
 var P: PTopic;
 begin
   P:=PTopic(Item);
-  if (P^.Text<>nil) or (P^.Links<>nil) then Inc(Count);
+  if (P.Text<>nil) or (P.Links<>nil) then Inc(Count);
 end;
 procedure SearchLRU(Item: Pointer);
 var P: PTopic;
 begin
   P:=PTopic(Item);
-  if P^.LastAccess<MinLRU then begin MinLRU:=P^.LastAccess; end;
+  if P.LastAccess<MinLRU then begin MinLRU:=P.LastAccess; end;
 end;
 var P: PTopic;
 begin
@@ -710,8 +710,8 @@ begin
     MinLRU:=MaxLongint; P:=nil; Topics.ForEach(@SearchLRU);
     if P<>nil then
     begin
-      FreeMem(P^.Text,P^.TextSize); P^.TextSize:=0; P^.Text:=nil;
-      FreeMem(P^.Links,P^.LinkSize); P^.LinkCount:=0; P^.Links:=nil;
+      FreeMem(P.Text,P.TextSize); P.TextSize:=0; P.Text:=nil;
+      FreeMem(P.Links,P.LinkSize); P.LinkCount:=0; P.Links:=nil;
     end;
   end;
 end;
@@ -826,14 +826,14 @@ function SearchExact(Item2: Pointer): boolean;
 var P: PIndexEntry;
 begin
   P:=PIndexEntry(Item2);
-  SearchExact:=UpcaseStr(P^.Tag^)=Keyword;
+  SearchExact:=UpcaseStr(P.Tag^)=Keyword;
 end;
 var P: PIndexEntry;
 begin
   H:=PHelpFile(Item);
   H.LoadIndex;
   P:=PIndexEntry(H.IndexEntries.FirstThat(@SearchExact));
-  if P<>nil then begin FileID:=H.ID; Context:=P^.HelpCtx; end;
+  if P<>nil then begin FileID:=H.ID; Context:=P.HelpCtx; end;
   ScanHelpFileExact:=P<>nil;
 end;
 function ScanHelpFile(Item: Pointer): boolean;
@@ -842,14 +842,14 @@ function Search(Item2: Pointer): boolean;
 var P: PIndexEntry;
 begin
   P:=PIndexEntry(Item2);
-  Search:=copy(UpcaseStr(P^.Tag^),1,length(Keyword))=Keyword;
+  Search:=copy(UpcaseStr(P.Tag^),1,length(Keyword))=Keyword;
 end;
 var P: PIndexEntry;
 begin
   H:=PHelpFile(Item);
   H.LoadIndex;
   P:=PIndexEntry(H.IndexEntries.FirstThat(@Search));
-  if P<>nil then begin FileID:=H.ID; Context:=P^.HelpCtx; end;
+  if P<>nil then begin FileID:=H.ID; Context:=P.HelpCtx; end;
   ScanHelpFile:=P<>nil;
 end;
 var
@@ -966,34 +966,34 @@ begin
     for I:=0 to T^.LinkCount-1 do
     begin
       KW:=Keywords.At(I);
-      if (LastTag<>KW^.Tag^) then
+      if (LastTag<>KW.Tag^) then
         Begin
           MultiCount:=0;
-          IsMultiple:=(I<T^.LinkCount-1) and (KW^.Tag^=Keywords.At(I+1)^.Tag^);
+          IsMultiple:=(I<T^.LinkCount-1) and (KW.Tag^=Keywords.At(I+1).Tag^);
         End
       else
         IsMultiple:=true;
       if IsMultiple then
         Begin
           Inc(MultiCount);
-          (* St:=Trim(strpas(pchar(HelpFacility.LoadTopic(KW^.FileID,KW^.HelpCtx).Text))); *)
-          St:=KW^.Tag^+' ['+IntToStr(MultiCount)+']';
+          (* St:=Trim(strpas(pchar(HelpFacility.LoadTopic(KW.FileID,KW.HelpCtx).Text))); *)
+          St:=KW.Tag^+' ['+IntToStr(MultiCount)+']';
           (* { Remove all special chars }
           for p:=1 to Length(st) do
             if ord(st[p])<=16 then
               st[p]:=' ';
-          p:=pos(KW^.Tag^,St);
+          p:=pos(KW.Tag^,St);
           if (p=1) then
             AddKeyword(St)
           else
-            AddKeyword(KW^.Tag^+' '+St); *)
+            AddKeyword(KW.Tag^+' '+St); *)
           AddKeyWord(St);
         End
       else
-        AddKeyword(KW^.Tag^);
-      LastTag:=KW^.Tag^;
-      T^.Links^[I].Context:=longint(KW^.HelpCtx);
-      T^.Links^[I].FileID:=KW^.FileID;
+        AddKeyword(KW.Tag^);
+      LastTag:=KW.Tag^;
+      T^.Links^[I].Context:=longint(KW.HelpCtx);
+      T^.Links^[I].FileID:=KW.FileID;
     end;
     FlushLine;
     AddLine('');

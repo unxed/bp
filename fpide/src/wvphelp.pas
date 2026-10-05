@@ -83,7 +83,7 @@ end;
 constructor TVPHHelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
-  if inherited Create(AID)=false then Fail;
+  inherited Create(AID);
   F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
   if OK then OK:=(F.Status=stOK);
@@ -108,7 +108,6 @@ begin
   end;
   if OK=false then
   begin
-    Done;
     Fail;
   end;
 end;
@@ -133,7 +132,7 @@ var OK: boolean;
     C: char;
 begin
   F.Read(C,sizeof(C));
-  OK:=(F.Status=stOK) and (C='þ');
+  OK:=(F.Status=stOK) and (C='ï¿½');
   if OK then
   begin
     if Assigned(Data) then

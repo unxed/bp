@@ -206,3 +206,4 @@ begin
   HandleParameter(0);
   Result[0] := Chr(ResultLength);
 end;
+

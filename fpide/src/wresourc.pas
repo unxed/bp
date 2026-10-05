@@ -55,6 +55,14 @@ type
 
      TResourceEntry = class;
      PResourceEntry = TResourceEntry;
+     TResource = class;
+     PResource = TResource;
+
+     TResourceEntryEnumFunc = function(P: PResourceEntry): Boolean is nested;
+     TResourceEntryEnumProc = procedure(P: PResourceEntry) is nested;
+     TResourceEnumFunc = function(P: PResource): Boolean is nested;
+     TResourceEnumProc = procedure(P: PResource) is nested;
+
      TResourceEntry = class(TObject)
        constructor Create(AID, ALangID, AFlags, ADataLen: longint);
      private
@@ -81,13 +89,11 @@ type
        function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
      end;
 
-     TResource = class;
-     PResource = TResource;
      TResource = class(TObject)
        constructor Create(const AName: string; AClass, AFlags: longint);
        function    GetName: string; virtual;
-       function    FirstThatEntry(Func: pointer): PResourceEntry; virtual;
-       procedure   ForEachEntry(Func: pointer); virtual;
+       function    FirstThatEntry(Func: TResourceEntryEnumFunc): PResourceEntry; virtual;
+       procedure   ForEachEntry(Func: TResourceEntryEnumProc); virtual;
        destructor Destroy; virtual;
      private
        Name   : PString;
@@ -105,14 +111,14 @@ type
      PResourceCollection = TResourceCollection;
 
      TResourceFile = class(TObject)
-       constructor Create(var RS: TStream; ALoad: boolean);
-       constructor Create(var RS: TStream);
-       constructor Load(var RS: TStream);
+       constructor Create(ARS: TStream; ALoad: boolean);
+       constructor Create(ARS: TStream);
+       constructor Load(ARS: TStream);
        constructor CreateFile(AFileName: string);
        constructor LoadFile(AFileName: string);
-       function    FirstThatResource(Func: pointer): PResource; virtual;
-       procedure   ForEachResource(Func: pointer); virtual;
-       procedure   ForEachResourceEntry(Func: pointer); virtual;
+       function    FirstThatResource(Func: TResourceEnumFunc): PResource; virtual;
+       procedure   ForEachResource(Func: TResourceEnumProc); virtual;
+       procedure   ForEachResourceEntry(Func: TResourceEntryEnumProc); virtual;
        function    CreateResource(const Name: string; AClass, AFlags: longint): boolean; virtual;
        function    AddResourceEntry(const ResName: string; ALangID, AFlags: longint; var Data;
                    ADataSize: sw_integer): boolean; virtual;
@@ -227,7 +233,7 @@ begin
   GetName:=GetStr(Name);
 end;
 
-function TResource.FirstThatEntry(Func: pointer): PResourceEntry;
+function TResource.FirstThatEntry(Func: TResourceEntryEnumFunc): PResourceEntry;
 var EP,P: PResourceEntry;
     I: sw_integer;
 begin
@@ -235,8 +241,7 @@ begin
   for I:=0 to Items.Count-1 do
     begin
       EP:=Items.At(I);
-      if Byte(Longint(CallPointerMethodLocal(Func,
-           get_caller_frame(get_frame,get_pc_addr),Self,EP)))<>0 then
+      if Func(EP) then
         begin
           P := EP;
           Break;
@@ -245,15 +250,14 @@ begin
   FirstThatEntry:=P;
 end;
 
-procedure TResource.ForEachEntry(Func: pointer);
+procedure TResource.ForEachEntry(Func: TResourceEntryEnumProc);
 var RP: PResourceEntry;
     I: sw_integer;
 begin
   for I:=0 to Items.Count-1 do
     begin
       RP:=Items.At(I);
-      CallPointerMethodLocal(Func,
-        get_caller_frame(get_frame,get_pc_addr),Self,RP);
+      Func(RP);
     end;
 end;
 
@@ -302,19 +306,17 @@ begin
   SearchResourceByName:=P;
 end;
 
-constructor TResourceFile.Create(var RS: TStream);
+constructor TResourceFile.Create(ARS: TStream);
 begin
-  if Init(RS,false)=false then
-    Fail;
+  Create(ARS, False);
 end;
 
-constructor TResourceFile.Load(var RS: TStream);
+constructor TResourceFile.Load(ARS: TStream);
 begin
-  if Init(RS,true)=false then
-    Fail;
+  Create(ARS, True);
 end;
 
-constructor TResourceFile.Create(var RS: TStream; ALoad: boolean);
+constructor TResourceFile.Create(ARS: TStream; ALoad: boolean);
 var OK: boolean;
     RH: TResourceHeader;
     REH: TResourceEntryHeader;
@@ -324,7 +326,7 @@ var OK: boolean;
     St: string;
 begin
   inherited Create;
-  S:=@RS;
+  S:=ARS;
   Resources := TResourceCollection.Create(100, 1000);
   Entries := TGlobalResourceEntryCollection.Create(500,2000);
   OK:=true;
@@ -365,13 +367,10 @@ begin
           end;
     end;
   if OK=false then
-    begin
-      Done;
-      Fail;
-    end;
+    Fail;
 end;
 
-function TResourceFile.FirstThatResource(Func: pointer): PResource;
+function TResourceFile.FirstThatResource(Func: TResourceEnumFunc): PResource;
 var RP,P: PResource;
     I: sw_integer;
 begin
@@ -379,8 +378,7 @@ begin
   for I:=0 to Resources.Count-1 do
     begin
       RP:=Resources.At(I);
-      if Byte(Longint(CallPointerMethodLocal(Func,
-           get_caller_frame(get_frame,get_pc_addr),Self,RP)))<>0 then
+      if Func(RP) then
         begin
           P := RP;
           Break;
@@ -389,25 +387,25 @@ begin
   FirstThatResource:=P;
 end;
 
-procedure TResourceFile.ForEachResource(Func: pointer);
+procedure TResourceFile.ForEachResource(Func: TResourceEnumProc);
 var RP: PResource;
     I: sw_integer;
 begin
   for I:=0 to Resources.Count-1 do
     begin
       RP:=Resources.At(I);
-      CallPointerMethodLocal(Func,get_caller_frame(get_frame,get_pc_addr),Self,RP);
+      Func(RP);
     end;
 end;
 
-procedure TResourceFile.ForEachResourceEntry(Func: pointer);
+procedure TResourceFile.ForEachResourceEntry(Func: TResourceEntryEnumProc);
 var E: PResourceEntry;
     I: sw_integer;
 begin
   for I:=0 to Entries.Count-1 do
     begin
       E:=Entries.At(I);
-      CallPointerMethodLocal(Func,get_caller_frame(get_frame,get_pc_addr),Self,E);
+      Func(E);
     end;
 end;
 
@@ -780,12 +778,12 @@ begin
   B := TFastBufStream.Create(AFileName, stCreate, 4096);
   if (B<>nil) and (B.Status<>stOK) then
     begin B.Free; B:=nil; end;
-  if B=nil then Fail;
-  if Create(B^)=false then
-    Begin
-      B.Free;
+  if B=nil then
+    begin
       Fail;
-    End;
+      Exit;
+    end;
+  Create(B, False);
   MyStream:=true;
   {$ifdef HASAMIGA}
   Flush;
@@ -798,12 +796,12 @@ begin
   B := TFastBufStream.Create(AFileName, stOpen, 4096);
   if (B<>nil) and (B.Status<>stOK) then
     begin B.Free; B:=nil; end;
-  if B=nil then Fail;
-  if Load(B^)=false then
-    Begin
-      B.Free;
+  if B=nil then
+    begin
       Fail;
-    End;
+      Exit;
+    end;
+  Create(B, True);
   MyStream:=true;
 end;
 
