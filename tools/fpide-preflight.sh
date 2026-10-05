@@ -40,6 +40,9 @@ fi
 grep -q 'fpide-smoke: shims+tv3 OK' "$out/smoke.run"
 echo "smoke OK"
 
+echo "== ensure FPC compiler/ (fetch, not in git)"
+"$here/fpide/bootstrap/ensure-compiler.sh"
+
 echo "== compile fp.pas (informational unless STRICT)"
 export out
 . "$here/tools/fpide-env.sh"

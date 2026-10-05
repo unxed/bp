@@ -1,29 +1,15 @@
-# bootstrap/: откуда взялись `fpide/src` и `fpide/fpc-compiler`
+# bootstrap/: IDE in git; compiler fetched on demand (not committed)
 
-Запись о воспроизводимом пути от официальных исходников FPC.
-
-| Что | Значение |
-|---|---|
-| IDE | Free Pascal `packages/ide` (Text Mode IDE) → `fpide/src` |
-| Компилятор | Free Pascal `compiler/` → `fpide/fpc-compiler` (**обязательно**, не заглушки) |
-| Репозиторий | `upstream.env` → GitLab `freepascal.org/fpc/source` |
-| Версия | тег `release_3_2_2`, commit в `FPC_COMMIT` |
-| Лицензия | LGPL/GPL как в дистрибутиве FPC (`COPYING` в дереве компилятора) |
-
-Free Vision (`packages/fv`) **не** копируется: UI — submodule [`tv/`](../../tv/) ([unxed/tv3](https://github.com/unxed/tv3)).
-
-## Короткий путь
+| Что | В git? | Где |
+|---|---|---|
+| IDE (`packages/ide`) | да | `fpide/src` |
+| Компилятор (`compiler/`) | **нет** | `build/bootstrap-fpide/staging-compiler` после `ensure-compiler.sh` |
+| Pin | да | `upstream.env` (`FPC_COMMIT`) |
 
 ```sh
-fpide/bootstrap/run.sh build/bootstrap-fpide
-diff -rq build/bootstrap-fpide/staging-ide fpide/src
-diff -rq build/bootstrap-fpide/staging-compiler fpide/fpc-compiler
+fpide/bootstrap/run.sh build/bootstrap-fpide          # stage both trees
+diff -rq build/bootstrap-fpide/staging-ide fpide/src  # IDE must match pin
+fpide/bootstrap/ensure-compiler.sh                    # compiler only (cached by commit)
 ```
 
-Или обновить деревья из staging:
-
-```sh
-fpide/bootstrap/materialize.sh
-```
-
-Нужны: `git`, `sh`.
+Компилятор настоящий (тот же тег, что IDE); в репозиторий его не кладём — только pin и скрипты.

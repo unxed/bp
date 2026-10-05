@@ -8,8 +8,7 @@ UTF-8 внутри, модель **классов** вместо `object`/`New`/
 | Каталог | Назначение |
 |---|---|
 | [`fpide/src/`](src/) | исходники IDE (база — FPC `packages/ide` @ 3.2.2) |
-| [`fpide/fpc-compiler/`](fpc-compiler/) | **настоящий** FPC `compiler/` того же тега (не заглушки) |
-| [`fpide/bootstrap/`](bootstrap/) | как воспроизвести `src/` и `fpc-compiler/` из апстрима FPC |
+| [`fpide/bootstrap/`](bootstrap/) | pin FPC + fetch; **compiler/** не в git — в `build/…/staging-compiler` |
 | [`fpide/compat/shims/`](compat/shims/) | карта имён Free Vision → tv3 (`tools/gen-shim.py`) |
 | [`tv/`](../tv/) | git submodule tv3 (отдельная лицензия; код не смешивается с `fpide/`) |
 | [`tools/build-fpide.sh`](../tools/build-fpide.sh) | сборка (локально можно не гонять тяжёлое — см. CI) |

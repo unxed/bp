@@ -1,6 +1,6 @@
 #!/bin/sh
-# Reproduce fpide/src (packages/ide) and fpide/fpc-compiler (compiler/)
-# from upstream FPC at the pin in upstream.env.
+# Fetch FPC at the pin and stage packages/ide + compiler/ under OUT (not committed).
+# IDE sources in git: fpide/src. Compiler: build only — FPIDE_COMPILER=OUT/staging-compiler.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -19,7 +19,6 @@ copy_tree() {
     [ -d "$src" ] || { echo "missing $src" >&2; exit 1; }
     ( cd "$src" && find . -type f ! -path './fpmake*' ! -name 'fpmake.exe' ! -name '*.o' ! -name '*.ppu' ! -name '*.a' ) | while read -r f; do
         base=$(echo "$f" | sed 's|^\./||')
-        # Skip VCS / build debris if any
         case "$base" in
             .git/*|*/.git/*) continue ;;
         esac
@@ -30,6 +29,6 @@ copy_tree() {
 }
 
 copy_tree "$tmp/$FPC_IDE_PATH" "$ide"
-copy_tree "$tmp/compiler" "$comp"
+copy_tree "$tmp/$FPC_COMPILER_PATH" "$comp"
 echo "staging-ide: $ide ($(find "$ide" -type f | wc -l) files)"
 echo "staging-compiler: $comp ($(find "$comp" -type f | wc -l) files)"

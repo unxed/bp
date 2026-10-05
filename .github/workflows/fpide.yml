@@ -31,10 +31,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Reproduce IDE + compiler trees from FPC upstream
         run: fpide/bootstrap/run.sh out/bootstrap-fpide
-      - name: Match committed IDE tree
+      - name: Match committed IDE tree (compiler is not in git)
         run: diff -rq out/bootstrap-fpide/staging-ide fpide/src
-      - name: Match committed compiler tree
-        run: diff -rq out/bootstrap-fpide/staging-compiler fpide/fpc-compiler
 
   layout:
     runs-on: ubuntu-24.04

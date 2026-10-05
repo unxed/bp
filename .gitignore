@@ -1,5 +1,6 @@
 build/
 out/
+fpide/fpc-compiler/
 __pycache__/
 *.o
 *.ppu

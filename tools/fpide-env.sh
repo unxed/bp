@@ -1,17 +1,22 @@
 # Environment for building fpide (after need-tv.sh).
-# Full IDE: real FPC compiler/ + GDB/MI by default (upstream Linux IDE).
+# Compiler sources are NOT in git: bootstrap stages them under build/bootstrap-fpide/staging-compiler.
 FPIDE_STAGE=${FPIDE_STAGE:-$here/fpide/src}
 FPIDE_OBJ=${FPIDE_OBJ:-$out/obj}
 FPIDE_GEN=${FPIDE_GEN:-$out/gen}
 FPIDE_COMPAT=${FPIDE_COMPAT:-$here/fpide/compat}
-FPIDE_COMPILER=${FPIDE_COMPILER:-$here/fpide/fpc-compiler}
+FPIDE_BOOTSTRAP=${FPIDE_BOOTSTRAP:-$here/build/bootstrap-fpide}
+FPIDE_COMPILER=${FPIDE_COMPILER:-$FPIDE_BOOTSTRAP/staging-compiler}
 FPIDE_CPU=${FPIDE_CPU:-x86_64}
 mkdir -p "$FPIDE_OBJ" "$FPIDE_GEN"
 : "${FPIDE_NOGDB:=0}"
 : "${FPIDE_GDBMI:=1}"
 
 if [ ! -f "$FPIDE_COMPILER/finput.pas" ]; then
-    echo "fpide-env: missing $FPIDE_COMPILER/finput.pas — run fpide/bootstrap/run.sh and materialize fpc-compiler" >&2
+    echo "fpide-env: fetching FPC compiler/ via bootstrap…" >&2
+    "$here/fpide/bootstrap/ensure-compiler.sh"
+fi
+if [ ! -f "$FPIDE_COMPILER/finput.pas" ]; then
+    echo "fpide-env: missing $FPIDE_COMPILER/finput.pas" >&2
     exit 1
 fi
 
@@ -35,7 +40,6 @@ FPIDE_OPTS="$FPIDE_OPTS ${FPIDE_EXTRA:-}"
 
 fpide_gen_shims() {
     python3 "$here/tools/gen-shim.py" "$here/fpide/compat/shims/shims.map" "$FPIDE_GEN" "$here/tv/src" >/dev/null
-    # {$I manual/...} in generated shims: ensure manual/ sits next to them (FPC -Fi is flaky for nested I)
     rm -rf "$FPIDE_GEN/manual"
     cp -a "$here/fpide/compat/shims/manual" "$FPIDE_GEN/manual"
 }
