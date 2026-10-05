@@ -35,6 +35,9 @@ FPIDE_OPTS="$FPIDE_OPTS ${FPIDE_EXTRA:-}"
 
 fpide_gen_shims() {
     python3 "$here/tools/gen-shim.py" "$here/fpide/compat/shims/shims.map" "$FPIDE_GEN" "$here/tv/src" >/dev/null
+    # {$I manual/...} in generated shims: ensure manual/ sits next to them (FPC -Fi is flaky for nested I)
+    rm -rf "$FPIDE_GEN/manual"
+    cp -a "$here/fpide/compat/shims/manual" "$FPIDE_GEN/manual"
 }
 
 fpide_compile() {

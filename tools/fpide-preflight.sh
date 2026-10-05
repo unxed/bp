@@ -22,11 +22,13 @@ echo "== [2/4] layout"
 echo "== [3/4] generate shims"
 python3 "$here/tools/gen-shim.py" \
   "$here/fpide/compat/shims/shims.map" "$out/gen" "$here/tv/src" | tee "$out/shims.txt"
+rm -rf "$out/gen/manual"
+cp -a "$here/fpide/compat/shims/manual" "$out/gen/manual"
 
 echo "== [4/4] smoke link (shims + tv3)"
 # shellcheck disable=SC2086
 fpc -Mobjfpc -Sh- -Se1 \
-  -Futv/src -Fu"$out/gen" -Fufpide/compat -Fifpide/compat/shims \
+  -Futv/src -Fu"$out/gen" -Fufpide/compat -Fi"$here/fpide/compat/shims" \
   -FU"$out/obj" -FE"$out" \
   fpide/compat/fpide_smoke.pas > "$out/smoke.log" 2>&1 || true
 if [ ! -x "$out/fpide_smoke" ]; then
