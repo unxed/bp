@@ -2942,7 +2942,7 @@ begin
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
   GetExtent(R); R.Grow(-1,-1);
-  Editor := TDisassemblyEditor.Create(R, HSB, VSB, Indicator, '');
+  Editor := TSourceEditor.Create(R, HSB, VSB, Indicator, '');
   Editor.GrowMode:=gfGrowHiX+gfGrowHiY;
   Insert(Editor);
 
