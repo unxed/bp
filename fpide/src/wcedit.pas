@@ -271,7 +271,7 @@ implementation
 uses Dos,
      WConsts,
      FVConsts,
-     App,WViews;
+     App,WViews,WUtf8;
 
 { Object-style TStreamRec typed consts (Ofs(TypeOf)) are invalid for classes.
   Load/Store for these types are currently commented out; registration deferred. }
@@ -576,10 +576,13 @@ begin
    SetLineText(I,S);
 end;
 
+{ DT: the text of the line with the tabs expanded (UTF-8); DF: one format byte for each COLUMN of it (a character is one column) }
 procedure TCodeEditorCore.IGetDisplayTextFormat(Binding: PEditorBinding; LineNo: sw_integer;var DT,DF:string);
 var
   L : PCustomLine;
-  P,PAdd : SW_Integer;
+  Raw,F : string;
+  I,Col,PAdd,CL : SW_Integer;
+  FC : char;
 begin
   DF:='';
   DT:='';
@@ -588,19 +591,27 @@ begin
      L:=GetLine(LineNo);
      if not assigned(L) then
        exit;
-     DF:=IGetLineFormat(Binding,LineNo);
-     DT:=L.GetText;
-     p:=0;
-     while p<length(DT) do
+     F:=IGetLineFormat(Binding,LineNo);
+     Raw:=L.GetText;
+     I:=1; Col:=0;
+     while I<=length(Raw) do
       begin
-        inc(p);
-        if DT[p]=#9 then
+        if I<=length(F) then FC:=F[I] else FC:=#0;
+        if Raw[I]=#9 then
          begin
-           PAdd:=TabSize-((p-1) mod TabSize);
-           if DF<>'' then
-            DF:=copy(DF,1,P-1)+CharStr(DF[p],PAdd)+copy(DF,P+1,High(DF));
-           DT:=copy(DT,1,P-1)+CharStr(' ',PAdd)+copy(DT,P+1,High(DF));
-           inc(P,PAdd-1);
+           PAdd:=TabSize-(Col mod TabSize);
+           DT:=DT+CharStr(' ',PAdd);
+           if F<>'' then DF:=DF+CharStr(FC,PAdd);
+           Inc(Col,PAdd);
+           Inc(I);
+         end
+        else
+         begin
+           CL:=U8CharBytes(Raw,I);
+           DT:=DT+copy(Raw,I,CL);
+           if F<>'' then DF:=DF+FC;
+           Inc(I,CL);
+           Inc(Col);
          end;
       end;
    end;

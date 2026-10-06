@@ -366,7 +366,7 @@ def section_unicode(t):
     t.key('C-PPage', 'Right', 'Right', 'Right')
     check(t.indicator() == (1, 4), 'three Right keys: column 4 (%r)' % (t.indicator(),), t)
     t.key('End')
-    check(t.indicator() == (1, 28), 'End: after the last character (%r)' % (t.indicator(),), t)
+    check(t.indicator() == (1, 25), 'End: after the last character (%r)' % (t.indicator(),), t)
     t.key('BSpace')
     check('─│' in t.text() and '─│┌' not in t.text(), 'Backspace removes one character (not one byte)', t)
     # reopen

@@ -533,6 +533,7 @@ type
    {a}function    GetLine(LineNo: sw_integer): PCustomLine; virtual;
    {a}function    CharIdxToLinePos(Line,CharIdx: sw_integer): sw_integer; virtual;
    {a}function    LinePosToCharIdx(Line,X: sw_integer): sw_integer; virtual;
+      function    CursorCells(Line,Col: sw_integer): sw_integer;
    {a}function    GetLineText(I: sw_integer): string; virtual;
    {a}procedure   SetDisplayText(I: sw_integer;const S: string); virtual;
    {a}function    GetDisplayText(I: sw_integer): string; virtual;
@@ -704,6 +705,8 @@ type
       procedure PrintBlock; virtual;
       procedure ExpandCodeTemplate; virtual;
       procedure AddChar(C: char); virtual;
+      procedure AddCharStr(const Ch: string); virtual;
+      procedure AddString(const S: string);
 {$ifdef WinClipSupported}
       function  ClipCopyWin: Boolean; virtual;
       function  ClipPasteWin: Boolean; virtual;
@@ -793,7 +796,7 @@ uses
     regexpr,
   {$endif not USE_OLD_REGEXP}
 {$endif TEST_REGEXP}
-  WConsts,WCEdit;
+  WConsts,WCEdit,WUtf8;
 
 type
     RecordWord = sw_word;
@@ -1027,20 +1030,34 @@ end;
 
 function ExtractTabs(S: string; TabSize: Sw_integer): string;
 var
-  P,PAdd: Sw_integer;
+  I,Col,PAdd,L: Sw_integer;
+  R: string;
 begin
-  p:=0;
-  while p<length(s) do
+  if Pos(TAB,S)=0 then
+    begin
+      ExtractTabs:=S;
+      Exit;
+    end;
+  R:='';
+  I:=1; Col:=0;
+  while I<=length(S) do
    begin
-     inc(p);
-     if s[p]=TAB then
+     if S[I]=TAB then
       begin
-        PAdd:=TabSize-((p-1) mod TabSize);
-        s:=copy(S,1,P-1)+CharStr(' ',PAdd)+copy(S,P+1,High(s));
-        inc(P,PAdd-1);
+        PAdd:=TabSize-(Col mod TabSize);
+        R:=R+CharStr(' ',PAdd);
+        Inc(Col,PAdd);
+        Inc(I);
+      end
+     else
+      begin
+        L:=U8CharBytes(S,I);
+        R:=R+copy(S,I,L);
+        Inc(I,L);
+        Inc(Col);
       end;
    end;
-  ExtractTabs:=S;
+  ExtractTabs:=R;
 end;
 
 {function CompressUsingTabs(S: string; TabSize: byte): string;
@@ -1878,73 +1895,62 @@ begin
   Abstract;
 end;
 
+{ CharIdx is a byte index in the text of the line (tabs not expanded, UTF-8 characters of several bytes);
+  the result is the (0-based) column where the character at that index starts }
 function TCustomCodeEditorCore.CharIdxToLinePos(Line,CharIdx: sw_integer): sw_integer;
-var S: string;
-    TabSize,CP,RX,NextInc: sw_integer;
-begin
-  S:=GetLineText(Line);
-  (* this would fasten the code
-    but UseTabCharacters is set for Editor not for EditorCore
-    objects,which is dangerous anyway and should be changed ... PM
-  if not IsFlagSet(efUseTabCharacters) then
-    begin
-     if CharIdx<=Length(S) then
-       CharIdxToLinePos:=CharIdx-1
-     else
-       CharIdxToLinePos:=Length(S)-1;
-     exit;
-    end; *)
-
-  TabSize:=GetTabSize;
-  CP:=1; RX:=0;
-  NextInc:=0;
-  while {(CP<=length(S)) and }(CP<=CharIdx) do
-   begin
-     if NextInc>0 then
-       Inc(RX,NextInc);
-     if (CP<=length(S)) and (S[CP]=TAB) then
-       NextInc:=TabSize-(RX mod TabSize) -1
-     else
-       NextInc:=0;
-     Inc(RX);
-     Inc(CP);
-   end;
-  CharIdxToLinePos:=RX-1;
-end;
-
-function TCustomCodeEditorCore.LinePosToCharIdx(Line,X: sw_integer): sw_integer;
 var S: string;
     TabSize,CP,RX: sw_integer;
 begin
+  S:=GetLineText(Line);
+  TabSize:=GetTabSize;
+  CP:=1; RX:=0;
+  while CP<CharIdx do
+   begin
+     if CP<=length(S) then
+       begin
+         if S[CP]=TAB then
+           Inc(RX,TabSize-(RX mod TabSize))
+         else
+           Inc(RX);
+         Inc(CP,U8CharBytes(S,CP));
+       end
+     else
+       begin
+         Inc(RX);
+         Inc(CP);
+       end;
+   end;
+  CharIdxToLinePos:=RX;
+end;
+
+{ X is a (0-based) column; the result is the byte index of the character that covers it (Length+1 beyond the end, 0 for an empty line) }
+function TCustomCodeEditorCore.LinePosToCharIdx(Line,X: sw_integer): sw_integer;
+var S: string;
+    TabSize,CP,RX,W: sw_integer;
+begin
   TabSize:=GetTabSize;
   S:=GetLineText(Line);
-  (*
-  if not IsFlagSet(efUseTabCharacters) then
+  if (S='') or (X<0) then
     begin
-      if S='' then
-        CP:=0
-      else if (Line<Length(S)) then
-        LinePosToCharIdx:=Line+1
-      else
-        LinePosToCharIdx:=Length(S);
-      exit;
-    end; *)
-  if S='' then
-    CP:=0
-  else
-    begin
-     CP:=0; RX:=0;
-     while (RX<=X) and (CP<=length(S)) do
-      begin
-        Inc(CP);
-        if (CP<=length(S)) and
-           (S[CP]=TAB) then
-          Inc(RX,TabSize-(RX mod TabSize))
-        else
-          Inc(RX);
-      end;
+      LinePosToCharIdx:=0;
+      Exit;
     end;
-  LinePosToCharIdx:=CP;
+  CP:=1; RX:=0;
+  while CP<=length(S) do
+   begin
+     if S[CP]=TAB then
+       W:=TabSize-(RX mod TabSize)
+     else
+       W:=1;
+     if RX+W>X then
+       begin
+         LinePosToCharIdx:=CP;
+         Exit;
+       end;
+     Inc(RX,W);
+     Inc(CP,U8CharBytes(S,CP));
+   end;
+  LinePosToCharIdx:=length(S)+1;
 end;
 
 function TCustomCodeEditorCore.GetLineCount: sw_integer;
@@ -2306,7 +2312,7 @@ var
               cc:=ccAlpha
           end;
       end
-    else if C in {$ifdef USE_UNTYPEDSET}['A'..'Z','a'..'z','_']{$else}AlphaChars{$endif} then CC:=ccAlpha else
+    else if (C in {$ifdef USE_UNTYPEDSET}['A'..'Z','a'..'z','_']{$else}AlphaChars{$endif}) or (Utf8Text and (C>=#128)) then CC:=ccAlpha else
       CC:=ccSymbol;
     GetCharClass:=CC;
   end;
@@ -3127,8 +3133,7 @@ begin
   OldPos:=CurPos;
   HoldUndo:=GetStoreUndo;
   SetStoreUndo(false);
-  for I:=1 to length(S) do
-    AddChar(S[I]);
+  AddString(S);
   InsertText:=true;
   SetStoreUndo(HoldUndo);
   AddAction(eaInsertText,OldPos,CurPos,S,GetFlags);
@@ -3547,6 +3552,15 @@ begin
                 if IsModal then
                   DontClear:=true;
            else
+            if Utf8Text and (Event.TextLength>0) and (Byte(Event.Text[0])>=$80) then
+              begin
+                { a character of the keyboard that is not ASCII: its UTF-8 text }
+                NoSelect:=true;
+                AddString(EventText(Event));
+                NoSelect:=false;
+                CCAction:=ccClear;
+              end
+            else
             case Event.CharCode of
              9,32..255 :
                if (Event.CharCode=9) and IsModal then
@@ -3777,6 +3791,51 @@ begin
   GetReservedColCount:=LSX;
 end;
 
+{ the width in cells of one column of the display text: 1 for ASCII and for a stray byte, 0..2 for a UTF-8 character }
+function ColumnCells(const Ch: string): sw_integer;
+var CP: longword;
+    Used: integer;
+begin
+  if (length(Ch)<=1) or (not Utf8Text) then
+    ColumnCells:=1
+  else if Utf8Decode(@Ch[1],length(Ch),CP,Used) and (Used=length(Ch)) then
+    ColumnCells:=CharWidth(CP)
+  else
+    ColumnCells:=1;
+end;
+
+{ one character into the cell row; the cell takes the BIOS attribute of Color (as the Word draw buffers do) }
+procedure PutCell(var Cells: array of TScreenCell; Width: sw_integer; Pos: sw_integer; const Ch: string; Color: word);
+var Cell,Trail: TScreenCell;
+    W: sw_integer;
+begin
+  if (Pos<0) or (Pos>=Width) then Exit;
+  Cell:=CellFromBIOS(((Color and $FF) shl 8) or Ord(' '));
+  W:=ColumnCells(Ch);
+  if length(Ch)=0 then
+    { a blank }
+  else if length(Ch)=1 then
+    ScInitChar(Cell.Character,Byte(Ch[1]))
+  else if W=0 then
+    begin
+      { a combining character: it goes onto the cell before }
+      if Pos>0 then
+        ScAppendZeroWidth(Cells[Pos-1].Character,@Ch[1],length(Ch));
+      Exit;
+    end
+  else if (W=2) and (Pos+1>=Width) then
+    { a wide character that does not fit at the edge: blank }
+  else
+    ScInitText(Cell.Character,@Ch[1],length(Ch),W=2);
+  Cells[Pos]:=Cell;
+  if (W=2) and (length(Ch)>1) and (Pos+1<Width) then
+    begin
+      Trail:=Cell;
+      ScInitWideTrail(Trail.Character);
+      Cells[Pos+1]:=Trail;
+    end;
+end;
+
 procedure TCustomCodeEditor.Draw;
 function GetEIFold(EI: PEditorLineInfo): PFold;
 begin
@@ -3787,7 +3846,10 @@ var SelectColor,
     HighlightRowColor,
     ErrorMessageColor  : word;
     B: TFVDrawBuffer;
+    Cells: array[0..MaxViewWidth] of TScreenCell;
     X,Y,AX,AY,MaxX,LSX: sw_integer;
+    PosX,ColW,BI,CL,I: sw_integer;
+    CharS: string;
     PX: TPoint;
     LineCount: sw_integer;
     Line: PCustomLine;
@@ -3888,13 +3950,27 @@ begin
           FillChar(FreeFormat,SizeOf(FreeFormat),1);
           MoveChar(B,' ',Color,Size.X);
           GetDisplayTextFormat(AY,LineText,Format);
+          { the row of cells: blanks, then the characters of the line (UTF-8: a column is a character, a wide one is two cells) }
+          for I:=0 to Size.X-1 do
+            PutCell(Cells,Size.X,I,'',Color);
+          { the columns before Delta.X are scrolled out: the cell where the first visible column starts }
+          PosX:=LSX-U8Cells(LineText,0,Delta.X);
+          BI:=1;
 
       {    if FlagSet(efSyntaxHighlight) then MaxX:=length(LineText)+1
              else }MaxX:=Size.X+Delta.X;
           for X:=1 to Min(MaxX,High(LineText)) do
           begin
             AX:=Delta.X+X-1;
-            if X<=length(LineText) then C:=LineText[X] else C:=' ';
+            if BI<=length(LineText) then
+              begin
+                CL:=U8CharBytes(LineText,BI);
+                CharS:=copy(LineText,BI,CL);
+                Inc(BI,CL);
+              end
+            else
+              CharS:=' ';
+            ColW:=ColumnCells(CharS);
 
             PX.X:=AX-Delta.X; PX.Y:=AY;
             if (Highlight.A.X<>Highlight.B.X) or (Highlight.A.Y<>Highlight.B.Y) then
@@ -3958,21 +4034,35 @@ begin
                 FreeFormat[X]:=false;
               end;
 
-            if (0<=LSX+X-1-Delta.X) and (LSX+X-1-Delta.X<MaxViewWidth) then
-              MoveChar(B[LSX+X-1-Delta.X],C,Color,1);
+            if (PosX<0) and (PosX+ColW>0) then
+              PutCell(Cells,Size.X,0,' ',Color)         { half of a wide character is scrolled out }
+            else if PosX>=0 then
+              PutCell(Cells,Size.X,PosX,CharS,Color);
+            Inc(PosX,ColW);
+            if PosX>=Size.X then Break;
           end; { for X:=1 to ... }
           if IsFlagSet(efFolds) then
           begin
             GetFoldStrings(AY,FoldPrefix,FoldSuffix);
-            MoveStr(B[0],FoldPrefix,ColorTab[coTextColor]);
-            if FoldSuffix<>'' then
-              MoveStr(B[Size.X-1-length(FoldSuffix)],FoldSuffix,ColorTab[coTextColor]);
+            for I:=1 to length(FoldPrefix) do
+              PutCell(Cells,Size.X,I-1,FoldPrefix[I],ColorTab[coTextColor]);
+            for I:=1 to length(FoldSuffix) do
+              PutCell(Cells,Size.X,Size.X-1-length(FoldSuffix)+I-1,FoldSuffix[I],ColorTab[coTextColor]);
           end;
-          WriteLineW(0,Y,Size.X,1,B);
+          WriteBuf(0,Y,Size.X,1,@Cells[0]);
         end; { if not SkipLine ... }
       end; { not errorline }
   end; { while (Y<Size.Y) ... }
   DrawCursor;
+end;
+
+{ the cells that the first Col columns of the line take }
+function TCustomCodeEditor.CursorCells(Line,Col: sw_integer): sw_integer;
+begin
+  if (Line<0) or (Line>=GetLineCount) or (Col<=0) then
+    CursorCells:=Max(Col,0)
+  else
+    CursorCells:=U8Cells(GetDisplayText(Line),0,Col);
 end;
 
 procedure TCustomCodeEditor.DrawCursor;
@@ -3981,7 +4071,7 @@ begin
     DrawCursorCalled:=true
   else
     begin
-      SetCursor(GetReservedColCount+CurPos.X-Delta.X,EditorToViewLine(CurPos.Y)-Delta.Y);
+      SetCursor(GetReservedColCount+CursorCells(CurPos.Y,CurPos.X)-CursorCells(CurPos.Y,Delta.X),EditorToViewLine(CurPos.Y)-Delta.Y);
       SetState(sfCursorIns,Overwrite);
     end;
 end;
@@ -4127,15 +4217,15 @@ begin
     PreS:=RTrim(GetLineText(CurPos.Y-1),not IsFlagSet(efUseTabCharacters))
   else
     PreS:='';
-  if CurPos.X>=length(PreS) then
+  if CurPos.X>=U8Len(PreS) then
     Shift:=GetTabSize
   else
     begin
       Shift:=1;
-      while (CurPos.X+Shift<length(PreS)) and (PreS[CurPos.X+Shift]<>' ') do
+      while (CurPos.X+Shift<U8Len(PreS)) and (U8ColChar(PreS,CurPos.X+Shift-1)<>' ') do
        Inc(Shift);
     end;
-  SetLineText(CurPos.Y,RExpand(copy(S,1,CurPos.X+1),CurPos.X+1)+CharStr(' ',Shift)+copy(S,CurPos.X+2,High(S)));
+  SetLineText(CurPos.Y,U8Pad(U8Copy(S,0,CurPos.X+1),CurPos.X+1)+CharStr(' ',Shift)+U8Copy(S,CurPos.X+1,High(S)));
   SetCurPtr(CurPos.X+Shift,CurPos.Y);
   UpdateAttrs(CurPos.Y,attrAll);
   DrawLines(CurPos.Y);
@@ -4169,25 +4259,25 @@ begin
    begin
      if Y=CurPos.Y then
       begin
-   X:=length(GetDisplayText(Y));
+   X:=U8Len(GetDisplayText(Y));
    if CurPos.X<X then
      X:=CurPos.X; Dec(X);
    if (X=-1) then
      begin
        Dec(Y);
        if Y>=0 then
-        X:=length(GetDisplayText(Y));
+        X:=U8Len(GetDisplayText(Y));
        Break;
      end;
       end
      else
-      X:=length(GetDisplayText(Y))-1;
+      X:=U8Len(GetDisplayText(Y))-1;
      Line:=GetDisplayText(Y);
      while (X>=0) and (GotIt=false) do
       begin
    if FoundNonSeparator then
     begin
-      if IsWordSeparator(Line[X+1]) then
+      if IsWordSeparator(U8ColChar(Line,X)) then
        begin
          Inc(X);
          GotIt:=true;
@@ -4195,10 +4285,10 @@ begin
        end;
     end
    else
-    if not IsWordSeparator(Line[X+1]) then
+    if not IsWordSeparator(U8ColChar(Line,X)) then
      FoundNonSeparator:=true;
    Dec(X);
-   if (X=0) and (IsWordSeparator(Line[1])=false) then
+   if (X=0) and (IsWordSeparator(U8ColChar(Line,0))=false) then
     begin
       GotIt:=true;
       Break;
@@ -4210,7 +4300,7 @@ begin
      Dec(Y);
      if Y>=0 then
       begin
-   X:=length(GetDisplayText(Y));
+   X:=U8Len(GetDisplayText(Y));
    Break;
       end;
    end;
@@ -4229,23 +4319,23 @@ begin
     if Y=CurPos.Y then
        begin
     X:=CurPos.X; Inc(X);
-    if (X>length(GetDisplayText(Y))-1) then
+    if (X>U8Len(GetDisplayText(Y))-1) then
        begin Inc(Y); X:=0; end;
        end else X:=0;
     Line:=GetDisplayText(Y);
-    while (X<=length(Line)+1) and (GotIt=false) and (Line<>'') do
+    while (X<=U8Len(Line)+1) and (GotIt=false) and (Line<>'') do
     begin
-      if X=length(Line)+1 then begin GotIt:=true; Dec(X); Break end;
-      if IsWordSeparator(Line[X]) then
+      if X=U8Len(Line)+1 then begin GotIt:=true; Dec(X); Break end;
+      if IsWordSeparator(U8ColChar(Line,X-1)) then
     begin
       while (Y<GetLineCount) and
-       (X<=length(Line)) and (IsWordSeparator(Line[X])) do
+       (X<=U8Len(Line)) and (IsWordSeparator(U8ColChar(Line,X-1))) do
        begin
          Inc(X);
-         if X>=length(Line) then
+         if X>=U8Len(Line) then
             begin GotIt:=true; Dec(X); Break; end;
        end;
-      if (GotIt=false) and (X<length(Line)) then
+      if (GotIt=false) and (X<U8Len(Line)) then
       begin
         Dec(X);
         GotIt:=true;
@@ -4260,7 +4350,7 @@ begin
     if (Y<GetLineCount) then
     begin
       Line:=GetDisplayText(Y);
-      if (Line<>'') and (IsWordSeparator(Line[1])=false) then Break;
+      if (Line<>'') and (IsWordSeparator(U8ColChar(Line,0))=false) then Break;
     end;
   end;
   if Y=GetLineCount then Y:=GetLineCount-1;
@@ -4280,8 +4370,8 @@ begin
   if CurPos.Y<GetLineCount then
     begin
       s:=GetDisplayText(CurPos.Y);
-      i:=length(s);
-      while (i>0) and (s[i]=' ') do
+      i:=U8Len(s);
+      while (i>0) and (U8ColChar(s,i-1)=' ') do
         dec(i);
       SetCurPtr(i,CurPos.Y);
     end
@@ -4510,7 +4600,7 @@ end;
 procedure TCustomCodeEditor.ChangeCaseArea(StartP,EndP: TPoint; CaseAction: TCaseAction);
 var Y,X: sw_integer;
     X1,X2: sw_integer;
-    S: string;
+    S,Mid,Tog,C1: string;
     C: char;
     StartPos : TPoint;
     HoldUndo : boolean;
@@ -4522,7 +4612,7 @@ begin
   begin
     S:=GetDisplayText(Y);
     { Pierre, please implement undo here! Gabor }
-    X1:=0; X2:=length(S)-1;
+    X1:=0; X2:=U8Len(S)-1;
     if Y=StartP.Y then X1:=StartP.X;
     if Y=EndP.Y then X2:=EndP.X;
     SetStoreUndo(HoldUndo);
@@ -4531,21 +4621,24 @@ begin
     { the only drawback is that we keep
       the original text even if Toggle where
       it is not really necessary PM }
-    Addaction(eaOverwriteText,StartPos,StartPos,Copy(S,X1+1,X2-X1+1),GetFlags);
+    Addaction(eaOverwriteText,StartPos,StartPos,U8Copy(S,X1,X2-X1+1),GetFlags);
     SetStoreUndo(false);
-    for X:=X1 to X2 do
-    begin
-      C:=S[X+1];
-      case CaseAction of
-        caToLowerCase : C:=LowCase(C);
-        caToUpperCase : C:=UpCase(C);
-        caToggleCase  : if C in['a'..'z'] then
-                          C:=Upcase(C)
-                        else
-                          C:=LowCase(C);
-       end;
-      S[X+1]:=C;
+    Mid:=U8Copy(S,X1,X2-X1+1);
+    case CaseAction of
+      caToLowerCase : Mid:=U8Lower(Mid);
+      caToUpperCase : Mid:=U8Upper(Mid);
+      caToggleCase  :
+        begin
+          Tog:='';
+          for X:=0 to U8Len(Mid)-1 do
+            begin
+              C1:=U8Char(Mid,X);
+              if U8Lower(C1)=C1 then Tog:=Tog+U8Upper(C1) else Tog:=Tog+U8Lower(C1);
+            end;
+          Mid:=Tog;
+        end;
     end;
+    S:=U8Copy(S,0,X1)+Mid+U8Copy(S,X2+1,High(S));
     SetDisplayText(Y,S);
   end;
   UpdateAttrsRange(StartP.Y,EndP.Y,attrAll);
@@ -4684,7 +4777,7 @@ var SymIdx: integer;
 begin
   JumpPos.X:=-1; JumpPos.Y:=-1;
   LineText:=GetDisplayText(CurPos.Y);
-  LineText:=copy(LineText,CurPos.X+1,1);
+  LineText:=U8Copy(LineText,CurPos.X,1);
   if LineText='' then Exit;
   CurChar:=LineText[1];
   Y:=CurPos.Y; X:=CurPos.X; LineCount:=0;
@@ -4699,20 +4792,20 @@ begin
         if LineCount<>1 then X:=-1;
         repeat
           Inc(X);
-          if X<length(LineText) then
+          if X<U8Len(LineText) then
            if copy(LineAttr,X+1,1)<>chr(attrComment) then
-             if (LineText[X+1]=CloseSymbols[SymIdx]) and (BracketLevel=1) then
+             if (U8ColChar(LineText,X)=CloseSymbols[SymIdx]) and (BracketLevel=1) then
                begin
                  JumpPos.X:=X; JumpPos.Y:=Y;
                end
              else
-               if LineText[X+1]=OpenSymbols[SymIdx] then
+               if U8ColChar(LineText,X)=OpenSymbols[SymIdx] then
                  Inc(BracketLevel)
                else
-               if LineText[X+1]=CloseSymbols[SymIdx] then
+               if U8ColChar(LineText,X)=CloseSymbols[SymIdx] then
                  if BracketLevel>1 then
                    Dec(BracketLevel);
-        until (X>=length(LineText)) or (JumpPos.X<>-1);
+        until (X>=U8Len(LineText)) or (JumpPos.X<>-1);
         Inc(Y);
       until (Y>=GetLineCount) or (JumpPos.X<>-1);
     end
@@ -4723,20 +4816,20 @@ begin
       repeat
         Inc(LineCount);
         GetDisplayTextFormat(Y,LineText,LineAttr);
-        if LineCount<>1 then X:=length(LineText);
+        if LineCount<>1 then X:=U8Len(LineText);
         repeat
           Dec(X);
           if X>0 then
            if copy(LineAttr,X+1,1)<>chr(attrComment) then
-             if (LineText[X+1]=OpenSymbols[SymIdx]) and (BracketLevel=1) then
+             if (U8ColChar(LineText,X)=OpenSymbols[SymIdx]) and (BracketLevel=1) then
                begin
                  JumpPos.X:=X; JumpPos.Y:=Y;
                end
              else
-               if LineText[X+1]=CloseSymbols[SymIdx] then
+               if U8ColChar(LineText,X)=CloseSymbols[SymIdx] then
                  Inc(BracketLevel)
                else
-               if LineText[X+1]=OpenSymbols[SymIdx] then
+               if U8ColChar(LineText,X)=OpenSymbols[SymIdx] then
                  if BracketLevel>1 then
                    Dec(BracketLevel);
         until (X<0) or (JumpPos.X<>-1);
@@ -4883,10 +4976,10 @@ begin
    begin
      if CurPos.Y>0 then
       begin
-        CI:=Length(GetDisplayText(CurPos.Y-1));
+        CI:=U8Len(GetDisplayText(CurPos.Y-1));
         S:=GetLineText(CurPos.Y-1);
         SetLineText(CurPos.Y-1,S+GetLineText(CurPos.Y));
-        SC1.X:=Length(S);SC1.Y:=CurPOS.Y-1;
+        SC1.X:=CI;SC1.Y:=CurPOS.Y-1;
         SetStoreUndo(HoldUndo);
         AddAction(eaDeleteLine,SCP,SC1,GetLineText(CurPos.Y),GetFlags);
         SetStoreUndo(false);
@@ -4902,22 +4995,22 @@ begin
      S:=GetLineText(CurPos.Y);
      CI:=LinePosToCharIdx(CurPos.Y,CP);
      if (s[ci]=TAB) and (CharIdxToLinePos(Curpos.y,ci)=cp) then
-      CP:=CharIdxToLinePos(CurPos.Y,CI-1)+1;
+      CP:=CharIdxToLinePos(CurPos.Y,U8PrevIdx(S,CI))+1;
      if IsFlagSet(efBackspaceUnindents) then
       begin
         S:=GetDisplayText(CurPos.Y);
-        if Trim(copy(S,1,CP+1))='' then
+        if Trim(U8Copy(S,0,CP+1))='' then
          begin
            Y:=CurPos.Y;
            while (Y>0) do
             begin
               Dec(Y);
               PreS:=GetDisplayText(Y);
-              if Trim(copy(PreS,1,CP+1))<>'' then Break;
+              if Trim(U8Copy(PreS,0,CP+1))<>'' then Break;
             end;
            if Y<0 then PreS:='';
            TX:=0;
-           while (TX<length(PreS)) and (PreS[TX+1]=' ') do
+           while (TX<U8Len(PreS)) and (U8ColChar(PreS,TX)=' ') do
             Inc(TX);
            if TX<CP then CP:=TX;
          end;
@@ -4955,7 +5048,7 @@ begin
    begin
      if CurPos.Y<GetLineCount-1 then
       begin
-        SetLineText(CurPos.Y,S+CharStr(' ',CurPOS.X-Length(S))+GetLineText(CurPos.Y+1));
+        SetLineText(CurPos.Y,S+CharStr(' ',Max(0,CurPos.X-U8Len(GetDisplayText(CurPos.Y))))+GetLineText(CurPos.Y+1));
         SDX:=CurPos.X;
         SetStoreUndo(HoldUndo);
         SCP.X:=0;SCP.Y:=CurPos.Y+1;
@@ -4995,10 +5088,10 @@ begin
      else
        begin
          SetStoreUndo(HoldUndo);
-         Addaction(eaDeleteText,CurPos,CurPos,S[CI],GetFlags);
+         Addaction(eaDeleteText,CurPos,CurPos,copy(S,CI,U8CharBytes(S,CI)),GetFlags);
          SetStoreUndo(false);
          SDX:=-1;
-         Delete(S,CI,1);
+         Delete(S,CI,U8CharBytes(S,CI));
        end;
      SetLineText(CurPos.Y,S);
      SDY:=0;
@@ -5047,7 +5140,7 @@ begin
   S:=GetDisplayText(CurPos.Y);
   if ((SelStart.X=SelEnd.X) and (SelStart.Y=SelEnd.Y)) then
     begin
-      if (Length(S) <= CurPos.X) then
+      if (U8Len(S) <= CurPos.X) then
         begin
           SetSelection(SP,EP);
           DelChar;
@@ -5060,8 +5153,8 @@ begin
           SelEnd.Y:=CurPos.Y;
         end;
     end;
-  while (length(S)>= SelEnd.X+1) and
-        ((S[SelEnd.X+1]=' ') or (S[SelEnd.X+1]=TAB))  do
+  while (U8Len(S)>= SelEnd.X+1) and
+        ((U8ColChar(S,SelEnd.X)=' ') or (U8ColChar(S,SelEnd.X)=TAB))  do
     inc(SelEnd.X);
   SetSelection(CurPos,SelEnd);
   SelSize:=SelEnd.X-SelStart.X;
@@ -5093,7 +5186,7 @@ begin
     SetStoreUndo(HoldUndo);
     Addaction(eaDeleteText,SCP,CurPos,copy(S,1,OI-1),GetFlags);
     SetStoreUndo(false);
-    AdjustSelectionPos(CurPos.X,CurPos.Y,-length(copy(S,1,OI-1)),0);
+    AdjustSelectionPos(CurPos.X,CurPos.Y,-U8Len(copy(S,1,OI-1)),0);
     UpdateAttrs(CurPos.Y,attrAll);
     DrawLines(CurPos.Y);
     SetModified(true);
@@ -5114,7 +5207,7 @@ begin
   SetStoreUndo(false);
   SCP:=CurPos;
   S:=GetLineText(CurPos.Y);
-  if (S<>'') and (CurPos.X<>length(S)) then
+  if (S<>'') and (CurPos.X<>U8Len(S)) then
   begin
     OI:=LinePosToCharIdx(CurPos.Y,CurPos.X);
     SetLineText(CurPos.Y,copy(S,1,OI-1));
@@ -5122,7 +5215,7 @@ begin
     SetStoreUndo(HoldUndo);
     Addaction(eaDeleteText,SCP,CurPos,copy(S,OI,High(S)),GetFlags);
     SetStoreUndo(false);
-    AdjustSelectionPos(CurPos.X+1,CurPos.Y,-length(copy(S,OI,High(S)))+1,0);
+    AdjustSelectionPos(CurPos.X+1,CurPos.Y,-U8Len(copy(S,OI,High(S)))+1,0);
     UpdateAttrs(CurPos.Y,attrAll);
     DrawLines(CurPos.Y);
     SetModified(true);
@@ -5167,22 +5260,29 @@ function TCustomCodeEditor.GetCurrentWordArea(var StartP,EndP: TPoint): boolean;
 const WordChars = ['A'..'Z','a'..'z','0'..'9','_'];
 var P : TPoint;
     S : String;
-    StartPos,EndPos : byte;
+    StartPos,EndPos,N : sw_integer;
     OK: boolean;
+  { the character at a column is a word character: ASCII letters and digits, and every multi-byte character }
+  function IsWordCol(Col: sw_integer): boolean;
+  begin
+    IsWordCol:=(Col>=0) and (Col<N) and
+      ((U8ColChar(S,Col) in WordChars) or (U8ColChar(S,Col)>=#128));
+  end;
 begin
   P:=CurPos;
-  S:=GetLineText(P.Y);
-  StartPos:=P.X+1;
+  S:=GetDisplayText(P.Y);
+  N:=U8Len(S);
+  StartPos:=P.X;
   EndPos:=StartPos;
-  OK:=(S[StartPos] in WordChars);
+  OK:=IsWordCol(StartPos);
   if OK then
     begin
-       While (StartPos>1) and (S[StartPos-1] in WordChars) do
+       While IsWordCol(StartPos-1) do
          Dec(StartPos);
-       While (EndPos<Length(S)) and (S[EndPos+1] in WordChars) do
+       While IsWordCol(EndPos+1) do
          Inc(EndPos);
-       StartP.X:=StartPos-1; StartP.Y:=CurPos.Y;
-       EndP.X:=EndPos-1; EndP.Y:=CurPos.Y;
+       StartP.X:=StartPos; StartP.Y:=CurPos.Y;
+       EndP.X:=EndPos; EndP.Y:=CurPos.Y;
     end;
   GetCurrentWordArea:=OK;
 end;
@@ -5195,8 +5295,8 @@ begin
     S:=''
   else
     begin
-      S:=GetLineText(StartP.Y);
-      S:=copy(S,StartP.X+1,EndP.X-StartP.X+1);
+      S:=GetDisplayText(StartP.Y);
+      S:=U8Copy(S,StartP.X,EndP.X-StartP.X+1);
     end;
   GetCurrentWord:=S;
 end;
@@ -5224,7 +5324,7 @@ var P: TPoint;
 begin
   P:=CurPos;
 {  P.X:=Min(SelEnd.X,length(GetLineText(SelEnd.Y)));}
-  LS:=length(GetLineText(SelEnd.Y));
+  LS:=U8Len(GetDisplayText(SelEnd.Y));
   if LS<P.X then P.X:=LS;
   CheckSels;
   SetSelection(SelStart,P);
@@ -5250,13 +5350,13 @@ begin
       S:=GetDisplayText(CurLine);
       StartX:=SelStart.X;
       EndX:=SelEnd.X;
-      SetDisplayText(CurLine,RExpand(copy(S,1,StartX),StartX)
-        +copy(S,EndX+1,High(S)));
+      SetDisplayText(CurLine,U8Pad(U8Copy(S,0,StartX),StartX)
+        +U8Copy(S,EndX,High(S)));
       if GetStoreUndo then
         begin
           SPos.X:=StartX;
           SPos.Y:=CurLine;
-          AddAction(eaDeleteText,SPos,SPos,Copy(S,StartX+1,EndX-StartX),GetFlags);
+          AddAction(eaDeleteText,SPos,SPos,U8Copy(S,StartX,EndX-StartX),GetFlags);
         end;
       Inc(CurLine);
       LastX:=SelStart.X;
@@ -5267,13 +5367,13 @@ begin
       S:=GetDisplayText(CurLine);
       StartX:=SelStart.X;
       EndX:=SelEnd.X;
-      SetDisplayText(CurLine,RExpand(copy(S,1,StartX),StartX)
-        +copy(GetDisplayText(CurLine+LineCount-1),EndX+1,High(S)));
+      SetDisplayText(CurLine,U8Pad(U8Copy(S,0,StartX),StartX)
+        +U8Copy(GetDisplayText(CurLine+LineCount-1),EndX,High(S)));
       if GetStoreUndo then
         begin
           SPos.X:=StartX;
           SPos.Y:=CurLine;
-          AddAction(eaDeleteText,SPos,SPos,Copy(S,StartX+1,High(S)),GetFlags);
+          AddAction(eaDeleteText,SPos,SPos,U8Copy(S,StartX,High(S)),GetFlags);
           S:=GetDisplayText(CurLine+LineCount-1);
         end;
       Inc(CurLine);
@@ -5287,7 +5387,7 @@ begin
         end;
       if GetStoreUndo then
         begin
-          AddAction(eaInsertText,SPos,SPos,Copy(S,EndX+1,High(S)),GetFlags);
+          AddAction(eaInsertText,SPos,SPos,U8Copy(S,EndX,High(S)),GetFlags);
         end;
     end;
   HideSelect;
@@ -5492,24 +5592,30 @@ end;
 procedure TCustomCodeEditor.SelectWord;
 const WordChars = ['A'..'Z','a'..'z','0'..'9','_'];
 var S : String;
-    StartPos,EndPos : byte;
+    StartPos,EndPos,N : sw_integer;
     A,B: TPoint;
+  function IsWordCol(Col: sw_integer): boolean;
+  begin
+    IsWordCol:=(Col>=0) and (Col<N) and
+      ((U8ColChar(S,Col) in WordChars) or (U8ColChar(S,Col)>=#128));
+  end;
 begin
   A:=CurPos;
   B:=CurPos;
   S:=GetDisplayText(A.Y);
-  StartPos:=A.X+1;
+  N:=U8Len(S);
+  StartPos:=A.X;
   EndPos:=StartPos;
-  if not (S[StartPos] in WordChars) then
+  if not IsWordCol(StartPos) then
     exit
   else
     begin
-       While (StartPos>0) and (S[StartPos-1] in WordChars) do
+       While IsWordCol(StartPos-1) do
          Dec(StartPos);
-       While (EndPos<Length(S)) and (S[EndPos+1] in WordChars) do
+       While IsWordCol(EndPos+1) do
          Inc(EndPos);
-       A.X:=StartPos-1;
-       B.X:=EndPos;
+       A.X:=StartPos;
+       B.X:=EndPos+1;
        SetSelection(A,B);
     end;
 end;
@@ -5684,22 +5790,44 @@ begin
 end;
 
 procedure TCustomCodeEditor.AddChar(C: char);
+begin
+  AddCharStr(C);
+end;
+
+{ the characters of S, one after another (a UTF-8 character is one) }
+procedure TCustomCodeEditor.AddString(const S: string);
+var I,L: sw_integer;
+begin
+  I:=1;
+  while I<=length(S) do
+    begin
+      L:=U8CharBytes(S,I);
+      if L<1 then L:=1;
+      AddCharStr(copy(S,I,L));
+      Inc(I,L);
+    end;
+end;
+
+procedure TCustomCodeEditor.AddCharStr(const Ch: string);
 const OpenBrackets  : string[10] = '[({';
       CloseBrackets : string[10] = '])}';
 var S,SC,TabS: string;
     BI: byte;
-    CI,TabStart,LocTabSize : Sw_integer;
+    C: char;
+    CI,TabStart,LocTabSize,LW,CL : Sw_integer;
     SP: TPoint;
     HoldUndo : boolean;
 begin
   if IsReadOnly then Exit;
+  if Ch='' then Exit;
+  C:=Ch[1];
 
   Lock;
   SP:=CurPos;
   HoldUndo:=GetStoreUndo;
   SetStoreUndo(false);
-  if (C<>TAB) or IsFlagSet(efUseTabCharacters) then
-    SC:=C
+  if (Ch<>TAB) or IsFlagSet(efUseTabCharacters) then
+    SC:=Ch
   else
     begin
       LocTabSize:=GetTabSize - (CurPos.X mod GetTabSize);
@@ -5718,12 +5846,22 @@ begin
         end;
     end;
   S:=GetLineText(CurPos.Y);
-  if CharIdxToLinePos(CurPos.Y,length(S))<CurPos.X then
+  { the cursor is beyond the end of the line: blanks up to it }
+  LW:=CharIdxToLinePos(CurPos.Y,length(S)+1);
+  if LW<CurPos.X then
     begin
-      S:=S+CharStr(' ',CurPos.X-CharIdxToLinePos(CurPos.Y,length(S)){-1});
+      S:=S+CharStr(' ',CurPos.X-LW);
       SetLineText(CurPos.Y,S);
     end;
+  { a line is a string of at most 255 bytes: nothing is cut off silently }
+  if length(S)+length(SC)>MaxLineLength then
+    begin
+      SetStoreUndo(HoldUndo);
+      Unlock;
+      Exit;
+    end;
   CI:=LinePosToCharIdx(CurPos.Y,CurPos.X);
+  if CI<=0 then CI:=1;                    { an empty line }
   if CI>High(S) then
     begin
       Unlock;
@@ -5734,7 +5872,7 @@ begin
       if CI=1 then
         TabStart:=0
       else
-        TabStart:=CharIdxToLinePos(CurPos.Y,CI-1)+1;
+        TabStart:=CharIdxToLinePos(CurPos.Y,U8PrevIdx(S,CI))+1;
       if SC=Tab then TabS:=Tab else
         TabS:=CharStr(' ',CurPos.X-TabStart);
       SetLineText(CurPos.Y,copy(S,1,CI-1)+TabS+SC+copy(S,CI+1,High(S)));
@@ -5744,7 +5882,8 @@ begin
     begin
       if Overwrite and (CI<=length(S)) then
         begin
-          SetLineText(CurPos.Y,copy(S,1,CI-1)+SC+copy(S,CI+length(SC),High(S)));
+          CL:=U8CharBytes(S,CI);
+          SetLineText(CurPos.Y,copy(S,1,CI-1)+SC+copy(S,CI+CL,High(S)));
         end
       else
         SetLineText(CurPos.Y,copy(S,1,CI-1)+SC+copy(S,CI,High(S)));
@@ -5753,17 +5892,17 @@ begin
  { must be before CloseBrackets !! }
   SetStoreUndo(HoldUndo);
   if Overwrite then
-    Addaction(eaOverwriteText,SP,CurPos,Copy(S,CI,length(SC)),GetFlags)
+    Addaction(eaOverwriteText,SP,CurPos,Copy(S,CI,U8CharBytes(S,CI)),GetFlags)
   else
     Addaction(eaInsertText,SP,CurPos,SC,GetFlags);
   SetStoreUndo(false);
   if IsFlagSet(efAutoBrackets) then
     begin
       BI:=Pos(C,OpenBrackets);
-      if (BI>0) then
+      if (BI>0) and (length(Ch)=1) then
         begin
           SetStoreUndo(HoldUndo);
-          AddChar(CloseBrackets[BI]);
+          AddCharStr(CloseBrackets[BI]);
           SetStoreUndo(false);
           SetCurPtr(CurPos.X-1,CurPos.Y);
         end;
