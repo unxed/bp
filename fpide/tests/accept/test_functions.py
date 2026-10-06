@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode debug
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -458,9 +458,52 @@ def section_unicode(t):
     check(t.wait_for('Привет, мир!'), 'the saved file is read back as UTF-8', t)
 
 
+def line_colors(t, n=8):
+    """the background colour of editor lines 1..n (column 5): the debugger row and a breakpoint row stand out"""
+    return t.row_backgrounds(5)[2:2 + n]
+
+
+def section_debug(t):
+    """the debugger: a breakpoint, Run stops on it (gdb runs the program), the call stack, stepping, a watch, Continue to the end"""
+    new_file(t)
+    type_lines(t, 'program dbgt;', 'var i,s: integer;', 'begin', 's:=0;', 'for i:=1 to 3 do', 's:=s+i;', 'writeln(s);', 'end.')
+    t.key('F2'); t.wait_for('Save File As'); t.type('dbgt.pas'); t.key('Enter'); t.pump(0.8)
+    t.key('C-Home', 'Down', 'Down', 'Down', 'Down', 'Down', 'Home')
+    check(t.wait_until(lambda: t.indicator() == (6, 1)), 'the cursor is on the line to stop at: %r' % (t.indicator(),), t)
+    menu(t, 'M-d', 'Breakpoint')
+    menu(t, 'M-d', 'Breakpoint List')
+    check(t.wait_for('Breakpoint list', 3) and 'dbgt.pas' in t.text(), 'Debug > Breakpoint adds a breakpoint to the list', t)
+    t.key('Escape'); t.pump(0.3)             # closes the breakpoint list window
+    plain = line_colors(t)                   # line 6 is painted as a breakpoint now
+    # Run builds with symbols and starts gdb; the program stops at the breakpoint
+    t.menu('M-r', 'Run', exact=True)
+    check(t.wait_until(lambda: line_colors(t)[5] != plain[5], 45), 'Run stops at the breakpoint: line 6 is painted as the debugger row', t)
+    menu(t, 'M-d', 'Call stack')
+    check(t.wait_for('dbgt.pas(6) main()', 5), 'Debug > Call stack shows main() on line 6', t)
+    t.key('Escape'); t.pump(0.3)
+    # Step over executes the line: s becomes 1
+    t.key('F8')
+    check(t.wait_until(lambda: line_colors(t)[5] == plain[5] and line_colors(t)[4] != plain[4], 10), 'F8 moves the debugger row off the breakpoint line (to line 5, the loop)', t)
+    menu(t, 'M-d', 'Add Watch')
+    t.wait_for('Expression to watch')
+    t.type('s'); t.key('Enter'); t.pump(0.8)
+    menu(t, 'M-d', 'Watches')
+    check(t.wait_for('s = 1', 5), 'the watch shows s = 1 after the first step', t)
+    t.key('Escape'); t.pump(0.3)
+    # Continue until the program ends
+    for _ in range(6):
+        if 'Program exited' in t.text():
+            break
+        t.menu('M-r', 'Continue', exact=True)
+        t.pump(1.5)
+    check(t.wait_for('Program exited with', 8) and 'exitcode = 0' in t.text(), 'Run/Continue lets the program finish: "Program exited with exitcode = 0"', t)
+    t.key('Enter')
+    check(t.wait_gone('Program exited', 3) and t.alive(), 'the IDE is back in control after the program ends', t)
+
+
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile),
-            ('unicode', section_unicode)]
+            ('unicode', section_unicode), ('debug', section_debug)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])

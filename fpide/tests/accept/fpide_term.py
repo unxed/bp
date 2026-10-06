@@ -82,6 +82,19 @@ class TmuxTerm:
             i += 1
         return cells
 
+    def row_backgrounds(self, col):
+        """the background colour of the cell in column `col` of every screen row (tmux writes only the
+        changes of the attributes, also across line ends: the whole screen is read as one stream)"""
+        raw = self._tmux('capture-pane', '-t', self.session, '-p', '-e')
+        out, row = [], []
+        for ch, bg in self._cells(raw):
+            if ch == '\n':
+                out.append(row[col] if len(row) > col else None)
+                row = []
+            else:
+                row.append(bg)
+        return out
+
     def _menu_rows(self):
         """[(row, text, highlighted)] of the drop-down box on screen: the box is the `┌...┐` found on
         the screen, a row is highlighted if its colour differs from the other rows'."""
