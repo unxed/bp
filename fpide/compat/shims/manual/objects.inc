@@ -27,6 +27,13 @@ type
   PSortedCollection = TSortedCollection;
   PStringCollection = TStringCollection;
 
+type
+  { Free Vision (Objects) record views of the integer types. }
+  WordRec = packed record Lo, Hi: Byte; end;
+  LongRec = packed record Lo, Hi: Word; end;
+  ByteArray = array[0..MaxBytes - 1] of Byte;
+  PByteArray = ^ByteArray;
+
 { ShortString heap helpers (FV). PString stays ^ShortString until the IDE
   buffer/file/search path is fully UTF-8; do not switch these to AnsiString. }
 function NewStr(const S: ShortString): PString;

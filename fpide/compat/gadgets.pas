@@ -11,8 +11,11 @@ type
   THeapView = class(TView)
   private
     FOldMem: PtrUInt;
+    FKb: Boolean;
   public
     constructor Create(const Bounds: TRect); reintroduce;
+    { Free Vision: the same view showing the free memory in Kb }
+    constructor InitKb(const Bounds: TRect);
     procedure Draw; override;
     procedure Update; virtual;
   end;
@@ -37,6 +40,12 @@ begin
   FOldMem := 0;
 end;
 
+constructor THeapView.InitKb(const Bounds: TRect);
+begin
+  Create(Bounds);
+  FKb := True;
+end;
+
 procedure THeapView.Draw;
 var
   B: TDrawBuffer;
@@ -46,7 +55,10 @@ begin
   B := TDrawBuffer.Create(Size.X);
   C := GetColor(1);
   B.MoveChar(0, Ord(' '), C.Lo, Size.X);
-  S := ShortString(Format('%6d', [GetHeapStatus.TotalAllocated]));
+  if FKb then
+    S := ShortString(Format('%6d', [GetHeapStatus.TotalAllocated div 1024]))
+  else
+    S := ShortString(Format('%6d', [GetHeapStatus.TotalAllocated]));
   B.MoveStrS(0, S, C.Lo);
   WriteLineD(0, 0, Size.X, 1, B);
   B.Free;

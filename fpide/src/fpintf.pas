@@ -58,7 +58,7 @@ var
 
 function LinkAfter : boolean;
 begin
-  LinkAfter:=LinkAfterSwitches^.GetBooleanItem(0);
+  LinkAfter:=LinkAfterSwitches.GetBooleanItem(0);
 end;
 
 function GetRunParameters: string;
@@ -71,7 +71,7 @@ begin
   RunParameters:=Params;
 {$ifndef NODEBUG}
   If assigned(Debugger) then
-    Debugger^.SetArgs(RunParameters);
+    Debugger.SetArgs(RunParameters);
 {$endif}
 end;
 
@@ -85,7 +85,7 @@ begin
   RunDir:=Params;
 {$ifndef NODEBUG}
   If assigned(Debugger) then
-    Debugger^.SetDir(RunDir);
+    Debugger.SetDir(RunDir);
 {$endif}
 end;
 
@@ -216,9 +216,9 @@ begin
           on e : exception do
             begin
               CompilationPhase:=cpFailed;
-              CompilerMessageWindow^.AddMessage(V_Error,
+              CompilerMessageWindow.AddMessage(V_Error,
                 'Compiler exited','',0,0);
-              CompilerMessageWindow^.AddMessage(V_Error,
+              CompilerMessageWindow.AddMessage(V_Error,
                 e.message,'',0,0);
             end;
       end;

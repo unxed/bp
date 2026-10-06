@@ -386,7 +386,6 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 var RBreakpointsWindow: TStreamRec;
-const
 
 
   {$endif}
@@ -738,7 +737,7 @@ procedure TDebugController.InsertBreakpoints;
   end;
 
 begin
-  BreakpointsCollection.ForEach(@DoInsert);
+  BreakpointsCollection.ForEach(TNestedActionProc(@DoInsert));
   Disableallinvalidbreakpoints:=false;
 end;
 
@@ -750,7 +749,7 @@ procedure TDebugController.ReadWatches;
   end;
 
 begin
-  WatchesCollection.ForEach(@DoRead);
+  WatchesCollection.ForEach(TNestedActionProc(@DoRead));
   If Assigned(WatchesWindow) then
     WatchesWindow.Update;
 end;
@@ -763,7 +762,7 @@ procedure TDebugController.RereadWatches;
   end;
 
 begin
-  WatchesCollection.ForEach(@DoRead);
+  WatchesCollection.ForEach(TNestedActionProc(@DoRead));
   If Assigned(WatchesWindow) then
     WatchesWindow.Update;
 end;
@@ -775,7 +774,7 @@ procedure TDebugController.RemoveBreakpoints;
       PB.Remove;
     end;
 begin
-   BreakpointsCollection.ForEach(@DoDelete);
+   BreakpointsCollection.ForEach(TNestedActionProc(@DoDelete));
 end;
 
 procedure TDebugController.ResetBreakpointsValues;
@@ -784,7 +783,7 @@ procedure TDebugController.ResetBreakpointsValues;
       PB.ResetValues;
     end;
 begin
-   BreakpointsCollection.ForEach(@DoResetVal);
+   BreakpointsCollection.ForEach(TNestedActionProc(@DoResetVal));
 end;
 
 destructor TDebugController.Destroy;
@@ -962,7 +961,7 @@ begin
       SetDir(StartupDir);
     end;
   DebuggerScreen;
-  IDEApp.SetCmdState([cmResetDebugger,cmUntilReturn],true);
+  SetCmdState([cmResetDebugger,cmUntilReturn],true);
   IDEApp.UpdateRunMenu(true);
   UpdateDebugViews;
 end;
@@ -1163,7 +1162,7 @@ begin
   { In case we have something that the compiler touched }
   If IDEApp.IsRunning then
     begin
-      IDEApp.SetCmdState([cmResetDebugger,cmUntilReturn],false);
+      SetCmdState([cmResetDebugger,cmUntilReturn],false);
       IDEApp.UpdateRunMenu(false);
       AskToReloadAllModifiedFiles;
       ResetDebuggerRows;
@@ -1310,7 +1309,7 @@ begin
         Backtrace;
         for i:=0 to frame_count-1 do
           begin
-            with frames[i]^ do
+            with frames[i] do
               begin
                 if ExitAddr=address then
                   begin
@@ -1471,7 +1470,7 @@ end;
 procedure TDebugController.DoEndSession(code:longint);
 var P :Array[1..2] of longint;
 begin
-   IDEApp.SetCmdState([cmUntilReturn,cmResetDebugger],false);
+   SetCmdState([cmUntilReturn,cmResetDebugger],false);
    IDEApp.UpdateRunMenu(false);
    ResetDebuggerRows;
    LastExitCode:=Code;
@@ -1582,7 +1581,7 @@ function  ActiveBreakpoints : boolean;
 begin
    IsActive:=false;
    If assigned(BreakpointsCollection) then
-     BreakpointsCollection.ForEach(@TestActive);
+     BreakpointsCollection.ForEach(TNestedActionProc(@TestActive));
    ActiveBreakpoints:=IsActive;
 end;
 
@@ -1927,7 +1926,7 @@ begin
   if index=0 then
     GetGDB:=nil
   else
-    GetGDB:=FirstThat(@IsNum);
+    GetGDB:=TBreakpoint(FirstThat(TNestedTestProc(@IsNum)));
 end;
 
 procedure TBreakpointCollection.ShowBreakpoints(W : PFPWindow);
@@ -1976,9 +1975,9 @@ procedure TBreakpointCollection.ShowBreakpoints(W : PFPWindow);
 
 begin
   if W=PFPWindow(DisassemblyWindow) then
-    ForEach(@SetInDisassembly)
+    ForEach(TNestedActionProc(@SetInDisassembly))
   else
-    ForEach(@SetInSource);
+    ForEach(TNestedActionProc(@SetInSource));
 end;
 
 
@@ -2010,7 +2009,7 @@ procedure TBreakpointCollection.AdaptBreakpoints(Editor : PSourceEditor; Pos, Ch
   var
     I : longint;
 begin
-  ForEach(@AdaptInSource);
+  ForEach(TNestedActionProc(@AdaptInSource));
   I:=Count-1;
   While (I>=0) do
     begin
@@ -2033,7 +2032,7 @@ function TBreakpointCollection.FindBreakpointAt(Editor : PSourceEditor; Line : l
   end;
 
 begin
-  FindBreakpointAt:=FirstThat(@IsAtLine);
+  FindBreakpointAt:=TBreakpoint(FirstThat(TNestedTestProc(@IsAtLine)));
 end;
 
 procedure TBreakpointCollection.ShowAllBreakpoints;
@@ -2051,7 +2050,7 @@ procedure TBreakpointCollection.ShowAllBreakpoints;
   end;
 
 begin
-  ForEach(@SetInSource);
+  ForEach(TNestedActionProc(@SetInSource));
 end;
 
 function TBreakpointCollection.GetType(typ : BreakpointType;Const s : String) : PBreakpoint;
@@ -2062,7 +2061,7 @@ function TBreakpointCollection.GetType(typ : BreakpointType;Const s : String) : 
   end;
 
 begin
-  GetType:=FirstThat(@IsThis);
+  GetType:=TBreakpoint(FirstThat(TNestedTestProc(@IsThis)));
 end;
 
 
@@ -2079,7 +2078,7 @@ var
 begin
     ToggleFileLine:=false;
     FileName:=OSFileName(FExpand(FileName));
-    PB:=FirstThat(@IsThere);
+    PB:=TBreakpoint(FirstThat(TNestedTestProc(@IsThere)));
     If Assigned(PB) then
       begin
         { delete it form source window }
@@ -2215,7 +2214,7 @@ begin
     evBroadcast :
       case Event.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Self then
+          if Event.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmEditBreakpoint,nil);
       end;
     evCommand :
@@ -2268,7 +2267,7 @@ function TBreakpointsListBox.GetText(Item,MaxLen: Sw_Integer): String;
 var P: PBreakpointItem;
     S: string;
 begin
-  P:=List.At(Item);
+  P:=TBreakpointItem(List.At(Item));
   S:=P.GetText(MaxLen);
   GetText:=copy(S,1,MaxLen);
 end;
@@ -2290,7 +2289,7 @@ var W: PSourceWindow;
 begin
   (*Message(Application,evBroadcast,cmClearLineHighlights,Self);
   if Range=0 then Exit;*)
-  P:=List.At(Focused);
+  P:=TBreakpointItem(List.At(Focused));
   if P.GetModuleName='' then Exit;
   Desktop.Lock;
   GetNextEditorBounds(R);
@@ -2321,7 +2320,7 @@ var
   P: PBreakpointItem;
 begin
   if Range=0 then Exit;
-  P:=List.At(Focused);
+  P:=TBreakpointItem(List.At(Focused));
   if P=nil then Exit;
   if P.Breakpoint.state=bs_enabled then
     P.Breakpoint.state:=bs_disabled
@@ -2336,7 +2335,7 @@ var
   P: PBreakpointItem;
 begin
   if Range=0 then Exit;
-  P:=List.At(Focused);
+  P:=TBreakpointItem(List.At(Focused));
   if P=nil then Exit;
   Application.ExecuteDialog(TBreakpointItemDialog.Create(P.Breakpoint),nil);
   P.Breakpoint.UpdateSource;
@@ -2348,7 +2347,7 @@ var
   P: PBreakpointItem;
 begin
   if Range=0 then Exit;
-  P:=List.At(Focused);
+  P:=TBreakpointItem(List.At(Focused));
   if P=nil then Exit;
   { delete it form source window }
   P.Breakpoint.state:=bs_disabled;
@@ -2578,7 +2577,7 @@ procedure TBreakpointsWindow.ReloadBreakpoints;
 begin
   If not assigned(BreakpointsCollection) then
     exit;
-  BreakpointsCollection.ForEach(@InsertInBreakLB);
+  BreakpointsCollection.ForEach(TNestedActionProc(@InsertInBreakLB));
   ReDraw;
 end;
 
@@ -2972,7 +2971,7 @@ destructor TWatch.Destroy;
 
          begin
           W:=0;
-          ForEach(@GetMax);
+          ForEach(TNestedActionProc(@GetMax));
           MaxW:=W;
           If assigned(WatchesWindow) then
             WatchesWindow.WLB.Update(MaxW);
@@ -2980,7 +2979,7 @@ destructor TWatch.Destroy;
 
       function  TWatchesCollection.At(Index: Integer): PWatch;
         begin
-          At:=Inherited At(Index);
+          At:=TWatch(Inherited At(Index));
         end;
 
 {****************************************************************************
@@ -3243,7 +3242,7 @@ begin
     evBroadcast :
       case Event.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Self then
+          if Event.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmEdit,nil);
       end;
     evCommand :
@@ -3465,11 +3464,11 @@ end;
       { all is in tframeentry }
       for i:=0 to Debugger.frame_count-1 do
         begin
-          with Debugger.frames[i]^ do
+          with Debugger.frames[i] do
             begin
               if assigned(file_name) then
                 AddItem(TMessageItem.Create(0,GetPChar(function_name)+GetPChar(args),
-                  AddModuleName(GetPChar(file_name),line_number,1)))
+                  AddModuleName(GetPChar(file_name)),line_number,1))
               else
                 AddItem(TMessageItem.Create(0,HexStr(address,SizeOf(address)*2)+' '+GetPChar(function_name)+GetPChar(args),
                   AddModuleName(''),line_number,1));
@@ -3485,7 +3484,7 @@ end;
       { Now set all Debugger rows }
       for i:=0 to Debugger.frame_count-1 do
         begin
-          with Debugger.frames[i]^ do
+          with Debugger.frames[i] do
             begin
               W:=SearchOnDesktop(GetPChar(file_name),false);
               If assigned(W) then
@@ -3545,7 +3544,7 @@ end;
 
   procedure   TFramesListBox.HandleEvent(var Event: TEvent);
     begin
-      if ((Event.What=EvKeyDown) and (Event.CharCode='i')) or
+      if ((Event.What=EvKeyDown) and (Event.CharCode=Ord('i'))) or
          ((Event.What=EvCommand) and (Event.Command=cmDisassemble)) then
         GotoAssembly;
       inherited HandleEvent(Event);

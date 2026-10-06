@@ -2,6 +2,8 @@
   tv3 TDrawBuffer is a class; WriteLineW/GetColorW consume these arrays. }
 const
   MaxViewWidth = 255;
+  { Free Vision name of the Space key (scan code $39, char $20). }
+  kbSpaceBar = $3920;
 
 type
   TFVDrawBuffer = array[0..MaxViewWidth - 1] of Word;

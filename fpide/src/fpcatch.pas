@@ -143,7 +143,7 @@ begin
    SIGSEGV : begin
                if StopJmpValid then
                  LongJmp(StopJmp,SIGSEGV);
-               if Assigned(Application) then IDEApp.Done;
+               if Assigned(Application) then IDEApp.Free;
                Writeln('Internal SIGSEGV Error caught');
 {$ifndef DEBUG}
                Halt;
@@ -154,7 +154,7 @@ begin
     SIGFPE : begin
                 if StopJmpValid then
                   LongJmp(StopJmp,SIGFPE);
-               if Assigned(Application) then IDEApp.Done;
+               if Assigned(Application) then IDEApp.Free;
                Writeln('Internal SIGFPE Error caught');
 {$ifndef DEBUG}
                Halt;
@@ -165,7 +165,7 @@ begin
     SIGILL : begin
                 if StopJmpValid then
                   LongJmp(StopJmp,SIGILL);
-               if Assigned(Application) then IDEApp.Done;
+               if Assigned(Application) then IDEApp.Free;
                Writeln('Internal SIGILL Error caught');
 {$ifndef DEBUG}
                Halt;
@@ -195,7 +195,7 @@ begin
                  end;
                if MustQuit then
                 begin
-                  if Assigned(Application) then IDEApp.Done;
+                  if Assigned(Application) then IDEApp.Free;
 {$ifndef DEBUG}
                   Halt;
 {$else DEBUG}

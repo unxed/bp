@@ -342,7 +342,7 @@ function NewBrowserTabItem(ASign: char; ALink: PView; ANext: PBrowserTabItem): P
 var P: PBrowserTabItem;
 begin
   New(P); FillChar(P^,SizeOf(P^),0);
-  with P do begin Sign:=ASign; Link:=ALink; Next:=ANext; end;
+  with P^ do begin Sign:=ASign; Link:=ALink; Next:=ANext; end;
   NewBrowserTabItem:=P;
 end;
 
@@ -686,7 +686,7 @@ begin
       end;
     evMouseDown :
       begin
-        if Event.double then
+        if ((Event.EventFlags and meDoubleClick)<>0) then
           begin
             Browse;
             ClearEvent(Event);
@@ -711,7 +711,7 @@ begin
     evBroadcast :
       case Event.Command of
         cmListFocusChanged :
-         if Event.InfoPtr=Self then
+         if Event.InfoPtr=Pointer(Self) then
           if (MiscOptions and moAutoTrackSource)<>0 then
             if GetState(sfFocused) then
               AutoTrackSource;
@@ -868,9 +868,9 @@ begin
             ClearEvent(Event);
           end;
       else
-        if Event.CharCode in[#33..#255] then
+        if (Event.TextLength>0) and (Event.Text[0]>=#33) then
           begin
-            LookUp(LookUpStr+Event.CharCode);
+            LookUp(LookUpStr+EventText(Event));
             ClearEvent(Event);
           end;
       end;
@@ -886,7 +886,7 @@ var DeltaX: sw_integer;
 begin
   inherited Draw;
   if Assigned(HScrollBar)=false then DeltaX:=0 else
-    DeltaX:=HScrollBar.Value-HScrollBar.Min;
+    DeltaX:=HScrollBar.Value-HScrollBar.MinVal;
   SetCursor(2+SymbolTypLen+length(LookUpStr)-DeltaX,Focused-TopItem);
 end;
 
@@ -1234,7 +1234,7 @@ begin
         MakeLocal(Event.Where,P);
         SetCursor(P.X,P.Y);
 {$endif HASOUTLINE}
-        if Event.double then
+        if ((Event.EventFlags and meDoubleClick)<>0) then
           begin
             Message(Self,evKeyDown,kbEnter,nil);
             ClearEvent(Event);
@@ -1483,7 +1483,7 @@ begin
 end;
 begin
   NormColor:=GetColorW(1); SelColor:=GetColorW(2);
-  MoveChar(B,'─',SelColor,Size.X);
+  MoveChar(B,#196,SelColor,Size.X);
   CurX:=0; Count:=0;
   for I:=0 to GetItemCount-1 do
     if (Flags and (1 shl I))<>0 then
@@ -1491,13 +1491,13 @@ begin
       Inc(Count);
       if Current=I then C:=SelColor
                    else C:=NormColor;
-      if Count=1 then MoveChar(B[CurX],'┤',SelColor,1)
-                 else MoveChar(B[CurX],'│',SelColor,1);
+      if Count=1 then MoveChar(B[CurX],#180,SelColor,1)
+                 else MoveChar(B[CurX],#179,SelColor,1);
       MoveCStr(B[CurX+1],' '+Names(I)+' ',C);
       Inc(CurX,4);
     end;
   if Count>0 then
-    MoveChar(B[CurX],'├',SelColor,1);
+    MoveChar(B[CurX],#195,SelColor,1);
   WriteLineW(0,0,Size.X,Size.Y,B);
 end;
 
@@ -1813,21 +1813,21 @@ begin
         cmListItemSelected :
           begin
             S:=nil;
-            if (Event.InfoPtr=ScopeView) then
+            if (Event.InfoPtr=Pointer(ScopeView)) then
               begin
                 S:=ScopeView.Symbols.At(ScopeView.Focused);
                 MakeGlobal(ScopeView.Origin,P);
                 Desktop.MakeLocal(P,P); Inc(P.Y,ScopeView.Focused-ScopeView.TopItem);
                 Inc(P.Y);
               end;
-            if (Event.InfoPtr=UnitInfoUsed) then
+            if (Event.InfoPtr=Pointer(UnitInfoUsed)) then
               begin
                 S:=UnitInfoUsed.Symbols.At(UnitInfoUsed.Focused);
                 MakeGlobal(UnitInfoUsed.Origin,P);
                 Desktop.MakeLocal(P,P); Inc(P.Y,UnitInfoUsed.Focused-UnitInfoUsed.TopItem);
                 Inc(P.Y);
               end;
-            if (Event.InfoPtr=UnitInfoDependent) then
+            if (Event.InfoPtr=Pointer(UnitInfoDependent)) then
               begin
                 S:=UnitInfoDependent.Symbols.At(UnitInfoDependent.Focused);
                 MakeGlobal(UnitInfoDependent.Origin,P);
@@ -1898,7 +1898,7 @@ begin
   InitGDBWindow;
   if not assigned(Debugger) then
     begin
-      new(Debugger,Init);
+      Debugger := TDebugController.Create;
       if assigned(Debugger) then
         Debugger.SetExe(ExeFile);
     end;

@@ -649,7 +649,7 @@ var
   P : PSwitchItem;
 begin
   if index<ItemCount then
-    P:=Items.At(Index)
+    P:=TSwitchItem(Items.At(Index))
   else
     P:=nil;
   if assigned(P) then
@@ -664,7 +664,7 @@ var
   P : PSwitchItem;
 begin
   if index<ItemCount then
-    P:=Items.At(Index)
+    P:=TSwitchItem(Items.At(Index))
   else
     P:=nil;
   if assigned(P) then
@@ -679,7 +679,7 @@ var
   P : PBooleanItem;
 begin
   if index<ItemCount then
-    P:=Items.At(Index)
+    P:=TBooleanItem(Items.At(Index))
   else
     P:=nil;
   if assigned(P) and (P.Typ=ot_boolean) then
@@ -694,7 +694,7 @@ var
   P : PLongintItem;
 begin
   if index<ItemCount then
-    P:=Items.At(Index)
+    P:=TLongintItem(Items.At(Index))
   else
     P:=nil;
   if assigned(P) and (P.Typ=ot_longint) then
@@ -709,7 +709,7 @@ var
   P : PStringItem;
 begin
   if index<ItemCount then
-    P:=Items.At(Index)
+    P:=TStringItem(Items.At(Index))
   else
     P:=nil;
   if assigned(P) and (P.Typ=ot_string) then
@@ -724,7 +724,7 @@ var p:PMultiStringItem;
 
 begin
   if index<ItemCount then
-    p:=Items.at(Index)
+    p:=TMultiStringItem(Items.at(Index))
   else
     p:=nil;
   if (p<>nil) and (p.typ=ot_multistring) then
@@ -747,7 +747,7 @@ var
   P : PBooleanItem;
 begin
   if index<ItemCount then
-    P:=Items.At(Index)
+    P:=TBooleanItem(Items.At(Index))
   else
     P:=nil;
   if assigned(P) and (P.Typ=ot_boolean) then
@@ -760,7 +760,7 @@ var
   P : PLongintItem;
 begin
   if index<ItemCount then
-    P:=Items.At(Index)
+    P:=TLongintItem(Items.At(Index))
   else
     P:=nil;
   if assigned(P) and (P.Typ=ot_longint) then
@@ -773,7 +773,7 @@ var
   P : PStringItem;
 begin
   if index<ItemCount then
-    P:=Items.At(Index)
+    P:=TStringItem(Items.At(Index))
   else
     P:=nil;
   if assigned(P) and (P.Typ=ot_string) then
@@ -815,7 +815,7 @@ function  TSwitches.SetCurrSelParam(const s : String) : boolean;
 var
   FoundP : PSwitchItem;
 begin
-  FoundP:=Items.FirstThat(@CheckItem);
+  FoundP:=TSwitchItem(Items.FirstThat(TNestedTestProc(@CheckItem)));
   if Assigned(FoundP) then
     begin
       SetCurrSelParam:=true;
@@ -872,13 +872,13 @@ begin
       { can be empty for some targets }
       If Items.count>0 then
         begin
-          P:=Items.At(SelNr[SwitchesMode]);
+          P:=TSelectItem(Items.At(SelNr[SwitchesMode]));
           if not P.IsDefault then
             writeln(CfgFile,' '+ItemParam(SelNr[SwitchesMode]));
         end;
     end
   else
-    Items.ForEach(@writeitem);
+    Items.ForEach(TNestedActionProc(@writeitem));
 end;
 
 procedure WriteCustom;
@@ -917,7 +917,7 @@ var
   FoundP : PSwitchItem;
   code : integer;
 begin
-  FoundP:=Items.FirstThat(@checkitem);
+  FoundP:=TSwitchItem(Items.FirstThat(TNestedTestProc(@checkitem)));
   if assigned(FoundP) then
    begin
      case FoundP.Typ of
@@ -1085,12 +1085,12 @@ var
 begin
   GetSourceDirectories:='';
   c:='u';
-  P:=DirectorySwitches.Items.FirstThat(@CheckItem);
+  P:=TStringItem(DirectorySwitches.Items.FirstThat(TNestedTestProc(@CheckItem)));
   S:='';
   if assigned(P) then
     S:=P.Str[SwitchesMode];
   c:='i';
-  P:=DirectorySwitches.Items.FirstThat(@CheckItem);
+  P:=TStringItem(DirectorySwitches.Items.FirstThat(TNestedTestProc(@CheckItem)));
   if assigned(P) then
     S:=P.Str[SwitchesMode]+';'+S;
   if S='' then
@@ -1560,7 +1560,7 @@ begin
    end;
 end;
 begin
-  P.Items.ForEach(@HandleSwitch);
+  P.Items.ForEach(TNestedActionProc(@HandleSwitch));
 end;
 var I: integer;
     S: string;

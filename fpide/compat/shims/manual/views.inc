@@ -9,3 +9,11 @@ type
   PScrollBar  = TScrollBar;
   PScroller   = TScroller;
   PWindow     = TWindow;
+
+{ Free Vision phases of the focus chain (TGroup.Phase). }
+type
+  TPhaseType = TvViews.TPhaseType;
+const
+  phFocused     = TvViews.phFocused;
+  phPreProcess  = TvViews.phPreProcess;
+  phPostProcess = TvViews.phPostProcess;

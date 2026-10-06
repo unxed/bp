@@ -87,7 +87,13 @@ def main(log, src):
             b = lines[line - 1]
             s = expr_start(b, col - 1, is_arg)
             if s is None:
-                print(f'ptrcast: skipped {f}:{line}', file=sys.stderr)
+                # a comparison of a Pointer field with a class reference: cast the class side
+                new = re.sub(rb'(\bInfoPtr\s*(?:=|<>)\s*)(?!Pointer\()([A-Za-z_][\w.]*)', rb'\1Pointer(\2)', b)
+                if new != b:
+                    lines[line - 1] = new
+                    total += 1
+                else:
+                    print(f'ptrcast: skipped {f}:{line}', file=sys.stderr)
                 continue
             e = expr_end(b, s)
             expr = b[s:e].rstrip()

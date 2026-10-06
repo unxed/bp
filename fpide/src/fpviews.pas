@@ -781,7 +781,7 @@ begin
   EditorWindow:=(P.HelpCtx=hcSourceWindow);
 end;
 begin
-  FirstEditorWindow:=pointer(Desktop.FirstThat(@EditorWindow));
+  FirstEditorWindow:=TSourceWindow(pointer(Desktop.FirstThat(@EditorWindow)));
 end;
 
 function EditorWindowFile(const Name : String): PSourceWindow;
@@ -796,7 +796,7 @@ var
 
 begin
   SName:=FixFileName(FExpand(Name));
-  EditorWindowFile:=pointer(Desktop.FirstThat(@EditorWindow));
+  EditorWindowFile:=TSourceWindow(pointer(Desktop.FirstThat(@EditorWindow)));
 end;
 
 
@@ -1139,7 +1139,7 @@ end;
 function SearchWindowWithNo(No: integer): PWindow;
 var P: PWindow;
 begin
-  P:=Message(Desktop,evBroadcast,cmSearchWindow+No,nil);
+  P:=TWindow(Message(Desktop,evBroadcast,cmSearchWindow+No,nil));
   if pointer(P)=pointer(Desktop) then P:=nil;
   SearchWindowWithNo:=P;
 end;
@@ -1153,7 +1153,7 @@ begin
   { we have a crash here because of the TStatusLine
     that can also have one of these values
     but is not a Window object PM }
-  if P<>pointer(StatusLine) then
+  if Pointer(P)<>Pointer(StatusLine) then
   if IsWindow(P) then
     W:=PWindow(P);
   OK:=(W<>nil);
@@ -1215,7 +1215,7 @@ var OK: boolean;
 begin
   OK:=P.HelpCtx=hcSourceWindow;
   if OK then
-    with PSourceWindow(P)^ do
+    with PSourceWindow(P) do
      if FixFileName(Editor.FileName)=AFileName then
        begin
          EC:=Editor.Core;
@@ -1811,7 +1811,7 @@ end;
 function TSourceEditor.CreateLocalMenuView(var Bounds: TRect; M: PMenu): PMenuPopup;
 var MV: PAdvancedMenuPopup;
 begin
-  MV := TAdvancedMenuPopup.Create(Bounds,M);
+  MV := TAdvancedMenuPopup.Create(Bounds,M,nil);
   CreateLocalMenuView:=MV;
 end;
 
@@ -1948,7 +1948,7 @@ end;
 
 constructor TFPHeapView.InitKb(var Bounds: TRect);
 begin
-  if inherited InitKb(Bounds)=false then Fail;
+  inherited InitKb(Bounds);
   Options:=Options or gfGrowHiX or gfGrowHiY;
   EventMask:=EventMask or evIdle;
   GrowMode:=gfGrowAll;
@@ -2191,7 +2191,7 @@ begin
     NoNameCount:=-1;
   if AFileName='*' then
     AFileName:='';
-  Editor := TEditor.Create(R, HSB, VSB, Indicator,AFileName);
+  Editor := TSourceEditor.Create(R, HSB, VSB, Indicator,AFileName);
   Editor.GrowMode:=gfGrowHiX+gfGrowHiY;
   if LoadFile then
     begin
@@ -2355,9 +2355,16 @@ end;
 {$ifndef NODEBUG}
 
 function TGDBSourceEditor.Valid(Command: Word): Boolean;
+type
+  TValidFn = function(Command: Word): Boolean of object;
 var OK: boolean;
+    M: TMethod;
 begin
-  OK:=TCodeEditor.Valid(Command);
+  { object model: TCodeEditor.Valid was called directly, skipping TSourceEditor.Valid (the save
+    question). A class cannot name a grandparent method, so call its code address on Self. }
+  M.Code:=@TCodeEditor.Valid;
+  M.Data:=Self;
+  OK:=TValidFn(M)(Command);
   { do NOT ask for save !!
   if OK and ((Command=cmClose) or (Command=cmQuit)) then
      if IsClipboard=false then
@@ -2458,7 +2465,7 @@ begin
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
   GetExtent(R); R.Grow(-1,-1);
-  Editor := TEditor.Create(R, HSB, VSB, Indicator, GDBOutputFile);
+  Editor := TGDBSourceEditor.Create(R, HSB, VSB, Indicator, GDBOutputFile);
   Editor.GrowMode:=gfGrowHiX+gfGrowHiY;
   Editor.SetFlags(efInsertMode+efSyntaxHighlight+efNoIndent+efExpandAllTabs);
   if ExistsFile(GDBOutputFile) then
@@ -2698,7 +2705,7 @@ function   TDisassemblyEditor.GetCurrentLine(address : CORE_ADDR) : PDisasLine;
   Var
     PL : PDisasLine;
 begin
-  PL:=DisasLines.FirstThat(@IsCorrectLine);
+  PL:=TDisasLine(DisasLines.FirstThat(TNestedTestProc(@IsCorrectLine)));
   if Assigned(PL) then
     begin
       if assigned(CurL) then
@@ -3027,7 +3034,7 @@ begin
     evBroadcast :
       case Event.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Self then
+          if Event.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmMsgTrackSource,nil);
       end;
     evCommand :
@@ -3090,7 +3097,7 @@ function TMessageListBox.GetText(Item,MaxLen: Sw_Integer): String;
 var P: PMessageItem;
     S: string;
 begin
-  P:=List.At(Item);
+  P:=TMessageItem(List.At(Item));
   S:=P.GetText(MaxLen);
   GetText:=copy(S,1,MaxLen);
 end;
@@ -3116,7 +3123,7 @@ var W: PSourceWindow;
 begin
   Message(Application,evBroadcast,cmClearLineHighlights,Self);
   if Range=0 then Exit;
-  P:=List.At(Focused);
+  P:=TMessageItem(List.At(Focused));
   if P.Row=0 then Exit;
   Desktop.Lock;
   GetNextEditorBounds(R);
@@ -3163,7 +3170,7 @@ var W: PSourceWindow;
 begin
   Message(Application,evBroadcast,cmClearLineHighlights,Self);
   if Range=0 then Exit;
-  P:=List.At(Focused);
+  P:=TMessageItem(List.At(Focused));
   if P.Row=0 then Exit;
   Desktop.Lock;
   if P.Row>0 then Row:=P.Row-1 else Row:=0;
@@ -3361,8 +3368,6 @@ begin
   inherited HandleEvent(Event);
 end;
 
-
-(*
 constructor TTab.Create(var Bounds: TRect; ATabDef: PTabDef);
 begin
   inherited Create(Bounds);
@@ -3595,7 +3600,7 @@ begin
 end;
 
 procedure TTab.Draw;
-var B     : TDrawBuffer;
+var B     : TFVDrawBuffer;
     i     : integer;
     C1,C2,C3,C : word;
     HeaderLen  : integer;
@@ -3606,13 +3611,14 @@ var B     : TDrawBuffer;
     FC   : char;
     ClipR      : TRect;
 procedure SWriteBuf(X,Y,W,H: integer; var Buf);
-var i: integer;
+var i,j: integer;
 begin
   if Y+H>Size.Y then H:=Size.Y-Y;
   if X+W>Size.X then W:=Size.X-X;
   if Buffer=nil then WriteBufW(X,Y,W,H,Buf)
                 else for i:=1 to H do
-                         Move(Buf,Buffer^[X+(Y+i-1)*Size.X],W*2);
+                         for j:=0 to W-1 do
+                           Buffer[X+j+(Y+i-1)*Size.X]:=CellFromBIOS(PWord(@Buf)[j]);
 end;
 procedure ClearBuf;
 begin
@@ -3633,7 +3639,7 @@ begin
   if HeaderLen>Size.X-2 then HeaderLen:=Size.X-2;
 
   { --- 1. sor --- }
-  ClearBuf; MoveChar(B[0],'│',C1,1); MoveChar(B[HeaderLen+1],'│',C1,1);
+  ClearBuf; MoveChar(B[0],#179,C1,1); MoveChar(B[HeaderLen+1],#179,C1,1);
   X:=1;
   for i:=0 to DefCount-1 do
       begin
@@ -3646,47 +3652,47 @@ begin
                 end
            else C:=C2;
         MoveCStr(B[X],' '+Name^+' ',C); X:=X+X2+3;
-        MoveChar(B[X-1],'│',C1,1);
+        MoveChar(B[X-1],#179,C1,1);
       end;
   SWriteBuf(0,1,Size.X,1,B);
 
   { --- 0. sor --- }
-  ClearBuf; MoveChar(B[0],'┌',C1,1);
+  ClearBuf; MoveChar(B[0],#218,C1,1);
   X:=1;
   for i:=0 to DefCount-1 do
       begin
-        if I<ActiveDef then FC:='┌'
-                       else FC:='┐';
+        if I<ActiveDef then FC:=#218
+                       else FC:=#191;
         X2:=CStrLen(AtTab(i).Name^)+2;
-        MoveChar(B[X+X2],{'┬'}FC,C1,1);
+        MoveChar(B[X+X2],{#194}FC,C1,1);
         if i=DefCount-1 then X2:=X2+1;
         if X2>0 then
-        MoveChar(B[X],'─',C1,X2);
+        MoveChar(B[X],#196,C1,X2);
         X:=X+X2+1;
       end;
-  MoveChar(B[HeaderLen+1],'┐',C1,1);
-  MoveChar(B[ActiveKPos],'┌',C1,1); MoveChar(B[ActiveVPos],'┐',C1,1);
+  MoveChar(B[HeaderLen+1],#191,C1,1);
+  MoveChar(B[ActiveKPos],#218,C1,1); MoveChar(B[ActiveVPos],#191,C1,1);
   SWriteBuf(0,0,Size.X,1,B);
 
   { --- 2. sor --- }
-  MoveChar(B[1],'─',C1,Max(HeaderLen,0)); MoveChar(B[HeaderLen+2],'─',C1,Max(Size.X-HeaderLen-3,0));
-  MoveChar(B[Size.X-1],'┐',C1,1);
-  MoveChar(B[ActiveKPos],'┘',C1,1);
-  if ActiveDef=0 then MoveChar(B[0],'│',C1,1)
-                 else MoveChar(B[0],{'├'}'┌',C1,1);
-  MoveChar(B[HeaderLen+1],'─'{'┴'},C1,1); MoveChar(B[ActiveVPos],'└',C1,1);
+  MoveChar(B[1],#196,C1,Max(HeaderLen,0)); MoveChar(B[HeaderLen+2],#196,C1,Max(Size.X-HeaderLen-3,0));
+  MoveChar(B[Size.X-1],#191,C1,1);
+  MoveChar(B[ActiveKPos],#217,C1,1);
+  if ActiveDef=0 then MoveChar(B[0],#179,C1,1)
+                 else MoveChar(B[0],{#195}#218,C1,1);
+  MoveChar(B[HeaderLen+1],#196{#193},C1,1); MoveChar(B[ActiveVPos],#192,C1,1);
   MoveChar(B[ActiveKPos+1],' ',C1,Max(ActiveVPos-ActiveKPos-1,0));
   SWriteBuf(0,2,Size.X,1,B);
 
   { --- maradék sor --- }
-  ClearBuf; MoveChar(B[0],'│',C1,1); MoveChar(B[Size.X-1],'│',C1,1);
+  ClearBuf; MoveChar(B[0],#179,C1,1); MoveChar(B[Size.X-1],#179,C1,1);
   for i:=3 to Size.Y-1 do
     SWriteBuf(0,i,Size.X,1,B);
   { SWriteBuf(0,3,Size.X,Size.Y-4,B); this was wrong
     because WriteBuf then expect a buffer of size size.x*(size.y-4)*2 PM }
 
   { --- Size.X . sor --- }
-  MoveChar(B[0],'└',C1,1); MoveChar(B[1],'─',C1,Max(Size.X-2,0)); MoveChar(B[Size.X-1],'┘',C1,1);
+  MoveChar(B[0],#192,C1,1); MoveChar(B[1],#196,C1,Max(Size.X-2,0)); MoveChar(B[Size.X-1],#217,C1,1);
   SWriteBuf(0,Size.Y-1,Size.X,1,B);
 
   { - End of TGroup.Draw - }
@@ -3749,7 +3755,7 @@ begin
           P:=X;
         end;
 end;
-*)
+
 
 
 constructor TScreenView.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar;
@@ -3848,9 +3854,9 @@ begin
   InTranslate:=true;
   case Event.What of
     evMouseDown :
-      if (GetShiftState and kbAlt)<>0 then
+      if (Event.ControlKeyState and kbAltShift)<>0 then
         TranslateAction(AltMouseAction) else
-      if (GetShiftState and kbCtrl)<>0 then
+      if (Event.ControlKeyState and kbCtrlShift)<>0 then
         TranslateAction(CtrlMouseAction);
   end;
   InTranslate:=false;
@@ -3891,7 +3897,7 @@ begin
   if W<>nil then
   begin
     if (CurX<>0) or (CurY<>0) then
-       with W.Editor^ do
+       with W.Editor do
        begin
          SetCurPtr(CurX,CurY);
          TrackCursor(do_centre);

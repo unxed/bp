@@ -279,14 +279,12 @@ end;
 
 procedure RegisterIDEObjects;
 begin
-  RegisterApp;
   RegisterCodeComplete;
   RegisterCodeTemplates;
 {$ifdef COLORSEL}
   RegisterColorSel;
 {$endif COLORSEL}
   RegisterAsciiTab;
-  RegisterDialogs;
   RegisterWEditor;
   RegisterWCEdit;
   RegisterFPCalc;
@@ -297,12 +295,7 @@ begin
   RegisterFPDebugViews;
   RegisterFPRegsViews;
 {$endif}
-  RegisterMenus;
-  RegisterStdDlg;
   RegisterSymbols;
-  RegisterObjects;
-  RegisterValidate;
-  RegisterViews;
 
   RegisterWHTMLScan;
   RegisterWUtils;
@@ -402,8 +395,7 @@ BEGIN
 
   InitDirs;
 
-  RegisterIDEObjects;
-  StreamError:=@MyStreamError;
+  RegisterIDEObjects; { tv3 registers its own types in its unit initialization }
 
   ShowReadme:=ShowReadme or (LocateFile(INIFileName)='');
   if LocateFile(INIFileName)<>'' then
@@ -434,7 +426,7 @@ BEGIN
   { init target information etc. }
   InitSystems;
 
-  IDEApp.Init;
+  IDEApp := TIDEApp.Create;
   CheckINIFile;
   ReadSwitches(SwitchesPath);
   { load all options after init because of open files }
@@ -561,7 +553,7 @@ BEGIN
   DoneDesktopFile;
 
   DelTempFiles;
-  IDEApp.Done;
+  IDEApp.Free;
   WriteSwitches(SwitchesPath);
 
 {$IFDEF HasSignal}
@@ -598,7 +590,7 @@ BEGIN
 {$if defined(windows)}
   SetConsoleMode(GetStdHandle(cardinal(Std_Input_Handle)),StartupConsoleMode);
 {$endif defined(windows)}
-  StreamError:=nil;
+  { StreamError hook: not in tv3 }
 {$ifdef DEBUG}
   if CloseImmediately then
     writeln('Used time is ',getrealtime-StartTime:0:2);

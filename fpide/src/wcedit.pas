@@ -1643,7 +1643,7 @@ begin
       { NS.Init;
       SaveToStream(@NS);
       TSize:=NS.GetSize;
-      NS.Done;
+      NS.Free;
         This is waste of time PM
         use Seek instead !! }
       { yep. and this won't work for serial streams. - Gabor }
