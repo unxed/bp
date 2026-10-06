@@ -104,12 +104,12 @@ begin
   R.Assign(0,0,round(ScreenWidth*5/8),ScreenHeight-10);
   inherited Create(R, dialog_helpfiles);
 
-  New(C, Init(20,10));
+  C := TUnsortedStringCollection.Create(20,10);
 
   GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y); R.B.X:=R.B.X-13;
   R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
-  New(SB, Init(R2)); Insert(SB);
-  New(LB, Init(R, 1, SB));
+  SB := TScrollBar.Create(R2); Insert(SB);
+  LB := THelpFileListBox.Create(R, 1, SB);
 
   for I:=0 to HelpFiles.Count-1 do
     begin
@@ -144,7 +144,7 @@ procedure THelpFilesDialog.HandleEvent(var Event: TEvent);
     if Re<>cmCancel then
     begin
       PushStatus(FormatStrStr(msg_storinghtmlindexinfile,FileName));
-      New(BS, Init(FileName, stCreate, 4096));
+      BS := TBufStream.Create(FileName, stCreate, 4096);
       if Assigned(BS)=false then
         begin
           if not SilentFails then
@@ -155,7 +155,7 @@ procedure THelpFilesDialog.HandleEvent(var Event: TEvent);
         end
       else
         begin
-          LS.StoreDocuments(BS^);
+          LS.StoreDocuments(BS);
           if BS.Status<>stOK then
             begin
               if not SilentFails then
@@ -196,14 +196,14 @@ begin
         cmAddItem :
           begin
             S:='';
-            New(D, Init(HelpFileExts,
+            D := TFileDialog.Create(HelpFileExts,
               dialog_installhelpfile,
               label_installhelpfile_filename,
-              fdOpenButton,hidOpenHelpFile));
+              fdOpenButton,hidOpenHelpFile);
             Re:=Desktop.ExecView(D);
             if Re<>cmCancel then
             begin
-              D.GetFileName(FileName);
+              FileName := D.GetFileName;
               if UpcaseStr(ExtOf(FileName))=UpcaseStr(HTMLIndexExt) then
                 begin
                   S:='HTML Index';
@@ -220,7 +220,7 @@ begin
                     ShowMessage(msg_pleasewaitwhilecreatingindex);
                     S:='HTML Index';
                     PushStatus(FormatStrStr(msg_buildingindexfile,FileName));
-                    New(LS, Init(DirOf(FileName)));
+                    LS := TFPHTMLFileLinkScanner.Create(DirOf(FileName));
                     LS.ProcessDocument(FileName,[soSubDocsOnly]);
                     if LS.GetDocumentCount=0 then
                       begin
@@ -289,7 +289,7 @@ procedure TIDEApp.HelpFiles;
 var
   PHFD : PHelpFilesDialog;
 begin
-  New(PHFD, Init);
+  PHFD := THelpFilesDialog.Create;
   if Desktop.ExecView(PHFD)=cmOK then
   begin
     DoneHelpSystem;
@@ -302,6 +302,6 @@ end;
 
 procedure TIDEApp.About;
 begin
-  ExecuteDialog(New(PFPAboutDialog, Init), nil);
+  ExecuteDialog(TFPAboutDialog.Create, nil);
 end;
 

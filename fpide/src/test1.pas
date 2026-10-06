@@ -1,7 +1,7 @@
 unit test1;
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 
-{$mode objfpc}
+{$mode objfpc}{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 { dummy unit for test of dbx stabs info PM }
 

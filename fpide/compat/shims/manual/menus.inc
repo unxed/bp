@@ -5,3 +5,6 @@ type
   PMenuBox    = TMenuBox;
   PMenuPopup  = TMenuPopup;
   PStatusLine = TStatusLine;
+
+{ FV standard status line keys: Alt-X, F10, Alt-F3, F5, Ctrl-F5, F6, Shift-F6 (no text, so they are only keys). }
+function StdStatusKeys(ANext: PStatusItem): PStatusItem;

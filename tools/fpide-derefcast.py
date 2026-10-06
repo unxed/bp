@@ -7,7 +7,7 @@ patched, and only when the byte before that column is `^`. usage: fpide-derefcas
 import re, sys
 from pathlib import Path
 
-rx = re.compile(r'^(\w+\.pas)\((\d+),(\d+)\) Error: Illegal qualifier', re.M)
+rx = re.compile(r'^(\w+\.(?:pas|inc))\((\d+),(\d+)\) Error: Illegal qualifier', re.M)
 text = Path(sys.argv[1]).read_bytes().decode('utf-8', 'replace')
 hits = {}
 for m in rx.finditer(text):
@@ -18,8 +18,9 @@ for f, items in hits.items():
     lines = p.read_bytes().split(b'\n')
     for line, col in sorted(items, key=lambda x: (x[0], -x[1])):
         b = lines[line - 1]
-        if col >= 2 and b[col - 2:col - 1] == b'^':
-            lines[line - 1] = b[:col - 2] + b[col - 1:]
+        i = b.rfind(b'^', max(0, col - 5), col)   # the column is after the caret, or after `^ ` before `do`
+        if i >= 0:
+            lines[line - 1] = b[:i] + b[i + 1:]
             total += 1
     p.write_bytes(b'\n'.join(lines))
 print(f'derefcast: removed {total} carets')

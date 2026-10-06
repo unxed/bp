@@ -382,7 +382,7 @@ begin
    Name:=UpcaseStr(Name);
    If BrowCol.Modules<>nil then
      begin
-       PS:=BrowCol.Modules.FirstThat(@Search);
+       PS:=TSymbol(BrowCol.Modules.FirstThat(TNestedTestProc(@Search)));
        If assigned(PS) then
          begin
            S:=PS.Items.At(Index);
@@ -591,7 +591,7 @@ end;
 ****************************************************************************}
 function  TGDBValueCollection.At(Index: sw_Integer): PGDBValue;
 begin
-  At:= Inherited At(Index);
+  At:= TGDBValue(Inherited At(Index));
 end;
 {****************************************************************************
                                TSymbolView
@@ -753,7 +753,7 @@ var BW: PBrowserWindow;
 procedure IsBW(P: PView);
 begin
   if (P.HelpCtx=hcBrowserWindow) then
-    BW:=pointer(P);
+    BW:=TBrowserWindow(pointer(P));
 end;
 begin
   BW:=nil;
@@ -917,7 +917,7 @@ begin
   OK:=Range>0;
   if OK then
   begin
-    S:=List.At(Item);
+    S:=TSymbol(List.At(Item));
     OK:=(S.References<>nil) and (S.References.Count>0);
     if OK then
       OK:=GotoReference(S.References.At(0));
@@ -932,7 +932,7 @@ begin
   OK:=Range>0;
   if OK then
   begin
-    S:=List.At(Item);
+    S:=TSymbol(List.At(Item));
     OK:=(S.References<>nil) and (S.References.Count>0);
     if OK then
       OK:=TrackReference(S.References.At(0),AutoTrack);
@@ -1034,7 +1034,7 @@ var OK: boolean;
 begin
   OK:=Range>0;
   if OK then
-    OK:=GotoReference(List.At(Item));
+    OK:=GotoReference(TReference(List.At(Item)));
   GotoItem:=OK;
 end;
 
@@ -1043,7 +1043,7 @@ var OK: boolean;
 begin
   OK:=Range>0;
   if OK then
-    OK:=TrackReference(List.At(Item),AutoTrack);
+    OK:=TrackReference(TReference(List.At(Item)),AutoTrack);
   TrackItem:=OK;
 end;
 
@@ -1188,7 +1188,7 @@ var
     end;
 begin
   Nb:=0;
-  AddCount(Node);
+  AddCount(TObjectSymbol(Node));
   GetNumChildrenExposed:=Nb;
 end;
 
@@ -1665,7 +1665,7 @@ begin
       MemInfoView.MyBW:=Self;
     end;
   if Assigned(Asym) and ((ASym is TModuleSymbol)) then
-  with PModuleSymbol(Sym)^ do
+  with PModuleSymbol(Sym) do
     begin
       UnitInfo := TUnitInfoPanel.Create(R);
       UnitInfo.GetExtent(R3);

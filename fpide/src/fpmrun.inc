@@ -29,29 +29,29 @@ begin
   PPW:=PW;
   while assigned(PW) do
    begin
-     If PW^.HelpCtx=hcSourceWindow then
+     If PW.HelpCtx=hcSourceWindow then
       begin
-        if pw^.editor^.getmodified then
-         if pw^.editor^.core^.getmodifytime > LastCompileTime then
+        if pw.editor.getmodified then
+         if pw.editor.core.getmodifytime > LastCompileTime then
            begin
              Checkmodifiededitor:=true;
              break;
            end;
       end;
-     PW:=PSourceWindow(PW^.next);
-     While assigned(PW) and (PW<>PPW) and (PW^.HelpCtx<>hcSourceWindow) do
-      PW:=PSourceWindow(PW^.next);
+     PW:=PSourceWindow(PW.next);
+     While assigned(PW) and (PW<>PPW) and (PW.HelpCtx<>hcSourceWindow) do
+      PW:=PSourceWindow(PW.next);
      If PW=PPW then
       break;
    end;
   if Checkmodifiededitor then
    begin
-     if (MessageBox(#3+'You''ve edited a file, recompile the project?',nil,mfinformation+mfyesbutton+mfnobutton)=cmYes) then
+     if (MessageBox(#3+'You''ve edited a file, recompile the project?',mfinformation+mfyesbutton+mfnobutton)=cmYes) then
       begin
         {$IFNDEF NODEBUG}
         if Assigned(Debugger) then
           begin
-            if Debugger^.IsRunning then
+            if Debugger.IsRunning then
               RestartingDebugger:=true;
           end;
         DoResetDebugger;
@@ -69,7 +69,7 @@ end;
 procedure TIDEApp.DoStepOver;
 begin
 {$ifndef NODEBUG}
-  if not assigned(Debugger) or Not Debugger^.HasExe then
+  if not assigned(Debugger) or Not Debugger.HasExe then
    begin
      InitDebugger;
      if not assigned(Debugger) then
@@ -78,29 +78,29 @@ begin
         exit;
       end;
    end;
-  if not Debugger^.IsRunning then
-    Debugger^.StartTrace
+  if not Debugger.IsRunning then
+    Debugger.StartTrace
   else
    begin
      if AskRecompileIfModified then
       exit;
      if InDisassemblyWindow then
-       Debugger^.TraceNextI
+       Debugger.TraceNextI
      else
-       Debugger^.TraceNext;
+       Debugger.TraceNext;
    end;
-  {While (Debugger^.InvalidSourceLine and
-         Debugger^.IsRunning and
-         not Debugger^.error) do
+  {While (Debugger.InvalidSourceLine and
+         Debugger.IsRunning and
+         not Debugger.error) do
     begin
-      Inc(Debugger^.HiddenStepsCount);
+      Inc(Debugger.HiddenStepsCount);
      if InDisassemblyWindow then
-       Debugger^.TraceNextI
+       Debugger.TraceNextI
      else
-      Debugger^.TraceNext;
+      Debugger.TraceNext;
     end;}
-  if Debugger^.IsRunning then
-    Debugger^.AnnotateError;
+  if Debugger.IsRunning then
+    Debugger.AnnotateError;
 {$else NODEBUG}
   NoDebugger;
 {$endif NODEBUG}
@@ -110,7 +110,7 @@ end;
 procedure TIDEApp.DoTraceInto;
 begin
 {$ifndef NODEBUG}
-  if not assigned(Debugger) or Not Debugger^.HasExe then
+  if not assigned(Debugger) or Not Debugger.HasExe then
    begin
      InitDebugger;
      if not assigned(Debugger) then
@@ -119,16 +119,16 @@ begin
         exit;
       end;
    end;
-  if not debugger^.IsRunning then
-    Debugger^.StartTrace
+  if not debugger.IsRunning then
+    Debugger.StartTrace
   else
    begin
      if AskRecompileIfModified then
       exit;
      if InDisassemblyWindow then
-       Debugger^.TraceStepI
+       Debugger.TraceStepI
      else
-       Debugger^.TraceStep;
+       Debugger.TraceStep;
    end;
   { I think we should not try to go deeper !
     if the source is not found PM }
@@ -136,15 +136,15 @@ begin
   { in disassembly windows we should FK }
   if not(InDisassemblyWindow) then
     begin
-      While (Debugger^.InvalidSourceLine and
-             Debugger^.IsRunning and
-             not Debugger^.error) do
+      While (Debugger.InvalidSourceLine and
+             Debugger.IsRunning and
+             not Debugger.error) do
         begin
-          Inc(Debugger^.HiddenStepsCount);
-          Debugger^.TraceNext;
+          Inc(Debugger.HiddenStepsCount);
+          Debugger.TraceNext;
         end;
     end;
-  Debugger^.AnnotateError;
+  Debugger.AnnotateError;
 {$else NODEBUG}
   NoDebugger;
 {$endif NODEBUG}
@@ -153,7 +153,7 @@ end;
 procedure TIDEApp.DoContUntilReturn;
 begin
 {$ifndef NODEBUG}
-  if not assigned(Debugger) or Not Debugger^.HasExe then
+  if not assigned(Debugger) or Not Debugger.HasExe then
    begin
      InitDebugger;
      if not assigned(Debugger) then
@@ -162,15 +162,15 @@ begin
         exit;
       end;
    end;
-  if not debugger^.IsRunning then
-    Debugger^.Run
+  if not debugger.IsRunning then
+    Debugger.Run
   else
    begin
      if AskRecompileIfModified then
       exit;
-     Debugger^.UntilReturn;
+     Debugger.UntilReturn;
    end;
-  Debugger^.AnnotateError;
+  Debugger.AnnotateError;
 {$else NODEBUG}
   NoDebugger;
 {$endif NODEBUG}
@@ -183,7 +183,7 @@ var
   s : shortstring;
 begin
 {$ifndef NODEBUG}
-  if not assigned(Debugger) or not Debugger^.HasExe or not Debugger^.IsRunning then
+  if not assigned(Debugger) or not Debugger.HasExe or not Debugger.IsRunning then
 {$endif}
     begin
       if (not ExistsFile(ExeFile)) or (CompilationPhase<>cpDone) or
@@ -223,17 +223,17 @@ begin
          (target_info.shortname=source_info.shortname)
         then
         begin
-          if not assigned(Debugger) or Not Debugger^.HasExe then
+          if not assigned(Debugger) or Not Debugger.HasExe then
             InitDebugger;
           if assigned(Debugger) then
             begin
               if RestartingDebugger then
                 begin
                   RestartingDebugger:=false;
-                  Debugger^.StartTrace;
+                  Debugger.StartTrace;
                 end
               else
-                Debugger^.Run;
+                Debugger.Run;
               RunDirect:=false;
             end;
         end;
@@ -278,7 +278,7 @@ begin
     begin
       if AskRecompileIfModified then
         exit;
-      Debugger^.Continue;
+      Debugger.Continue;
     end;
 {$endif}
   ;
@@ -287,31 +287,31 @@ end;
 procedure TIDEApp.UpdateRunMenu(DebuggeeRunning : boolean);
 var MenuItem : PMenuItem;
 begin
-  MenuItem:=PAdvancedMenuBar(MenuBar)^.GetMenuItem(cmRun);
+  MenuItem:=PAdvancedMenuBar(MenuBar).GetMenuItem(cmRun);
   if not assigned(MenuItem) then
-    MenuItem:=PAdvancedMenuBar(MenuBar)^.GetMenuItem(cmContinue);
+    MenuItem:=PAdvancedMenuBar(MenuBar).GetMenuItem(cmContinue);
 
   if assigned(MenuItem) then
     begin
-      If assigned(MenuItem^.Name) then
-        DisposeStr(MenuItem^.Name);
+      If assigned(MenuItem.Name) then
+        DisposeStr(MenuItem.Name);
       if DebuggeeRunning then
         begin
-          MenuItem^.Name:=NewStr(menu_run_continue);
-          MenuItem^.command:=cmContinue;
+          MenuItem.Name:=NewStr(menu_run_continue);
+          MenuItem.command:=cmContinue;
         end
       else
         begin
-          MenuItem^.Name:=NewStr(menu_run_run);
-          MenuItem^.command:=cmRun;
+          MenuItem.Name:=NewStr(menu_run_run);
+          MenuItem.command:=cmRun;
         end;
     end;
-  MenuItem:=PAdvancedMenuBar(MenuBar)^.GetMenuItem(cmResetDebugger);
+  MenuItem:=PAdvancedMenuBar(MenuBar).GetMenuItem(cmResetDebugger);
   if assigned(MenuItem) then
-    MenuItem^.Disabled:=not DebuggeeRunning;
-  MenuItem:=PAdvancedMenuBar(MenuBar)^.GetMenuItem(cmUntilReturn);
+    MenuItem.Disabled:=not DebuggeeRunning;
+  MenuItem:=PAdvancedMenuBar(MenuBar).GetMenuItem(cmUntilReturn);
   if assigned(MenuItem) then
-    MenuItem^.Disabled:=not DebuggeeRunning;
+    MenuItem.Disabled:=not DebuggeeRunning;
 end;
 
 
@@ -331,26 +331,26 @@ var R,R2: TRect;
     IL: PEditorInputLine;
 begin
   R.Assign(0,0,round(ScreenWidth*54/80),4);
-  New(D, Init(R, dialog_programparameters));
-  with D^ do
+  D := TCenterDialog.Create(R, dialog_programparameters);
+  with D do
   begin
     GetExtent(R); R.Grow(-2,-1); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
     R2.Copy(R); R2.A.X:=16; Dec(R2.B.X,4);
-    New(IL, Init(R2, 255));
-    IL^.Data^:=GetRunParameters;
+    IL := TEditorInputLine.Create(R2, 255);
+    IL.Data^:=GetRunParameters;
     Insert(IL);
     R2.Copy(R); R2.A.X:=R2.B.X-3; R2.B.X:=R2.A.X+3;
-    Insert(New(PHistory, Init(R2, IL, hidRunParameters)));
+    Insert(THistory.Create(R2, IL, hidRunParameters));
     R2.Copy(R); R2.B.X:=16;
-    Insert(New(PLabel, Init(R2, label_parameters_parameter, IL)));
+    Insert(TLabel.Create(R2, label_parameters_parameter, IL));
   end;
   InsertButtons(D);
-  IL^.Select;
-  if Desktop^.ExecView(D)=cmOK then
+  IL.Select;
+  if Desktop.ExecView(D)=cmOK then
   begin
-    SetRunParameters(IL^.Data^);
+    SetRunParameters(IL.Data^);
   end;
-  Dispose(D, Done);
+  D.Free;
 end;
 
 procedure TIDEApp.DoResetDebugger;
@@ -374,15 +374,15 @@ var
 {$endif}
 begin
 {$ifndef NODEBUG}
-  if (DeskTop^.Current=nil) or
-     ((TypeOf(DeskTop^.Current^)<>TypeOf(TSourceWindow)) and
-      (TypeOf(DeskTop^.Current^)<>TypeOf(TDisassemblyWindow))) then
+  if (DeskTop.Current=nil) or
+     ((DeskTop.Current.ClassType<>TSourceWindow) and
+      (DeskTop.Current.ClassType<>TDisassemblyWindow)) then
     Begin
        ErrorBox(msg_impossibletoreachcursor,nil);
        Exit;
     End;
 
-  If not assigned(Debugger) or Not Debugger^.HasExe then
+  If not assigned(Debugger) or Not Debugger.HasExe then
     begin
       InitDebugger;
       if not assigned(Debugger) then
@@ -392,41 +392,41 @@ begin
         end;
     end;
 
-  W:=PFPWindow(DeskTop^.Current);
+  W:=PFPWindow(DeskTop.Current);
   If assigned(W) then
     begin
-      If TypeOf(W^)=TypeOf(TSourceWindow) then
+      If W.ClassType=TSourceWindow then
         begin
-          FileName:=PSourceWindow(W)^.Editor^.FileName;
-          LineNr:=PSourceWindow(W)^.Editor^.CurPos.Y+1;
-          Debugger^.SetTbreak(GDBFileName(NameAndExtOf(FileName))+':'+IntToStr(LineNr));
-          Debugger^.Continue;
+          FileName:=PSourceWindow(W).Editor.FileName;
+          LineNr:=PSourceWindow(W).Editor.CurPos.Y+1;
+          Debugger.SetTbreak(GDBFileName(NameAndExtOf(FileName))+':'+IntToStr(LineNr));
+          Debugger.Continue;
         end
       else
         begin
-          CurY:=PDisassemblyWindow(W)^.Editor^.CurPos.Y;
-          if CurY<PDisassemblyWindow(W)^.Editor^.GetLineCount then
-            PDL:=PDisasLine(PDisassemblyWindow(W)^.Editor^.GetLine(CurY))
+          CurY:=PDisassemblyWindow(W).Editor.CurPos.Y;
+          if CurY<PDisassemblyWindow(W).Editor.GetLineCount then
+            PDL:=PDisasLine(PDisassemblyWindow(W).Editor.GetLine(CurY))
           else
             PDL:=nil;
           if assigned(PDL) then
             begin
-              if PDL^.Address<>0 then
+              if PDL.Address<>0 then
                 begin
-                  Debugger^.SetTBreak('*0x'+HexStr(PDL^.Address,sizeof(pointer)*2));
+                  Debugger.SetTBreak('*0x'+HexStr(PDL.Address,sizeof(pointer)*2));
                 end
               else
                 begin
-                  S:=PDisassemblyWindow(W)^.Editor^.GetDisplayText(PDisassemblyWindow(W)^.Editor^.CurPos.Y);
+                  S:=PDisassemblyWindow(W).Editor.GetDisplayText(PDisassemblyWindow(W).Editor.CurPos.Y);
                   p:=pos(':',S);
                   FileName:=Copy(S,1,p-1);
                   S:=Copy(S,p+1,high(S));
                   p:=pos(' ',S);
                   S:=Copy(S,1,p-1);
                   LineNr:=StrToInt(S);
-                  Debugger^.SetTBreak(GDBFileName(NameAndExtOf(FileName))+':'+IntToStr(LineNr));
+                  Debugger.SetTBreak(GDBFileName(NameAndExtOf(FileName))+':'+IntToStr(LineNr));
                 end;
-              Debugger^.Continue;
+              Debugger.Continue;
             end;
         end;
     end;
@@ -441,12 +441,12 @@ begin
   InitGDBWindow;
   if not assigned(Debugger) then
     begin
-      new(Debugger,Init);
+      Debugger := TDebugController.Create;
       if assigned(Debugger) then
-        Debugger^.SetExe(ExeFile);
+        Debugger.SetExe(ExeFile);
     end;
   If assigned(GDBWindow) then
-    GDBWindow^.MakeFirst;
+    GDBWindow.MakeFirst;
 {$else NODEBUG}
   NoDebugger;
 {$endif NODEBUG}
@@ -465,60 +465,60 @@ var
 {$endif}
 begin
 {$ifndef NODEBUG}
-  if (DeskTop^.Current=nil) or
-     (TypeOf(DeskTop^.Current^)<>TypeOf(TSourceWindow)) and
-     (TypeOf(DeskTop^.Current^)<>TypeOf(TDisassemblyWindow)) then
+  if (DeskTop.Current=nil) or
+     (DeskTop.Current.ClassType<>TSourceWindow) and
+     (DeskTop.Current.ClassType<>TDisassemblyWindow) then
     Begin
        ErrorBox(msg_impossibletosetbreakpoint,nil);
        Exit;
     End;
 
-  if assigned (DeskTop^.Current) and
-     (TypeOf(DeskTop^.Current^)=TypeOf(TSourceWindow)) then
+  if assigned (DeskTop.Current) and
+     (DeskTop.Current.ClassType=TSourceWindow) then
     begin
-      W:=PSourceWindow(DeskTop^.Current);
-      FileName:=W^.Editor^.FileName;
+      W:=PSourceWindow(DeskTop.Current);
+      FileName:=W.Editor.FileName;
       If FileName='' then
         begin
-          W^.Editor^.SaveAs;
-          FileName:=W^.Editor^.FileName;
+          W.Editor.SaveAs;
+          FileName:=W.Editor.FileName;
           If FileName='' then
             Begin
               ErrorBox(msg_impossibletosetbreakpoint,nil);
               Exit;
             End;
         end;
-      LineNr:=W^.Editor^.CurPos.Y+1;
-      BreakpointsCollection^.ToggleFileLine(FileName,LineNr);
+      LineNr:=W.Editor.CurPos.Y+1;
+      BreakpointsCollection.ToggleFileLine(FileName,LineNr);
     end
-  else if assigned (DeskTop^.Current) and
-     (TypeOf(DeskTop^.Current^)=TypeOf(TDisassemblyWindow)) then
+  else if assigned (DeskTop.Current) and
+     (DeskTop.Current.ClassType=TDisassemblyWindow) then
     begin
-      WD:=PDisassemblyWindow(DeskTop^.Current);
-      CurY:=WD^.Editor^.CurPos.Y;
-      if CurY<WD^.Editor^.GetLineCount then
-        PDL:=PDisasLine(WD^.Editor^.GetLine(CurY))
+      WD:=PDisassemblyWindow(DeskTop.Current);
+      CurY:=WD.Editor.CurPos.Y;
+      if CurY<WD.Editor.GetLineCount then
+        PDL:=PDisasLine(WD.Editor.GetLine(CurY))
       else
         PDL:=nil;
       if assigned(PDL) then
         begin
-          if PDL^.Address<>0 then
+          if PDL.Address<>0 then
             begin
-              PB:=New(PBreakpoint,init_address(HexStr(PDL^.Address,sizeof(pointer)*2)));
-              BreakpointsCollection^.Insert(PB);
-              WD^.Editor^.SetLineFlagState(CurY,lfBreakpoint,true);
+              PB := TBreakpoint.init_address(HexStr(PDL.Address,sizeof(pointer)*2));
+              BreakpointsCollection.Insert(PB);
+              WD.Editor.SetLineFlagState(CurY,lfBreakpoint,true);
             end
           else
             begin
-              S:=WD^.Editor^.GetDisplayText(WD^.Editor^.CurPos.Y);
+              S:=WD.Editor.GetDisplayText(WD.Editor.CurPos.Y);
               p:=pos(':',S);
               FileName:=Copy(S,1,p-1);
               S:=Copy(S,p+1,high(S));
               p:=pos(' ',S);
               S:=Copy(S,1,p-1);
               LineNr:=StrToInt(S);
-              b:=BreakpointsCollection^.ToggleFileLine(FileName,LineNr);
-              WD^.Editor^.SetLineFlagState(CurY,lfBreakpoint,b);
+              b:=BreakpointsCollection.ToggleFileLine(FileName,LineNr);
+              WD.Editor.SetLineFlagState(CurY,lfBreakpoint,b);
             end;
         end;
     end;

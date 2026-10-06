@@ -1,4 +1,4 @@
-{$mode objfpc}
+{$mode objfpc}{$modeswitch nestedprocvars}{$modeswitch autoderef}
 {$R-}
 
 program TestProgram;

@@ -192,7 +192,7 @@ uses
   Dos{,Memory},Menus,Dialogs,StdDlg,timeddlg,
   Systems,
   WUtils,WHlpView,WViews,WHTMLHlp,WHelp,WConsole,
-  FPConst,FPVars,FPUtils,FPSwitch,FPIni,FPIntf,FPCompil,FPHelp,
+  FPConst,FPVars,FPUtils,FPSwitch,FPIni,FPIntf,FPCompil,FPHelp,FPVideo,
   FPTemplt,FPCalc,FPUsrScr,FPTools,
 {$ifndef NODEBUG}
   FPDebug,FPRegs,
@@ -883,7 +883,7 @@ begin
       NewItem(menu_file_changedir,'',kbNoKey,cmChangeDir,hcChangeDir,
       NewItem(menu_file_dosshell,'',kbNoKey,cmDOSShell,hcDOSShell,
       NewItem(menu_file_exit,menu_key_file_exit,kbNoKey,cmQuit,hcQuit,
-      nil)))))))))))))),
+      nil))))))))))))))),
     NewSubMenu(menu_edit,hcEditMenu, NewMenu(
       NewItem(menu_edit_undo,menu_key_edit_undo, kbAltBack, cmUndo, hcUndo,
       NewItem(menu_edit_redo,'', kbNoKey, cmRedo, hcRedo,
@@ -1037,7 +1037,7 @@ begin
       NewLine(
       NewItem(menu_help_about,'',kbNoKey, cmAbout, hcAbout,
       nil))))))))),
-    nil)))))))))))));
+    nil))))))))))));
    SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,false);
 end;
 
@@ -1098,7 +1098,7 @@ begin
       NewStatusKey('~Shift+Cursor~ Size', kbNoKey, 65535,
       NewStatusKey('~'#17'ды~ Done', kbNoKey, 65535, {#17 = left arrow}
       NewStatusKey('~Esc~ Cancel', kbNoKey, 65535,
-      nil))))),
+      nil)))))),
     NewStatusDef(hcStackWindow, hcStackWindow,
       NewStatusKey(status_help, kbF1, cmHelp,
       NewStatusKey(status_disassemble, kbAltI, cmDisassemble,
@@ -1161,7 +1161,7 @@ begin
       NewStatusKey(status_localmenu, kbAltF10, cmLocalMenu,
       StdStatusKeys(
       nil)))))),
-    nil))))))))))));
+    nil)))))))))));
 end;
 
 procedure TIDEApp.Idle;
@@ -1333,11 +1333,11 @@ begin
              cmTools         : Tools;
              cmPreferences   : Preferences;
              cmEditor        : EditorOptions(nil);
-             cmEditorOptions : EditorOptions(Event.InfoPtr);
+             cmEditorOptions : EditorOptions(TCodeEditor(Event.InfoPtr));
              cmCodeTemplateOptions: CodeTemplates;
              cmCodeCompleteOptions: CodeComplete;
              cmBrowser       : BrowserOptions(nil);
-             cmBrowserOptions : BrowserOptions(Event.InfoPtr);
+             cmBrowserOptions : BrowserOptions(TBrowserWindow(Event.InfoPtr));
              cmMouse         : Mouse;
              cmStartup       : StartUp;
              cmDesktopOptions: DesktopOptions;
@@ -1371,7 +1371,7 @@ begin
              cmHelpFiles     : HelpFiles;
              cmAbout         : About;
              cmShowReadme    : ShowReadme;
-             cmResizeApp     : ResizeApplication(Event.Id, Event.InfoWord);
+             cmResizeApp     : ; { tv3 resizes the application by itself }
              cmQuitApp       : Message(Self, evCommand, cmQuit, nil);
            else DontClear:=true;
            end;
@@ -1389,7 +1389,7 @@ begin
              Update;
            cmSourceWndClosing :
              begin
-               with PSourceWindow(Event.InfoPtr)^ do
+               with PSourceWindow(Event.InfoPtr) do
                  if Editor.FileName<>'' then
                    AddRecentFile(Editor.FileName,Editor.CurPos.X,Editor.CurPos.Y);
                {$ifndef NODEBUG}

@@ -16,7 +16,7 @@
 unit GDBMIProc;
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 
-{$MODE objfpc}{$H+}
+{$MODE objfpc}{$H+}{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 {$I globdir.inc}
 

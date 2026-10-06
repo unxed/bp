@@ -19,23 +19,23 @@ var D: PDialog;
     IL: PEditorInputLine;
 begin
   R.Assign(0,0,40,8);
-  New(D, Init(R, dialog_proceduredialog));
-  with D^ do
+  D := TDialog.Create(R, dialog_proceduredialog);
+  with D do
   begin
     Options:=Options or ofCentered;
     GetExtent(R); R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
     R1.Copy(R);
     R2.Copy(R); Inc(R2.A.Y);Inc(R2.B.Y);
-    New(IL, Init(R2,255));
+    IL := TEditorInputLine.Create(R2,255);
     Insert(IL);
-    IL^.SetData(S);
-    Insert(New(PLabel, Init(R1, label_enterproceduretofind, IL)));
+    IL.SetData(S);
+    Insert(TLabel.Create(R1, label_enterproceduretofind, IL));
     GetExtent(R); R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
-    Insert(New(PButton, Init(R, button_OK, cmOK, bfDefault)));
+    Insert(TButton.Create(R, button_OK, cmOK, bfDefault));
     R.Move(15,0);
-    Insert(New(PButton, Init(R, button_Cancel, cmCancel, bfNormal)));
+    Insert(TButton.Create(R, button_Cancel, cmCancel, bfNormal));
   end;
-  IL^.Select;
+  IL.Select;
   ProcedureDialog:=D;
 end;
 
@@ -57,22 +57,22 @@ var R: TRect;
     procedure InsertItemsInS(P: PSymbolCollection);
     var I: Sw_integer;
     begin
-      for I:=0 to P^.Count-1 do
-        InsertInS(P^.At(I));
+      for I:=0 to P.Count-1 do
+        InsertInS(P.At(I));
     end;
 
   begin
     Inc(level);
-    if S^.Count=MaxCollectionSize then
+    if S.Count=MaxCollectionSize then
        begin Overflow:=true; Exit; end;
-    if {(P^.typ = procsym) this needs symconst unit which I prefer to avoid }
-       ((P^.GetTypeName='proc') or (P^.GetTypeName='func'))
-       and NameMatches(P^.GetName) then
-      S^.Insert(P);
+    if {(P.typ = procsym) this needs symconst unit which I prefer to avoid }
+       ((P.GetTypeName='proc') or (P.GetTypeName='func'))
+       and NameMatches(P.GetName) then
+      S.Insert(P);
     { this is wrong because it inserted args or locals of proc
       in the globals list !! PM}
-    if (P^.Items<>nil) and (level=1) then
-      InsertItemsInS(P^.Items);
+    if (P.Items<>nil) and (level=1) then
+      InsertItemsInS(P.Items);
     Dec(level);
   end;
 
@@ -84,7 +84,7 @@ begin
      begin ErrorBox(msg_nodebuginfoavailable,nil); Exit; end;
   EditorWindow:=FirstEditorWindow;
   If assigned(EditorWindow) then
-    ProcS:=LowerCaseStr(EditorWindow^.Editor^.GetCurrentWord)
+    ProcS:=LowerCaseStr(EditorWindow.Editor.GetCurrentWord)
   else
     ProcS:='';
   if ExecuteDialog(ProcedureDialog(ProcS),@ProcS)=cmCancel then
@@ -93,17 +93,17 @@ begin
   Overflow:=false;
   if assigned(ProcedureCollection) then
     begin
-      ProcedureCollection^.deleteAll;
-      Dispose(ProcedureCollection,done);
+      ProcedureCollection.deleteAll;
+      ProcedureCollection.Free;
     end;
-  New(S, Init(500,500));
+  S := TSortedSymbolCollection.Create(500,500);
   ProcedureCollection:=S;
-  BrowCol.Modules^.ForEach(@InsertInS);
+  BrowCol.Modules.ForEach(TNestedActionProc(@InsertInS));
   if Overflow then
     WarningBox(msg_toomanysymbolscantdisplayall,nil);
-  Desktop^.GetExtent(R); R.A.X:=R.B.X-35;
-  Desktop^.Insert(New(PBrowserWindow, Init(R,
-    label_sym_findprocedure,SearchFreeWindowNo,nil,label_sym_findprocedure2+ProcS,'',S,nil,nil,nil)));
+  Desktop.GetExtent(R); R.A.X:=R.B.X-35;
+  Desktop.Insert(TBrowserWindow.Create(R,
+    label_sym_findprocedure,SearchFreeWindowNo,nil,label_sym_findprocedure2+ProcS,'',S,nil,nil,nil));
 end;
 
 procedure TIDEApp.Objects;
@@ -125,19 +125,19 @@ var R: TRect;
     procedure InsertItemsInS(P: PSymbolCollection);
     var I: Sw_integer;
     begin
-      for I:=0 to P^.Count-1 do
-        InsertInS(P^.At(I));
+      for I:=0 to P.Count-1 do
+        InsertInS(P.At(I));
     end;
 
   begin
     Inc(level);
-    if S^.Count=MaxCollectionSize then
+    if S.Count=MaxCollectionSize then
        begin Overflow:=true; Exit; end;
-    S^.Insert(P);
+    S.Insert(P);
     { this is wrong because it inserted args or locals of proc
       in the globals list !! PM}
-    if (P^.Items<>nil) and (level=1) then
-      InsertItemsInS(P^.Items);
+    if (P.Items<>nil) and (level=1) then
+      InsertItemsInS(P.Items);
     Dec(level);
   end;
 
@@ -148,17 +148,17 @@ begin
   Overflow:=false;
   if assigned(GlobalsCollection) then
     begin
-      GlobalsCollection^.deleteAll;
-      Dispose(GlobalsCollection,done);
+      GlobalsCollection.deleteAll;
+      GlobalsCollection.Free;
     end;
-  New(S, Init(500,500));
+  S := TSortedSymbolCollection.Create(500,500);
   GlobalsCollection:=S;
-  BrowCol.Modules^.ForEach(@InsertInS);
+  BrowCol.Modules.ForEach(TNestedActionProc(@InsertInS));
   if Overflow then
     WarningBox(msg_toomanysymbolscantdisplayall,nil);
-  Desktop^.GetExtent(R); R.A.X:=R.B.X-35;
-  Desktop^.Insert(New(PBrowserWindow, Init(R,
-    label_sym_globals,SearchFreeWindowNo,nil,label_sym_globalscope,'',S,nil,nil,nil)));
+  Desktop.GetExtent(R); R.A.X:=R.B.X-35;
+  Desktop.Insert(TBrowserWindow.Create(R,
+    label_sym_globals,SearchFreeWindowNo,nil,label_sym_globalscope,'',S,nil,nil,nil));
 end;
 
 procedure TIDEApp.Modules;
@@ -167,22 +167,22 @@ var
     S: PSortedSymbolCollection;
 procedure InsertInS(P: PSymbol);
 begin
-  S^.Insert(P);
+  S.Insert(P);
 end;
 begin
   if BrowCol.Modules=nil then
      begin ErrorBox(msg_nodebuginfoavailable,nil); Exit; end;
   if assigned(ModulesCollection) then
     begin
-      ModulesCollection^.deleteAll;
-      Dispose(ModulesCollection,done);
+      ModulesCollection.deleteAll;
+      ModulesCollection.Free;
     end;
-  New(S, Init(500,500));
+  S := TSortedSymbolCollection.Create(500,500);
   ModulesCollection:=S;
-  BrowCol.Modules^.ForEach(@InsertInS);
-  Desktop^.GetExtent(R); R.A.X:=R.B.X-35;
-  Desktop^.Insert(New(PBrowserWindow, Init(R,
-    dialog_units,SearchFreeWindowNo,nil,label_sym_globalscope,'',S,nil,nil,nil)));
+  BrowCol.Modules.ForEach(TNestedActionProc(@InsertInS));
+  Desktop.GetExtent(R); R.A.X:=R.B.X-35;
+  Desktop.Insert(TBrowserWindow.Create(R,
+    dialog_units,SearchFreeWindowNo,nil,label_sym_globalscope,'',S,nil,nil,nil));
 end;
 
 function SymbolDialog(S : string) : PDialog;
@@ -191,23 +191,23 @@ var D: PDialog;
     IL: PEditorInputLine;
 begin
   R.Assign(0,0,40,8);
-  New(D, Init(R, dialog_browsesymbol));
-  with D^ do
+  D := TDialog.Create(R, dialog_browsesymbol);
+  with D do
   begin
     Options:=Options or ofCentered;
     GetExtent(R); R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
     R1.Copy(R);
     R2.Copy(R); Inc(R2.A.Y);Inc(R2.B.Y);
-    New(IL, Init(R2,255));
+    IL := TEditorInputLine.Create(R2,255);
     Insert(IL);
-    IL^.SetData(S);
-    Insert(New(PLabel, Init(R1, label_entersymboltobrowse, IL)));
+    IL.SetData(S);
+    Insert(TLabel.Create(R1, label_entersymboltobrowse, IL));
     GetExtent(R); R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
-    Insert(New(PButton, Init(R, button_OK, cmOK, bfDefault)));
+    Insert(TButton.Create(R, button_OK, cmOK, bfDefault));
     R.Move(15,0);
-    Insert(New(PButton, Init(R, button_Cancel, cmCancel, bfNormal)));
+    Insert(TButton.Create(R, button_Cancel, cmCancel, bfNormal));
   end;
-  IL^.Select;
+  IL.Select;
   SymbolDialog:=D;
 end;
 
@@ -218,7 +218,7 @@ var
 begin
   EditorWindow:=FirstEditorWindow;
   If assigned(EditorWindow) then
-    S:=LowerCaseStr(EditorWindow^.Editor^.GetCurrentWord)
+    S:=LowerCaseStr(EditorWindow.Editor.GetCurrentWord)
   else
     S:='';
   if ExecuteDialog(SymbolDialog(S),@S)<>cmCancel then

@@ -16,26 +16,26 @@
 procedure TIDEApp.Messages;
 begin
   if MessagesWindow=nil then
-    Desktop^.Insert(New(PMessagesWindow, Init))
+    Desktop.Insert(TMessagesWindow.Create)
   else
-    MessagesWindow^.Focus;
+    MessagesWindow.Focus;
 end;
 
 procedure TIDEApp.DoAsciiTable;
 begin
   if ASCIIChart=nil then
     begin
-      New(ASCIIChart, Init);
-      Desktop^.Insert(ASCIIChart);
+      ASCIIChart := TFPASCIIChart.Create;
+      Desktop.Insert(ASCIIChart);
     end
   else
-    ASCIIChart^.Focus;
+    ASCIIChart.Focus;
 end;
 
 
 procedure TIDEApp.Calculator;
 begin
-  with CalcWindow^ do
+  with CalcWindow do
   begin
     if GetState(sfVisible)=false then Show;
     MakeFirst;
@@ -90,7 +90,7 @@ begin
       Messages;
       AddToolCommand(ProgramPath+' '+Params);
       UpdateToolMessages;
-      ToFocus:=ToolMessages^.count-1;
+      ToFocus:=ToolMessages.count-1;
     end
   else
     ToFocus:=-1;
@@ -114,7 +114,7 @@ begin
                 begin
                   W:=OpenEditorWindow(nil,'',0,0);
                   if W<>nil then
-                    if StartEditor(W^.Editor,CaptureFile)=false then
+                    if StartEditor(W.Editor,CaptureFile)=false then
                       ErrorBox(msg_errorreadingoutput,nil);
                 end;
             end
@@ -152,13 +152,13 @@ begin
                       Close(TextFile);
                       UpdateToolMessages;
                       if Assigned(MessagesWindow) then
-                        MessagesWindow^.MakeFirst;
+                        MessagesWindow.MakeFirst;
                     end;
                 end;
               UpdateToolMessages;
               if (ToFocus<>-1) then
                 if Assigned(MessagesWindow) then
-                  MessagesWindow^.FocusItem(ToFocus);
+                  MessagesWindow.FocusItem(ToFocus);
               if DosError=0 then
                 Messages;
             end;
@@ -182,9 +182,9 @@ begin
       UpdateToolMessages;
       if Assigned(MessagesWindow) then
         begin
-          MessagesWindow^.MakeFirst;
+          MessagesWindow.MakeFirst;
           if (ToFocus<>-1) then
-            MessagesWindow^.FocusItem(ToFocus);
+            MessagesWindow.FocusItem(ToFocus);
         end;
     end;
 {$ifndef DEBUG}
@@ -231,9 +231,9 @@ begin
       Exit;
     End;
 { Try to load the word from the editor }
-  If not(DeskTop^.Current=nil) and
-     (DeskTop^.Current^.HelpCtx=hcSourceWindow) then
-    Searchword:=PSourceWindow(DeskTop^.Current)^.Editor^.GetCurrentWord
+  If not(DeskTop.Current=nil) and
+     (DeskTop.Current.HelpCtx=hcSourceWindow) then
+    Searchword:=PSourceWindow(DeskTop.Current).Editor.GetCurrentWord
   else
     Searchword:='';
   { Don't use the listseparator in the file list else it's seen as 1 file
@@ -247,42 +247,42 @@ begin
   GrepArgs:=' -i "$TEXT" '+s;
 { Dialog }
   R.Assign(0,0,50,8);
-  new(PGrepDialog,Init(R,dialog_greparguments));
-  with PGrepDialog^ do
+  PGrepDialog := TCenterDialog.Create(R,dialog_greparguments);
+  with PGrepDialog do
     begin
       R2.A.Y:=R.A.Y+3;
       R2.B.Y:=R2.A.Y+1;
       R2.A.X:=R.A.X+3;
       R2.B.X:=R.B.X-6;
-      New(IL1, Init(R2, 128));
-      IL1^.Data^:=SearchWord;
+      IL1 := TEditorInputLine.Create(R2, 128);
+      IL1.Data^:=SearchWord;
       Insert(IL1);
       R2.Move(0,-1);
-      Insert(New(PLabel, Init(R2, label_grep_texttofind, IL1)));
+      Insert(TLabel.Create(R2, label_grep_texttofind, IL1));
       R1.Assign(R2.B.X, R2.A.Y+1, R2.B.X+3, R2.B.Y+1);
-      Control := New(PHistory, Init(R1, IL1, TextGrepId));
+      Control := THistory.Create(R1, IL1, TextGrepId);
       Insert(Control);
 
       R2.Move(0,4);
-      New(IL2, Init(R2, 128));
-      IL2^.Data^:=GrepArgs;
+      IL2 := TEditorInputLine.Create(R2, 128);
+      IL2.Data^:=GrepArgs;
       Insert(IL2);
       R2.Move(0,-1);
-      Insert(New(PLabel, Init(R2, label_grep_greparguments, IL2)));
+      Insert(TLabel.Create(R2, label_grep_greparguments, IL2));
       R1.Assign(R2.B.X, R2.A.Y+1, R2.B.X+3, R2.B.Y+1);
-      Control := New(PHistory, Init(R1, IL2, GrepArgsId));
+      Control := THistory.Create(R1, IL2, GrepArgsId);
       Insert(Control);
     end;
 
     InsertButtons(PGrepDialog);
-    IL1^.Select;
+    IL1.Select;
 
-    if Desktop^.ExecView(PGrepDialog)=cmOK then
+    if Desktop.ExecView(PGrepDialog)=cmOK then
     begin
-      SearchWord:=IL1^.Data^;
+      SearchWord:=IL1.Data^;
       if SearchWord<>'' then
        begin
-         GrepArgs:=IL2^.Data^;
+         GrepArgs:=IL2.Data^;
          { Remember last used Grep extensions }
          PosText:=pos('"$TEXT" ',GrepArgs);
          if PosText>0 then
@@ -293,10 +293,10 @@ begin
          ReplaceStr(GrepArgs,'$TEXT',SearchWord);
          { Linux ? }
          AddToolCommand(GrepExe+' -n '+GrepArgs);
-         ToFocus:=ToolMessages^.count-1;
+         ToFocus:=ToolMessages.count-1;
          UpdateToolMessages;
          if Assigned(MessagesWindow) then
-           MessagesWindow^.FocusItem(ToFocus);
+           MessagesWindow.FocusItem(ToFocus);
          showmsg:=true;
          Messages;
          PushStatus(FormatStrStr(msg_runninggrepwithargs,GrepArgs));
@@ -364,17 +364,17 @@ begin
          EatIO;
        end;
     end;
-  Dispose(PGrepDialog, Done);
+  PGrepDialog.Free;
   UpdateToolMessages;
   if (ToFocus<>-1) then
     if Assigned(MessagesWindow) then
       begin
-        MessagesWindow^.Lock;
-        MessagesWindow^.FocusItem(ToolMessages^.count-1);
+        MessagesWindow.Lock;
+        MessagesWindow.FocusItem(ToolMessages.count-1);
         if ToFocus>0 then
-          MessagesWindow^.FocusItem(ToFocus-1);
-        MessagesWindow^.FocusItem(ToFocus);
-        MessagesWindow^.UnLock;
+          MessagesWindow.FocusItem(ToFocus-1);
+        MessagesWindow.FocusItem(ToFocus);
+        MessagesWindow.UnLock;
       end;
   if showmsg then
     Messages;

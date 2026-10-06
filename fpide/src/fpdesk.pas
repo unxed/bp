@@ -56,7 +56,7 @@ uses Dos,
      FPKeys,
 {$endif Unix}
      FPConst,FPVars,FPTools,FPUtils,FPViews,FPHelp,
-     FPCompil,FPCodCmp,FPCodTmp,FPRegs,AsciiTab;
+     FPCompil,FPCodCmp,FPCodTmp,FPRegs,AsciiTab,FPVideo;
 
 type
      TWindowInfo =
@@ -856,15 +856,6 @@ begin
   if OK=false then
     ErrorBox(msg_errorreadingflags,nil);
   ReadFlags:=OK;
-end;
-
-{ tv3 port: ScreenMode is a mode number; the IDE desktop file stores a TVideoMode record,
-  so the current mode is built from the terminal size. A terminal cannot be switched. }
-function CurVideoMode: TVideoMode;
-begin
-  CurVideoMode.Col:=ScreenWidth;
-  CurVideoMode.Row:=ScreenHeight;
-  CurVideoMode.Color:=true;
 end;
 
 function WriteVideoMode(F: PResourceFile): boolean;

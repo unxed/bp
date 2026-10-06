@@ -17,7 +17,7 @@
 unit FPIntf;
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 
-{$mode objfpc}
+{$mode objfpc}{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

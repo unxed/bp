@@ -31,7 +31,7 @@ interface
 
 { $define VERBOSETXT}
 
-{$mode objfpc}
+{$mode objfpc}{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 uses
   { We need to include the exceptions from SysUtils, but the types from
@@ -375,10 +375,8 @@ end;
 *****************************************************************************}
 
 function TCompilerMessageListBox.GetPalette: TPalette;
-const
-  P: string[length(CBrowserListBox)] = CBrowserListBox;
 begin
-  GetPalette:=PPalette(@P);
+  GetPalette:=MakePalette(CBrowserListBox);
 end;
 
 procedure TCompilerMessageListBox.SelectFirstError;
@@ -389,7 +387,7 @@ procedure TCompilerMessageListBox.SelectFirstError;
   var
     P : PCompilerMessage;
 begin
-  P:=List.FirstThat(@IsError);
+  P:=TCompilerMessage(List.FirstThat(TNestedTestProc(@IsError)));
   If Assigned(P) then
     Begin
       FocusItem(List.IndexOf(P));
@@ -500,10 +498,8 @@ end;
 
 
 function TCompilerMessageWindow.GetPalette: TPalette;
-const
-  S : string[length(CBrowserWindow)] = CBrowserWindow;
 begin
-  GetPalette:=PPalette(@S);
+  GetPalette:=MakePalette(CBrowserWindow);
 end;
 
 

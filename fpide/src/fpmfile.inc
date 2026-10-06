@@ -30,46 +30,46 @@ var D: PCenterDialog;
 begin
   if GetTemplateCount=0 then
      begin InformationBox(msg_notemplatesavailable,nil); Exit; end;
-  New(C, Init(10,10));
+  C := TUnsortedStringCollection.Create(10,10);
   R.Assign(0,0,40,14);
-  New(D, Init(R, dialog_newfromtemplate));
-  with D^ do
+  D := TCenterDialog.Create(R, dialog_newfromtemplate);
+  with D do
   begin
     HelpCtx:=hcNewFromTemplate;
     GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y); Dec(R.B.X,12);
     R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
-    New(SB, Init(R2)); Insert(SB);
+    SB := TScrollBar.Create(R2); Insert(SB);
 
-    New(LB, Init(R,1,SB));
-    LB^.Default:=true;
+    LB := TAdvancedListBox.Create(R,1,SB);
+    LB.Default:=true;
     for I:=0 to GetTemplateCount-1 do
-      C^.Insert(NewStr(GetTemplateName(I)));
-    LB^.NewList(C);
+      C.Insert(NewStr(GetTemplateName(I)));
+    LB.NewList(C);
     Insert(LB);
     Dec(R.A.Y); R.B.Y:=R.A.Y+1;
-    Insert(New(PLabel, Init(R, label_availabletemplates, LB)));
+    Insert(TLabel.Create(R, label_availabletemplates, LB));
 
     GetExtent(R2); R2.Grow(-2,-3); R2.A.X:=R.B.X+2; R2.B.Y:=R2.A.Y+2;
-    Insert(New(PButton, Init(R2, button_OK, cmOK, bfDefault)));
+    Insert(TButton.Create(R2, button_OK, cmOK, bfDefault));
     R2.Move(0,2);
-    Insert(New(PButton, Init(R2, button_Cancel, cmCancel, bfNormal)));
+    Insert(TButton.Create(R2, button_Cancel, cmCancel, bfNormal));
   end;
-  LB^.Select;
-  if Desktop^.ExecView(D)=cmOK then
+  LB.Select;
+  if Desktop.ExecView(D)=cmOK then
   begin
-{    Desktop^.Lock;}
+{    Desktop.Lock;}
     TE:=OpenEditorWindow(nil,'',0,0);
     if TE<>nil then
     begin
-      TE^.Editor^.SetModified(false); { if nothing changes, we don't need to save it }
-      StartTemplate(LB^.Focused,TE^.Editor);
-(*      TE^.Hide; { we need this trick to get the editor updated }
-      TE^.Show;*)
+      TE.Editor.SetModified(false); { if nothing changes, we don't need to save it }
+      StartTemplate(LB.Focused,TE.Editor);
+(*      TE.Hide; { we need this trick to get the editor updated }
+      TE.Show;*)
     end;
-{    Desktop^.UnLock;}
+{    Desktop.UnLock;}
   end;
-  Dispose(D, Done);
-  Dispose(C, Done);
+  D.Free;
+  C.Free;
 end;
 
 
@@ -96,21 +96,21 @@ begin
        end;
      if (FileDir<>'') and ExistsDir(FileDir) then
        ChDir(TrimEndSlash(FileDir));
-     New(D, Init(OpenExts,dialog_openafile,label_filetoopen,fdOpenButton,hidOpenSourceFile));
-     D^.HelpCtx:=hcOpen;
-     OpenIt:=Desktop^.ExecView(D)<>cmCancel;
+     D := TFileDialog.Create(OpenExts,dialog_openafile,label_filetoopen,fdOpenButton,hidOpenSourceFile);
+     D.HelpCtx:=hcOpen;
+     OpenIt:=Desktop.ExecView(D)<>cmCancel;
      { if I go to root under go32v2 and there is no
        floppy I get a InOutRes = 152
        get rid of it ! }
      EatIO;
      if OpenIt then
        Begin
-         D^.GetFileName(FileName);
-         OpenExts:=D^.WildCard;
+         FileName := D.GetFileName;
+         OpenExts:=D.WildCard;
          if ExistsDir(DirOf(FExpand(FileName))) then
            FileDir:=DirOf(FExpand(FileName));
        End;
-     Dispose(D, Done);
+     D.Free;
      if DriveNumber<>0 then
        ChDir(TrimEndSlash(StoreDir2));
      ChDir(TrimEndSlash(StoreDir));
@@ -133,9 +133,9 @@ begin
        {ErrorBox(FormatStrStr(msg_cantfindfile,FileName),nil);}
        begin
          NewPSW:=OpenEditorWindow(nil,'',0,0);
-         NewPSW^.Editor^.FileName:=FileName;
-         NewPSW^.SetTitle(FileName);
-         Message(Application,evBroadcast,cmFileNameChanged,NewPSW^.Editor);
+         NewPSW.Editor.FileName:=FileName;
+         NewPSW.SetTitle(FileName);
+         Message(Application,evBroadcast,cmFileNameChanged,NewPSW.Editor);
        end;
    end;
 end;
@@ -151,14 +151,14 @@ begin
    begin
      ClearFormatParams; AddFormatParamStr(FileName);
      FormatStr(S,label_lookingfor,FormatParams);
-     New(D, Init(FileName,dialog_openafile,S,fdOpenButton,hidOpenSourceFile));
-     D^.HelpCtx:=hcOpen;
-     OpenIt:=Desktop^.ExecView(D)<>cmCancel;
+     D := TFileDialog.Create(FileName,dialog_openafile,S,fdOpenButton,hidOpenSourceFile);
+     D.HelpCtx:=hcOpen;
+     OpenIt:=Desktop.ExecView(D)<>cmCancel;
      if OpenIt then
        Begin
-         D^.GetFileName(FileName);
+         FileName := D.GetFileName;
        End;
-     Dispose(D, Done);
+     D.Free;
    end;
   if OpenIt then
    begin
@@ -171,7 +171,7 @@ begin
            SourceDirs:=SourceDirs+';'+Dir;
            {$IFNDEF NODEBUG}
            if assigned(Debugger) then
-             Debugger^.SetSourceDirs;
+             Debugger.SetSourceDirs;
            {$ENDIF}
          end;
      OpenEditorWindow(nil,FileName,0,0);
@@ -190,10 +190,10 @@ end;
 function TIDEApp.AskSaveAll: boolean;
 function CanClose(P: PView): boolean;
 begin
-  CanClose:=not P^.Valid(cmAskSaveAll);
+  CanClose:=not P.Valid(cmAskSaveAll);
 end;
 begin
-  AskSaveAll:=Desktop^.FirstThat(@CanClose)=nil;
+  AskSaveAll:=Desktop.FirstThat(@CanClose)=nil;
 end;
 
 function TIDEApp.SaveAll: boolean;
@@ -205,7 +205,7 @@ function TIDEApp.SaveAll: boolean;
 
 begin
   SaveCancelled:=false;
-  Desktop^.ForEach(@SendSave);
+  Desktop.ForEach(@SendSave);
   SaveAll:=not SaveCancelled;
 end;
 
@@ -214,8 +214,8 @@ procedure TIDEApp.ChangeDir;
 var
   D : PChDirDialog;
 begin
-  New(D, Init(cdNormal, hisChDirDialog));
-  D^.HelpCtx:=hcChangeDir;
+  D := TChDirDialog.Create(cdNormal, hisChDirDialog);
+  D.HelpCtx:=hcChangeDir;
   ExecuteDialog(D,nil);
   CurDirChanged;
   { Set new startup dir }
@@ -229,24 +229,24 @@ var R,R2: TRect;
     IL: PEditorInputLine;
 begin
   R.Assign(0,0,round(ScreenWidth*54/80),4);
-  New(D, Init(R, dialog_setupprinter));
-  with D^ do
+  D := TCenterDialog.Create(R, dialog_setupprinter);
+  with D do
   begin
     GetExtent(R); R.Grow(-2,-1); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
     R2.Copy(R); R2.A.X:=16; Dec(R2.B.X,4);
-    New(IL, Init(R2, 255));
-    IL^.Data^:=GetPrinterDevice;
+    IL := TEditorInputLine.Create(R2, 255);
+    IL.Data^:=GetPrinterDevice;
     Insert(IL);
     R2.Copy(R); R2.A.X:=R2.B.X-3; R2.B.X:=R2.A.X+3;
-    Insert(New(PHistory, Init(R2, IL, hidPrinterDevice)));
+    Insert(THistory.Create(R2, IL, hidPrinterDevice));
     R2.Copy(R); R2.B.X:=16;
-    Insert(New(PLabel, Init(R2, label_setupprinter_device, IL)));
+    Insert(TLabel.Create(R2, label_setupprinter_device, IL));
   end;
   InsertButtons(D);
-  IL^.Select;
-  if Desktop^.ExecView(D)=cmOK then
-    SetPrinterDevice(IL^.Data^);
-  Dispose(D, Done);
+  IL.Select;
+  if Desktop.ExecView(D)=cmOK then
+    SetPrinterDevice(IL.Data^);
+  D.Free;
 end;
 
 
@@ -262,7 +262,7 @@ procedure TIDEApp.Print;
     if d='' then
       d:='prn';
 
-    P:=Message(Desktop,evBroadcast,cmSearchWindow,nil);
+    P:=TSourceWindow(Message(Desktop,evBroadcast,cmSearchWindow,nil));
     if assigned(P) then
       begin
         assign(f,d);
@@ -271,15 +271,15 @@ procedure TIDEApp.Print;
 {$I+}
         if ioresult<>0 then
           begin
-            MessageBox(#3+msg_printernotopened,nil,mferror+mfokbutton);
+            MessageBox(#3+msg_printernotopened,mferror+mfokbutton);
             exit;
           end;
-        for i:=0 to P^.Editor^.Core^.GetLineCount-1 do
+        for i:=0 to P.Editor.Core.GetLineCount-1 do
           begin
-            writeln(f,P^.Editor^.Core^.GetLineText(i));
+            writeln(f,P.Editor.Core.GetLineText(i));
             if ioresult<>0 then
               begin
-                MessageBox(#3+msg_PrintError,nil,mferror+mfokbutton);
+                MessageBox(#3+msg_PrintError,mferror+mfokbutton);
                 close(f);
                 exit;
               end;

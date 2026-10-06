@@ -1254,7 +1254,7 @@ procedure TWindowsScreen.SaveIDEScreen;
 var
   NowIdeMode : Dword;
 begin
-  IdeScreenMode:=ScreenMode;
+  IdeScreenMode:=CurVideoMode;
   GetConsoleMode(GetStdHandle(cardinal(Std_Input_Handle)), @NowIdeMode);
 {$ifdef debug}
   Complain('IDE ConsoleMode is $'+hexstr(NowIdeMode,8));

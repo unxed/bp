@@ -34,7 +34,7 @@ begin
   if (OldR.B.Y-OldR.A.Y<>y) or
      (OldR.B.X-OldR.A.X<>x) then
     begin
-      Mode.color:=ScreenMode.Color;
+      Mode.color:=CurVideoMode.Color;
       Mode.col:=x;
       Mode.row:=y;
       SetScreenVideoMode(Mode);
@@ -74,7 +74,7 @@ function TWindowListBox.GetText(Item,MaxLen: Sw_Integer): String;
 var P: PView;
     S: string;
 begin
-  P:=List.At(Item);
+  P:=TView(List.At(Item));
   case P.HelpCtx of
     hcSourceWindow : S:=PSourceWindow(P).GetTitle(MaxLen);
     hcHelpWindow   : S:=PHelpWindow(P).GetTitle(MaxLen);
@@ -112,12 +112,12 @@ begin
   R.Assign(0,0,round(ScreenWidth*5/8),15);
   inherited Create(R, dialog_windowlist);
   HelpCtx:=hcWindowList;
-  New(C, Init(20,10));
+  C := TCollection.Create(20,10);
 
   GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y); R.B.X:=R.B.X-14;
   R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
-  New(SB, Init(R2)); Insert(SB);
-  New(LB, Init(R, SB));
+  SB := TScrollBar.Create(R2); Insert(SB);
+  LB := TWindowListBox.Create(R, SB);
   LB.Default:=true;
   LB.NewList(C);
   UpdateList;
@@ -133,10 +133,10 @@ begin
   R.Move(0,2);
   Insert(TButton.Create(R, button_Delete, cmDeleteItem, bfNormal));
   R.Move(0,2);
-  New(BtnShow, Init(R, button_Show, cmShowItem, bfNormal));
+  BtnShow := TNoUpdateButton.Create(R, button_Show, cmShowItem, bfNormal);
   Insert(BtnShow);
   R.Move(0,2);
-  New(BtnHide, Init(R, button_Hide, cmHideItem, bfNormal));
+  BtnHide := TNoUpdateButton.Create(R, button_Hide, cmHideItem, bfNormal);
   Insert(BtnHide);
   R.Move(0,2);
   Insert(TButton.Create(R, button_Cancel, cmCancel, bfNormal));
@@ -149,7 +149,7 @@ procedure TWindowListDialog.UpdateList;
 var VisState: boolean;
 procedure AddIt(P: PView);
 begin
-  if (P<>pointer(Desktop.Background)) and
+  if (Pointer(P)<>Pointer(Desktop.Background)) and
      (P.GetState(sfDisabled)=false) and
      ((P.Options and ofSelectable)<>0) and
      (P.GetState(sfVisible)=VisState) then
@@ -169,7 +169,7 @@ var W: PView;
 begin
   if LB.Range>0 then
     begin
-      W:=LB.List.At(LB.Focused);
+      W:=TView(LB.List.At(LB.Focused));
       if Assigned(BtnShow) then
         BtnShow.SetState(sfDisabled,W.GetState(sfVisible));
       if Assigned(BtnHide) then
@@ -199,7 +199,7 @@ begin
     evBroadcast :
       case Event.Command of
         cmListFocusChanged :
-          if Event.InfoPtr=LB then
+          if Event.InfoPtr=Pointer(LB) then
             UpdateButtons;
       end;
     evCommand :
@@ -262,7 +262,7 @@ end;
 procedure TIDEApp.WindowList;
 var W: PWindowListDialog;
 begin
-  New(W,Init);
+  W := TWindowListDialog.Create;
   ExecView(W);
   W.Free;
   if assigned(Desktop.Current) then

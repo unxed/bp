@@ -48,10 +48,10 @@ begin
   {$endif}
   if UserScreenWindow=nil then
     begin
-     New(UserScreenWindow, Init(UserScreen, SearchFreeWindowNo));
-     Desktop^.Insert(UserScreenWindow);
+     UserScreenWindow := TScreenWindow.Create(UserScreen, SearchFreeWindowNo);
+     Desktop.Insert(UserScreenWindow);
     end;
-  UserScreenWindow^.MakeFirst;
+  UserScreenWindow.MakeFirst;
 end;
 
 procedure TIDEApp.DoCloseUserScreenWindow;
@@ -81,16 +81,16 @@ begin
       Drivers.GetKeyEvent(Event);
     until Event.What=evKeyboard;
     Clear:=true;
-    if not UserScreen^.CanScroll then
+    if not UserScreen.CanScroll then
       Clear:=false
     else
       case Event.keycode of
-        kbPgUp : UserScreen^.Scroll(-20);
-        kbPgDn : UserScreen^.Scroll(20);
-        kbUp : UserScreen^.Scroll(-1);
-        kbDown : UserScreen^.Scroll(1);
-        kbHome : UserScreen^.Scroll(-1024);
-        kbEnd : UserScreen^.Scroll(+1024);
+        kbPgUp : UserScreen.Scroll(-20);
+        kbPgDn : UserScreen.Scroll(20);
+        kbUp : UserScreen.Scroll(-1);
+        kbDown : UserScreen.Scroll(1);
+        kbHome : UserScreen.Scroll(-1024);
+        kbEnd : UserScreen.Scroll(+1024);
       else
          Clear:=false;
       end;
@@ -112,7 +112,7 @@ begin
   If not assigned(StackWindow) then
     InitStackWindow
   else
-    StackWindow^.MakeFirst;
+    StackWindow.MakeFirst;
 {$endif NODEBUG}
 end;
 
@@ -125,8 +125,8 @@ begin
   If not assigned(DisassemblyWindow) then
     InitDisassemblyWindow
   else
-    DisassemblyWindow^.MakeFirst;
-  DisassemblyWindow^.LoadFunction('');
+    DisassemblyWindow.MakeFirst;
+  DisassemblyWindow.LoadFunction('');
 {$endif NODEBUG}
 end;
 
@@ -139,7 +139,7 @@ begin
   If not assigned(RegistersWindow) then
     InitRegistersWindow
   else
-    RegistersWindow^.MakeFirst;
+    RegistersWindow.MakeFirst;
 {$endif NODEBUG}
 end;
 
@@ -151,7 +151,7 @@ begin
   If not assigned(FPUWindow) then
     InitFPUWindow
   else
-    FPUWindow^.MakeFirst;
+    FPUWindow.MakeFirst;
 {$endif NODEBUG}
 end;
 
@@ -164,7 +164,7 @@ begin
   If not assigned(VectorWindow) then
     InitVectorWindow
   else
-    VectorWindow^.MakeFirst;
+    VectorWindow.MakeFirst;
 {$endif NODEBUG}
 end;
 
@@ -175,14 +175,14 @@ begin
 {$else}
   If assigned(BreakpointsWindow) then
     begin
-      BreakpointsWindow^.Update;
-      BreakpointsWindow^.Show;
-      BreakpointsWindow^.MakeFirst;
+      BreakpointsWindow.Update;
+      BreakpointsWindow.Show;
+      BreakpointsWindow.MakeFirst;
     end
   else
     begin
-      New(BreakpointsWindow,Init);
-      Desktop^.Insert(BreakpointsWindow);
+      BreakpointsWindow := TBreakpointsWindow.Create;
+      Desktop.Insert(BreakpointsWindow);
     end;
 {$endif NODEBUG}
 end;
@@ -194,13 +194,13 @@ begin
 {$else}
   If assigned(WatchesWindow) then
     begin
-      WatchesWindow^.Update;
-      WatchesWindow^.MakeFirst;
+      WatchesWindow.Update;
+      WatchesWindow.MakeFirst;
     end
   else
     begin
-      New(WatchesWindow,Init);
-      Desktop^.Insert(WatchesWindow);
+      WatchesWindow := TWatchesWindow.Create;
+      Desktop.Insert(WatchesWindow);
     end;
 {$endif NODEBUG}
 end;
@@ -219,23 +219,23 @@ var
 begin
   EditorWindow:=FirstEditorWindow;
   { Leave the editor first, but only if there was already an WatchesWindow }
-  EditorWasFirst:=(PWindow(Desktop^.First)=PWindow(EditorWindow)) and
+  EditorWasFirst:=(PWindow(Desktop.First)=PWindow(EditorWindow)) and
                   assigned(WatchesWindow);
   If assigned(EditorWindow) then
-    S:={LowerCaseStr(}EditorWindow^.Editor^.GetCurrentWord
+    S:={LowerCaseStr(}EditorWindow.Editor.GetCurrentWord
   else
     S:='';
-  P:=New(PWatch,Init(S));
-  if ExecuteDialog(New(PWatchItemDialog,Init(P)),nil)<>cmCancel then
+  P := TWatch.Create(S);
+  if ExecuteDialog(TWatchItemDialog.Create(P),nil)<>cmCancel then
     begin
-      WatchesCollection^.Insert(P);
-      WatchesCollection^.Update;
+      WatchesCollection.Insert(P);
+      WatchesCollection.Update;
       DoShowWatches;
       if EditorWasFirst then
-       EditorWindow^.MakeFirst;
+       EditorWindow.MakeFirst;
     end
   else
-    dispose(P,Done);
+    P.Free;
 end;
 {$endif NODEBUG}
 
@@ -252,12 +252,12 @@ var d:Pevaluate_dialog;
     r:Trect;
 
 begin
-  desktop^.getextent(r);
+  desktop.getextent(r);
   r.b.x:=r.b.x*3 div 4;
   r.b.y:=12;
-  new(d,init(r));
-  desktop^.execview(d);
-  dispose(d,done);
+  d := Tevaluate_dialog.Create(r);
+  desktop.execview(d);
+  d.Free;
 end;
 {$endif}
 

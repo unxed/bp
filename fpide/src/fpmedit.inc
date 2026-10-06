@@ -15,7 +15,7 @@
 
 procedure TIDEApp.ShowClipboard;
 begin
-  ClipboardWindow^.Show;
-  ClipboardWindow^.Focus;
+  ClipboardWindow.Show;
+  ClipboardWindow.Focus;
 end;
 

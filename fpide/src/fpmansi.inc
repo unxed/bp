@@ -67,8 +67,8 @@ begin
   DefExt:='*.ans';
   Name:='screen.ans';
   PushStatus(msg_saveansifile);
-  Re:=Application^.ExecuteDialog(New(PFileDialog, Init(DefExt,
-     dialog_savefileas, label_name, fdOkButton, FileId)), @Name);
+  Re:=Application.ExecuteDialog(TFileDialog.Create(DefExt,
+     dialog_savefileas, label_name, fdOkButton, FileId), @Name);
   if Re<>cmCancel then
     begin
       Assign(f,Name);

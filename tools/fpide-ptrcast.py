@@ -11,8 +11,8 @@ from pathlib import Path
 
 BASES = r'(?:Pointer|TObject|TStreamable|TView|TGroup|TCollection|TSortedCollection|TStringCollection|TUnsortedStringCollection)'
 RX = [
-    re.compile(r'^(\w+\.pas)\((\d+),(\d+)\) Error: Incompatible types: got "(%s)" expected "(T\w+)"' % BASES, re.M),
-    re.compile(r'^(\w+\.pas)\((\d+),(\d+)\) Error: Incompatible type for arg no\. \d+: Got "(%s)", expected "(T\w+)"' % BASES, re.I | re.M),
+    re.compile(r'^(\w+\.(?:pas|inc))\((\d+),(\d+)\) Error: Incompatible types: got "(%s)" expected "(T\w+)"' % BASES, re.M),
+    re.compile(r'^(\w+\.(?:pas|inc))\((\d+),(\d+)\) Error: Incompatible type for arg no\. \d+: Got "(%s)", expected "(T\w+)"' % BASES, re.I | re.M),
 ]
 STOP_KW = re.compile(rb'(?i)(then|do|else|of|to|downto|until|and|or|begin|end)\b')
 

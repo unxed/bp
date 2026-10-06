@@ -9,7 +9,7 @@ import re, sys
 from pathlib import Path
 
 log, src = Path(sys.argv[1]), Path(sys.argv[2])
-rx = re.compile(r'^(\w+\.pas)\((\d+),\d+\) Error: Incompatible type for arg no\. \d+: Got "<(?:address of|procedure variable type of) '
+rx = re.compile(r'^(\w+\.(?:pas|inc))\((\d+),\d+\) Error: Incompatible type for arg no\. \d+: Got "<(?:address of|procedure variable type of) '
                 r'(procedure|function)\([^"]*? is nested[^"]*", expected "<procedure variable type of '
                 r'(procedure|function)\(Pointer\)[^"]*is nested', re.M)
 n = 0

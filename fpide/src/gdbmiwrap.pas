@@ -16,7 +16,7 @@
 unit gdbmiwrap;
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 
-{$MODE objfpc}{$H+}
+{$MODE objfpc}{$H+}{$modeswitch nestedprocvars}{$modeswitch autoderef}
 {$ASSERTIONS on}
 
 {$I globdir.inc}

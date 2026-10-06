@@ -207,3 +207,62 @@ begin
   Result[0] := Chr(ResultLength);
 end;
 
+
+procedure GetKeyEvent(var Event: TEvent);
+begin
+  TvSys.PollEvent(0, Event);
+  if Event.What <> evKeyDown then
+    ClearEvent(Event);
+end;
+
+function ShrinkPath(Path: string; MaxLen: Integer): string;
+var
+  Cut: Integer;
+begin
+  if Length(Path) <= MaxLen then
+  begin
+    ShrinkPath := Path;
+    Exit;
+  end;
+  if MaxLen < 4 then
+    MaxLen := 4;
+  Cut := Length(Path) - (MaxLen - 3) + 1;
+  { do not start the tail in the middle of a UTF-8 sequence }
+  while (Cut <= Length(Path)) and ((Byte(Path[Cut]) and $C0) = $80) do
+    Inc(Cut);
+  ShrinkPath := '...' + Copy(Path, Cut, 255);
+end;
+
+procedure GetSystemEvent(var Event: TEvent);
+begin
+  ClearEvent(Event);
+end;
+
+procedure InitEvents;
+begin
+end;
+
+procedure DoneEvents;
+begin
+end;
+
+procedure InitSysError;
+begin
+end;
+
+procedure DoneSysError;
+begin
+end;
+
+procedure GiveUpTimeSlice;
+begin
+  ThreadSwitch;
+end;
+
+procedure ShowMouse;
+begin
+end;
+
+procedure HideMouse;
+begin
+end;

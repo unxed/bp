@@ -50,6 +50,8 @@ function FixFileName(const s:string):string;
 function MakeExeName(const fn:string):string;
 function Center(const S: string; Len: byte): string;
 function FitStr(const S: string; Len: byte): string;
+{ tv3 port: FV's directory picker was not carried over; a one-line input box asks for the path. }
+procedure SelectDir(var S: string; HistoryID: word);
 function KillTilde(S: string): string;
 function LowercaseStr(const S: string): string;
 {function DirOf(const S: string): string;
@@ -76,8 +78,17 @@ const ListSeparator      : char = ';';
 implementation
 
 uses Dos,
+     Views,Dialogs,
      WUtils,
      FPVars,FPSwitch;
+
+procedure SelectDir(var S: string; HistoryID: word);
+var T: ShortString;
+begin
+  T:=S;
+  if InputBox('Directory','~D~irectory',T,255)=cmOK then
+    S:=T;
+end;
 
 function IntToStr(L: longint): string;
 var S: string;

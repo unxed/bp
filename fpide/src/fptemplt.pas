@@ -47,7 +47,7 @@ implementation
 uses
   Dos,Objects,
   FVConsts,
-  MsgBox,
+  MsgBox,Dialogs,
   WUtils,
   WEditor,
   FPConst,FPVars,FPUtils;
