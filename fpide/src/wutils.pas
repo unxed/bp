@@ -227,7 +227,7 @@ uses
 {$IFDEF OS2}
   DosCalls,
 {$ENDIF OS2}
-  Strings, Drivers;
+  Strings, Drivers, WUtf8;
 
 const
    SpaceStr = '                                                            '+
@@ -897,7 +897,8 @@ end;
 procedure TFastBufStream.Readline(var s:string;var linecomplete,hasCR : boolean);
   var
     c : char;
-    i,pos,StartPos : longint;
+    i,pos,StartPos,j,need : longint;
+    lead : byte;
     charsInS : boolean;
   begin
     linecomplete:=false;
@@ -960,6 +961,23 @@ procedure TFastBufStream.Readline(var s:string;var linecomplete,hasCR : boolean)
       linecomplete:=true;
     if (c=#10) then
       hasCR:=true; 
+    { the end of the line buffer must not cut a UTF-8 character in two: the character goes to the next piece }
+    if Utf8Text and (not linecomplete) and (i=High(S)) then
+      begin
+        j:=i;
+        while (j>1) and (i-j<3) and ((Byte(s[j]) and $C0)=$80) do
+          dec(j);
+        lead:=Byte(s[j]);
+        if (lead>=$C2) and (lead<=$DF) then need:=2
+        else if (lead>=$E0) and (lead<=$EF) then need:=3
+        else if (lead>=$F0) and (lead<=$F4) then need:=4
+        else need:=1;
+        if (need>1) and (j+need-1>i) then
+          begin
+            Seek(GetPos-(i-j+1));
+            i:=j-1;
+          end;
+      end;
     SetLength(s,i);    
   end;
 

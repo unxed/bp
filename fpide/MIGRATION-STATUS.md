@@ -23,7 +23,8 @@ Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external 
 
 ## Open
 
-- `wansi.pas`/`fp.ans` and the help viewer (`whlpview`) still count bytes/CP437 words; lines are 255 bytes (shortstring).
+- The help viewer (`whlpview`) still counts bytes; a line is at most 255 bytes (shortstring): longer lines are split on load, as in the original, between characters (a message tells so).
+- `fp.ans` (desktop background, CP437 data) is read as CP437 by `wansi.pas` and shown correctly; the build copies it and the other data files (templates, tool descriptions) next to `fp`.
 - The symbol browser reads declarations only (no cross references of uses: they need the compiler); unsaved edits are not seen (the files on disk are parsed).
 - Wide characters in horizontally scrolled lines are approximated.
 

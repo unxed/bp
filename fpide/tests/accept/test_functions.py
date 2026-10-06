@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard debug browser
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard debug browser longlines
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -656,9 +656,35 @@ def section_browser(t):
     check('Draw' in txt and 'Area' in txt, 'the members of the class are listed', t)
 
 
+def section_longlines(t):
+    """a line longer than 255 bytes (a line is a short string here) is split when the file is loaded, as the original does,
+    and it is split between characters: the saved file is still valid UTF-8 with all the text"""
+    path = os.path.join(t.work, 'long.txt')
+    text = 'x' * 300 + '\nsecond\n' + 'ж' * 200 + '\n'
+    with open(path, 'w') as f:
+        f.write(text)
+    t.key('F3'); t.wait_for('Open a file'); t.type('long.txt'); t.key('Enter')
+    check(t.wait_for('had too long lines', 5), 'the IDE tells that the file had too long lines', t)
+    for _ in range(3):                      # the message is shown more than once; Enter closes each
+        t.key('Enter')
+        t.pump(0.5)
+    check(t.wait_for('long.txt') and t.wait_gone('had too long lines', 3), 'the file is opened after the messages', t)
+    t.key('F2')
+    t.pump(1)
+    data = open(path, 'rb').read()
+    try:
+        out = data.decode('utf-8')
+        valid = True
+    except UnicodeDecodeError:
+        out, valid = '', False
+    check(valid, 'the saved file is valid UTF-8 (no character was cut in two)', t)
+    check(out.replace('\n', '') == text.replace('\n', ''), 'and all the text is there (only line breaks were added)', t)
+    check(max(len(l.encode('utf-8')) for l in out.split('\n')) <= 255, 'every line is at most 255 bytes', t)
+
+
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile),
-            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser)]
+            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])
