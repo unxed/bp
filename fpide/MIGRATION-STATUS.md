@@ -1,20 +1,30 @@
 # Migration status: Free Vision → tv3, objects → classes
 
-Updated: 2026-10-06 (fp links and RUNS; acceptance tests in fpide/tests/accept)
+Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external fpc/gdb; acceptance tests in fpide/tests/accept)
 
 **Owner rule:** complete transfer without breaking functionality. See `.cursor/rules/fpide-full-port.mdc`.
 
 ## Current state
 
-- **Compiler:** real FPC `compiler/` @ same pin as IDE (`upstream.env`). **Not in git** — `fpide/bootstrap/ensure-compiler.sh` → `build/bootstrap-fpide/staging-compiler`. CI bootstrap diffs only `fpide/src`.
-- **Build flags:** match upstream IDE fpmake (GDB/MI, BrowserCol, …).
-- **Preflight:** smoke OK; next IDE error is `object` vs `class` (`wutils.pas`) — class-migrate UI units.
-- **Objects shim:** `MaxBytes` via `manual/objects.inc`.
+- **Build:** `tools/fpide-setup-build.sh [test]` — one command on Ubuntu (apt packages, `tv/` submodule, ~15 s build, tests). The compiler and
+  the debugger are the system `fpc` and `gdb` (external programs); the FPC compiler sources are not needed (a handful of compiler units
+  the IDE itself uses are vendored in `compat/fpc/`). `FPIDE_EMBED=1` keeps the original embedded-compiler build.
+- **Editor:** UTF-8 end to end (open/edit/save). A column is a character (valid UTF-8 sequence or a stray byte), wide characters take two
+  cells, drawing goes through tv3 cells; `WUtf8` has the helpers. Single byte mode only for go32v2 (`Utf8Text`).
+- **Sources** are UTF-8; the box/frame characters are Unicode.
+- **Debugger:** gdb through GDB/MI (`gdbmi*.pas`); Run with a breakpoint stops on it (the program is rebuilt with `-g` for that),
+  Call stack, Step/Trace, Watches, Evaluate, Continue to the exit are checked by the tests.
+- **User screen** (Ctrl+F9 and the debuggee): `UnixSuspend/UnixResume` of tv3 give the real terminal and take it back.
+- **Tests:** `test_accept.py` (35), `test_functions.py` (147: edit, search, window, tools, options, files, compile, unicode, debug),
+  `test_menu_sweep.py` (every menu item); `tools/fpide-accept.sh` runs all three; CI `.github/workflows/fpide-accept.yml`.
 
-## Next session
+## Open
 
-1. Class-migrate IDE units inheriting TV types (`WUtils`, …).
-2. Full link with compiler+debugger; PTY acceptance vs vanilla `fp`.
+- System clipboard integration of the editor (the internal clipboard is UTF-8).
+- `wansi.pas`/`fp.ans` and the help viewer (`whlpview`) still count bytes/CP437 words; lines are 255 bytes (shortstring).
+- Browser symbol windows are unavailable with the external compiler (no browser info).
+- Wide characters in horizontally scrolled lines are approximated.
+- The gdb warning "Failed to set controlling terminal" can appear on the user screen when the program is started by the debugger.
 
 ## 2026-10-06: where the build stands
 
@@ -51,4 +61,11 @@ tv3: `TListBox.Get/SetFocusedItem`, `;`-separated masks in `TFileList`.
 Known issues / next: after a failed Alt+F9 the compiler keeps state (use F9); file dialog date shows 2033;
 stale repaint after some dialogs; tv3 far2l clipboard query waits 30 s on terminals that do not answer (tests set TV_FAR2L=0);
 Run does not use UnixSuspend (user screen output not shown); Edit-menu items, Tile/Cascade/Zoom/Next not yet checked in detail;
-Debug (GDB) paths only smoke-tested; the 4 non-UTF-8 sources; DbgLog calls (FP_DEBUG_LOG) left in fpide.pas/fpviews.pas/fpmrun.inc.
+(all of these were fixed later the same day: see Current state).
+
+## 2026-10-06 (night): lost `override`s
+
+FPC's "An inherited method is hidden by ..." warnings are real bugs here: the old virtual->override fixer missed 78 methods
+(`Destroy`, `Store`, `Update`, `Draw`, `DoSelectSourceLine`, ...). `DoSelectSourceLine` was never called (the base stub returned garbage,
+the debugger kept resuming); many destructors were skipped. All restored; the only remaining warning is the deliberate
+`Update(AMaxWidth)` overload in `fpdebug.pas`. Keep the build free of this warning.

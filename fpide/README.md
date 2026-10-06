@@ -18,7 +18,8 @@ UTF-8 внутри, модель **классов** вместо `object`/`New`/
 
 ## Локальный preflight (перед push)
 
-Перед push: `tools/fpide-setup-build.sh test` (сборка ~15 с, тесты ~5 мин).
+Перед push: `tools/fpide-setup-build.sh test` (сборка ~15 с, тесты ~5 мин: `test_accept.py`, `test_functions.py` — прокликивание основных функций, включая отладчик, `test_menu_sweep.py`).
+В логе сборки не должно быть предупреждений `An inherited method is hidden by ...` (потерянный `override`).
 
 ## Сборка
 
