@@ -80,6 +80,7 @@ var
     EditorWindow : PSourceWindow;
 begin
   level:=0;
+  RefreshBrowserCol;
   if BrowCol.Modules=nil then
      begin ErrorBox(msg_nodebuginfoavailable,nil); Exit; end;
   EditorWindow:=FirstEditorWindow;
@@ -108,6 +109,7 @@ end;
 
 procedure TIDEApp.Objects;
 begin
+  RefreshBrowserCol;
   if ObjectTree=nil then
      begin ErrorBox(msg_nodebuginfoavailable,nil); Exit; end;
 
@@ -143,6 +145,7 @@ var R: TRect;
 
 begin
   level:=0;
+  RefreshBrowserCol;
   if BrowCol.Modules=nil then
      begin ErrorBox(msg_nodebuginfoavailable,nil); Exit; end;
   Overflow:=false;
@@ -170,6 +173,7 @@ begin
   S.Insert(P);
 end;
 begin
+  RefreshBrowserCol;
   if BrowCol.Modules=nil then
      begin ErrorBox(msg_nodebuginfoavailable,nil); Exit; end;
   if assigned(ModulesCollection) then

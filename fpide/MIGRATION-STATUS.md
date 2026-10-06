@@ -14,6 +14,8 @@ Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external 
 - **Sources** are UTF-8; the box/frame characters are Unicode.
 - **Debugger:** gdb through GDB/MI (`gdbmi*.pas`); Run with a breakpoint stops on it (the program is rebuilt with `-g` for that),
   Call stack, Step/Trace, Watches, Evaluate, Continue to the exit are checked by the tests.
+- **Browser** (Search > Objects/Modules/Globals/Symbol): built from the sources with fcl-passrc (`fpsrcbrw.pas`), no compiler tables needed.
+- **Debuggee terminal:** the program run by gdb gets a pty of its own (`gdbpty.pas`) that the IDE relays (output to the screen, keys to the program) — gdb's "Failed to set controlling terminal" is gone.
 - **User screen** (Ctrl+F9 and the debuggee): `UnixSuspend/UnixResume` of tv3 give the real terminal and take it back.
 - **Tests:** `test_accept.py` (35), `test_functions.py` (147: edit, search, window, tools, options, files, compile, unicode, debug),
   `test_menu_sweep.py` (every menu item); `tools/fpide-accept.sh` runs all three; CI `.github/workflows/fpide-accept.yml`.
@@ -22,9 +24,8 @@ Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external 
 
 - System clipboard integration of the editor (the internal clipboard is UTF-8).
 - `wansi.pas`/`fp.ans` and the help viewer (`whlpview`) still count bytes/CP437 words; lines are 255 bytes (shortstring).
-- Browser symbol windows are unavailable with the external compiler (no browser info).
+- The symbol browser reads declarations only (no cross references of uses: they need the compiler); unsaved edits are not seen (the files on disk are parsed).
 - Wide characters in horizontally scrolled lines are approximated.
-- The gdb warning "Failed to set controlling terminal" can appear on the user screen when the program is started by the debugger.
 
 ## 2026-10-06: where the build stands
 

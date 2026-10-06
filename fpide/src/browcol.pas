@@ -273,6 +273,14 @@ procedure DisposeBrowserCol;
 procedure NewBrowserCol;
 procedure CreateBrowserCol;
 procedure InitBrowserCol;
+
+var
+  { without the compiler's symbol tables (external compiler) the collections are built from the sources: the IDE
+    sets this function; it fills Modules and ObjectTree for the program being edited }
+  BuildBrowserHook: function: boolean = nil;
+
+{ calls the hook if there is one (the sources are read anew: they may have changed) }
+procedure RefreshBrowserCol;
 procedure DoneBrowserCol;
 
 function  LoadBrowserCol(S: PStream): boolean;
@@ -413,8 +421,8 @@ end;
 
 procedure TSymbolCollection.Insert(Item: Pointer);
 begin
-
-  inherited Insert(Item);
+  { not sorted: the symbols stay in the order they come in }
+  AtInsert(Count,Item);
 end;
 
 function TSymbolCollection.LookUp(const S: string; var Idx: sw_integer): string;
@@ -475,8 +483,10 @@ begin
 end;
 
 procedure TSortedSymbolCollection.Insert(Item: Pointer);
+var I: Integer;
 begin
-  inherited Insert(Item);
+  if not Search(KeyOf(Item),I) or Duplicates then
+    AtInsert(I,Item);
 end;
 
 function TSortedSymbolCollection.LookUp(const S: string; var Idx: sw_integer): string;
@@ -559,8 +569,10 @@ begin
 end;
 
 procedure TIDSortedSymbolCollection.Insert(Item: Pointer);
+var I: Integer;
 begin
-  inherited Insert(Item);
+  if not Search(KeyOf(Item),I) or Duplicates then
+    AtInsert(I,Item);
 end;
 
 function TIDSortedSymbolCollection.SearchSymbolByID(AID: longint): PSymbol;
@@ -568,9 +580,11 @@ var S: TSymbol;
     Index: sw_integer;
     P: PSymbol;
 begin
+  S:=TSymbol.Create('',abstractsym,'',nil);   { the search key: a symbol with that ID }
   S.TypeID:=AID;
-  if Search(@S,Index)=false then P:=nil else
+  if Search(S,Index)=false then P:=nil else
     P:=At(Index);
+  S.Free;
   SearchSymbolByID:=P;
 end;
 
@@ -1827,16 +1841,24 @@ begin
 end;
 
 {$else}
-{ the symbol information comes from the tables of the embedded compiler: nothing in this build }
+{ the symbol information of the embedded compiler is not here: BuildBrowserHook fills the collections from the sources }
 procedure NewBrowserCol;
 begin
   Modules := TSymbolCollection.Create(50,50);
+  ModuleNames := TModuleNameCollection.Create(50,50);
+  TypeNames := TTypeNameCollection.Create(1000,5000);
 end;
 
 procedure CreateBrowserCol;
 begin
 end;
 {$endif EMBED_COMPILER}
+
+procedure RefreshBrowserCol;
+begin
+  if Assigned(BuildBrowserHook) then
+    BuildBrowserHook();
+end;
 
 procedure BuildObjectInfo;
 var C,D: PIDSortedSymbolCollection;

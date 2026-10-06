@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode debug
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode debug browser
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -68,8 +68,8 @@ def type_lines(t, *lines):
             t.key('Enter')
 
 
-def menu(t, hot, item):
-    ok = t.menu(hot, item)
+def menu(t, hot, item, exact=False):
+    ok = t.menu(hot, item, exact=exact)
     t.pump(0.4)
     return ok
 
@@ -184,7 +184,7 @@ def section_search(t):
     new_file(t)
     type_lines(t, 'line 0 foo bar', 'line 1 foo bar', 'line 2 foo bar', 'line 3 foo bar', 'line 4 foo bar')
     t.key('C-PPage')
-    check(menu(t, 'M-s', 'Find'), 'Search > Find...')
+    check(menu(t, 'M-s', 'Find', exact=True), 'Search > Find...')
     check(t.wait_for('Text to find') and t.wait_for('Case sensitive'), 'the Find dialog opens with its options', t)
     t.type('foo')          # the word under the cursor is preselected: typing replaces it
     t.key('Enter')
@@ -194,7 +194,7 @@ def section_search(t):
     check(t.wait_until(lambda: t.indicator() == (2, 11)), 'Search again goes to the next one (2:11): %r' % (t.indicator(),), t)
 
     # not found: a message, and the IDE goes on
-    menu(t, 'M-s', 'Find')
+    menu(t, 'M-s', 'Find', exact=True)
     t.wait_for('Text to find')
     t.type('nothing-like-this')
     t.key('Enter')
@@ -425,7 +425,7 @@ def section_unicode(t):
 
     # search: case-insensitive for Cyrillic; replace with a Cyrillic text
     t.key('C-PPage')
-    menu(t, 'M-s', 'Find')
+    menu(t, 'M-s', 'Find', exact=True)
     t.wait_for('Text to find')
     t.type('ЖИВЕТ')
     t.key('Enter')
@@ -528,9 +528,82 @@ def section_debug(t):
           'the typed line reaches the program; it runs on to the breakpoint and the IDE returns: %r' % (t.indicator(),), t)
 
 
+SHAPES = """unit shapes;
+interface
+type
+  TColor = (clRed, clGreen, clBlue);
+  TShape = class
+  private
+    FName: string;
+  public
+    constructor Create(const AName: string);
+    procedure Draw; virtual;
+    function Area: double; virtual;
+  end;
+  TCircle = class(TShape)
+    R: double;
+    function Area: double; override;
+  end;
+const
+  Pi2 = 6.28;
+var
+  Count: integer;
+procedure Reset(var n: integer; const s: string);
+implementation
+constructor TShape.Create(const AName: string); begin FName:=AName end;
+procedure TShape.Draw; begin end;
+function TShape.Area: double; begin Result:=0 end;
+function TCircle.Area: double; begin Result:=3.14*R*R end;
+procedure Reset(var n: integer; const s: string); begin n:=0 end;
+end.
+"""
+USESHP = """program useshp;
+uses shapes;
+var c: TCircle;
+begin
+  c:=TCircle.Create('c');
+  writeln(c.Area:0:2);
+end.
+"""
+
+
+def section_browser(t):
+    """Search > Objects / Modules / Globals / Symbol: the symbol browser, fed from the sources (the compiler is external)"""
+    for name, text in (('shapes.pas', SHAPES), ('useshp.pas', USESHP)):
+        with open(os.path.join(t.work, name), 'w') as f:
+            f.write(text)
+    t.key('F3'); t.wait_for('Open a file'); t.type('useshp.pas'); t.key('Enter')
+    check(t.wait_for('program useshp'), 'the program is opened', t)
+    menu(t, 'M-s', 'Objects')
+    check(t.wait_for('Browse: Objects', 5), 'Search > Objects opens the class browser', t)
+    txt = t.text()
+    check('TShape' in txt and 'TCircle' in txt, 'both classes are listed', t)
+    lines = t.lines()
+    ti = next((i for i, l in enumerate(lines) if '└──TShape' in l), None)
+    ci = next((i for i, l in enumerate(lines) if '└──TCircle' in l), None)
+    check(ti is not None and ci is not None and ci == ti + 1 and lines[ci].index('└──TCircle') > lines[ti].index('└──TShape'),
+          'TCircle is a descendant of TShape in the tree', t)
+    t.key('Escape'); t.pump(0.3)
+    menu(t, 'M-s', 'Modules')
+    check(t.wait_for('Browse: Units', 5) and 'shapes' in t.text() and 'useshp' in t.text(), 'Search > Modules lists the units', t)
+    t.key('Escape'); t.pump(0.3)
+    menu(t, 'M-s', 'Globals')
+    check(t.wait_for('Browse: Globals', 5), 'Search > Globals opens', t)
+    txt = t.text()
+    check('Pi2 = 6.28' in txt and 'Count: Integer' in txt and 'Reset(var n: Integer' in txt
+          and 'clGreen' in txt, 'constants, variables, procedures with their parameters and enumeration items are there', t)
+    t.key('Escape'); t.pump(0.3)
+    menu(t, 'M-s', 'Symbol')
+    t.wait_for('Enter symbol')
+    t.key('End'); t.key(*['BSpace'] * 30); t.type('TShape'); t.key('Enter')
+    check(t.wait_for('Browse: TShape', 5) or t.wait_for('TShape', 5), 'Search > Symbol shows a class', t)
+    txt = t.text()
+    check('Draw' in txt and 'Area' in txt, 'the members of the class are listed', t)
+
+
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile),
-            ('unicode', section_unicode), ('debug', section_debug)]
+            ('unicode', section_unicode), ('debug', section_debug), ('browser', section_browser)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])

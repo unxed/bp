@@ -362,7 +362,7 @@ end;
 
 function IsSymbolInfoAvailable: boolean;
 begin
-  IsSymbolInfoAvailable:=BrowCol.Modules<>nil;
+  IsSymbolInfoAvailable:=(BrowCol.Modules<>nil) or Assigned(BrowCol.BuildBrowserHook);
 end;
 
 procedure OpenOneSymbolBrowser(Name : String);
@@ -380,6 +380,7 @@ var Index : sw_integer;
 
 begin
    Name:=UpcaseStr(Name);
+   RefreshBrowserCol;
    If BrowCol.Modules<>nil then
      begin
        PS:=TSymbol(BrowCol.Modules.FirstThat(TNestedTestProc(@Search)));
@@ -604,7 +605,7 @@ begin
   MyBW:=nil;
   if assigned(HScrollBar) then
     begin
-      HScrollBar.SetRange(1,80);
+      HScrollBar.SetRange(0,80);
     end;
   Options:=Options or (ofSelectable+ofTopSelect);
   EventMask:=EventMask or evBroadcast;

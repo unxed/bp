@@ -44,6 +44,9 @@ uses
   Drivers,Views,Dialogs,
   WUtils,WViews,WCEdit,
   FPSymbol,
+{$ifndef EMBED_COMPILER}
+  FPSrcBrw,
+{$endif}
   FPViews;
 
 type
@@ -1344,8 +1347,19 @@ end;
 
 {$endif}
 
+{$ifndef EMBED_COMPILER}
+{ the browser of this build reads the sources of the program (or unit) being edited }
+function BrowserFromSources: boolean;
+begin
+  BrowserFromSources:=FPSrcBrw.BuildSourceBrowser(GetMainFile(cRun));
+end;
+{$endif}
+
 procedure RegisterFPCompile;
 begin
+{$ifndef EMBED_COMPILER}
+  BuildBrowserHook:=@BrowserFromSources;
+{$endif}
 {$ifndef NOOBJREG}
   FillStreamRecs_fpcompil;
   RegisterType(RCompilerMessageListBox);

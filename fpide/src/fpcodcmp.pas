@@ -262,7 +262,7 @@ var
 begin
   if OnlyStandard then
     UpStandardunits:=UpCaseStr(StandardUnits)+',';
-  if IsSymbolInfoAvailable then
+  if IsSymbolInfoAvailable and (BrowCol.Modules<>nil) then
     begin
       if Assigned(UnitsCodeCompleteWords) then
         begin
