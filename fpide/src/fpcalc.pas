@@ -320,6 +320,7 @@ begin
               if Key='SQRT' then begin if R<0 then Error else SetDisplay(sqrt(R),false) end else
               if Key='LOG' then begin if R<=0 then Error else SetDisplay(ln(R),false) end else
               if Key='X^2' then SetDisplay(R*R,false) else
+              if Key='±' then begin if Sign = ' ' then Sign := '-' else Sign := ' '; SetDisplay(-R,true) end else
               if Key='M+' then Memory:=Memory+R else
               if Key='M-' then Memory:=Memory-R else
               if Key='M'#26 then SetDisplay(Memory,false) else
@@ -474,7 +475,7 @@ end;
 constructor TCalculator.Create;
 const
   Keys: array[0..29] of string[4] =
-   ('M+',  'x^y','C'  ,#27  ,'%'  ,#241 ,
+   ('M+',  'x^y','C'  ,#27  ,'%'  ,'±'  ,
     'M-',  'x^2','7'  ,'8'  ,'9'  ,'/'  ,
     'M'#26,'1/x','4'  ,'5'  ,'6'  ,'*'  ,
     'M'#27,'sqrt','1'  ,'2'  ,'3'  ,'-'  ,
@@ -511,6 +512,7 @@ end;
 
 procedure TCalculator.HandleEvent(var Event: TEvent);
 var R: extended;
+    CDEvent: TEvent;
 {    Re: real;}
 begin
   if (State and sfSelected)<>0 then
@@ -549,7 +551,11 @@ begin
   end;
   { lets CD try to handle this }
   if Event.What=evKeyDown then
-     Message(CD,Event.What,Event.KeyCode,Event.InfoPtr);
+    begin
+      { tv3: Message() fills Command, which is not the KeyCode of a key event: hand over a copy }
+      CDEvent:=Event;
+      CD.HandleEvent(CDEvent);
+    end;
   inherited HandleEvent(Event);
 end;
 
