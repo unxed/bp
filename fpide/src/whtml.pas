@@ -440,10 +440,10 @@ begin
   if (Code=$5D)                    then E:=']'   else { ] }
   if (Code=$5E)                    then E:='^'   else { ^ }
   if (Code=$5F)                    then E:='_'   else { _ }
-  if (Code=160) or (Name='nbsp')   then E:=#255  else { no-break space                }
-  if (Code=161) or (Name='iexcl')  then E:='­'   else { inverted exclamation mark    }
-  if (Code=162) or (Name='cent')   then E:='›'   else { cent sign                     }
-  if (Code=163) or (Name='pound')  then E:='œ'   else { pound sterling sign           }
+  if (Code=160) or (Name='nbsp')   then E:=#$C2#$A0  else { no-break space                }
+  if (Code=161) or (Name='iexcl')  then E:='Â¡'   else { inverted exclamation mark    }
+  if (Code=162) or (Name='cent')   then E:='Â¢'   else { cent sign                     }
+  if (Code=163) or (Name='pound')  then E:='Â£'   else { pound sterling sign           }
   if (Code=164) or (Name='curren') then E:='$'   else { general currency sign         }
   if (Code=165) or (Name='yen')    then E:=''   else { yen sign                      }
   if (Code=166) or (Name='brvbar') then E:='|'   else { broken vertical bar           }
@@ -456,30 +456,30 @@ begin
   if (Code=173) or (Name='shy')    then E:='-'   else { soft hypen                    }
   if (Code=174) or (Name='reg')    then E:='(R)' else { registered sign               }
 (*  if (Code=175) or (Name='macr')   then E:='?'   else { macron                        }*)
-  if (Code=176) or (Name='deg')    then E:='ø'   else { degree sign                   }
-  if (Code=177) or (Name='plusmn') then E:='ñ'   else { plus-or-minus sign            }
-  if (Code=178) or (Name='sup2')   then E:='ý'   else { superscript 2                 }
+  if (Code=176) or (Name='deg')    then E:='Â°'   else { degree sign                   }
+  if (Code=177) or (Name='plusmn') then E:='Â±'   else { plus-or-minus sign            }
+  if (Code=178) or (Name='sup2')   then E:='Â²'   else { superscript 2                 }
   if (Code=179) or (Name='sup3')   then E:='^3'  else { superscript 3                 }
   if (Code=180) or (Name='acute')  then E:=''''  else { acute accent                  }
-  if (Code=181) or (Name='micro')  then E:='æ'   else { micro sign                    }
+  if (Code=181) or (Name='micro')  then E:='Âµ'   else { micro sign                    }
 (*  if (Code=182) or (Name='para')   then E:='?'   else { paragraph sign                }*)
-  if (Code=183) or (Name='middot') then E:='ù'   else { middle dot                    }
+  if (Code=183) or (Name='middot') then E:='Â·'   else { middle dot                    }
 (*  if (Code=184) or (Name='cedil')  then E:='?'   else { cedilla                       }*)
   if (Code=185) or (Name='sup1')   then E:='^1'  else { superscript 1                 }
 (*  if (Code=186) or (Name='ordm')   then E:='?'   else { ordinal indicator, masculine  }*)
   if (Code=187) or (Name='raquo')  then E:='"'   else { angle quoatation mark -right  }
-  if (Code=188) or (Name='frac14') then E:='¬'   else { fraction one-quarter          }
-  if (Code=189) or (Name='frac12') then E:='«'   else { fraction one-half             }
+  if (Code=188) or (Name='frac14') then E:='Â¼'   else { fraction one-quarter          }
+  if (Code=189) or (Name='frac12') then E:='Â½'   else { fraction one-half             }
   if (Code=190) or (Name='frac34') then E:='3/4' else { fraction three-quarters       }
-  if (Code=191) or (Name='iquest') then E:='¨'   else { inverted question mark        }
+  if (Code=191) or (Name='iquest') then E:='Â¿'   else { inverted question mark        }
   if (Code=192) or (Name='Agrave') then E:='A'   else { capital A, grave accent       }
   if (Code=193) or (Name='Aacute') then E:='A'   else { capital A, acute accent       }
   if (Code=194) or (Name='Acirc')  then E:='A'   else { capital A, circumflex accent  }
   if (Code=195) or (Name='Atilde') then E:='A'   else { capital A, tilde accent       }
-  if (Code=196) or (Name='Auml')   then E:='Ž'   else { capital A, dieresis or umlaut }
+  if (Code=196) or (Name='Auml')   then E:='Ã„'   else { capital A, dieresis or umlaut }
   if (Code=197) or (Name='Aring')  then E:=''   else { capital A, ring               }
-  if (Code=198) or (Name='AElig')  then E:='’'   else { capital AE diphthong          }
-  if (Code=199) or (Name='Ccedil') then E:='€'   else { capital C, cedilla            }
+  if (Code=198) or (Name='AElig')  then E:='Ã†'   else { capital AE diphthong          }
+  if (Code=199) or (Name='Ccedil') then E:='Ã‡'   else { capital C, cedilla            }
   if (Code=200) or (Name='Egrave') then E:=''   else { capital E, grave accent       }
   if (Code=201) or (Name='Eacute') then E:=''   else { capital E, acute accent       }
   if (Code=202) or (Name='Ecirc')  then E:='E'   else { capital E, circumflex accent  }
@@ -489,49 +489,49 @@ begin
   if (Code=206) or (Name='Icirc')  then E:='I'   else { capital I, circumflex accent  }
   if (Code=207) or (Name='Iuml')   then E:='I'   else { capital I, dieresis or umlaut }
 (*  if (Code=208) or (Name='ETH')    then E:='?'   else { capital Eth, Icelandic        }*)
-  if (Code=209) or (Name='Ntidle') then E:='¥'   else { capital N, tilde              }
+  if (Code=209) or (Name='Ntidle') then E:='Ã‘'   else { capital N, tilde              }
   if (Code=210) or (Name='Ograve') then E:='O'   else { capital O, grave accent       }
   if (Code=211) or (Name='Oacute') then E:='O'   else { capital O, acute accent       }
   if (Code=212) or (Name='Ocirc')  then E:='O'   else { capital O, circumflex accent  }
   if (Code=213) or (Name='Otilde') then E:='O'   else { capital O, tilde              }
-  if (Code=214) or (Name='Ouml')   then E:='™'   else { capital O, dieresis or umlaut }
+  if (Code=214) or (Name='Ouml')   then E:='Ã–'   else { capital O, dieresis or umlaut }
   if (Code=215) or (Name='times')  then E:='*'   else { multiply sign                 }
   if (Code=216) or (Name='Oslash') then E:='O'   else { capital O, slash              }
   if (Code=217) or (Name='Ugrave') then E:='U'   else { capital U, grave accent       }
   if (Code=218) or (Name='Uacute') then E:='U'   else { capital U, acute accent       }
   if (Code=219) or (Name='Ucirc')  then E:='U'   else { capital U, circumflex accent  }
-  if (Code=220) or (Name='Uuml')   then E:='š'   else { capital U, dieresis or umlaut }
+  if (Code=220) or (Name='Uuml')   then E:='Ãœ'   else { capital U, dieresis or umlaut }
   if (Code=221) or (Name='Yacute') then E:='Y'   else { capital Y, acute accent       }
 (*  if (Code=222) or (Name='THORN')  then E:='?'   else { capital THORN, Icelandic      }*)
-  if (Code=223) or (Name='szlig')  then E:='á'   else { small sharp S, German         }
-  if (Code=224) or (Name='agrave') then E:='…'   else { small a, grave accent         }
-  if (Code=225) or (Name='aacute') then E:=' '   else { small a, acute accent         }
-  if (Code=226) or (Name='acirc')  then E:='ƒ'   else { small a, circumflex accent    }
-  if (Code=227) or (Name='atilde') then E:='ƒ'   else { small a, tilde                }
-  if (Code=228) or (Name='auml')   then E:='„'   else { small a, dieresis or umlaut   }
-  if (Code=229) or (Name='aring')  then E:='†'   else { small a, ring                 }
+  if (Code=223) or (Name='szlig')  then E:='ÃŸ'   else { small sharp S, German         }
+  if (Code=224) or (Name='agrave') then E:='Ã '   else { small a, grave accent         }
+  if (Code=225) or (Name='aacute') then E:='Ã¡'   else { small a, acute accent         }
+  if (Code=226) or (Name='acirc')  then E:='Ã¢'   else { small a, circumflex accent    }
+  if (Code=227) or (Name='atilde') then E:='Ã£'   else { small a, tilde                }
+  if (Code=228) or (Name='auml')   then E:='Ã¤'   else { small a, dieresis or umlaut   }
+  if (Code=229) or (Name='aring')  then E:='Ã¥'   else { small a, ring                 }
   if (Code=230) or (Name='aelig')  then E:='ae'  else { small ae, diphthong           }
-  if (Code=231) or (Name='ccedil') then E:='‡'   else { small c, cedilla              }
-  if (Code=232) or (Name='egrave') then E:='Š'   else { small e, grave accent         }
-  if (Code=233) or (Name='eacute') then E:='‚'   else { small e, acute accent         }
-  if (Code=234) or (Name='ecirc')  then E:='ˆ'   else { small e, circumflex accent    }
-  if (Code=235) or (Name='euml')   then E:='‰'   else { small e, dieresis or umlaut   }
+  if (Code=231) or (Name='ccedil') then E:='Ã§'   else { small c, cedilla              }
+  if (Code=232) or (Name='egrave') then E:='Ã¨'   else { small e, grave accent         }
+  if (Code=233) or (Name='eacute') then E:='Ã©'   else { small e, acute accent         }
+  if (Code=234) or (Name='ecirc')  then E:='Ãª'   else { small e, circumflex accent    }
+  if (Code=235) or (Name='euml')   then E:='Ã«'   else { small e, dieresis or umlaut   }
   if (Code=236) or (Name='igrave') then E:=''   else { small i, grave accent         }
-  if (Code=237) or (Name='iacute') then E:='¡'   else { small i, acute accent         }
-  if (Code=238) or (Name='icirc')  then E:='Œ'   else { small i, circumflex accent    }
-  if (Code=239) or (Name='iuml')   then E:='‹'   else { small i, dieresis or umlaut   }
+  if (Code=237) or (Name='iacute') then E:='Ã­'   else { small i, acute accent         }
+  if (Code=238) or (Name='icirc')  then E:='Ã®'   else { small i, circumflex accent    }
+  if (Code=239) or (Name='iuml')   then E:='Ã¯'   else { small i, dieresis or umlaut   }
 (*  if (Code=240) or (Name='eth')    then E:='?'   else { small eth, Icelandic          }*)
-  if (Code=241) or (Name='ntilde') then E:='¤'   else { small n, tilde                }
-  if (Code=242) or (Name='ograve') then E:='•'   else { small o, grave accent         }
-  if (Code=243) or (Name='oacute') then E:='¢'   else { small o, acute accent         }
-  if (Code=244) or (Name='ocirc')  then E:='“'   else { small o, circumflex accent    }
-  if (Code=245) or (Name='otilde') then E:='“'   else { small o, tilde                }
-  if (Code=246) or (Name='ouml')   then E:='”'   else { small o, dieresis or umlaut   }
+  if (Code=241) or (Name='ntilde') then E:='Ã±'   else { small n, tilde                }
+  if (Code=242) or (Name='ograve') then E:='Ã²'   else { small o, grave accent         }
+  if (Code=243) or (Name='oacute') then E:='Ã³'   else { small o, acute accent         }
+  if (Code=244) or (Name='ocirc')  then E:='Ã´'   else { small o, circumflex accent    }
+  if (Code=245) or (Name='otilde') then E:='Ãµ'   else { small o, tilde                }
+  if (Code=246) or (Name='ouml')   then E:='Ã¶'   else { small o, dieresis or umlaut   }
   if (Code=247) or (Name='divide') then E:='/'   else { divide sign                   }
   if (Code=248) or (Name='oslash') then E:='"'   else { small o, slash                }
-  if (Code=249) or (Name='ugrave') then E:='—'   else { small u, grave accent         }
-  if (Code=250) or (Name='uacute') then E:='£'   else { small u, acute accent         }
-  if (Code=251) or (Name='ucirc')  then E:='–'   else { small u, circumflex accent    }
+  if (Code=249) or (Name='ugrave') then E:='Ã¹'   else { small u, grave accent         }
+  if (Code=250) or (Name='uacute') then E:='Ãº'   else { small u, acute accent         }
+  if (Code=251) or (Name='ucirc')  then E:='Ã»'   else { small u, circumflex accent    }
   if (Code=252) or (Name='uuml')   then E:=''   else { small u, dieresis or umlaut   }
   if (Code=253) or (Name='yacute') then E:='y'   else { small y, acute accent         }
 (*  if (Code=254) or (Name='thorn')  then E:='?'   else { small thorn, Icelandic        }*)

@@ -1,6 +1,6 @@
 {
     This file is part of the Free Pascal Integrated Development Environment
-    Copyright (c) 1998 by B‚rczi G bor
+    Copyright (c) 1998 by BÃ©rczi GÃ¡bor
 
     Reading and writing .INI files
 

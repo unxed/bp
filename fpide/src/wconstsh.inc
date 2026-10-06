@@ -19,26 +19,26 @@
 {$endif}
 
     btn_OK = 'O~K~';
-    btn_Cancel = 'MÇgsem';
+    btn_Cancel = 'M√©gsem';
 
-    dialog_find = 'KeresÇs';
-    label_find_options = 'Opci¢k';
-    label_find_texttofind = '~K~eresendã';
-    label_find_casesensitive = 'K~i~s-/nagybetãk kÅlîn';
+    dialog_find = 'Keres√©s';
+    label_find_options = 'Opci√≥k';
+    label_find_texttofind = '~K~eresend≈ë';
+    label_find_casesensitive = 'K~i~s-/nagybet≈ëk k√ºl√∂n';
     label_find_wholewordsonly = 'Csak teljes sza~v~akat';
-    label_find_direction = 'Ir†ny';
-    label_find_forward = 'Elãre (~d~)';
-    label_find_backward = 'VisszafelÇ (~b~)';
-    label_find_scope = 'Szk¢p';
-    label_find_global = 'Teljes szîve~g~';
-    label_find_selectedtext = 'Kiv†la~s~ztott szîveg';
-    label_find_origin = 'Kiindul†si pont';
-    label_find_fromcursor = 'A kur~z~ort¢l';
-    label_find_entirescope = 'T~e~ljes szk¢p';
+    label_find_direction = 'Ir√°ny';
+    label_find_forward = 'El≈ëre (~d~)';
+    label_find_backward = 'Visszafel√© (~b~)';
+    label_find_scope = 'Szk√≥p';
+    label_find_global = 'Teljes sz√∂ve~g~';
+    label_find_selectedtext = 'Kiv√°la~s~ztott sz√∂veg';
+    label_find_origin = 'Kiindul√°si pont';
+    label_find_fromcursor = 'A kur~z~ort√≥l';
+    label_find_entirescope = 'T~e~ljes szk√≥p';
 
     dialog_replace = 'Csere';
     label_replace_texttofind = label_find_texttofind;
-    label_replace_newtext = '   ~È~j szîveg';
+    label_replace_newtext = '   ~√ö~j sz√∂veg';
     label_replace_options = label_find_options;
     label_replace_casesensitive = label_find_casesensitive;
     label_replace_wholewordsonly = label_find_wholewordsonly;
@@ -52,51 +52,51 @@
     label_replace_origin = label_find_origin;
     label_replace_fromcursor = label_find_fromcursor;
     label_replace_entirescope = label_find_entirescope;
-    btn_replace_changeall = '~A~z îsszeset';
+    btn_replace_changeall = '~A~z √∂sszeset';
 
-    dialog_gotoline = 'Ugr†s sorra';
-    label_gotoline_linenumber = 'Az £j sor s~z~†ma';
+    dialog_gotoline = 'Ugr√°s sorra';
+    label_gotoline_linenumber = 'Az √∫j sor s~z~√°ma';
 
-    msg_invalidmarkindex = 'êrvÇnytelen pont index (%d)';
-    msg_marknotset = 'A %d. pont nincs be†ll°tva.';
+    msg_invalidmarkindex = '√ârv√©nytelen pont index (%d)';
+    msg_marknotset = 'A %d. pont nincs be√°ll√≠tva.';
 
-    msg_foldboundsarenotvalid = 'A hajt†s hat†rai nem ÇrvÇnyesek';
+    msg_foldboundsarenotvalid = 'A hajt√°s hat√°rai nem √©rv√©nyesek';
 
-    msg_notenoughmemoryforthisoperation = 'Nincs elÇg mem¢ria a mãvelet elvÇgzÇsÇhez.';
-    msg_errorreadingfile = 'Hiba a  %s f†jl olvas†sa kîzben.';
-    msg_errorwritingfile = 'Hiba a  %s f†jl °r†sa kîzben.';
-    msg_errorsavingfile = 'Hiba a %s f†jl mentÇse kîzben.';
-    msg_errorcreatingfile = 'Hiba a %s f†jl lÇtrehoz†sa kîzben.';
-    msg_filehasbeenmodifiedsave = 'A %s m¢dosult. Menti?';
-    msg_saveuntitledfile = 'Elmenti a c°m nÇlkÅli f†jlt?';
-    msg_filehadtoolonglines = #3'A %s f†jlnak t£l hossz£'#13+
-                              #3'sora(i) voltak. Az elsã a %d';
-    msg_filewasmodified = #3'A %s f†jlt'#13+
-                          #3'egy m†sik program m¢dos°totta.'#13+
-                          #3'FelÅl°rja az £jabb verzi¢t?';
+    msg_notenoughmemoryforthisoperation = 'Nincs el√©g mem√≥ria a m≈ëvelet elv√©gz√©s√©hez.';
+    msg_errorreadingfile = 'Hiba a  %s f√°jl olvas√°sa k√∂zben.';
+    msg_errorwritingfile = 'Hiba a  %s f√°jl √≠r√°sa k√∂zben.';
+    msg_errorsavingfile = 'Hiba a %s f√°jl ment√©se k√∂zben.';
+    msg_errorcreatingfile = 'Hiba a %s f√°jl l√©trehoz√°sa k√∂zben.';
+    msg_filehasbeenmodifiedsave = 'A %s m√≥dosult. Menti?';
+    msg_saveuntitledfile = 'Elmenti a c√≠m n√©lk√ºli f√°jlt?';
+    msg_filehadtoolonglines = #3'A %s f√°jlnak t√∫l hossz√∫'#13+
+                              #3'sora(i) voltak. Az els≈ë a %d';
+    msg_filewasmodified = #3'A %s f√°jlt'#13+
+                          #3'egy m√°sik program m√≥dos√≠totta.'#13+
+                          #3'Fel√ºl√≠rja az √∫jabb verzi√≥t?';
 
-    dialog_savefileas = 'F†jl mentÇse m†s nÇven';
-    dialog_writeblocktofile = 'Blokk ki°r†sa f†jlba';
-    dialog_readblockfromfile = 'Blokk beolvas†sa f†jlb¢l';
+    dialog_savefileas = 'F√°jl ment√©se m√°s n√©ven';
+    dialog_writeblocktofile = 'Blokk ki√≠r√°sa f√°jlba';
+    dialog_readblockfromfile = 'Blokk beolvas√°sa f√°jlb√≥l';
 
-    label_name = '~N~Çv';
+    label_name = '~N~√©v';
 
-    msg_searchstringnotfound = 'A keresett karaktersor nem tal†lhat¢.';
-    msg_replacethisoccourence = 'LecserÇljem ezt az elãfordul†st?';
-    msg_fileexistsoverwrite = 'A %s f†jl m†r lÇtezik. FelÅl°rja?';
+    msg_searchstringnotfound = 'A keresett karaktersor nem tal√°lhat√≥.';
+    msg_replacethisoccourence = 'Lecser√©ljem ezt az el≈ëfordul√°st?';
+    msg_fileexistsoverwrite = 'A %s f√°jl m√°r l√©tezik. Fel√ºl√≠rja?';
 
     { Help system }
 
-    msg_nohelpfilesinstalled = 'Nincsenek s£g¢-f†jlok telep°tve.';
-    msg_helpindex = 'S£g¢ index';
-    msg_nohelpavailabelforthistopic = 'Ehhez a tÇm†hoz nem tartozik s£g¢.';
-    msg_pagenotavailable = 'Az oldal nem elÇrhetã';
+    msg_nohelpfilesinstalled = 'Nincsenek s√∫g√≥-f√°jlok telep√≠tve.';
+    msg_helpindex = 'S√∫g√≥ index';
+    msg_nohelpavailabelforthistopic = 'Ehhez a t√©m√°hoz nem tartozik s√∫g√≥.';
+    msg_pagenotavailable = 'Az oldal nem el√©rhet≈ë';
     msg_cantaccessurl = 'Sajnos nem tudom megnyitni a %s URL-t...';
 
     { WUtils }
-    msg_bugcheckfailed = 'Belsã hiba: %s'#13+
-                         'KÇrem, jelezze a szerzãnek!';
-    msg_functionnotimplemented = #3'Ez a funkci¢ mÇg'#13+
+    msg_bugcheckfailed = 'Bels≈ë hiba: %s'#13+
+                         'K√©rem, jelezze a szerz≈ënek!';
+    msg_functionnotimplemented = #3'Ez a funkci√≥ m√©g'#13+
                                  #3+'nincs kidolgozva...'#13+
                                  #3+'';
 

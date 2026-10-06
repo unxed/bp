@@ -1,6 +1,6 @@
 {
     This file is part of the Free Pascal Integrated Development Environment
-    Copyright (c) 2000 by B‚rczi G bor
+    Copyright (c) 2000 by BÃ©rczi GÃ¡bor
 
     Strings for common utilities
 
