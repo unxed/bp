@@ -37,8 +37,6 @@ procedure InitEvents;
 procedure DoneEvents;
 procedure InitSysError;
 procedure DoneSysError;
-{ Yield the CPU while the IDE is idle. }
-procedure GiveUpTimeSlice;
 
 var
   { Number of mouse buttons (FV: set by InitMouse; 0 = no mouse). }

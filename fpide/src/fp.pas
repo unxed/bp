@@ -32,6 +32,9 @@ program FP;
 (**********************************************************************)
 
 uses
+{$ifdef Unix}
+  TvUnix, { tv3 terminal backend: raw mode, alternate screen, input; must be linked in }
+{$endif Unix}
 {$ifdef Windows}
   windows,
 {$endif Windows}
@@ -426,6 +429,13 @@ BEGIN
   { init target information etc. }
   InitSystems;
 
+{$ifdef Unix}
+  if not UnixInit then
+    begin
+      writeln(stderr,'fp: standard input is not a terminal');
+      Halt(1);
+    end;
+{$endif Unix}
   IDEApp := TIDEApp.Create;
   CheckINIFile;
   ReadSwitches(SwitchesPath);
@@ -554,6 +564,9 @@ BEGIN
 
   DelTempFiles;
   IDEApp.Free;
+{$ifdef Unix}
+  UnixDone;
+{$endif Unix}
   WriteSwitches(SwitchesPath);
 
 {$IFDEF HasSignal}

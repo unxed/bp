@@ -254,10 +254,6 @@ procedure DoneSysError;
 begin
 end;
 
-procedure GiveUpTimeSlice;
-begin
-  ThreadSwitch;
-end;
 
 procedure ShowMouse;
 begin

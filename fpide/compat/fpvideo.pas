@@ -13,11 +13,18 @@ uses
 
 function CurVideoMode: TVideoMode;
 procedure SetScreenVideoMode(const Mode: TVideoMode);
+{ Yield the CPU while the IDE is idle (FV Drivers.GiveUpTimeSlice; ThreadSwitch needs a thread driver). }
+procedure GiveUpTimeSlice;
 
 implementation
 
 uses
-  Drivers;
+  SysUtils, Drivers;
+
+procedure GiveUpTimeSlice;
+begin
+  Sleep(1);
+end;
 
 function CurVideoMode: TVideoMode;
 begin

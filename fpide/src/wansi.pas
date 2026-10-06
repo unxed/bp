@@ -128,7 +128,7 @@ type
        ANSICurPosStack    : array[1..ANSICurPosStackSize] of TPoint;
        ANSICurPosStackPtr : byte;
        constructor Create(AReplyHook, AKeyHook, AWriteHook: PHookProc);
-       procedure   ProcessChar(C: char); virtual;
+       procedure   ProcessChar(C: char); override;
        function    GetANSIParam: integer; virtual;
        { --- ANSI functions --- }
        procedure   PushCurPos; virtual;

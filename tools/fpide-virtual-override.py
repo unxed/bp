@@ -10,6 +10,13 @@ import re, sys
 from pathlib import Path
 
 CLS = re.compile(r'(?im)^[ \t]*(T\w+)[ \t]*=[ \t]*class[ \t]*(?:\([ \t]*(\w+)[ \t]*(?:,[^)]*)?\))?[ \t]*$|^[ \t]*(T\w+)[ \t]*=[ \t]*class[ \t]*\([ \t]*(\w+)')
+VIS = re.compile(r'(?is)^\s*(?:(?:strict\s+)?(?:public|private|protected|published|automated)\b\s*)+')
+
+
+def clean(st):
+    return VIS.sub('', re.sub(r'\{[^}]*\}|//[^\n]*', '', st))
+
+
 METH = re.compile(r'(?is)^\s*(?:class\s+)?(procedure|function|destructor|constructor)\s+(\w+)')
 
 
@@ -63,7 +70,7 @@ def scan(paths):
             meth = {}
             for a, b in members(t[s:e]):
                 st = t[s + a:s + b]
-                m = METH.match(re.sub(r'\{[^}]*\}', '', st))
+                m = METH.match(clean(st))
                 if not m:
                     continue
                 low = st.lower()
@@ -98,11 +105,11 @@ def main():
         for name, parent, s, e in class_bodies(t):
             for a, b in members(t[s:e]):
                 st = t[s + a:s + b]
-                m = METH.match(re.sub(r'\{[^}]*\}', '', st))
+                m = METH.match(clean(st))
                 if not m or m.group(1).lower() == 'constructor':
                     continue
                 mv = re.search(r'\bvirtual\b(\s*;)', st, re.I)
-                if mv and ancestor_virtual(info, name.lower(), m.group(2).lower()) and 'abstract' not in st.lower():
+                if mv and ancestor_virtual(info, name.lower(), m.group(2).lower()) and not re.search(r'\babstract\s*;', st, re.I):
                     edits.append((s + a + mv.start(), s + a + mv.start() + 7))
         edits = sorted(set(edits))   # {$ifdef} variants of one class share a body
         if edits:

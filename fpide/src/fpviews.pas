@@ -100,7 +100,7 @@ type
       procedure   InitHelpView; virtual;
       procedure   Show; {virtual;}
       procedure   Hide; {override;}
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
       function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
@@ -156,12 +156,12 @@ type
 {$endif NODEBUG}
     public
       { Syntax highlight }
-      function  IsReservedWord(const S: string): boolean; virtual;
+      function  IsReservedWord(const S: string): boolean; override;
       function  IsAsmReservedWord(const S: string): boolean; override;
-      function  GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; virtual;
+      function  GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; override;
       function  GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; override;
       { CodeTemplates }
-      function    TranslateCodeTemplate(var Shortcut: string; ALines: PUnsortedStringCollection): boolean; virtual;
+      function    TranslateCodeTemplate(var Shortcut: string; ALines: PUnsortedStringCollection): boolean; override;
       function    SelectCodeTemplate(var ShortCut: string): boolean; override;
       { CodeComplete }
       function    CompleteCodeWord(const WordS: string; var Text: string): boolean; override;
@@ -452,7 +452,7 @@ PTabItem = ^TTabItem;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
                     PScrollBar; AIndicator: PIndicator);
       function    IsReservedWord(const S: string): boolean; override;
-      function    GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; virtual;
+      function    GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; override;
       function    GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; override;
       function    GetPalette: TPalette; override;
       procedure   HandleEvent(var Event: TEvent); override;

@@ -127,7 +127,7 @@ type
        procedure   StoreDocuments(S: TStream);
        destructor Destroy; override;
      public
-       procedure   AddLink(const LinkText, LinkURL: string); virtual;
+       procedure   AddLink(const LinkText, LinkURL: string); override;
      private
        Documents:  PHTMLLinkScanDocumentCollection;
        BaseDir:    PString;
@@ -173,13 +173,13 @@ type
        procedure   ProcessDocument(const DocumentURL: string; AOptions: THTMLLinkScanOptions);
        destructor Destroy; override;
      public
-       function    GetDocumentBaseURL: string; virtual;
+       function    GetDocumentBaseURL: string; override;
        function    FindID(const AName : string) : PNameID; override;
        procedure   AddLink(const LinkText, LinkURL: string); override;
        procedure   AddRef(LinkURL: string); override;
        procedure   AddNameID(AName: string); override;
        procedure   AddID(AName: string); override;
-       function    CheckURL(const URL: string): boolean; virtual;
+       function    CheckURL(const URL: string): boolean; override;
      private
        Options: THTMLLinkScanOptions;
        BaseURL: string;

@@ -41,7 +41,7 @@ type
     TFPHTMLFileLinkScanner = class(THTMLFileLinkScanner)
        function    CheckURL(const URL: string): boolean; override;
        function    CheckText(const Text: string): boolean; override;
-       procedure   ProcessDoc(Doc: PHTMLLinkScanFile); virtual;
+       procedure   ProcessDoc(Doc: PHTMLLinkScanFile); override;
     end;
 
 procedure Help(FileID, Context: THelpCtx; Modal: boolean);

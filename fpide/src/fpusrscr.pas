@@ -127,7 +127,7 @@ type
       constructor Create;
       destructor Destroy; virtual;
     public
-      function    GetWidth: integer; virtual;
+      function    GetWidth: integer; override;
       function    GetHeight: integer; override;
       procedure   GetLine(Line: integer; var Text, Attr: string); override;
       procedure   GetCursorPos(var P: TPoint); override;
@@ -167,7 +167,7 @@ type
       constructor Create;
       destructor Destroy; virtual;
     public
-      function    GetWidth: integer; virtual;
+      function    GetWidth: integer; override;
       function    GetHeight: integer; override;
       procedure   GetLine(Line: integer; var Text, Attr: string); override;
       procedure   GetCursorPos(var P: TPoint); override;
@@ -214,7 +214,7 @@ type
       constructor Create;
       destructor Destroy; virtual;
     public
-      function    GetWidth: integer; virtual;
+      function    GetWidth: integer; override;
       function    GetHeight: integer; override;
       procedure   GetLine(Line: integer; var Text, Attr: string); override;
       procedure   GetCursorPos(var P: TPoint); override;
@@ -246,7 +246,7 @@ type
       constructor Create;
       destructor Destroy; virtual;
     public
-      function    GetWidth: integer; virtual;
+      function    GetWidth: integer; override;
       function    GetHeight: integer; override;
       procedure   GetLine(Line: integer; var Text, Attr: string); override;
       procedure   GetCursorPos(var P: TPoint); override;

@@ -80,7 +80,7 @@ type
     THTMLTopicRenderer = class(THTMLParser)
       function  BuildTopic(P: PTopic; AURL: string; HTMLFile: PTextFile; ATopicLinks: PTopicLinkCollection): boolean;
     public
-      function  DocAddTextChar(C: char): boolean; virtual;
+      function  DocAddTextChar(C: char): boolean; override;
       procedure DocSoftBreak; override;
       procedure DocTYPE; override;
       procedure DocHTML(Entered: boolean); override;
@@ -184,7 +184,7 @@ type
     THTMLHelpFile = class(TCustomHTMLHelpFile)
       constructor Create(AFileName: string; AID: word; ATOCEntry: string);
     public
-      function    LoadIndex: boolean; virtual;
+      function    LoadIndex: boolean; override;
     private
       TOCEntry: string;
     end;
@@ -195,7 +195,7 @@ type
       constructor Create(AFileName: string; AID: word);
       destructor Destroy; override;
     public
-      function    LoadIndex: boolean; virtual;
+      function    LoadIndex: boolean; override;
       function    ReadTopic(T: PTopic): boolean; override;
       function    GetTopicInfo(T: PTopic) : string; override;
       function    SearchTopic(HelpCtx: THelpCtx): PTopic; override;
@@ -208,7 +208,7 @@ type
     PHTMLIndexHelpFile = THTMLIndexHelpFile;
     THTMLIndexHelpFile = class(TCustomHTMLHelpFile)
       constructor Create(AFileName: string; AID: word);
-      function    LoadIndex: boolean; virtual;
+      function    LoadIndex: boolean; override;
     private
       IndexFileName: string;
     end;

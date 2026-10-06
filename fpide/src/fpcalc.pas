@@ -72,7 +72,7 @@ type
     constructor Create;
     procedure   HandleEvent(var Event: TEvent); override;
     procedure   Show; {override;}
-    procedure   Close; virtual;
+    procedure   Close; override;
     constructor Load(S: TStream);
     procedure   Store(S: TStream);
   end;

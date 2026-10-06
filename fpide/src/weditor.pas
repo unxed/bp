@@ -488,7 +488,7 @@ type
       function    CreateLocalMenuView(var Bounds: TRect; M: PMenu): PMenuPopup; virtual;
       function    GetPalette: TPalette; override;
     public
-      procedure   Draw; virtual;
+      procedure   Draw; override;
       procedure   DrawCursor; virtual;
       { this is the only way I found to avoid
         having the cursor being updated if lock is on PM }

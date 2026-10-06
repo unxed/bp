@@ -47,7 +47,7 @@ type
       PST,PST2 : PAdvancedStaticText;
       constructor Create(Const ATitle : String);
      {Procedure HandleEvent(var E : TEvent);override;}
-     function Execute : Word;Virtual;
+     function Execute : Word;override;
    end;
 
 Procedure LoadKeys(S : TStream);

@@ -55,7 +55,7 @@ type
       EditorInfos : PEditorLineInfoCollection;
       Flags       : longint;
       Owner       : PCustomCodeEditorCore;
-      procedure AddEditorInfo(Index: sw_integer; AEditor: PCustomCodeEditor); virtual;
+      procedure AddEditorInfo(Index: sw_integer; AEditor: PCustomCodeEditor); override;
       procedure RemoveEditorInfo(AEditor: PCustomCodeEditor); override;
     public
       constructor Create(AOwner: PCustomCodeEditorCore; const AText: string; AFlags: longint);
@@ -85,7 +85,7 @@ type
       constructor Create;
       destructor Destroy; override;
       procedure   ChangeLinesTo(ALines : PLineCollection); virtual;
-      function    GetModified: boolean; virtual;
+      function    GetModified: boolean; override;
       procedure   SetModified(AModified: boolean); override;
       function    GetModifyTime: cardinal; virtual;
       function    GetTabSize: integer; override;
@@ -101,13 +101,13 @@ type
       { Storage }
     protected
       { Text & info storage abstraction }
-      procedure   ISetLineFlagState(Binding: PEditorBinding; LineNo: sw_integer; Flag: longint; ASet: boolean); virtual;
+      procedure   ISetLineFlagState(Binding: PEditorBinding; LineNo: sw_integer; Flag: longint; ASet: boolean); override;
       procedure   IGetDisplayTextFormat(Binding: PEditorBinding; LineNo: sw_integer;var DT,DF:string); override;
       function    IGetLineFormat(Binding: PEditorBinding; LineNo: sw_integer): string; override;
       procedure   ISetLineFormat(Binding: PEditorBinding; LineNo: sw_integer;const S: string); override;
     public
       { Text & info storage abstraction }
-      function    GetLineCount: sw_integer; virtual;
+      function    GetLineCount: sw_integer; override;
       function    GetLine(LineNo: sw_integer): PCustomLine; override;
       function    GetLineText(LineNo: sw_integer): string; override;
       procedure   SetDisplayText(I: sw_integer;const S: string); override;
@@ -121,7 +121,7 @@ type
       procedure   SetContent(ALines: PUnsortedStringCollection); override;
    public
      { Undo info storage }
-      procedure   AddAction(AAction: byte; AStartPos, AEndPos: TPoint; AText: string;AFlags : longint); virtual;
+      procedure   AddAction(AAction: byte; AStartPos, AEndPos: TPoint; AText: string;AFlags : longint); override;
       procedure   AddGroupedAction(AAction : byte); override;
       procedure   CloseGroupedAction(AAction : byte); override;
       function    GetUndoActionCount: sw_integer; override;
@@ -149,9 +149,9 @@ type
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore);
     public
-      procedure   DrawIndicator; virtual;
+      procedure   DrawIndicator; override;
     public
-      function    GetFlags: longint; virtual;
+      function    GetFlags: longint; override;
       procedure   SetFlags(AFlags: longint); override;
       function    GetModified: boolean; override;
       procedure   SetModified(AModified: boolean); override;
@@ -180,7 +180,7 @@ type
     public
 {      ChangedLine : sw_integer;}
       { Text & info storage abstraction }
-      function    GetLineCount: sw_integer; virtual;
+      function    GetLineCount: sw_integer; override;
       function    GetLine(LineNo: sw_integer): PCustomLine; override;
       function    CharIdxToLinePos(Line,CharIdx: sw_integer): sw_integer; override;
       function    LinePosToCharIdx(Line,X: sw_integer): sw_integer; override;
@@ -203,7 +203,7 @@ type
       procedure   UnLock; override;
     public
      { CodeComplete support }
-      function    GetCodeCompleteWord: string; virtual;
+      function    GetCodeCompleteWord: string; override;
       procedure   SetCodeCompleteWord(const S: string); override;
       function    GetCodeCompleteFrag: string; override;
       procedure   SetCodeCompleteFrag(const S: string); override;
@@ -211,11 +211,11 @@ type
       procedure   SetCompleteState(AState: TCompleteState); override;
    public
       { Syntax highlight }
-   {a}function    UpdateAttrs(FromLine: sw_integer; Attrs: byte): sw_integer; virtual;
+   {a}function    UpdateAttrs(FromLine: sw_integer; Attrs: byte): sw_integer; override;
    {a}function    UpdateAttrsRange(FromLine, ToLine: sw_integer; Attrs: byte): sw_integer; override;
    public
      { Undo info storage }
-      procedure   AddAction(AAction: byte; AStartPos, AEndPos: TPoint; AText: string;AFlags : longint); virtual;
+      procedure   AddAction(AAction: byte; AStartPos, AEndPos: TPoint; AText: string;AFlags : longint); override;
       procedure   AddGroupedAction(AAction : byte); override;
       procedure   CloseGroupedAction(AAction : byte); override;
       function    GetUndoActionCount: sw_integer; override;
@@ -248,7 +248,7 @@ type
       function    ShouldSave: boolean; virtual;
       function    IsChangedOnDisk : boolean;
     public
-      procedure   BindingsChanged; virtual;
+      procedure   BindingsChanged; override;
     end;
 
 function DefUseSyntaxHighlight(Editor: PFileEditor): boolean;

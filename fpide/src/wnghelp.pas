@@ -109,7 +109,7 @@ type
         constructor Create(AFileName: string; AID: word);
         destructor Destroy; override;
       public
-        function    LoadIndex: boolean; virtual;
+        function    LoadIndex: boolean; override;
         function    ReadTopic(T: PTopic): boolean; override;
       private
         F: PStream;
