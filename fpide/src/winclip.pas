@@ -52,6 +52,11 @@ implementation
     clipboard,cliputils;
 {$endif}
 
+{$ifdef Unix}
+  uses
+    TvClip;
+{$endif Unix}
+
 
 {$ifdef DOS}
 function WinClipboardSupported : boolean;
@@ -136,6 +141,35 @@ begin
 end;
 {$endif Windows}
 
+{$ifdef Unix}
+{ the clipboard of tv3: text in UTF-8; the system clipboard of the terminal when it has one, else the internal buffer }
+function WinClipboardSupported : boolean;
+begin
+  WinClipboardSupported:=true;
+end;
+
+function OpenWinClipboard : boolean;
+begin
+  OpenWinClipboard:=true;
+end;
+
+function EmptyWinClipboard : boolean;
+begin
+  EmptyWinClipboard:=true;
+end;
+
+function CloseWinClipboard : boolean;
+begin
+  CloseWinClipboard:=true;
+end;
+
+{ asking the terminal for its clipboard on every look at the menu would be slow: the menu item is always enabled }
+function InternGetDataSize : longint;
+begin
+  InternGetDataSize:=1;
+end;
+{$endif Unix}
+
 {$ifdef HASAMIGA}
 function WinClipboardSupported: Boolean;
 begin
@@ -188,6 +222,9 @@ var
   Text: AnsiString;
   pp: PChar;
 {$endif HASAMIGA}
+{$ifdef Unix}
+  Text: AnsiString;
+{$endif Unix}
 begin
   p:=nil;
   GetTextWinClipBoardData:=False;
@@ -222,6 +259,15 @@ begin
     end;
   GetTextWinClipBoardData:=h<>0;
 {$endif Windows}
+{$ifdef Unix}
+  Text := ClipboardGetText;
+  l := Length(Text) + 1;
+  GetMem(p,l);
+  if Text <> '' then
+    Move(Text[1],p^,Length(Text));
+  p[l-1] := #0;
+  GetTextWinClipBoardData := Text <> '';
+{$endif Unix}
 {$ifdef HASAMIGA}
   Text := GetTextFromClip(0) + #0;
   PP := @Text[1];
@@ -252,9 +298,12 @@ var
   pp: PChar;
   Test: AnsiString;
 {$endif HASAMIGA}
+{$ifdef Unix}
+  Text: AnsiString;
+{$endif Unix}
 begin
   SetTextWinClipBoardData:=False;
-  if (l=0) or (l>65520) then
+  if (l=0) {$ifndef Unix}or (l>65520){$endif} then
     exit;
   if not OpenWinClipBoard then
     exit;
@@ -295,6 +344,11 @@ begin
 {$ifdef HASAMIGA}
   PutTextToClip(0, AnsiString(p));
 {$endif HASAMIGA}
+{$ifdef Unix}
+  SetString(Text,p,l);
+  ClipboardSetText(Text);
+  SetTextWinClipBoardData:=true;
+{$endif Unix}
   CloseWinClipBoard;
 end;
 

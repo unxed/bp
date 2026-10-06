@@ -3007,7 +3007,11 @@ begin
     LineDelta:=0; LineCount:=(Editor.SelEnd.Y-Editor.SelStart.Y)+1;
     OK:=GetLineCount<MaxLineCount;
     OrigS:=GetLineText(DestPos.Y);
-    BeforeS:=Copy(OrigS,1,LinePosToCharIdx(DestPos.Y,DestPos.X-1));
+    CP:=LinePosToCharIdx(DestPos.Y,DestPos.X-1);
+    { the character before the cursor with all its bytes }
+    if (CP>0) and (CP<=length(OrigS)) then
+      CP:=CP+U8CharBytes(OrigS,CP)-1;
+    BeforeS:=Copy(OrigS,1,CP);
     { we might need to add some spaces here,
       but how many ? }
     TabSize:=GetTabSize;
@@ -6129,6 +6133,10 @@ begin
       if ShowInfo then
         PushInfo(msg_copyingclipboard);
       clipcopy:=Clipboard.InsertFrom(Self);
+{$ifdef Unix}
+      if clipcopy then
+        ClipCopyWin;                { the system clipboard gets it too }
+{$endif Unix}
       if ShowInfo then
         PopInfo;
       {Enable paste command.}
@@ -6154,6 +6162,9 @@ begin
        PushInfo(msg_cutting);
      if Clipboard.InsertFrom(Self) then
       begin
+{$ifdef Unix}
+        ClipCopyWin;                { the system clipboard gets it too }
+{$endif Unix}
         if not IsClipBoard then
          DelSelect;
         SetModified(true);

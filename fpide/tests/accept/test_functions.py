@@ -4,11 +4,12 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode debug browser
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode clipboard debug browser
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
 import re
+import subprocess
 import sys
 import time
 
@@ -152,9 +153,9 @@ def section_edit(t):
 
     # select all, copy, paste
     check(menu(t, 'M-e', 'Select All'), 'Edit > Select All')
-    check(menu(t, 'M-e', 'Copy'), 'Edit > Copy is enabled for a selection')
+    check(menu(t, 'M-e', 'Copy', exact=True), 'Edit > Copy is enabled for a selection')
     t.key('C-NPage', 'Enter')
-    check(menu(t, 'M-e', 'Paste'), 'Edit > Paste is enabled after a copy')
+    check(menu(t, 'M-e', 'Paste', exact=True), 'Edit > Paste is enabled after a copy')
     got = editor_lines(t)
     check(got[:4] == ['hello world', 'second l', 'hello world', 'second l'], 'Paste inserts the copied text: %r' % got[:5], t)
     t.key('C-NPage', 'Enter')
@@ -167,7 +168,7 @@ def section_edit(t):
     t.key('C-PPage', 'S-Down')
     check(menu(t, 'M-e', 'Cut'), 'Edit > Cut is enabled for a selection')
     check(editor_lines(t)[:2] == ['two', 'three'], 'Cut removes the selection: %r' % editor_lines(t)[:3], t)
-    check(menu(t, 'M-e', 'Paste'), 'Edit > Paste after the cut')
+    check(menu(t, 'M-e', 'Paste', exact=True), 'Edit > Paste after the cut')
     check(editor_lines(t)[:3] == ['one', 'two', 'three'], 'Paste puts it back: %r' % editor_lines(t)[:3], t)
     menu(t, 'M-e', 'Unselect')
     t.key('C-PPage', 'S-Down')
@@ -417,9 +418,9 @@ def section_unicode(t):
     t.key('C-PPage', 'Down', 'End')      # end of line 2 ("abc")
     t.key('C-PPage')
     t.key('S-End')
-    menu(t, 'M-e', 'Copy')
+    menu(t, 'M-e', 'Copy', exact=True)
     t.key('C-NPage', 'Enter')
-    menu(t, 'M-e', 'Paste')
+    menu(t, 'M-e', 'Paste', exact=True)
     lines = editor_lines(t)
     check(len(lines) >= 3 and lines[2] == lines[0], 'the first line copied and pasted keeps all its characters: %r' % lines[:4], t)
 
@@ -465,6 +466,32 @@ def line_colors(t, n=8):
         if 'program dbgt;' in l:
             return t.row_backgrounds(l.index('program dbgt;') + 2)[top:top + n]
     return [None] * n
+
+
+def section_clipboard(t):
+    """the clipboards: a paste after a two-byte last character, the system clipboard (OSC 52) on Copy, Paste from System"""
+
+    # a selection that ends at the end of a line with a multi-byte last character: Paste appends, nothing is split
+    new_file(t)
+    t.type('Привет мир')
+    t.key('Home', 'Right', 'Right', 'Right', 'S-End')
+    menu(t, 'M-e', 'Copy', exact=True)
+    t.key('End')
+    menu(t, 'M-e', 'Paste', exact=True)
+    check(editor_lines(t)[0] == 'Привет мирвет мир', 'a paste after the last character (two bytes) keeps it whole: %r' % editor_lines(t)[0], t)
+
+    # the system clipboard (OSC 52) gets what Copy copies, Paste from System brings text in
+    subprocess.call(['tmux', 'set-option', '-g', 'set-clipboard', 'on'])
+    t.key('Home', 'S-End')
+    menu(t, 'M-e', 'Copy', exact=True)
+    t.pump(0.5)
+    buf = subprocess.run(['tmux', 'show-buffer'], capture_output=True, text=True).stdout
+    check(buf == 'Привет мирвет мир', 'Edit > Copy also sets the system clipboard: %r' % buf, t)
+    t.key('C-NPage', 'Enter')
+    menu(t, 'M-e', 'Paste from System', exact=False)
+    check(editor_lines(t)[-1].startswith('Привет мирвет мир') or 'Привет мирвет мир' in '\n'.join(editor_lines(t)[1:]),
+          'Edit > Paste from System inserts the text: %r' % editor_lines(t)[:3], t)
+
 
 
 def section_debug(t):
@@ -603,7 +630,7 @@ def section_browser(t):
 
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile),
-            ('unicode', section_unicode), ('debug', section_debug), ('browser', section_browser)]
+            ('unicode', section_unicode), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])

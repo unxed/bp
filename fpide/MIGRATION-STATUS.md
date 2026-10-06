@@ -14,6 +14,7 @@ Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external 
 - **Sources** are UTF-8; the box/frame characters are Unicode.
 - **Debugger:** gdb through GDB/MI (`gdbmi*.pas`); Run with a breakpoint stops on it (the program is rebuilt with `-g` for that),
   Call stack, Step/Trace, Watches, Evaluate, Continue to the exit are checked by the tests.
+- **System clipboard:** Copy/Cut also set it (tv3: OSC 52 / far2l); Edit > Copy to System / Paste from System. The menu item is always enabled (asking the terminal for its clipboard on every look at the menu would be slow).
 - **Browser** (Search > Objects/Modules/Globals/Symbol): built from the sources with fcl-passrc (`fpsrcbrw.pas`), no compiler tables needed.
 - **Debuggee terminal:** the program run by gdb gets a pty of its own (`gdbpty.pas`) that the IDE relays (output to the screen, keys to the program) — gdb's "Failed to set controlling terminal" is gone.
 - **User screen** (Ctrl+F9 and the debuggee): `UnixSuspend/UnixResume` of tv3 give the real terminal and take it back.
@@ -22,7 +23,6 @@ Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external 
 
 ## Open
 
-- System clipboard integration of the editor (the internal clipboard is UTF-8).
 - `wansi.pas`/`fp.ans` and the help viewer (`whlpview`) still count bytes/CP437 words; lines are 255 bytes (shortstring).
 - The symbol browser reads declarations only (no cross references of uses: they need the compiler); unsaved edits are not seen (the files on disk are parsed).
 - Wide characters in horizontally scrolled lines are approximated.

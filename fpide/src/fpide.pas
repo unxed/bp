@@ -251,8 +251,13 @@ resourcestring  menu_local_gotosource = '~G~oto source';
                 menu_edit_pastewin     = 'Paste from Syste~m~';
                 {$endif}
                 {$else}
+                {$ifdef Unix}
+                menu_edit_copywin      = 'Cop~y~ to System';
+                menu_edit_pastewin     = 'Paste from Syste~m~';
+                {$else}
                 menu_edit_copywin      = 'Cop~y~ to Windows';
                 menu_edit_pastewin     = 'Paste from ~W~indows';
+                {$endif}
                 {$endif}
                 menu_edit_undo         = '~U~ndo';
                 menu_edit_redo         = '~R~edo';

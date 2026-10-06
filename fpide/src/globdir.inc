@@ -221,3 +221,8 @@
     {$define GDB_WINDOWS_ALWAYS_USE_ANOTHER_CONSOLE}
   {$endif Windows}
 {$endif GDBMI}
+
+{ the system clipboard (OSC 52 or far2l, through tv3): Edit > Copy to / Paste from System; Copy and Cut also set it }
+{$ifdef Unix}
+  {$define WinClipSupported}
+{$endif Unix}
