@@ -4,6 +4,7 @@ terminal emulator has to be written. Needs: tmux, python3.  Used by test_accept.
 import collections
 import os
 import re
+import unicodedata
 import shutil
 import subprocess
 import tempfile
@@ -79,6 +80,8 @@ class TmuxTerm:
                 i += m.end()
                 continue
             cells.append((line[i], bg))
+            if unicodedata.east_asian_width(line[i]) in 'WF':
+                cells.append((' ', bg))      # a wide character covers two cells; tmux prints it once
             i += 1
         return cells
 

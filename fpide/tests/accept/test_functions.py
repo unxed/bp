@@ -459,8 +459,12 @@ def section_unicode(t):
 
 
 def line_colors(t, n=8):
-    """the background colour of editor lines 1..n (column 5): the debugger row and a breakpoint row stand out"""
-    return t.row_backgrounds(5)[2:2 + n]
+    """the background colour of the first n lines of the program text on screen (the debugger row and a breakpoint
+    row stand out); the window is found by its first line, wherever it is"""
+    for top, l in enumerate(t.lines()):
+        if 'program dbgt;' in l:
+            return t.row_backgrounds(l.index('program dbgt;') + 2)[top:top + n]
+    return [None] * n
 
 
 def section_debug(t):
