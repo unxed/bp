@@ -960,8 +960,13 @@ begin
 {$endif EMBED_COMPILER}
 { Compile ! }
 {$ifdef redircompiler}
-  ChangeRedirOut(FPOutFileName,false);
-  ChangeRedirError(FPErrFileName,false);
+  { an external compiler is a process of its own with pipes: nothing to redirect (and the redirection would
+    swallow the screen output of the IDE, which goes to stdout) }
+  if not UseExternalCompiler then
+    begin
+      ChangeRedirOut(FPOutFileName,false);
+      ChangeRedirError(FPErrFileName,false);
+    end;
 {$endif}
   { insert "" around name so that spaces are allowed }
   { only supported in compiler after 2000/01/14 PM   }
@@ -1066,8 +1071,11 @@ begin
          WUtils.DeleteFile(GetExePath+PpasFile);
     end;
 {$ifdef redircompiler}
-  RestoreRedirOut;
-  RestoreRedirError;
+  if not UseExternalCompiler then
+    begin
+      RestoreRedirOut;
+      RestoreRedirError;
+    end;
 {$endif}
   PopStatus;
 { Set end status }

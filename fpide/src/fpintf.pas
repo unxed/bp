@@ -233,13 +233,11 @@ begin
             end;
         end;
     end;
+  { a message without a position (the summary of the compiler, the linker) is shown, not counted: the exit
+    code of the compiler decides if there was an error when no message with a position said so }
   Level:=Severity(L,Text);
   if Level<>0 then
-    begin
-      if Level in [V_Fatal,V_Error] then
-        Inc(status.errorCount);
-      CompilerMessageWindow.AddMessage(Level,Text,'',0,0);
-    end;
+    CompilerMessageWindow.AddMessage(Level,Text,'',0,0);
 end;
 
 { an external compiler reads the files, not the editors: write the modified ones that have a name }

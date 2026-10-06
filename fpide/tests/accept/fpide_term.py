@@ -122,6 +122,28 @@ class TmuxTerm:
             self.pump(0.1)
         return False
 
+    def cursor(self):
+        """the hardware cursor (row, column) of the terminal"""
+        out = self._tmux('display-message', '-p', '-t', self.session, '#{cursor_y},#{cursor_x}').strip()
+        y, x = out.split(',')
+        return int(y), int(x)
+
+    def indicator(self):
+        """(line, column) of the editor indicator in the frame of the active window, or None"""
+        for l in self.lines()[-4:]:
+            m = re.search(r'═\*?═*\s*(\d+):(\d+)\s', l) or re.search(r'(\d+):(\d+) ═', l)
+            if m:
+                return int(m.group(1)), int(m.group(2))
+        return None
+
+    def wait_until(self, pred, timeout=6.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            if pred():
+                return True
+            time.sleep(0.1)
+        return pred()
+
     def pump(self, secs):
         time.sleep(secs)
 
