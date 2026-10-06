@@ -111,10 +111,11 @@ const ClipboardWindow  : PClipboardWindow = nil;
       EditorModified   : boolean = false;
       IniCenterDebuggerRow : tcentre = do_centre;
       SleepTimeOut     : longint = trunc(10*18.2);
-{$ifdef USE_EXTERNAL_COMPILER}
-      UseExternalCompiler : boolean = true;
-      ExternalCompilerExe : string = 'ppc386'+ExeExt;
-{$endif USE_EXTERNAL_COMPILER}
+      { which compiler Alt+F9 runs: 'auto' (fpc found on the PATH, else the built-in one), 'builtin',
+        or the path of an external compiler (FP_COMPILER overrides the saved setting) }
+      CompilerSetting     : string = 'auto';
+      UseExternalCompiler : boolean = false;
+      ExternalCompilerExe : string = '';
       ShowReadme       : boolean = true;
       AskRecompileIfModifiedFlag : boolean = true;
 

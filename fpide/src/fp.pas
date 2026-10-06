@@ -81,7 +81,7 @@ uses
 {$endif COLORSEL}
   ASCIITab,
   WUtils,WViews,WHTMLScn,WHelp,
-  FPIDE,FPCalc,FPCompil,
+  FPIDE,FPCalc,FPCompil,FPIntf,
   FPIni,FPViews,FPConst,FPVars,FPUtils,FPHelp,FPSwitch,FPUsrScr,
   FPTools,
 {$ifndef NODEBUG}
@@ -443,6 +443,7 @@ BEGIN
   ReadSwitches(SwitchesPath);
   { load all options after init because of open files }
   ReadINIFile;
+  ResolveCompiler;
   InitDesktopFile;
   LoadDesktop;
 

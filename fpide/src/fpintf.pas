@@ -31,17 +31,16 @@ procedure SetRunDir(const Params: string);
 procedure Compile(const FileName, ConfigFile: string);
 procedure SetPrimaryFile(const fn:string);
 function LinkAfter : boolean;
-{$ifdef USE_EXTERNAL_COMPILER}
-function version_string : string;
-function full_version_string : string;
-{$endif USE_EXTERNAL_COMPILER}
+{ the compiler to use: CompilerSetting is 'auto', 'builtin' or the path of an external compiler (env FP_COMPILER wins) }
+procedure ResolveCompiler;
+function  CompilerDescription: string;
 
 
 implementation
 
 uses
   Compiler,Comphook,
-  sysutils,
+  sysutils,Process,Version,App,Views,Drivers,WEditor,FPConst,FPViews,
 {$ifndef NODEBUG}
   FPDebug,
 {$endif NODEBUG}
@@ -102,161 +101,351 @@ begin
   LongJmp(CatchErrorLongJumpBuffer,1);
 end;
 
+const
+  { what 'auto' looks for on the PATH }
+  DefaultExternalCompiler = 'fpc';
+
+procedure ResolveCompiler;
+var
+  S,Exe: string;
+begin
+  S:=GetEnvironmentVariable('FP_COMPILER');
+  if S='' then
+    S:=CompilerSetting;
+  if (S='') or (LowerCase(S)='auto') then
+    begin
+      Exe:=DefaultExternalCompiler;
+      UseExternalCompiler:=LocateExeFile(Exe);
+      if UseExternalCompiler then
+        ExternalCompilerExe:=Exe;
+    end
+  else if (LowerCase(S)='builtin') or (LowerCase(S)='built-in') then
+    UseExternalCompiler:=false
+  else
+    begin
+      Exe:=S;
+      UseExternalCompiler:=LocateExeFile(Exe);
+      if UseExternalCompiler then
+        ExternalCompilerExe:=Exe
+      else
+        ExternalCompilerExe:=S;
+      { a path that does not exist is kept: Compile says so }
+      UseExternalCompiler:=true;
+    end;
+end;
+
+function RunToString(const Exe, Args: AnsiString): AnsiString;
+var
+  P: TProcess;
+  Buf: array[0..1023] of char;
+  N: LongInt;
+begin
+  Result:='';
+  P:=TProcess.Create(nil);
+  try
+    P.Executable:=Exe;
+    P.Parameters.Add(Args);
+    P.Options:=[poUsePipes,poStderrToOutput,poNoConsole];
+    try
+      P.Execute;
+      repeat
+        N:=P.Output.Read(Buf,SizeOf(Buf));
+        if N>0 then
+          Result:=Result+Copy(AnsiString(Buf),1,N);
+      until N<=0;
+      P.WaitOnExit;
+    except
+      Result:='';
+    end;
+  finally
+    P.Free;
+  end;
+  while (Result<>'') and (Result[Length(Result)] in [#10,#13]) do
+    Delete(Result,Length(Result),1);
+  if Pos(#10,Result)>0 then
+    Result:=Copy(Result,1,Pos(#10,Result)-1);
+end;
+
+function CompilerDescription: string;
+begin
+  if UseExternalCompiler then
+    CompilerDescription:=ExternalCompilerExe+' '+RunToString(ExternalCompilerExe,'-iV')
+  else
+    CompilerDescription:='built-in '+version_string;
+end;
+
+{ the message of one line of the output of an external compiler:
+    file.pas(12,5) Error: text      file.pas(12) Warning: text      Fatal: text      Compiling file.pas }
+procedure ExternalCompilerLine(const Line: AnsiString);
+var
+  L,Module,Text: AnsiString;
+  P,P1,P2,LineNb,ColNb,Err: LongInt;
+  Level: LongInt;
+  function Severity(const T: AnsiString; var Rest: AnsiString): LongInt;
+  begin
+    Severity:=0;
+    if Pos('Fatal: ',T)=1 then Severity:=V_Fatal
+    else if Pos('Error: ',T)=1 then Severity:=V_Error
+    else if Pos('Warning: ',T)=1 then Severity:=V_Warning
+    else if Pos('Note: ',T)=1 then Severity:=V_Note
+    else if Pos('Hint: ',T)=1 then Severity:=V_Hint
+    else if Pos('Info: ',T)=1 then Severity:=V_Info;
+    if Severity<>0 then
+      Rest:=Copy(T,Pos(' ',T)+1,Length(T));
+  end;
+begin
+  L:=Line;
+  while (L<>'') and (L[Length(L)] in [#13,#10]) do
+    Delete(L,Length(L),1);
+  if L='' then Exit;
+  if Pos('Compiling ',L)=1 then
+    begin
+      status.currentsource:=Copy(L,11,Length(L));
+      Exit;
+    end;
+  P1:=Pos(' lines compiled',L);
+  if P1>0 then
+    begin
+      Val(Copy(L,1,P1-1),status.compiledlines,Err);
+      Exit;
+    end;
+  { file(line[,col]) Severity: text }
+  P:=Pos('(',L);
+  if P>1 then
+    begin
+      P2:=Pos(') ',L);
+      if P2>P then
+        begin
+          Module:=Copy(L,1,P-1);
+          Text:=Copy(L,P+1,P2-P-1);
+          P1:=Pos(',',Text);
+          Err:=0;
+          if P1>0 then
+            begin
+              Val(Copy(Text,1,P1-1),LineNb,Err);
+              if Err=0 then
+                Val(Copy(Text,P1+1,Length(Text)),ColNb,Err);
+            end
+          else
+            begin
+              Val(Text,LineNb,Err);
+              ColNb:=0;
+            end;
+          if Err=0 then
+            begin
+              Level:=Severity(Copy(L,P2+2,Length(L)),Text);
+              if Level<>0 then
+                begin
+                  if Level in [V_Fatal,V_Error] then
+                    Inc(status.errorCount);
+                  CompilerMessageWindow.AddMessage(Level or V_LineInfo,Text,Module,LineNb,ColNb);
+                  Exit;
+                end;
+            end;
+        end;
+    end;
+  Level:=Severity(L,Text);
+  if Level<>0 then
+    begin
+      if Level in [V_Fatal,V_Error] then
+        Inc(status.errorCount);
+      CompilerMessageWindow.AddMessage(Level,Text,'',0,0);
+    end;
+end;
+
+{ an external compiler reads the files, not the editors: write the modified ones that have a name }
+procedure SaveModifiedSources;
+  procedure DoSave(P: PView);
+  begin
+    if P.HelpCtx=hcSourceWindow then
+      if PSourceWindow(P).Editor.GetModified and (PSourceWindow(P).Editor.FileName<>'') then
+        Message(P,evCommand,cmSave,nil);
+  end;
+begin
+  Desktop.ForEach(@DoSave);
+end;
+
+{ program, unit or library: the first word of the source that is not in a comment }
+function SourceKind(const FileName: string): string;
+var
+  F: TextFile;
+  S,W: AnsiString;
+  InBrace,InParen: boolean;
+  I: LongInt;
+  Lines: LongInt;
+begin
+  Result:='program';
+  AssignFile(F,FileName);
+  {$I-}
+  Reset(F);
+  {$I+}
+  if IOResult<>0 then Exit;
+  InBrace:=false; InParen:=false; Lines:=0;
+  while not EOF(F) and (Lines<200) do
+    begin
+      ReadLn(F,S);
+      Inc(Lines);
+      I:=1;
+      while I<=Length(S) do
+        begin
+          if InBrace then begin if S[I]='}' then InBrace:=false; Inc(I); end
+          else if InParen then
+            begin
+              if (S[I]='*') and (I<Length(S)) and (S[I+1]=')') then begin InParen:=false; Inc(I); end;
+              Inc(I);
+            end
+          else if S[I]='{' then begin InBrace:=true; Inc(I); end
+          else if (S[I]='(') and (I<Length(S)) and (S[I+1]='*') then begin InParen:=true; Inc(I,2); end
+          else if (S[I]='/') and (I<Length(S)) and (S[I+1]='/') then I:=Length(S)+1
+          else if S[I] in ['A'..'Z','a'..'z','_'] then
+            begin
+              W:='';
+              while (I<=Length(S)) and (S[I] in ['A'..'Z','a'..'z','_','0'..'9']) do
+                begin W:=W+LowerCase(S[I]); Inc(I); end;
+              if (W='unit') or (W='library') or (W='program') then
+                begin
+                  Result:=W;
+                  CloseFile(F);
+                  Exit;
+                end;
+              { a source without the program heading is a program }
+              CloseFile(F);
+              Exit;
+            end
+          else
+            Inc(I);
+        end;
+    end;
+  CloseFile(F);
+end;
+
+procedure CompileExternal(const FileName, ConfigFile: string);
+var
+  P: TProcess;
+  Exe: string;
+  CmdLine: AnsiString;
+  Buf: array[0..4095] of char;
+  Pending: AnsiString;
+  N,NL: LongInt;
+  Aborted: boolean;
+  Kind: string;
+  procedure Feed(const Data: AnsiString);
+  begin
+    Pending:=Pending+Data;
+    NL:=Pos(#10,Pending);
+    while NL>0 do
+      begin
+        ExternalCompilerLine(Copy(Pending,1,NL-1));
+        Delete(Pending,1,NL);
+        NL:=Pos(#10,Pending);
+      end;
+  end;
+begin
+  SaveModifiedSources;
+  Exe:=ExternalCompilerExe;
+  if not LocateExeFile(Exe) then
+    begin
+      CompilerMessageWindow.AddMessage(V_Fatal,'Compiler "'+ExternalCompilerExe+'" not found','',0,0);
+      Inc(status.errorCount);
+      Exit;
+    end;
+  CmdLine:='';
+  if ConfigFile<>'' then
+    CmdLine:='"@'+ConfigFile+'" ';
+  CmdLine:=CmdLine+'-d'+SwitchesModeStr[SwitchesMode];
+  if PrimaryFileSwitches<>'' then
+    CmdLine:=CmdLine+' '+PrimaryFileSwitches;
+  CmdLine:=CmdLine+' '+FileName;
+  status.currentsource:=FileName;
+  status.compiledlines:=0;
+  Aborted:=false;
+  Pending:='';
+  P:=TProcess.Create(nil);
+  try
+    P.Executable:=Exe;
+    CommandToList(CmdLine,P.Parameters);
+    P.Options:=[poUsePipes,poStderrToOutput,poNoConsole];
+    try
+      P.Execute;
+    except
+      on E: Exception do
+        begin
+          CompilerMessageWindow.AddMessage(V_Fatal,'Cannot run '+Exe+': '+E.Message,'',0,0);
+          Inc(status.errorCount);
+          Exit;
+        end;
+    end;
+    repeat
+      if P.Output.NumBytesAvailable>0 then
+        begin
+          N:=P.Output.Read(Buf,SizeOf(Buf));
+          if N>0 then
+            Feed(Copy(AnsiString(Buf),1,N));
+        end
+      else
+        Sleep(10);
+      { the status dialog and Esc, as for the built-in compiler }
+      if Assigned(do_status) and do_status() and not Aborted then
+        begin
+          Aborted:=true;
+          P.Terminate(1);
+        end;
+    until (not P.Running) and (P.Output.NumBytesAvailable=0);
+    P.WaitOnExit;
+    if Pending<>'' then
+      Feed(Pending+#10);
+    if Aborted then
+      CompilationPhase:=cpAborted
+    else if (P.ExitStatus<>0) and (status.errorCount=0) then
+      begin
+        CompilerMessageWindow.AddMessage(V_Error,'The compiler exited with code '+IntToStr(P.ExitStatus),'',0,0);
+        Inc(status.errorCount);
+      end;
+    status.IsExe:=false;
+    status.IsLibrary:=false;
+    if (status.errorCount=0) and not Aborted then
+      begin
+        Kind:=SourceKind(MainFile);
+        status.IsExe:=Kind<>'unit';
+        status.IsLibrary:=Kind='library';
+      end;
+  finally
+    P.Free;
+  end;
+end;
+
 procedure Compile(const FileName, ConfigFile: string);
 var
   cmd : string;
-  ExitReason : integer;
-  ExitAddr,StoreExitProc : pointer;
-{$ifdef USE_EXTERNAL_COMPILER}
-  CompilerOut : Text;
-  CompilerOutputLine : longint;
-  V,p,p1,p2,lineNb,ColumnNb : longint;
-  error : word;
-  ModuleName,Line : string;
-  error_in_reading : boolean;
-{$endif USE_EXTERNAL_COMPILER}
 begin
-{$ifndef USE_EXTERNAL_COMPILER}
+  if UseExternalCompiler then
+    begin
+      CompileExternal(FileName,ConfigFile);
+      Exit;
+    end;
   cmd:='-d'+SwitchesModeStr[SwitchesMode];
   if ConfigFile<>'' then
     cmd:='['+ConfigFile+'] '+cmd;
-{$else USE_EXTERNAL_COMPILER}
-  cmd:='-n -d'+SwitchesModeStr[SwitchesMode];
-  if ConfigFile<>'' then
-    cmd:='@'+ConfigFile+' '+cmd;
-  if not UseExternalCompiler then
-{$endif USE_EXTERNAL_COMPILER}
 { Add the switches from the primary file }
   if PrimaryFileSwitches<>'' then
     cmd:=cmd+' '+PrimaryFileSwitches;
   cmd:=cmd+' '+FileName;
 { call the compiler }
-{$ifdef USE_EXTERNAL_COMPILER}
-  if UseExternalCompiler then
-    begin
-      If not LocateExeFile(ExternalCompilerExe) then
+  begin
+    try
+      Compiler.Compile(cmd);
+    except
+      on e : exception do
         begin
-          CompilerMessageWindow^.AddMessage(
-            0,ExternalCompilerExe+' not found','',0,0);
-          exit;
+          CompilationPhase:=cpFailed;
+          CompilerMessageWindow.AddMessage(V_Error,
+            'Compiler exited','',0,0);
+          CompilerMessageWindow.AddMessage(V_Error,
+            e.message,'',0,0);
         end;
-      CompilerMessageWindow^.AddMessage(
-        0,'Running: '+ExternalCompilerExe+' '+cmd,'',0,0);
-      if not ExecuteRedir(ExternalCompilerExe,cmd,'','ppc___.out','ppc___.err') then
-        begin
-          CompilerMessageWindow^.AddMessage(
-            V_error,msg_errorinexternalcompilation,'',0,0);
-          CompilerMessageWindow^.AddMessage(
-            V_error,FormatStrInt(msg_iostatusis,IOStatus),'',0,0);
-          CompilerMessageWindow^.AddMessage(
-            V_error,FormatStrInt(msg_executeresultis,ExecuteResult),'',0,0);
-          if IOStatus<>0 then
-            exit;
-        end;
-      Assign(CompilerOut,'ppc___.out');
-      Reset(CompilerOut);
-      error_in_reading:=false;
-      CompilerOutputLine:=0;
-      While not eof(CompilerOut) do
-        begin
-          readln(CompilerOut,Line);
-          Inc(CompilerOutputLine);
-          p:=pos('(',line);
-          if p>0 then
-            begin
-              ModuleName:=copy(Line,1,p-1);
-              Line:=Copy(Line,p+1,255);
-              p1:=pos(',',Line);
-              val(copy(Line,1,p1-1),lineNb,error);
-              Line:=Copy(Line,p1+1,255);
-              p2:=pos(')',Line);
-              if error=0 then
-                val(copy(Line,1,p2-1),ColumnNb,error);
-              Line:=Copy(Line,p2+1,255);
-              V:=0;
-              { using constants here isn't a good idea, because this won't
-                work with localized versions of the compiler - Gabor }
-              If Pos(' Error:',line)=1 then
-                begin
-                  V:=V_error;
-                  Line:=Copy(Line,8,Length(Line));
-                end
-              else if Pos(' Fatal:',line)=1 then
-                begin
-                  V:=V_fatal;
-                  Line:=Copy(Line,8,Length(Line));
-                end
-              else if Pos(' Hint:',line)=1 then
-                begin
-                  V:=V_hint;
-                  Line:=Copy(Line,7,Length(Line));
-                end
-              else if Pos(' Note:',line)=1 then
-                begin
-                  V:=V_note;
-                  Line:=Copy(Line,7,Length(Line));
-                end;
-              if error=0 then
-                CompilerMessageWindow^.AddMessage(V,Line,ModuleName,LineNb,ColumnNb)
-              else
-                error_in_reading:=true;
-            end
-          else
-            CompilerMessageWindow^.AddMessage(0,Line,'',0,0);
-          ;
-        end;
-      Close(CompilerOut);
-    end
-  else
-{$endif USE_EXTERNAL_COMPILER}
-    begin
-      try
-          Compiler.Compile(cmd);
-      except
-          on e : exception do
-            begin
-              CompilationPhase:=cpFailed;
-              CompilerMessageWindow.AddMessage(V_Error,
-                'Compiler exited','',0,0);
-              CompilerMessageWindow.AddMessage(V_Error,
-                e.message,'',0,0);
-            end;
-      end;
     end;
+  end;
 end;
-
-{$ifdef USE_EXTERNAL_COMPILER}
-function version_string : string;
-  begin
-    if not ExecuteRedir(ExternalCompilerExe,'-iV','','ppc___.out','ppc___.err') then
-      version_string:=version.version_string
-    else
-     begin
-      Assign(CompilerOut,'ppc___.out');
-      Reset(CompilerOut);
-      Readln(CompilerOut,s);
-      Close(CompilerOut);
-      version_string:=s;
-     end;
-  end;
-
-function full_version_string : string;
-  begin
-    if not ExecuteRedir(ExternalCompilerExe,'-iW','','ppc___.out','ppc___.err') then
-      full_version_string:=version.full_version_string
-    else
-     begin
-      Assign(CompilerOut,'ppc___.out');
-      Reset(CompilerOut);
-      Readln(CompilerOut,s);
-      Close(CompilerOut);
-      if Pos ('-iW', S) <> 0 then
-(* Unknown option - full version not supported! *)
-       S := Version_String;
-      full_version_string:=s;
-     end;
-  end;
-{$endif USE_EXTERNAL_COMPILER}
 
 procedure SetPrimaryFile(const fn:string);
 var

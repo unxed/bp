@@ -40,9 +40,6 @@ uses
   Dos,Objects,Drivers,
   FVConsts,
   Version,
-{$ifdef USE_EXTERNAL_COMPILER}
-   fpintf, { superseeds version_string of version unit }
-{$endif USE_EXTERNAL_COMPILER}
   WConsts,WUtils,WINI,WViews,WEditor,WCEdit,
   {$ifndef NODEBUG}FPDebug,{$endif}FPConst,FPVars,
   FPIntf,FPTools,FPSwitch,fpccrc;
@@ -156,6 +153,7 @@ const
   ieDesktopFlags     = 'DesktopFileFlags';
   ieCenterDebuggerRow= 'CenterCurrentLineWhileDebugging';
   ieShowReadme       = 'ShowReadme';
+  ieExternalCompiler = 'Compiler';
   ieEditKeys         = 'EditKeys';
 
 
@@ -586,6 +584,7 @@ begin
   DesktopLocation:=INIFile.GetIntEntry(secPreferences,ieDesktopLocation,DesktopLocation);
   { Misc }
   ShowReadme:=INIFile.GetIntEntry(secMisc,ieShowReadme,{integer(ShowReadme)}1)<>0;
+  CompilerSetting:=INIFile.GetEntry(secCompile,ieExternalCompiler,CompilerSetting);
   INIFile.Free;
  end;
   ReadINIFile:=OK;
@@ -766,6 +765,7 @@ begin
   INIFile.SetIntEntry(secPreferences,ieDesktopLocation,DesktopLocation);
   { Misc }
   INIFile.SetIntEntry(secMisc,ieShowReadme,integer(ShowReadme));
+  INIFile.SetEntry(secCompile,ieExternalCompiler,CompilerSetting);
   OK:=INIFile.Update;
   INIFile.Free;
   WriteINIFile:=OK;

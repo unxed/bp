@@ -598,9 +598,6 @@ uses
   {$ifdef m68k}
      ag68kgas,
   {$endif}
-{$ifdef USE_EXTERNAL_COMPILER}
-   fpintf, { superseeds version_string of version unit }
-{$endif USE_EXTERNAL_COMPILER}
   {$ifdef VESA}Vesa,{$endif}
   FPSwitch,FPSymbol,FPDebug,FPVars,FPUtils,FPCompil,FPHelp,
   FPTools,FPIDE,FPCodTmp,FPCodCmp;
