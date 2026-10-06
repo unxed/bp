@@ -17,7 +17,7 @@ type
     { Free Vision: the same view showing the free memory in Kb }
     constructor InitKb(const Bounds: TRect);
     procedure Draw; override;
-    procedure Update; virtual;
+    procedure Update; override;
   end;
   PHeapView = THeapView;
 
@@ -28,7 +28,7 @@ type
     TimeStr: string;
     constructor Create(const Bounds: TRect); reintroduce;
     procedure Draw; override;
-    procedure Update; virtual;
+    procedure Update; override;
   end;
   PClockView = TClockView;
 

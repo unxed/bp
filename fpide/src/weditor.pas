@@ -234,7 +234,7 @@ type
       procedure   Collapse(ACollapse: boolean);
       procedure   Changed;
       function    GetLevel: sw_integer;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     public
       ParentFold: PFold;
       Collapsed_: boolean;
@@ -261,7 +261,7 @@ type
       BeginCommentType,EndCommentType : byte;
       Fold: PFold;
       constructor Create(AEditor: PCustomCodeEditor);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
       function    GetFormat: string;
       procedure   SetFormat(const AFormat: string);
       procedure   SetFold(AFold: PFold);
@@ -290,7 +290,7 @@ type
    {a}procedure   SetFlags(AFlags: longint); virtual;
       function    IsFlagSet(AFlag: longint): boolean; {$ifdef USEINLINE}inline;{$endif}
       procedure   SetFlagState(AFlag: longint; ASet: boolean);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     public { internal use only! }
    {a}procedure AddEditorInfo(Index: sw_integer; AEditor: PCustomCodeEditor); virtual;
    {a}procedure RemoveEditorInfo(AEditor: PCustomCodeEditor); virtual;
@@ -324,7 +324,7 @@ type
       constructor Create(act:byte; StartP,EndP:TPoint;Txt:String;AFlags : longint);
       constructor Create_group(act:byte);
       function is_grouped_action : boolean;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     TEditorActionCollection = class;
@@ -358,7 +358,7 @@ type
     TEditorBinding = class(TObject)
       Editor : PCustomCodeEditor;
       constructor Create(AEditor: PCustomCodeEditor);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     TCustomCodeEditorCore = class;
@@ -386,7 +386,7 @@ type
       function    GetBindingIndex(AEditor: PCustomCodeEditor): sw_integer;
       function    SearchBinding(AEditor: PCustomCodeEditor): PEditorBinding;
       function    CanDispose: boolean;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     public
    {a}function    GetModified: boolean; virtual;
       function    GetChangedLine: sw_integer;

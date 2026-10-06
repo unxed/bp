@@ -97,7 +97,7 @@ type
       procedure   FocusItem(Item: sw_integer); override;
       procedure   HandleEvent(var Event: TEvent); override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
     end;
 
     TNoUpdateButton = class;
@@ -127,7 +127,7 @@ type
       function    GetPalette: TPalette; override;
       procedure   Draw; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
     end;
 
     THSListBox = class;

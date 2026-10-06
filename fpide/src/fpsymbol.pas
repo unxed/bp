@@ -51,7 +51,7 @@ type
       constructor Create(Const AExpr : String;ASym : PSymbol);
       procedure GetValue;
       function  GetText : String;
-      destructor Destroy;virtual;
+      destructor Destroy;override;
     private
       expr : Pstring;
       St   : Pstring;
@@ -147,13 +147,13 @@ type
 {$endif HASOUTLINE}
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar; ARoot: PObjectSymbol);
       destructor Destroy; override;
-      function     GetRoot: Pointer; virtual;
-      function     HasChildren(Node: Pointer): Boolean; virtual;
-      function     GetChild(Node: Pointer; I: sw_Integer): Pointer; virtual;
-      function     GetNumChildren(Node: Pointer): sw_Integer; virtual;
+      function     GetRoot: Pointer; override;
+      function     HasChildren(Node: Pointer): Boolean; override;
+      function     GetChild(Node: Pointer; I: sw_Integer): Pointer; override;
+      function     GetNumChildren(Node: Pointer): sw_Integer; override;
       function     GetNumChildrenExposed(Node: Pointer) : sw_Integer; virtual;
-      procedure    Adjust(Node: Pointer; Expand: Boolean); virtual;
-      function     IsExpanded(Node: Pointer): Boolean; virtual;
+      procedure    Adjust(Node: Pointer; Expand: Boolean); override;
+      function     IsExpanded(Node: Pointer): Boolean; override;
 {$ifdef HASOUTLINE}
       function     GetText(Node: Pointer): String; override;
 {$else not HASOUTLINE}
@@ -163,7 +163,7 @@ type
       function     GetText(Item,MaxLen: Sw_Integer): String; override;
 {$endif HASOUTLINE}
       procedure    NodeSelected(P: pointer); virtual;
-      procedure    Selected(I: sw_Integer); virtual;
+      procedure    Selected(I: sw_Integer); override;
       procedure    HandleEvent(var Event: TEvent); override;
       function     GetPalette: TPalette; override;
     private

@@ -97,7 +97,7 @@ type
 
     { init }
     constructor Create;
-    destructor Destroy;
+    destructor Destroy; override;
     { from gdbcon }
     function GetOutput: PChar;
     function GetError: PChar;

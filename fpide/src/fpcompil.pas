@@ -75,7 +75,7 @@ type
       procedure   AddMessage(AClass: longint;const Msg, Module: string; Line, Column: longint);
       procedure   ClearMessages;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   UpdateCommands; override;
     private
@@ -94,7 +94,7 @@ type
       starttime : real;
       constructor Create;
       destructor Destroy;override;
-      procedure   Update;
+      procedure   Update; override;
       procedure SetStartTime(r : real);
     end;
 

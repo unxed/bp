@@ -212,7 +212,7 @@ type
     PLinuxScreen = TLinuxScreen;
     TLinuxScreen = class(TScreen)
       constructor Create;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     public
       function    GetWidth: integer; override;
       function    GetHeight: integer; override;

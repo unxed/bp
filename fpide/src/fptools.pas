@@ -109,7 +109,7 @@ type
       procedure   Update; override;
       function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       destructor Destroy; override;
     end;
 
@@ -121,7 +121,7 @@ type
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       destructor Destroy; override;
       procedure   FocusItem(i : sw_integer);
       procedure   SizeLimits(out Min, Max: TPoint); override;

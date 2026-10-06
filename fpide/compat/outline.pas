@@ -47,7 +47,7 @@ type
     function IsSelected(I: Sw_Integer): Boolean; virtual;
     procedure Selected(I: Sw_Integer); virtual;
     procedure SetState(AState: Word; Enable: Boolean); override;
-    procedure Update;
+    procedure Update; override;
   private
     procedure SetFocusItem(AFocus: Sw_Integer);
     function DoRecurse(Action: TOutlineAction; StopIfFound: Boolean): Pointer;

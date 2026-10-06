@@ -35,7 +35,7 @@ type
       function    GetValue: string;
       procedure   SetValue(const S: string);
       procedure   SetComment(const S: string);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     private
       TagHash  : Cardinal;
       Tag      : PString;
@@ -58,7 +58,7 @@ type
       function    SearchEntry(Tag: string): PINIEntry; virtual;
       procedure   DeleteEntry(Tag: string);
       procedure   ForEachEntry(EnumProc: TINIEntryEnumProc); virtual;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     private
       NameHash : Cardinal;
       Name     : PString;
@@ -85,7 +85,7 @@ type
       procedure   SetIntEntry(const Section, Tag: string; Value: longint); virtual;
       procedure   DeleteSection(const Section: string); virtual;
       procedure   DeleteEntry(const Section, Tag: string);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     private
 {      ReadOnly: boolean;}
       Sections: PCollection;

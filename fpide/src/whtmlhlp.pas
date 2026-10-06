@@ -52,7 +52,7 @@ type
       FirstEl,LastEl : PTableElement;
       constructor Create;
       procedure AddElement(PTE : PTableElement);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     THTMLTopicRenderer = class;

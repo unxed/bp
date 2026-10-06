@@ -72,14 +72,14 @@ type
     constructor Create;
     procedure SetExe(const exefn:string);
     procedure SetSourceDirs;
-    destructor Destroy;
-    function DoSelectSourceline(const fn:string;line,BreakIndex:longint): Boolean;virtual;
+    destructor Destroy; override;
+    function DoSelectSourceline(const fn:string;line,BreakIndex:longint): Boolean;override;
 {    procedure DoStartSession;virtual;
     procedure DoBreakSession;virtual;}
-    procedure DoEndSession(code:longint);virtual;
-    procedure DoUserSignal;virtual;
-    procedure FlushAll; virtual;
-    function Query(question : pchar; args : pchar) : longint; virtual;
+    procedure DoEndSession(code:longint);override;
+    procedure DoUserSignal;override;
+    procedure FlushAll; override;
+    function Query(question : pchar; args : pchar) : longint; override;
 
     procedure AnnotateError;
     procedure InsertBreakpoints;
@@ -87,8 +87,8 @@ type
     procedure ReadWatches;
     procedure RereadWatches;
     procedure ResetBreakpointsValues;
-    procedure DoDebuggerScreen;virtual;
-    procedure DoUserScreen;virtual;
+    procedure DoDebuggerScreen;override;
+    procedure DoUserScreen;override;
     procedure Reset;override;
     procedure ResetDebuggerRows;
     procedure Run;override;
@@ -97,7 +97,7 @@ type
     procedure CommandBegin(const s:string);override;
     procedure CommandEnd(const s:string);override;
     function  IsRunning : boolean;
-    function  AllowQuit : boolean;virtual;
+    function  AllowQuit : boolean;override;
     function  GetValue(Const expr : string) : pchar;
     function  GetFramePointer : CORE_ADDR;
     function  GetLongintAt(addr : CORE_ADDR) : longint;
@@ -140,7 +140,7 @@ type
      procedure  Disable;
      procedure  UpdateSource;
      procedure  ResetValues;
-     destructor Destroy;virtual;
+     destructor Destroy;override;
   end;
 
   TBreakpointCollection= class(TCollection)
@@ -185,7 +185,7 @@ type
       procedure   Draw; override;
       procedure   HandleEvent(var Event: TEvent); override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       destructor Destroy; override;
     end;
 
@@ -202,7 +202,7 @@ type
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   Update; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       destructor Destroy; override;
     end;
 
@@ -232,7 +232,7 @@ type
       procedure rename(s : string);
       procedure Get_new_value;
       procedure Force_new_value;
-      destructor Destroy;virtual;
+      destructor Destroy;override;
     private
       GDBRunCount : longint;
     end;
@@ -265,10 +265,10 @@ type
       procedure   EditCurrent; virtual;
       procedure   DeleteCurrent; virtual;
       (*procedure   ToggleCurrent; *)
-      procedure   Draw; virtual;
+      procedure   Draw; override;
       procedure   HandleEvent(var Event: TEvent); override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       destructor Destroy; override;
     end;
 
@@ -290,7 +290,7 @@ type
       WLB : PWatchesListBox;
       constructor Create;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -299,7 +299,7 @@ type
   PFramesListBox = TFramesListBox;
     TFramesListBox = class(TMessageListBox)
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
-      procedure   Update;
+      procedure   Update; override;
       function    GetLocalMenu: PMenu;override;
       procedure   GotoSource; override;
       procedure   GotoAssembly; virtual;
@@ -313,7 +313,7 @@ type
       FLB : PFramesListBox;
       constructor Create;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -3759,7 +3759,12 @@ begin
        end;
     end;
   if NeedRecompileExe then
-    DoCompile(cRun);
+    begin
+      { a program that is about to be built for the debugger needs symbols }
+      if DebugInfoSwitches.GetCurrSelParam='-' then
+        DebugInfoSwitches.SetCurrSelParam('');
+      DoCompile(cRun);
+    end;
   if CompilationPhase<>cpDone then
     Exit;
   if (EXEFile='') then

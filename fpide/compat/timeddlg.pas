@@ -27,7 +27,7 @@ type
   PTimedDialogText = TTimedDialogText;
   TTimedDialogText = class(TStaticText)
     constructor Create(var Bounds: TRect); reintroduce;
-    procedure GetText(var S: string); virtual;
+    procedure GetText(var S: string); override;
   end;
 
 function TimedMessageBox(const Msg: string; Params: Pointer;

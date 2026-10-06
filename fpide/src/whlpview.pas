@@ -76,7 +76,7 @@ type
       PKeywordCollection = TKeywordCollection;
       TKeywordCollection = class({TSorted}TCollection)
         function  At(Index: sw_Integer): PHelpKeyword;
-        procedure FreeItem(Item: Pointer); virtual;
+        procedure FreeItem(Item: Pointer); override;
         function  Compare(Key1, Key2: Pointer): sw_Integer; virtual;
       end;
 
@@ -93,7 +93,7 @@ type
       TNamedMark = class(TObject)
         constructor Create(const AName: string; AX, AY: integer);
         function    GetName: string;
-        destructor Destroy; virtual;
+        destructor Destroy; override;
       private
         Name: PString;
         Pos: TPoint;
@@ -138,7 +138,7 @@ type
         procedure   GetColorAreaBounds(Index: sw_integer; var R: TRect); virtual;
         function    GetColorAreaColor(Index: sw_integer): word; virtual;
         function    GetColorAreaMask(Index: sw_integer): word; virtual;
-        destructor Destroy; virtual;
+        destructor Destroy; override;
       private
         Width,Margin: sw_integer;
 {        StockItem: boolean;}
@@ -163,11 +163,11 @@ type
         procedure   ChangeBounds(const Bounds: TRect); override;
         procedure   Draw; override;
         procedure   HandleEvent(var Event: TEvent); override;
-        procedure   SetCurPtr(X,Y: sw_integer); virtual;
-        function    GetLineCount: sw_integer; virtual;
-        function    GetLine(LineNo: sw_integer): PCustomLine; virtual;
-        function    GetLineText(Line: sw_integer): string; virtual;
-        function    GetDisplayText(I: sw_integer): string; virtual;
+        procedure   SetCurPtr(X,Y: sw_integer); override;
+        function    GetLineCount: sw_integer; override;
+        function    GetLine(LineNo: sw_integer): PCustomLine; override;
+        function    GetLineText(Line: sw_integer): string; override;
+        function    GetDisplayText(I: sw_integer): string; override;
         function    GetLinkCount: sw_integer; virtual;
         procedure   GetLinkBounds(Index: sw_integer; var R: TRect); virtual;
         function    GetLinkFileID(Index: sw_integer): word; virtual;
@@ -189,7 +189,7 @@ type
         procedure   Lookup(S: string); virtual;
         function    GetPalette: TPalette; override;
         constructor Load(S: TStream);
-        procedure   Store(S: TStream);
+        procedure   Store(S: TStream); override;
         destructor Destroy; override;
       private
         History    : array[0..HistorySize] of THelpHistoryEntry;

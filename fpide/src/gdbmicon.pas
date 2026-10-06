@@ -51,7 +51,7 @@ type
 
   public
     constructor Create;
-    destructor Destroy;
+    destructor Destroy; override;
 
     procedure Command(const s: string);
     procedure Reset; virtual;

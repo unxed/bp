@@ -58,7 +58,7 @@ type
     procedure Draw; override;
     function  GetPalette: TPalette; override;
     procedure HandleEvent(var Event: TEvent); override;
-    procedure Store(S: TStream);
+    procedure Store(S: TStream); override;
   private
     procedure GetDisplay(var R: extended);
     procedure SetDisplay(R: extended;ShouldKeepZeroes : boolean);
@@ -74,7 +74,7 @@ type
     procedure   Show; {override;}
     procedure   Close; override;
     constructor Load(S: TStream);
-    procedure   Store(S: TStream);
+    procedure   Store(S: TStream); override;
   end;
 
 {$ifndef NOOBJREG}

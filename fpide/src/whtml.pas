@@ -38,7 +38,7 @@ type
       function    GetLine(Idx: sw_integer; var S: string): boolean; override;
       function    GetFileName : string; override;
       function    GetLineCount : sw_integer;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     private
       Lines : PUnsortedStrCollection;
     end;
@@ -58,7 +58,7 @@ type
       constructor Create;
       function    Process(HTMLFile: PTextFile): boolean; virtual;
       function    ProcessLine(LineText: string): boolean; virtual;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     public
       Line,LinePos: sw_integer;
       procedure   DocSoftBreak; virtual;

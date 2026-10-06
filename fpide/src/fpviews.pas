@@ -80,7 +80,7 @@ type
       procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   UpdateCommands; virtual;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   Update; override;
       procedure   SelectInDebugSession;
     end;
@@ -88,8 +88,8 @@ type
     TFPHelpViewer = class;
     PFPHelpViewer = TFPHelpViewer;
     TFPHelpViewer = class(THelpViewer)
-      function    GetLocalMenu: PMenu; virtual;
-      function    GetCommandTarget: PView; virtual;
+      function    GetLocalMenu: PMenu; override;
+      function    GetCommandTarget: PView; override;
     end;
 
     TFPHelpWindow = class;
@@ -97,13 +97,13 @@ type
     TFPHelpWindow = class(THelpWindow)
       constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
       destructor Destroy;override;
-      procedure   InitHelpView; virtual;
+      procedure   InitHelpView; override;
       procedure   Show; {virtual;}
       procedure   Hide; {override;}
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
     end;
 
     TTextScroller = class;
@@ -206,7 +206,7 @@ type
       procedure   UpdateCommands; override;
       function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   Close; override;
       destructor Destroy; override;
     end;
@@ -242,7 +242,7 @@ type
       procedure   WriteErrorText(Buf : pchar);
       function    GetPalette: TPalette;override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   UpdateCommands; override;
       destructor Destroy; override;
     end;
@@ -304,7 +304,7 @@ type
       constructor Create;
       procedure   Close; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       destructor Destroy; override;
     end;
 
@@ -319,7 +319,7 @@ type
       function    GetText(MaxLen: Sw_integer): string; virtual;
       procedure   Selected; virtual;
       function    GetModuleName: string; virtual;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     TMessageListBox = class;
@@ -341,7 +341,7 @@ type
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetLocalMenu: PMenu; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       destructor Destroy; override;
     end;
 
@@ -426,7 +426,7 @@ PTabItem = ^TTabItem;
     TFPASCIIChart = class(TASCIIChart)
       constructor Create;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   HandleEvent(var Event: TEvent); override;
       destructor Destroy; override;
     end;
@@ -443,7 +443,7 @@ PTabItem = ^TTabItem;
       constructor Create(var Bounds: TRect);
       procedure   InitBackground; override;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
     end;
 
     TFPMemo = class;

@@ -115,7 +115,7 @@ type
        { --- Hook procedures --- }
        procedure   Reply(S: string); virtual;
        procedure   PutKey(S: string); virtual;
-       destructor Destroy; virtual;
+       destructor Destroy; override;
        private
        procedure   ProcessChar(C: char); virtual;
      end;

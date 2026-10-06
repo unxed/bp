@@ -57,7 +57,7 @@ type
       function    SaveAll: boolean;
       function    AutoSave: boolean;
       procedure   Idle; override;
-      procedure   Update;
+      procedure   Update; override;
       procedure   UpdateMode;
       procedure   UpdateRunMenu(DebuggeeRunning : boolean);
       procedure   UpdateTarget;

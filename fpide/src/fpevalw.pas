@@ -32,7 +32,7 @@ type
         constructor Create(var bounds:Trect);
         procedure evaluate;
         procedure handleevent(var event:Tevent);override;
-        destructor Destroy;
+        destructor Destroy; override;
       end;
 
 {****************************************************************************}

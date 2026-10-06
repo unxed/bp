@@ -98,7 +98,7 @@ uses
       RV : PRegistersView;
       constructor Create;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -148,7 +148,7 @@ uses
       RV : PFPUView;
       constructor Create;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -212,7 +212,7 @@ uses
       RV : PVectorView;
       constructor Create;
       constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      procedure   Store(S: TStream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;

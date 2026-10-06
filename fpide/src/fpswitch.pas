@@ -104,7 +104,7 @@ type
       function  ParamValue(nr:sw_integer):string;override;
       function  ParamCount:sw_integer;override;
       procedure Reset;override;
-      destructor Destroy;virtual;
+      destructor Destroy;override;
     end;
 
 
@@ -124,7 +124,7 @@ type
     TSwitches = class
       constructor Create(ch:char);
       constructor InitSelect(ch:char);
-      destructor Destroy;
+      destructor Destroy; override;
       { general items }
       function  ItemCount:integer;
       function  ItemName(index:integer):string;

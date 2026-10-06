@@ -41,7 +41,7 @@ type
       procedure   SetParams(const AShortCut: string; Lines: PUnsortedStringCollection);
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     private
       ShortCut: PString;
       Text: PUnsortedStringCollection;
@@ -87,7 +87,7 @@ type
       procedure Add;
       procedure Edit;
       procedure Delete;
-      procedure Update;
+      procedure Update; override;
     end;
 
 const CodeTemplates : PCodeTemplateCollection = nil;

@@ -63,7 +63,7 @@ type
      PNameID = TNameID;
      TNameID  = class(TObject)
        constructor Create(const AName : string; Astate : TNameIDState);
-       destructor Destroy; virtual;
+       destructor Destroy; override;
        procedure SetState(Astate : TNameIDState; enabled : boolean);
        procedure SetOrigin(const AOrigin : string);
        procedure SetLine(ALine : sw_integer);
@@ -95,7 +95,7 @@ type
        procedure   AddAlias(const Alias: string);
        constructor Load(S: TStream);
        procedure   Store(S: TStream);
-       destructor Destroy; virtual;
+       destructor Destroy; override;
      private
        DocName: PString;
        Synonym: PHTMLLinkScanDocument;
@@ -142,7 +142,7 @@ type
      THTMLLinkScanFile = class(TObject)
        constructor Create(const ADocumentURL: string);
        function    GetDocumentURL: string;
-       destructor Destroy; virtual;
+       destructor Destroy; override;
        function    AddReferencedName (const AName : string) : PNameID;
        function    AddFoundName (const AName : string) : PNameID;
        procedure   CheckNameList;

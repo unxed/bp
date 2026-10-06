@@ -95,7 +95,7 @@ type
        function    GetName: string; virtual;
        function    FirstThatEntry(Func: TResourceEntryEnumFunc): PResourceEntry; virtual;
        procedure   ForEachEntry(Func: TResourceEntryEnumProc); virtual;
-       destructor Destroy; virtual;
+       destructor Destroy; override;
      private
        Name   : PString;
        _Class : longint;
@@ -130,7 +130,7 @@ type
        function    ReadResourceEntry(const ResName: string; ALangID: longint; var Buf; BufSize: sw_word): boolean;
        function    ReadResourceEntryToStream(const ResName: string; ALangID: longint; DestS: TStream): boolean;
        procedure   Flush; virtual;
-       destructor Destroy; virtual;
+       destructor Destroy; override;
      public
        BaseOfs: longint;
        function    FindResource(const ResName: string): PResource;
