@@ -399,6 +399,8 @@ BEGIN
   InitDirs;
 
   RegisterIDEObjects; { tv3 registers its own types in its unit initialization }
+  { Free Vision's TListBox.Done does not dispose the list; the IDE's code does it itself (tv3 default: it does) }
+  ListBoxOwnsList:=False;
 
   ShowReadme:=ShowReadme or (LocateFile(INIFileName)='');
   if LocateFile(INIFileName)<>'' then

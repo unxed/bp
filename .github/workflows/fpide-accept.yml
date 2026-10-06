@@ -1,11 +1,27 @@
 name: fpide-accept
 
-# Full UI parity vs vanilla fp (bitwise screen dumps). Disabled until tools/fpide-linux-accept.py exists.
+# Builds fp (the Free Pascal IDE on tv3) and clicks through it in tmux: fpide/tests/accept.
+# test_accept.py: the main functions (start, menus, editor, save, directories, make, run);
+# test_menu_sweep.py: every menu item is activated and the IDE must stay alive.
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - fpide/**
+      - tv/**
+      - tools/fpide-*.sh
+      - tools/fpide-*.py
+      - tools/build-fpide.sh
+      - .github/workflows/fpide-accept.yml
 
 jobs:
-  placeholder:
+  accept:
     runs-on: ubuntu-24.04
     steps:
-      - run: echo "fpide acceptance gate — not wired yet; see fpide/PLAN.md milestone 6 and unxed/dn dn-accept.yml"
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-fcl fp-units-base fp-units-misc fp-units-gfx python3 tmux gdb git
+      - name: Build and run the acceptance tests
+        run: tools/fpide-accept.sh

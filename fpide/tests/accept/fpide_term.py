@@ -48,15 +48,29 @@ class TmuxTerm:
 
     @staticmethod
     def _cells(line):
-        """one line of `capture-pane -e` as [(char, sgr-state)]"""
-        cells, sgr, i = [], '', 0
+        """one line of `capture-pane -e` as [(char, background)]: the background colour in force
+        (tmux sends fg and bg as separate sequences; only the background tells a highlighted row)"""
+        cells, bg, i = [], '', 0
         while i < len(line):
             m = re.match(r'\x1b\[([0-9;]*)m', line[i:])
             if m:
-                sgr = m.group(1) if m.group(1) not in ('', '0') else ''
+                codes = m.group(1).split(';') if m.group(1) else ['0']
+                j = 0
+                while j < len(codes):
+                    c = codes[j]
+                    if c in ('0', ''):
+                        bg = ''
+                    elif c == '49':
+                        bg = ''
+                    elif c in ('48',) and j + 1 < len(codes):
+                        bg = ';'.join(codes[j:j + 3 if codes[j + 1] == '5' else j + 5])
+                        j += 2 if codes[j + 1] == '5' else 4
+                    elif (c.isdigit() and (40 <= int(c) <= 47 or 100 <= int(c) <= 107)):
+                        bg = c
+                    j += 1
                 i += m.end()
                 continue
-            cells.append((line[i], sgr))
+            cells.append((line[i], bg))
             i += 1
         return cells
 

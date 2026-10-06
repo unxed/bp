@@ -16,6 +16,16 @@ fails = 0
 count = 0
 
 
+def find_rtl_units():
+    """the directory with the RTL units of the installed FPC (it differs between distributions)"""
+    import glob
+    for pat in ('/usr/lib/*/fpc/*/units/*/rtl', '/usr/lib/fpc/*/units/*/rtl', '/usr/local/lib/fpc/*/units/*/rtl'):
+        found = sorted(glob.glob(pat))
+        if found:
+            return found[-1]
+    return ''
+
+
 def check(cond, name, term=None):
     global fails, count
     count += 1
@@ -83,8 +93,10 @@ try:
     # --- Options > Directories: set the unit directory -------------------------------------------------
     check(t.menu('M-o', 'Directories'), 'Options > Directories is found in the menu', t)
     check(t.wait_for('Unit directories:'), 'the Directories dialog opens with its tabs', t)
-    t.type('/usr/lib/x86_64-linux-gnu/fpc/3.2.2/units/x86_64-linux/rtl')
-    check(t.wait_for('x86_64-linux/rtl'), 'text typed into the unit directories memo appears', t)
+    rtl = find_rtl_units()
+    check(rtl != '', 'the RTL units of FPC are installed (fp-units-rtl)')
+    t.type(rtl)
+    check(t.wait_for(rtl[-30:]), 'text typed into the unit directories memo appears', t)
     t.key('Tab', 'Enter')
     check(t.wait_gone('Unit directories:'), 'OK closes the dialog', t)
 
