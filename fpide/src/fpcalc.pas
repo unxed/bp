@@ -79,25 +79,10 @@ type
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-const
-  RCalcButton: TStreamRec = (
-     ObjType: 10139;
-     VmtLink: 0 { PtrUInt(System.TClass(TCalcButton)) at runtime };
-     Load:    @TCalcButton.Load;
-     Store:   @TCalcButton.Store
-  );
-  RCalcDisplay: TStreamRec = (
-     ObjType: 10140;
-     VmtLink: 0 { PtrUInt(System.TClass(TCalcDisplay)) at runtime };
-     Load:    @TCalcDisplay.Load;
-     Store:   @TCalcDisplay.Store
-  );
-  RCalculator: TStreamRec = (
-     ObjType: 10141;
-     VmtLink: 0 { PtrUInt(System.TClass(TCalculator)) at runtime };
-     Load:    @TCalculator.Load;
-     Store:   @TCalculator.Store
-  );
+var RCalcButton: TStreamRec;
+var RCalcDisplay: TStreamRec;
+var RCalculator: TStreamRec;
+
 {$endif}
 {$endif}
 {$endif}
@@ -591,9 +576,63 @@ begin
 end;
 
 
+{$ifndef NOOBJREG}
+{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
+function Build_RCalcButton(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TCalcButton.Load(S)));
+end;
+
+procedure Store_RCalcButton(P: TStreamable; S: TStream);
+begin
+  TCalcButton(Pointer(P)).Store(S);
+end;
+
+function Build_RCalcDisplay(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TCalcDisplay.Load(S)));
+end;
+
+procedure Store_RCalcDisplay(P: TStreamable; S: TStream);
+begin
+  TCalcDisplay(Pointer(P)).Store(S);
+end;
+
+function Build_RCalculator(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TCalculator.Load(S)));
+end;
+
+procedure Store_RCalculator(P: TStreamable; S: TStream);
+begin
+  TCalculator(Pointer(P)).Store(S);
+end;
+
+procedure FillStreamRecs_fpcalc;
+begin
+  RCalcButton.ObjType := 10139;
+  RCalcButton.VmtLink := PtrUInt(System.TClass(TCalcButton));
+  RCalcButton.Load := @Build_RCalcButton;
+  RCalcButton.Store := @Store_RCalcButton;
+  RCalcButton.Next := nil;
+  RCalcDisplay.ObjType := 10140;
+  RCalcDisplay.VmtLink := PtrUInt(System.TClass(TCalcDisplay));
+  RCalcDisplay.Load := @Build_RCalcDisplay;
+  RCalcDisplay.Store := @Store_RCalcDisplay;
+  RCalcDisplay.Next := nil;
+  RCalculator.ObjType := 10141;
+  RCalculator.VmtLink := PtrUInt(System.TClass(TCalculator));
+  RCalculator.Load := @Build_RCalculator;
+  RCalculator.Store := @Store_RCalculator;
+  RCalculator.Next := nil;
+end;
+
+{$endif}
+
 procedure RegisterFPCalc;
 begin
 {$ifndef NOOBJREG}
+  FillStreamRecs_fpcalc;
   RegisterType(RCalcButton);
   RegisterType(RCalcDisplay);
   RegisterType(RCalculator);

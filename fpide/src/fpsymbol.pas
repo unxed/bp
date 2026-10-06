@@ -482,7 +482,7 @@ begin
           end;
         Sym.Typ:=Typ;
         NextLine;
-        New(Sym.Items, Init(0,50));
+        Sym.Items := TSymbolCollection.Create(0,50);
         ProcessSymTable(Indent+2,Sym.Items);
       end else
 {    if Sym<>nil then}
@@ -499,7 +499,7 @@ begin
         PS:=ModuleNames.Add(Source);
         Ref := TSymbolReference.Create(PS, PX);
         if Sym.References=nil then
-          New(Sym.References, Init(10,50));
+          Sym.References := TReferenceCollection.Create(10,50);
         Sym.References.Insert(Ref);
       end;
     if ExitBack=false then
@@ -1743,7 +1743,7 @@ begin
     end;
 
   GetExtent(R); R.Grow(-1,-1); R.Move(0,1); R.B.Y:=R.A.Y+1;
-  TageTab.Create(R,
+  PageTab := TBrowserTab.Create(R,
     NewBrowserTabItem(label_browsertab_scope,ScopeView,
     NewBrowserTabItem(label_browsertab_reference,ReferenceView,
     NewBrowserTabItem(label_browsertab_inheritance,InheritanceView,
@@ -1971,7 +1971,7 @@ begin
                  begin
                    Sym.Name:=NewStr(GetStr(PS)+'*');
                    DrawView;
-                   New(PB,init_function(GetStr(PS)));
+                   PB := TBreakpoint.init_function(GetStr(PS));
                    DisposeStr(PS);
                    BreakpointsCollection.Insert(PB);
                    BreakpointsCollection.Update;
@@ -1996,7 +1996,7 @@ begin
                  begin
                    Sym.Name:=NewStr(GetStr(PS)+'*');
                    DrawView;
-                   New(PB,init_type(bt_awatch,GetStr(PS)));
+                   PB := TBreakpoint.init_type(bt_awatch,GetStr(PS));
                    DisposeStr(PS);
                    BreakpointsCollection.Insert(PB);
                    BreakpointsCollection.Update;

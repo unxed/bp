@@ -22,11 +22,13 @@ uses Objects,Drivers,Dialogs,
      WEditor,WUtils,WViews;
 
 type
-     PCodeCompleteWordList = ^TCodeCompleteWordList;
+     TCodeCompleteWordList = class;
+     PCodeCompleteWordList = TCodeCompleteWordList;
      TCodeCompleteWordList = class(TTextCollection)
      end;
 
-    PCodeCompleteDialog = ^TCodeCompleteDialog;
+    TCodeCompleteDialog = class;
+    PCodeCompleteDialog = TCodeCompleteDialog;
     TCodeCompleteDialog = class(TCenterDialog)
       constructor Create;
       function    Execute: Word; virtual;
@@ -71,13 +73,8 @@ uses App,Views,MsgBox,Validate,
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-const
-  RCodeCompleteWordList: TStreamRec = (
-     ObjType: 14401;
-     VmtLink: 0 { PtrUInt(System.TClass(TCodeCompleteWordList)) at runtime };
-     Load:    @TCodeCompleteWordList.Load;
-     Store:   @TCodeCompleteWordList.Store
-  );
+var RCodeCompleteWordList: TStreamRec;
+
 {$endif}
 {$endif}
 {$endif}
@@ -656,9 +653,33 @@ begin
   ReDraw;
 end;
 
+{$ifndef NOOBJREG}
+{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
+function Build_RCodeCompleteWordList(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TCodeCompleteWordList.Load(S)));
+end;
+
+procedure Store_RCodeCompleteWordList(P: TStreamable; S: TStream);
+begin
+  TCodeCompleteWordList(Pointer(P)).Store(S);
+end;
+
+procedure FillStreamRecs_fpcodcmp;
+begin
+  RCodeCompleteWordList.ObjType := 14401;
+  RCodeCompleteWordList.VmtLink := PtrUInt(System.TClass(TCodeCompleteWordList));
+  RCodeCompleteWordList.Load := @Build_RCodeCompleteWordList;
+  RCodeCompleteWordList.Store := @Store_RCodeCompleteWordList;
+  RCodeCompleteWordList.Next := nil;
+end;
+
+{$endif}
+
 procedure RegisterCodeComplete;
 begin
 {$ifndef NOOBJREG}
+  FillStreamRecs_fpcodcmp;
   RegisterType(RCodeCompleteWordList);
 {$endif}
 end;

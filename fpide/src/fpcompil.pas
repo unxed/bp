@@ -47,18 +47,21 @@ type
   TCompileMode = (cBuild,cMake,cCompile,cRun);
 
 type
-    PCompilerMessage = ^TCompilerMessage;
+    TCompilerMessage = class;
+    PCompilerMessage = TCompilerMessage;
     TCompilerMessage = class(TMessageItem)
       function GetText(MaxLen: Sw_Integer): String; virtual;
     end;
 
-    PCompilerMessageListBox = ^TCompilerMessageListBox;
+    TCompilerMessageListBox = class;
+    PCompilerMessageListBox = TCompilerMessageListBox;
     TCompilerMessageListBox = class(TMessageListBox)
       function  GetPalette: TPalette; virtual;
       procedure SelectFirstError;
     end;
 
-    PCompilerMessageWindow = ^TCompilerMessageWindow;
+    TCompilerMessageWindow = class;
+    PCompilerMessageWindow = TCompilerMessageWindow;
     TCompilerMessageWindow = class(TFPWindow)
       constructor Create;
       procedure   HandleEvent(var Event: TEvent); virtual;
@@ -80,7 +83,8 @@ type
       InfoST : PColorStaticText;}
     end;
 
-    PCompilerStatusDialog = ^TCompilerStatusDialog;
+    TCompilerStatusDialog = class;
+    PCompilerStatusDialog = TCompilerStatusDialog;
     TCompilerStatusDialog = class(TCenterDialog)
       ST    : PAdvancedStaticText;
       KeyST : PColorStaticText;
@@ -153,19 +157,9 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-const
-  RCompilerMessageListBox: TStreamRec = (
-     ObjType: 1211;
-     VmtLink: 0 { PtrUInt(System.TClass(TCompilerMessageListBox)) at runtime };
-     Load:    @TCompilerMessageListBox.Load;
-     Store:   @TCompilerMessageListBox.Store
-  );
-  RCompilerMessageWindow: TStreamRec = (
-     ObjType: 1212;
-     VmtLink: 0 { PtrUInt(System.TClass(TCompilerMessageWindow)) at runtime };
-     Load:    @TCompilerMessageWindow.Load;
-     Store:   @TCompilerMessageWindow.Store
-  );
+var RCompilerMessageListBox: TStreamRec;
+var RCompilerMessageWindow: TStreamRec;
+
 {$endif}
 {$endif}
 {$endif}
@@ -1287,9 +1281,48 @@ begin
   packtime(dt,filetime);
 end;
 
+{$ifndef NOOBJREG}
+{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
+function Build_RCompilerMessageListBox(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TCompilerMessageListBox.Load(S)));
+end;
+
+procedure Store_RCompilerMessageListBox(P: TStreamable; S: TStream);
+begin
+  TCompilerMessageListBox(Pointer(P)).Store(S);
+end;
+
+function Build_RCompilerMessageWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TCompilerMessageWindow.Load(S)));
+end;
+
+procedure Store_RCompilerMessageWindow(P: TStreamable; S: TStream);
+begin
+  TCompilerMessageWindow(Pointer(P)).Store(S);
+end;
+
+procedure FillStreamRecs_fpcompil;
+begin
+  RCompilerMessageListBox.ObjType := 1211;
+  RCompilerMessageListBox.VmtLink := PtrUInt(System.TClass(TCompilerMessageListBox));
+  RCompilerMessageListBox.Load := @Build_RCompilerMessageListBox;
+  RCompilerMessageListBox.Store := @Store_RCompilerMessageListBox;
+  RCompilerMessageListBox.Next := nil;
+  RCompilerMessageWindow.ObjType := 1212;
+  RCompilerMessageWindow.VmtLink := PtrUInt(System.TClass(TCompilerMessageWindow));
+  RCompilerMessageWindow.Load := @Build_RCompilerMessageWindow;
+  RCompilerMessageWindow.Store := @Store_RCompilerMessageWindow;
+  RCompilerMessageWindow.Next := nil;
+end;
+
+{$endif}
+
 procedure RegisterFPCompile;
 begin
 {$ifndef NOOBJREG}
+  FillStreamRecs_fpcompil;
   RegisterType(RCompilerMessageListBox);
   RegisterType(RCompilerMessageWindow);
 {$endif}

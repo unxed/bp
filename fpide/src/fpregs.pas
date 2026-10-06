@@ -247,41 +247,12 @@ uses
 
 
 {$ifndef NOOBJREG}
-Const
-  RRegistersWindow: TStreamRec = (
-     ObjType: 1711;
-     VmtLink: Ofs(TypeOf(TRegistersWindow)^);
-     Load:    @TRegistersWindow.Load;
-     Store:   @TRegistersWindow.Store
-  );
+var RRegistersWindow: TStreamRec;
+var RRegistersView: TStreamRec;
+var RFPUWindow: TStreamRec;
+var RFPUView: TStreamRec;
+var RVectorView: TStreamRec;
 
-  RRegistersView: TStreamRec = (
-     ObjType: 1712;
-     VmtLink: Ofs(TypeOf(TRegistersView)^);
-     Load:    @TRegistersView.Load;
-     Store:   @TRegistersView.Store
-  );
-
-  RFPUWindow: TStreamRec = (
-     ObjType: 1713;
-     VmtLink: Ofs(TypeOf(TFPUWindow)^);
-     Load:    @TFPUWindow.Load;
-     Store:   @TFPUWindow.Store
-  );
-
-  RFPUView: TStreamRec = (
-     ObjType: 1714;
-     VmtLink: Ofs(TypeOf(TFPUView)^);
-     Load:    @TFPUView.Load;
-     Store:   @TFPUView.Store
-  );
-
-  RVectorView: TStreamRec = (
-     ObjType: 1715;
-     VmtLink: Ofs(TypeOf(TVectorView)^);
-     Load:    @TVectorView.Load;
-     Store:   @TVectorView.Store
-  );
 {$endif}
 
 
@@ -1680,9 +1651,93 @@ begin
 end;
 
 
+{$ifndef NOOBJREG}
+{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
+function Build_RRegistersWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TRegistersWindow.Load(S)));
+end;
+
+procedure Store_RRegistersWindow(P: TStreamable; S: TStream);
+begin
+  TRegistersWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RRegistersView(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TRegistersView.Load(S)));
+end;
+
+procedure Store_RRegistersView(P: TStreamable; S: TStream);
+begin
+  TRegistersView(Pointer(P)).Store(S);
+end;
+
+function Build_RFPUWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TFPUWindow.Load(S)));
+end;
+
+procedure Store_RFPUWindow(P: TStreamable; S: TStream);
+begin
+  TFPUWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RFPUView(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TFPUView.Load(S)));
+end;
+
+procedure Store_RFPUView(P: TStreamable; S: TStream);
+begin
+  TFPUView(Pointer(P)).Store(S);
+end;
+
+function Build_RVectorView(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TVectorView.Load(S)));
+end;
+
+procedure Store_RVectorView(P: TStreamable; S: TStream);
+begin
+  TVectorView(Pointer(P)).Store(S);
+end;
+
+procedure FillStreamRecs_fpregs;
+begin
+  RRegistersWindow.ObjType := 1711;
+  RRegistersWindow.VmtLink := PtrUInt(System.TClass(TRegistersWindow));
+  RRegistersWindow.Load := @Build_RRegistersWindow;
+  RRegistersWindow.Store := @Store_RRegistersWindow;
+  RRegistersWindow.Next := nil;
+  RRegistersView.ObjType := 1712;
+  RRegistersView.VmtLink := PtrUInt(System.TClass(TRegistersView));
+  RRegistersView.Load := @Build_RRegistersView;
+  RRegistersView.Store := @Store_RRegistersView;
+  RRegistersView.Next := nil;
+  RFPUWindow.ObjType := 1713;
+  RFPUWindow.VmtLink := PtrUInt(System.TClass(TFPUWindow));
+  RFPUWindow.Load := @Build_RFPUWindow;
+  RFPUWindow.Store := @Store_RFPUWindow;
+  RFPUWindow.Next := nil;
+  RFPUView.ObjType := 1714;
+  RFPUView.VmtLink := PtrUInt(System.TClass(TFPUView));
+  RFPUView.Load := @Build_RFPUView;
+  RFPUView.Store := @Store_RFPUView;
+  RFPUView.Next := nil;
+  RVectorView.ObjType := 1715;
+  RVectorView.VmtLink := PtrUInt(System.TClass(TVectorView));
+  RVectorView.Load := @Build_RVectorView;
+  RVectorView.Store := @Store_RVectorView;
+  RVectorView.Next := nil;
+end;
+
+{$endif}
+
 procedure RegisterFPRegsViews;
 begin
   {$ifndef NOOBJREG}
+FillStreamRecs_fpregs;
 RegisterType(RRegistersWindow);
   RegisterType(RRegistersView);
   RegisterType(RFPUWindow);

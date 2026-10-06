@@ -188,7 +188,7 @@ begin
                else
                  begin
                    if Assigned(Application) then
-                     MustQuit:=MessageBox(#3+msg_QuitConfirm,nil,mferror+mfyesbutton+mfnobutton)=cmYes
+                     MustQuit:=MessageBox(#3+msg_QuitConfirm,mferror+mfyesbutton+mfnobutton)=cmYes
                    else
                      MustQuit:=true;
                  end;

@@ -385,80 +385,24 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
+var RBreakpointsWindow: TStreamRec;
 const
-  RBreakpointsWindow: TStreamRec = (
-     ObjType: 1701;
-     VmtLink: 0 { PtrUInt(System.TClass(TBreakpointsWindow)) at runtime };
-     Load:    @TBreakpointsWindow.Load;
-     Store:   @TBreakpointsWindow.Store
-  );
+
 
   {$endif}
 {$endif}
 {$endif NOOBJREG}
-RBreakpointsListBox : TStreamRec = (
-     ObjType: 1702;
-     VmtLink: 0 { PtrUInt(System.TClass(TBreakpointsListBox)) at runtime };
-     Load:    @TBreakpointsListBox.Load;
-     Store:   @TBreakpointsListBox.Store
-  );
 
-  RWatchesWindow: TStreamRec = (
-     ObjType: 1703;
-     VmtLink: 0 { PtrUInt(System.TClass(TWatchesWindow)) at runtime };
-     Load:    @TWatchesWindow.Load;
-     Store:   @TWatchesWindow.Store
-  );
+var RBreakpointsListBox: TStreamRec;
+var RWatchesWindow: TStreamRec;
+var RWatchesListBox: TStreamRec;
+var RStackWindow: TStreamRec;
+var RFramesListBox: TStreamRec;
+var RBreakpoint: TStreamRec;
+var RWatch: TStreamRec;
+var RBreakpointCollection: TStreamRec;
+var RWatchesCollection: TStreamRec;
 
-  RWatchesListBox: TStreamRec = (
-     ObjType: 1704;
-     VmtLink: 0 { PtrUInt(System.TClass(TWatchesListBox)) at runtime };
-     Load:    @TWatchesListBox.Load;
-     Store:   @TWatchesListBox.Store
-  );
-
-  RStackWindow: TStreamRec = (
-     ObjType: 1705;
-     VmtLink: 0 { PtrUInt(System.TClass(TStackWindow)) at runtime };
-     Load:    @TStackWindow.Load;
-     Store:   @TStackWindow.Store
-  );
-
-  RFramesListBox: TStreamRec = (
-     ObjType: 1706;
-     VmtLink: 0 { PtrUInt(System.TClass(TFramesListBox)) at runtime };
-     Load:    @TFramesListBox.Load;
-     Store:   @TFramesListBox.Store
-  );
-
-  RBreakpoint: TStreamRec = (
-     ObjType: 1707;
-     VmtLink: 0 { PtrUInt(System.TClass(TBreakpoint)) at runtime };
-     Load:    @TBreakpoint.Load;
-     Store:   @TBreakpoint.Store
-  );
-
-  RWatch: TStreamRec = (
-     ObjType: 1708;
-     VmtLink: 0 { PtrUInt(System.TClass(TWatch)) at runtime };
-     Load:    @TWatch.Load;
-     Store:   @TWatch.Store
-  );
-
-
-  RBreakpointCollection: TStreamRec = (
-     ObjType: 1709;
-     VmtLink: 0 { PtrUInt(System.TClass(TBreakpointCollection)) at runtime };
-     Load:    @TBreakpointCollection.Load;
-     Store:   @TBreakpointCollection.Store
-  );
-
-  RWatchesCollection: TStreamRec = (
-     ObjType: 1710;
-     VmtLink: 0 { PtrUInt(System.TClass(TWatchesCollection)) at runtime };
-     Load:    @TWatchesCollection.Load;
-     Store:   @TWatchesCollection.Store
-  );
 
 {$ifdef USERESSTRINGS}
 resourcestring
@@ -710,7 +654,7 @@ begin
           HasExe:=false;
           if GetError<>'' then
             f:=GetError;
-          MessageBox(#3'Failed to load file '#13#3+f,nil,mfOKbutton);
+          MessageBox(#3'Failed to load file '#13#3+f,mfOKbutton);
           exit;
         end;
       HasExe:=true;
@@ -916,7 +860,7 @@ begin
       else if not UseSsh then
         begin
           s:=TransformRemoteString(RemoteExecCommand);
-          MessageBox(#3'Start in remote'#13#3+s,nil,mfOKbutton);
+          MessageBox(#3'Start in remote'#13#3+s,mfOKbutton);
         end;
       if usessh then
         { we use ssh port redirection }
@@ -1096,7 +1040,7 @@ begin
   else
     WasModal:=false;
   PushStatus(Question);
-  res:=MessageBox(Question,nil,mfyesbutton+mfnobutton);
+  res:=MessageBox(Question,mfyesbutton+mfnobutton);
   PopStatus;
   if res=cmYes then
     Query:=1
@@ -3961,8 +3905,167 @@ begin
   WatchesCollection:=nil;
 end;
 
+{$ifndef NOOBJREG}
+{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
+function Build_RBreakpointsWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TBreakpointsWindow.Load(S)));
+end;
+
+procedure Store_RBreakpointsWindow(P: TStreamable; S: TStream);
+begin
+  TBreakpointsWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RBreakpointsListBox(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TBreakpointsListBox.Load(S)));
+end;
+
+procedure Store_RBreakpointsListBox(P: TStreamable; S: TStream);
+begin
+  TBreakpointsListBox(Pointer(P)).Store(S);
+end;
+
+function Build_RWatchesWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TWatchesWindow.Load(S)));
+end;
+
+procedure Store_RWatchesWindow(P: TStreamable; S: TStream);
+begin
+  TWatchesWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RWatchesListBox(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TWatchesListBox.Load(S)));
+end;
+
+procedure Store_RWatchesListBox(P: TStreamable; S: TStream);
+begin
+  TWatchesListBox(Pointer(P)).Store(S);
+end;
+
+function Build_RStackWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TStackWindow.Load(S)));
+end;
+
+procedure Store_RStackWindow(P: TStreamable; S: TStream);
+begin
+  TStackWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RFramesListBox(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TFramesListBox.Load(S)));
+end;
+
+procedure Store_RFramesListBox(P: TStreamable; S: TStream);
+begin
+  TFramesListBox(Pointer(P)).Store(S);
+end;
+
+function Build_RBreakpoint(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TBreakpoint.Load(S)));
+end;
+
+procedure Store_RBreakpoint(P: TStreamable; S: TStream);
+begin
+  TBreakpoint(Pointer(P)).Store(S);
+end;
+
+function Build_RWatch(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TWatch.Load(S)));
+end;
+
+procedure Store_RWatch(P: TStreamable; S: TStream);
+begin
+  TWatch(Pointer(P)).Store(S);
+end;
+
+function Build_RBreakpointCollection(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TBreakpointCollection.Load(S)));
+end;
+
+procedure Store_RBreakpointCollection(P: TStreamable; S: TStream);
+begin
+  TBreakpointCollection(Pointer(P)).Store(S);
+end;
+
+function Build_RWatchesCollection(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TWatchesCollection.Load(S)));
+end;
+
+procedure Store_RWatchesCollection(P: TStreamable; S: TStream);
+begin
+  TWatchesCollection(Pointer(P)).Store(S);
+end;
+
+procedure FillStreamRecs_fpdebug;
+begin
+  RBreakpointsWindow.ObjType := 1701;
+  RBreakpointsWindow.VmtLink := PtrUInt(System.TClass(TBreakpointsWindow));
+  RBreakpointsWindow.Load := @Build_RBreakpointsWindow;
+  RBreakpointsWindow.Store := @Store_RBreakpointsWindow;
+  RBreakpointsWindow.Next := nil;
+  RBreakpointsListBox.ObjType := 1702;
+  RBreakpointsListBox.VmtLink := PtrUInt(System.TClass(TBreakpointsListBox));
+  RBreakpointsListBox.Load := @Build_RBreakpointsListBox;
+  RBreakpointsListBox.Store := @Store_RBreakpointsListBox;
+  RBreakpointsListBox.Next := nil;
+  RWatchesWindow.ObjType := 1703;
+  RWatchesWindow.VmtLink := PtrUInt(System.TClass(TWatchesWindow));
+  RWatchesWindow.Load := @Build_RWatchesWindow;
+  RWatchesWindow.Store := @Store_RWatchesWindow;
+  RWatchesWindow.Next := nil;
+  RWatchesListBox.ObjType := 1704;
+  RWatchesListBox.VmtLink := PtrUInt(System.TClass(TWatchesListBox));
+  RWatchesListBox.Load := @Build_RWatchesListBox;
+  RWatchesListBox.Store := @Store_RWatchesListBox;
+  RWatchesListBox.Next := nil;
+  RStackWindow.ObjType := 1705;
+  RStackWindow.VmtLink := PtrUInt(System.TClass(TStackWindow));
+  RStackWindow.Load := @Build_RStackWindow;
+  RStackWindow.Store := @Store_RStackWindow;
+  RStackWindow.Next := nil;
+  RFramesListBox.ObjType := 1706;
+  RFramesListBox.VmtLink := PtrUInt(System.TClass(TFramesListBox));
+  RFramesListBox.Load := @Build_RFramesListBox;
+  RFramesListBox.Store := @Store_RFramesListBox;
+  RFramesListBox.Next := nil;
+  RBreakpoint.ObjType := 1707;
+  RBreakpoint.VmtLink := PtrUInt(System.TClass(TBreakpoint));
+  RBreakpoint.Load := @Build_RBreakpoint;
+  RBreakpoint.Store := @Store_RBreakpoint;
+  RBreakpoint.Next := nil;
+  RWatch.ObjType := 1708;
+  RWatch.VmtLink := PtrUInt(System.TClass(TWatch));
+  RWatch.Load := @Build_RWatch;
+  RWatch.Store := @Store_RWatch;
+  RWatch.Next := nil;
+  RBreakpointCollection.ObjType := 1709;
+  RBreakpointCollection.VmtLink := PtrUInt(System.TClass(TBreakpointCollection));
+  RBreakpointCollection.Load := @Build_RBreakpointCollection;
+  RBreakpointCollection.Store := @Store_RBreakpointCollection;
+  RBreakpointCollection.Next := nil;
+  RWatchesCollection.ObjType := 1710;
+  RWatchesCollection.VmtLink := PtrUInt(System.TClass(TWatchesCollection));
+  RWatchesCollection.Load := @Build_RWatchesCollection;
+  RWatchesCollection.Store := @Store_RWatchesCollection;
+  RWatchesCollection.Next := nil;
+end;
+
+{$endif}
+
 procedure RegisterFPDebugViews;
 begin
+  FillStreamRecs_fpdebug;
   RegisterType(RWatchesWindow);
   RegisterType(RBreakpointsWindow);
   RegisterType(RWatchesListBox);

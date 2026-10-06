@@ -123,19 +123,9 @@ resourcestring  label_codetemplate_shortcut = '~S~hortcut';
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-const
-  RCodeTemplate: TStreamRec = (
-     ObjType: 14501;
-     VmtLink: 0 { PtrUInt(System.TClass(TCodeTemplate)) at runtime };
-     Load:    @TCodeTemplate.Load;
-     Store:   @TCodeTemplate.Store
-  );
-  RCodeTemplateCollection: TStreamRec = (
-     ObjType: 14502;
-     VmtLink: 0 { PtrUInt(System.TClass(TCodeTemplateCollection)) at runtime };
-     Load:    @TCodeTemplateCollection.Load;
-     Store:   @TCodeTemplateCollection.Store
-  );
+var RCodeTemplate: TStreamRec;
+var RCodeTemplateCollection: TStreamRec;
+
 {$endif}
 {$endif}
 {$endif}
@@ -656,9 +646,48 @@ begin
 end;
 
 
+{$ifndef NOOBJREG}
+{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
+function Build_RCodeTemplate(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TCodeTemplate.Load(S)));
+end;
+
+procedure Store_RCodeTemplate(P: TStreamable; S: TStream);
+begin
+  TCodeTemplate(Pointer(P)).Store(S);
+end;
+
+function Build_RCodeTemplateCollection(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TCodeTemplateCollection.Load(S)));
+end;
+
+procedure Store_RCodeTemplateCollection(P: TStreamable; S: TStream);
+begin
+  TCodeTemplateCollection(Pointer(P)).Store(S);
+end;
+
+procedure FillStreamRecs_fpcodtmp;
+begin
+  RCodeTemplate.ObjType := 14501;
+  RCodeTemplate.VmtLink := PtrUInt(System.TClass(TCodeTemplate));
+  RCodeTemplate.Load := @Build_RCodeTemplate;
+  RCodeTemplate.Store := @Store_RCodeTemplate;
+  RCodeTemplate.Next := nil;
+  RCodeTemplateCollection.ObjType := 14502;
+  RCodeTemplateCollection.VmtLink := PtrUInt(System.TClass(TCodeTemplateCollection));
+  RCodeTemplateCollection.Load := @Build_RCodeTemplateCollection;
+  RCodeTemplateCollection.Store := @Store_RCodeTemplateCollection;
+  RCodeTemplateCollection.Next := nil;
+end;
+
+{$endif}
+
 procedure RegisterCodeTemplates;
 begin
 {$ifndef NOOBJREG}
+  FillStreamRecs_fpcodtmp;
   RegisterType(RCodeTemplate);
   RegisterType(RCodeTemplateCollection);
 {$endif}

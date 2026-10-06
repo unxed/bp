@@ -470,7 +470,7 @@ var I,P: sw_integer;
     S: string;
     Param: string;
 begin
-  New(HelpFacility, Init);
+  HelpFacility := THelpFacility.Create;
 
   WOAHelp.RegisterHelpType;
   WNGHelp.RegisterHelpType;
@@ -527,7 +527,7 @@ end;
 procedure Help(FileID, Context: THelpCtx; Modal: boolean);
 begin
   if Modal then
-     begin MessageBox(msg_modalhelpnotimplemented,nil,mfInformation+mfInsertInApp+mfOKButton); Exit; end;
+     begin MessageBox(msg_modalhelpnotimplemented,mfInformation+mfInsertInApp+mfOKButton); Exit; end;
   HelpCreateWindow;
   with HelpWindow do
   begin
@@ -670,7 +670,7 @@ begin
   HTMLGetSectionColor:={$ifdef FPC}@{$endif}FPHTMLGetSectionColor;
   NGGetAttrColor:={$ifdef FPC}@{$endif}FPNGGetAttrColor;
   INFGetAttrColor:={$ifdef FPC}@{$endif}FPINFGetAttrColor;
-  New(HelpFiles, Init(10,10));
+  HelpFiles := TUnsortedStringCollection.Create(10,10);
 end;
 
 procedure DoneHelpFiles;

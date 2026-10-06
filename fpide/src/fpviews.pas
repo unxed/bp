@@ -608,90 +608,24 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-const
-  RSourceEditor: TStreamRec = (
-     ObjType: 1500;
-     VmtLink: 0 { PtrUInt(System.TClass(TSourceEditor)) at runtime };
-     Load:    @TSourceEditor.Load;
-     Store:   @TSourceEditor.Store
-  );
-  RSourceWindow: TStreamRec = (
-     ObjType: 1501;
-     VmtLink: 0 { PtrUInt(System.TClass(TSourceWindow)) at runtime };
-     Load:    @TSourceWindow.Load;
-     Store:   @TSourceWindow.Store
-  );
-  RFPHelpViewer: TStreamRec = (
-     ObjType: 1502;
-     VmtLink: 0 { PtrUInt(System.TClass(TFPHelpViewer)) at runtime };
-     Load:    @TFPHelpViewer.Load;
-     Store:   @TFPHelpViewer.Store
-  );
-  RFPHelpWindow: TStreamRec = (
-     ObjType: 1503;
-     VmtLink: 0 { PtrUInt(System.TClass(TFPHelpWindow)) at runtime };
-     Load:    @TFPHelpWindow.Load;
-     Store:   @TFPHelpWindow.Store
-  );
-  RClipboardWindow: TStreamRec = (
-     ObjType: 1504;
-     VmtLink: 0 { PtrUInt(System.TClass(TClipboardWindow)) at runtime };
-     Load:    @TClipboardWindow.Load;
-     Store:   @TClipboardWindow.Store
-  );
-  RMessageListBox: TStreamRec = (
-     ObjType: 1505;
-     VmtLink: 0 { PtrUInt(System.TClass(TMessageListBox)) at runtime };
-     Load:    @TMessageListBox.Load;
-     Store:   @TMessageListBox.Store
-  );
-  RFPDesktop: TStreamRec = (
-     ObjType: 1506;
-     VmtLink: 0 { PtrUInt(System.TClass(TFPDesktop)) at runtime };
-     Load:    @TFPDesktop.Load;
-     Store:   @TFPDesktop.Store
-  );
-
-  RFPASCIIChart: TStreamRec = (
-     ObjType: 1509;
-     VmtLink: 0 { PtrUInt(System.TClass(TFPASCIIChart)) at runtime };
-     Load:    @TFPASCIIChart.Load;
-     Store:   @TFPASCIIChart.Store
-  );
-  RFPDlgWindow: TStreamRec = (
-     ObjType: 1511;
-     VmtLink: 0 { PtrUInt(System.TClass(TFPDlgWindow)) at runtime };
-     Load:    @TFPDlgWindow.Load;
-     Store:   @TFPDlgWindow.Store
-  );
+var RSourceEditor: TStreamRec;
+var RSourceWindow: TStreamRec;
+var RFPHelpViewer: TStreamRec;
+var RFPHelpWindow: TStreamRec;
+var RClipboardWindow: TStreamRec;
+var RMessageListBox: TStreamRec;
+var RFPDesktop: TStreamRec;
+var RFPASCIIChart: TStreamRec;
+var RFPDlgWindow: TStreamRec;
 {$endif}
 {$endif}
 {$endif NOOBJREG}
 {$ifndef NODEBUG}
-  RGDBWindow: TStreamRec = (
-     ObjType: 1508;
-     VmtLink: 0 { PtrUInt(System.TClass(TGDBWindow)) at runtime };
-     Load:    @TGDBWindow.Load;
-     Store:   @TGDBWindow.Store
-  );
-  RGDBSourceEditor: TStreamRec = (
-     ObjType: 1507;
-     VmtLink: 0 { PtrUInt(System.TClass(TGDBSourceEditor)) at runtime };
-     Load:    @TGDBSourceEditor.Load;
-     Store:   @TGDBSourceEditor.Store
-  );
-  RDisassemblyEditor: TStreamRec = (
-     ObjType: 1512;
-     VmtLink: 0 { PtrUInt(System.TClass(TDisassemblyEditor)) at runtime };
-     Load:    @TDisassemblyEditor.Load;
-     Store:   @TDisassemblyEditor.Store
-  );
-  RDisassemblyWindow: TStreamRec = (
-     ObjType: 1513;
-     VmtLink: 0 { PtrUInt(System.TClass(TDisassemblyWindow)) at runtime };
-     Load:    @TDisassemblyWindow.Load;
-     Store:   @TDisassemblyWindow.Store
-  );
+var RGDBWindow: TStreamRec;
+var RGDBSourceEditor: TStreamRec;
+var RDisassemblyEditor: TStreamRec;
+var RDisassemblyWindow: TStreamRec;
+
 {$endif NODEBUG}
 const
   GlobalNoNameCount : integer = 0;
@@ -4747,8 +4681,212 @@ begin
   InformationBox(msg_nodebuggersupportavailable,nil);
 end;
 
+{$ifndef NOOBJREG}
+{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
+function Build_RSourceEditor(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TSourceEditor.Load(S)));
+end;
+
+procedure Store_RSourceEditor(P: TStreamable; S: TStream);
+begin
+  TSourceEditor(Pointer(P)).Store(S);
+end;
+
+function Build_RSourceWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TSourceWindow.Load(S)));
+end;
+
+procedure Store_RSourceWindow(P: TStreamable; S: TStream);
+begin
+  TSourceWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RFPHelpViewer(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TFPHelpViewer.Load(S)));
+end;
+
+procedure Store_RFPHelpViewer(P: TStreamable; S: TStream);
+begin
+  TFPHelpViewer(Pointer(P)).Store(S);
+end;
+
+function Build_RFPHelpWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TFPHelpWindow.Load(S)));
+end;
+
+procedure Store_RFPHelpWindow(P: TStreamable; S: TStream);
+begin
+  TFPHelpWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RClipboardWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TClipboardWindow.Load(S)));
+end;
+
+procedure Store_RClipboardWindow(P: TStreamable; S: TStream);
+begin
+  TClipboardWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RMessageListBox(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TMessageListBox.Load(S)));
+end;
+
+procedure Store_RMessageListBox(P: TStreamable; S: TStream);
+begin
+  TMessageListBox(Pointer(P)).Store(S);
+end;
+
+function Build_RFPDesktop(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TFPDesktop.Load(S)));
+end;
+
+procedure Store_RFPDesktop(P: TStreamable; S: TStream);
+begin
+  TFPDesktop(Pointer(P)).Store(S);
+end;
+
+function Build_RFPASCIIChart(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TFPASCIIChart.Load(S)));
+end;
+
+procedure Store_RFPASCIIChart(P: TStreamable; S: TStream);
+begin
+  TFPASCIIChart(Pointer(P)).Store(S);
+end;
+
+function Build_RFPDlgWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TFPDlgWindow.Load(S)));
+end;
+
+procedure Store_RFPDlgWindow(P: TStreamable; S: TStream);
+begin
+  TFPDlgWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RGDBWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TGDBWindow.Load(S)));
+end;
+
+procedure Store_RGDBWindow(P: TStreamable; S: TStream);
+begin
+  TGDBWindow(Pointer(P)).Store(S);
+end;
+
+function Build_RGDBSourceEditor(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TGDBSourceEditor.Load(S)));
+end;
+
+procedure Store_RGDBSourceEditor(P: TStreamable; S: TStream);
+begin
+  TGDBSourceEditor(Pointer(P)).Store(S);
+end;
+
+function Build_RDisassemblyEditor(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TDisassemblyEditor.Load(S)));
+end;
+
+procedure Store_RDisassemblyEditor(P: TStreamable; S: TStream);
+begin
+  TDisassemblyEditor(Pointer(P)).Store(S);
+end;
+
+function Build_RDisassemblyWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TDisassemblyWindow.Load(S)));
+end;
+
+procedure Store_RDisassemblyWindow(P: TStreamable; S: TStream);
+begin
+  TDisassemblyWindow(Pointer(P)).Store(S);
+end;
+
+procedure FillStreamRecs_fpviews;
+begin
+  RSourceEditor.ObjType := 1500;
+  RSourceEditor.VmtLink := PtrUInt(System.TClass(TSourceEditor));
+  RSourceEditor.Load := @Build_RSourceEditor;
+  RSourceEditor.Store := @Store_RSourceEditor;
+  RSourceEditor.Next := nil;
+  RSourceWindow.ObjType := 1501;
+  RSourceWindow.VmtLink := PtrUInt(System.TClass(TSourceWindow));
+  RSourceWindow.Load := @Build_RSourceWindow;
+  RSourceWindow.Store := @Store_RSourceWindow;
+  RSourceWindow.Next := nil;
+  RFPHelpViewer.ObjType := 1502;
+  RFPHelpViewer.VmtLink := PtrUInt(System.TClass(TFPHelpViewer));
+  RFPHelpViewer.Load := @Build_RFPHelpViewer;
+  RFPHelpViewer.Store := @Store_RFPHelpViewer;
+  RFPHelpViewer.Next := nil;
+  RFPHelpWindow.ObjType := 1503;
+  RFPHelpWindow.VmtLink := PtrUInt(System.TClass(TFPHelpWindow));
+  RFPHelpWindow.Load := @Build_RFPHelpWindow;
+  RFPHelpWindow.Store := @Store_RFPHelpWindow;
+  RFPHelpWindow.Next := nil;
+  RClipboardWindow.ObjType := 1504;
+  RClipboardWindow.VmtLink := PtrUInt(System.TClass(TClipboardWindow));
+  RClipboardWindow.Load := @Build_RClipboardWindow;
+  RClipboardWindow.Store := @Store_RClipboardWindow;
+  RClipboardWindow.Next := nil;
+  RMessageListBox.ObjType := 1505;
+  RMessageListBox.VmtLink := PtrUInt(System.TClass(TMessageListBox));
+  RMessageListBox.Load := @Build_RMessageListBox;
+  RMessageListBox.Store := @Store_RMessageListBox;
+  RMessageListBox.Next := nil;
+  RFPDesktop.ObjType := 1506;
+  RFPDesktop.VmtLink := PtrUInt(System.TClass(TFPDesktop));
+  RFPDesktop.Load := @Build_RFPDesktop;
+  RFPDesktop.Store := @Store_RFPDesktop;
+  RFPDesktop.Next := nil;
+  RFPASCIIChart.ObjType := 1509;
+  RFPASCIIChart.VmtLink := PtrUInt(System.TClass(TFPASCIIChart));
+  RFPASCIIChart.Load := @Build_RFPASCIIChart;
+  RFPASCIIChart.Store := @Store_RFPASCIIChart;
+  RFPASCIIChart.Next := nil;
+  RFPDlgWindow.ObjType := 1511;
+  RFPDlgWindow.VmtLink := PtrUInt(System.TClass(TFPDlgWindow));
+  RFPDlgWindow.Load := @Build_RFPDlgWindow;
+  RFPDlgWindow.Store := @Store_RFPDlgWindow;
+  RFPDlgWindow.Next := nil;
+  RGDBWindow.ObjType := 1508;
+  RGDBWindow.VmtLink := PtrUInt(System.TClass(TGDBWindow));
+  RGDBWindow.Load := @Build_RGDBWindow;
+  RGDBWindow.Store := @Store_RGDBWindow;
+  RGDBWindow.Next := nil;
+  RGDBSourceEditor.ObjType := 1507;
+  RGDBSourceEditor.VmtLink := PtrUInt(System.TClass(TGDBSourceEditor));
+  RGDBSourceEditor.Load := @Build_RGDBSourceEditor;
+  RGDBSourceEditor.Store := @Store_RGDBSourceEditor;
+  RGDBSourceEditor.Next := nil;
+  RDisassemblyEditor.ObjType := 1512;
+  RDisassemblyEditor.VmtLink := PtrUInt(System.TClass(TDisassemblyEditor));
+  RDisassemblyEditor.Load := @Build_RDisassemblyEditor;
+  RDisassemblyEditor.Store := @Store_RDisassemblyEditor;
+  RDisassemblyEditor.Next := nil;
+  RDisassemblyWindow.ObjType := 1513;
+  RDisassemblyWindow.VmtLink := PtrUInt(System.TClass(TDisassemblyWindow));
+  RDisassemblyWindow.Load := @Build_RDisassemblyWindow;
+  RDisassemblyWindow.Store := @Store_RDisassemblyWindow;
+  RDisassemblyWindow.Next := nil;
+end;
+
+{$endif}
+
 procedure RegisterFPViews;
 begin
+  FillStreamRecs_fpviews;
   RegisterType(RSourceEditor);
   RegisterType(RSourceWindow);
   RegisterType(RFPHelpViewer);
@@ -4759,6 +4897,7 @@ begin
   RegisterType(RFPASCIIChart);
   RegisterType(RFPDlgWindow);
 {$ifndef NODEBUG}
+  FillStreamRecs_fpviews;
   RegisterType(RGDBWindow);
   RegisterType(RGDBSourceEditor);
 {$endif NODEBUG}

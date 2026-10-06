@@ -819,21 +819,21 @@ begin
   InsideDone:=false;
   IsRunning:=true;
   MenuBar.GetBounds(R); R.A.X:=R.B.X-8;
-  New(ClockView, Init(R));
+  ClockView := TFPClockView.Create(R);
   ClockView.GrowMode:=gfGrowLoX+gfGrowHiX;
   Application.Insert(ClockView);
-  New(ClipboardWindow, Init);
+  ClipboardWindow := TClipboardWindow.Create;
   Desktop.Insert(ClipboardWindow);
-  New(CalcWindow, Init); CalcWindow.Hide;
+  CalcWindow := TCalculator.Create; CalcWindow.Hide;
   Desktop.Insert(CalcWindow);
-  New(CompilerMessageWindow, Init);
+  CompilerMessageWindow := TCompilerMessageWindow.Create;
   CompilerMessageWindow.Hide;
   Desktop.Insert(CompilerMessageWindow);
   Message(Self,evBroadcast,cmUpdate,nil);
   CurDirChanged;
   { heap viewer }
   GetExtent(R); Dec(R.B.X); R.A.X:=R.B.X-9; R.A.Y:=R.B.Y-1;
-  New(HeapView, InitKb(R));
+  HeapView := TFPHeapView.InitKb(R);
   if (StartupOptions and soHeapMonitor)=0 then HeapView.Hide;
   Insert(HeapView);
   Drivers.ShowMouse;

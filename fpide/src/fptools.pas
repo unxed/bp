@@ -177,19 +177,9 @@ uses Dos,
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-const
-  RToolMessageListBox: TStreamRec = (
-     ObjType: 1600;
-     VmtLink: 0 { PtrUInt(System.TClass(TToolMessageListBox)) at runtime };
-     Load:    @TToolMessageListBox.Load;
-     Store:   @TToolMessageListBox.Store
-  );
-  RMessagesWindow: TStreamRec = (
-     ObjType: 1601;
-     VmtLink: 0 { PtrUInt(System.TClass(TMessagesWindow)) at runtime };
-     Load:    @TMessagesWindow.Load;
-     Store:   @TMessagesWindow.Store
-  );
+var RToolMessageListBox: TStreamRec;
+var RMessagesWindow: TStreamRec;
+
 {$endif}
 {$endif}
 {$endif}
@@ -1661,9 +1651,48 @@ begin
   inherited Destroy;
 end;
 
+{$ifndef NOOBJREG}
+{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
+function Build_RToolMessageListBox(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TToolMessageListBox.Load(S)));
+end;
+
+procedure Store_RToolMessageListBox(P: TStreamable; S: TStream);
+begin
+  TToolMessageListBox(Pointer(P)).Store(S);
+end;
+
+function Build_RMessagesWindow(S: TStream): TStreamable;
+begin
+  Result := TStreamable(Pointer(TMessagesWindow.Load(S)));
+end;
+
+procedure Store_RMessagesWindow(P: TStreamable; S: TStream);
+begin
+  TMessagesWindow(Pointer(P)).Store(S);
+end;
+
+procedure FillStreamRecs_fptools;
+begin
+  RToolMessageListBox.ObjType := 1600;
+  RToolMessageListBox.VmtLink := PtrUInt(System.TClass(TToolMessageListBox));
+  RToolMessageListBox.Load := @Build_RToolMessageListBox;
+  RToolMessageListBox.Store := @Store_RToolMessageListBox;
+  RToolMessageListBox.Next := nil;
+  RMessagesWindow.ObjType := 1601;
+  RMessagesWindow.VmtLink := PtrUInt(System.TClass(TMessagesWindow));
+  RMessagesWindow.Load := @Build_RMessagesWindow;
+  RMessagesWindow.Store := @Store_RMessagesWindow;
+  RMessagesWindow.Next := nil;
+end;
+
+{$endif}
+
 procedure RegisterFPTools;
 begin
 {$ifndef NOOBJREG}
+  FillStreamRecs_fptools;
   RegisterType(RToolMessageListBox);
   RegisterType(RMessagesWindow);
 {$endif}

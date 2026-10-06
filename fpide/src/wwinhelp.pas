@@ -184,6 +184,9 @@ type
         LinkData2: PByteArray;
       end;
 
+      { Class port: topic callbacks are nested routines, passed as nested procedure variables. }
+      TTopicEnumProc = function(P: PTopicEnumData): boolean is nested;
+
       TWinHelpFile = class;
       PWinHelpFile = TWinHelpFile;
       TWinHelpFile = class(THelpFile)
@@ -230,7 +233,7 @@ type
         function UsesHallCompression: boolean;
         procedure ExtractTopicOffset(TopicOffset: longint; var TopicBlockNo, TopicBlockOffset: word);
         function  ReadTopicBlock(BlockNo: word; var T: TTopicBlock; ReadData: boolean): boolean;
-        function  ProcessTopicBlock(BlockNo: longint; EnumProc: pointer): boolean;
+        function  ProcessTopicBlock(BlockNo: longint; EnumProc: TTopicEnumProc): boolean;
         procedure PhraseDecompress(SrcBufP: pointer; SrcBufSize: longint; DestBufP: pointer; DestBufSize: longint);
         procedure HallDecompress(SrcBufP: pointer; SrcBufSize: longint; DestBufP: pointer; DestBufSize: longint);
       end;
@@ -240,6 +243,18 @@ procedure RegisterHelpType;
 implementation
 
 uses Strings;
+
+{ Class port: the callback is the code address of a TWinHelpFile method (@TWinHelpFile.Foo);
+  rebuild a method pointer on Self and call it as function(P: pointer): boolean. }
+type
+  TPointerMethod = function(P: pointer): boolean of object;
+
+function CallPointerMethod(Code: pointer; Obj: TObject; P: pointer): longint;
+var M: TMethod;
+begin
+  M.Code:=Code; M.Data:=Pointer(Obj);
+  if TPointerMethod(M)(P) then CallPointerMethod:=1 else CallPointerMethod:=0;
+end;
 
 function ReadString(F: PStream): string;
 var S: string;
@@ -285,7 +300,7 @@ constructor TWinHelpFile.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
   inherited Create(AID);
-  Thrases.Create(1000,1000);
+  Phrases := TUnsortedStringCollection.Create(1000,1000);
   F := TFastBufStream.Create(AFileName, stOpenRead, HelpStreamBufSize);
   OK:=F<>nil;
   if OK then OK:=(F.Status=stOK);
@@ -987,7 +1002,7 @@ begin
     end else
     if (PhrIndexStart<>0) and (PhrImageStart<>0) then
     begin
-      TO.Create(1000,1000);
+      PO := TIntCollection.Create(1000,1000);
       F.Seek(PhrIndexStart); OK:=(F.Status=stOK);
       if OK then OK:=ReadPhrIndexFile(PO,IH);
       if OK then begin F.Seek(PhrImageStart); OK:=(F.Status=stOK); end;
@@ -1169,7 +1184,7 @@ begin
   end;
 end;
 
-function TWinHelpFile.ProcessTopicBlock(BlockNo: longint; EnumProc: pointer): boolean;
+function TWinHelpFile.ProcessTopicBlock(BlockNo: longint; EnumProc: TTopicEnumProc): boolean;
 var TB: TTopicBlock;
     TL: TWinHelpTopicLink;
     BlockFileOfs: longint;
@@ -1232,8 +1247,7 @@ begin
       TEN.LinkData1:=LinkData1;
       TEN.LinkData2Size:=LinkData2Size;
       TEN.LinkData2:=LinkData2;
-      DoCont:=(longint(CallPointerLocal(EnumProc,
-                get_caller_frame(get_frame,get_pc_addr),@TEN)) and $ff)<>0;
+      DoCont:=EnumProc(@TEN);
       case TL.RecordType of
         $02: ;
         $20,$23:

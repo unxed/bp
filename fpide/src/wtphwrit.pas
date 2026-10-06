@@ -56,8 +56,8 @@ implementation
 constructor THelpFileWriter.Create(AFileName: string; AID: word);
 var OK: boolean;
 begin
-  THelpFile.Init(AID);
-  New(F, Init(AFileName, stCreate, HelpStreamBufSize));
+  inherited Create(AID);
+  F := TBufStream.Create(AFileName, stCreate, HelpStreamBufSize);
   OK:=F<>nil;
   if OK then OK:=(F.Status=stOK);
   if OK=false then Fail;
