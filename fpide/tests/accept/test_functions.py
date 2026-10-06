@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode clipboard debug browser
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard debug browser
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -267,7 +267,9 @@ def section_tools(t):
     def disp():
         L = t.lines()
         i = [k for k, l in enumerate(L) if 'Calculator' in l][0]
-        return L[i + 2].strip('║ ').strip()
+        # the display row between the calculator's own borders (the desktop shows through on both sides)
+        m = re.search(r'║([^║]*)║', L[i + 2])
+        return m.group(1).strip() if m else ''
 
     t.type('7*6=')
     check(t.wait_until(lambda: disp() == '42', 4), 'the calculator computes 7*6 = 42 (shows %r)' % disp(), t)
@@ -468,6 +470,32 @@ def line_colors(t, n=8):
     return [None] * n
 
 
+def section_templates(t):
+    """File > New from template (the .pt files next to the executable) and Tools > Grep (an external grep over the sources)"""
+    menu(t, 'M-f', 'New from template')
+    check(t.wait_for('Available templates', 5), 'File > New from template lists the templates', t)
+    txt = t.text()
+    check(all(n in txt for n in ('Gplprog', 'Gplunit', 'Program', 'Unit')), 'all four templates are there', t)
+    t.key('Enter')
+    check(t.wait_for('Fill in template parameter', 5), 'a template asks for its parameters', t)
+    for _ in range(8):
+        if not t.wait_for('Fill in template parameter', 1):
+            break
+        t.key('Enter')
+        t.pump(0.3)
+    check('program' in t.text().lower() and 'BEGIN' in t.text(), 'the template becomes a new source: %r' % editor_lines(t)[:2], t)
+    close_all(t)
+
+    with open(os.path.join(t.work, 'a.pas'), 'w') as f:
+        f.write('program a;\nbegin\n  writeln(1);\nend.\n')
+    with open(os.path.join(t.work, 'b.pas'), 'w') as f:
+        f.write('unit b;\ninterface\nimplementation\nend.\n')
+    t.menu('M-t', 'Grep', exact=True)
+    check(t.wait_for('Grep arguments', 5), 'Tools > Grep asks for the arguments', t)
+    t.key('End'); t.key(*['BSpace'] * 30); t.type('writeln'); t.key('Enter')
+    check(t.wait_for('a.pas(3)', 8) and 'b.pas' not in t.text().split('Messages')[-1], 'grep lists the line that matches (and only that file)', t)
+
+
 def section_clipboard(t):
     """the clipboards: a paste after a two-byte last character, the system clipboard (OSC 52) on Copy, Paste from System"""
 
@@ -630,7 +658,7 @@ def section_browser(t):
 
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile),
-            ('unicode', section_unicode), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser)]
+            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])
