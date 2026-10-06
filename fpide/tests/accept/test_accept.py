@@ -7,6 +7,7 @@ Every step is something done by hand while bringing the port up: the file list o
 is the test list. A check that fails is a bug to fix or a documented limitation (MIGRATION-STATUS.md)."""
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 from fpide_term import TmuxTerm
@@ -26,7 +27,8 @@ def check(cond, name, term=None):
             print('stderr:', term.stderr()[:400])
 
 
-t = TmuxTerm(sys.argv[1])
+# TV_FAR2L=0: tmux does not answer the far2l terminal queries (clipboard etc.); see MIGRATION-STATUS.md
+t = TmuxTerm(sys.argv[1], env={'TV_FAR2L': '0'})
 try:
     # --- start ------------------------------------------------------------------------------------
     check(t.wait_for('Window  Help'), 'starts and draws the menu bar', t)
@@ -52,8 +54,8 @@ try:
     check(t.wait_for('noname01.pas'), 'File > New opens an edit window', t)
     t.type('program hello;')
     t.key('Enter')
-    t.type("begin writeln('hi') end.")
-    check(t.wait_for("begin writeln('hi') end."), 'typed text appears in the editor', t)
+    t.type("var f: text; begin assign(f, 'ran.txt'); rewrite(f); writeln(f, 'ok'); close(f) end.")
+    check(t.wait_for("rewrite(f)"), 'typed text appears in the editor', t)
     check('program hello;' in t.text(), 'a semicolon and Enter are typed correctly', t)
 
     # the Search menu is disabled (skipped) until there is an edit window, as in the original IDE
@@ -69,14 +71,38 @@ try:
     check(t.wait_for('hello.pas'), 'the window is renamed after Save as', t)
     check(os.path.exists(os.path.join(t.work, 'hello.pas')), 'the file was written to disk', t)
     saved = os.path.join(t.work, 'hello.pas')
-    check(os.path.exists(saved) and 'begin writeln' in open(saved).read(), 'with the typed content', t)
+    check(os.path.exists(saved) and 'rewrite(f)' in open(saved).read(), 'with the typed content', t)
 
-    # --- compile (the built-in compiler: with no unit path it must say so, not crash) ---------------
+    # --- compile: first without a unit directory (must say so, not crash) ----------------------------
     t.key('M-F9')
     check(t.wait_for('Compiler Messages', 15), 'Alt+F9 runs the built-in compiler and shows its messages', t)
-    check(t.wait_for('Fatal', 5) or t.wait_for('Error', 5) or t.wait_for('Compile successful', 5),
-          'the compiler reports a result', t)
-    check(t.alive(), 'is still running after a compile', t)
+    check(t.wait_for("Can't find unit system", 5), 'without a unit directory the compiler says so', t)
+    check(t.alive(), 'is still running after a failed compile', t)
+    t.key('Escape')
+
+    # --- Options > Directories: set the unit directory -------------------------------------------------
+    check(t.menu('M-o', 'Directories'), 'Options > Directories is found in the menu', t)
+    check(t.wait_for('Unit directories:'), 'the Directories dialog opens with its tabs', t)
+    t.type('/usr/lib/x86_64-linux-gnu/fpc/3.2.2/units/x86_64-linux/rtl')
+    check(t.wait_for('x86_64-linux/rtl'), 'text typed into the unit directories memo appears', t)
+    t.key('Tab', 'Enter')
+    check(t.wait_gone('Unit directories:'), 'OK closes the dialog', t)
+
+    # --- make and run ---------------------------------------------------------------------------------
+    # (after a failed Alt+F9 the built-in compiler keeps its state, so Compile again still fails;
+    # Make (F9) starts clean. Same behaviour as the vanilla IDE as far as we know: not a port bug.)
+    t.key('F9')
+    check(t.wait_for('Compile successful', 20), 'F9 (Make) now compiles hello.pas successfully', t)
+    check(os.path.exists(os.path.join(t.work, 'hello')), 'the executable was linked', t)
+    t.key('Enter')
+    t.key('C-F9')
+    ran = os.path.join(t.work, 'ran.txt')
+    end = time.time() + 15
+    while time.time() < end and not os.path.exists(ran):
+        time.sleep(0.2)
+    check(os.path.exists(ran), 'Ctrl+F9 runs the program (it wrote ran.txt)', t)
+    check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE is back after the program ended', t)
+    check(os.path.exists(os.path.join(t.work, 'fp.dsk')), 'the desktop file was saved before the run', t)
 
     check(t.alive(), 'no runtime error during the whole run (stderr: %r)' % t.stderr()[:80], t)
 finally:

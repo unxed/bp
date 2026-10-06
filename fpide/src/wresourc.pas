@@ -181,9 +181,11 @@ var P: PResourceEntry;
     E: TResourceEntry;
     Index: sw_integer;
 begin
-  E.LangID:=ALangID;
-  if Search(@E,Index)=false then P:=nil else
+  { class port: the search key was a stack object; it is a short-lived heap object now }
+  E:=TResourceEntry.Create(0,ALangID,0,0);
+  if Search(E,Index)=false then P:=nil else
     P:=At(Index);
+  E.Free;
   SearchEntryForLang:=P;
 end;
 

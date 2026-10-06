@@ -1623,9 +1623,8 @@ begin
 end;
 
 function TMessagesWindow.GetPalette: TPalette;
-const S: string[length(CBrowserWindow)] = CBrowserWindow;
 begin
-  GetPalette:=@S;
+  GetPalette:=MakePalette(CBrowserWindow);
 end;
 
 constructor TMessagesWindow.Load(S: TStream);

@@ -46,21 +46,48 @@ class TmuxTerm:
             self._tmux('send-keys', '-t', self.session, '-H', '%02x' % b)
         time.sleep(0.15)
 
+    @staticmethod
+    def _cells(line):
+        """one line of `capture-pane -e` as [(char, sgr-state)]"""
+        cells, sgr, i = [], '', 0
+        while i < len(line):
+            m = re.match(r'\x1b\[([0-9;]*)m', line[i:])
+            if m:
+                sgr = m.group(1) if m.group(1) not in ('', '0') else ''
+                i += m.end()
+                continue
+            cells.append((line[i], sgr))
+            i += 1
+        return cells
+
     def _menu_rows(self):
-        """[(row, text, highlighted)] of the drop-down box on screen. The highlighted row is the one
-        whose colour attributes differ from the others'."""
+        """[(row, text, highlighted)] of the drop-down box on screen: the box is the `┌...┐` found on
+        the screen, a row is highlighted if its colour differs from the other rows'."""
         raw = self._tmux('capture-pane', '-t', self.session, '-p', '-e').split('\n')
+        grid = [self._cells(l) for l in raw]
+        box = None
+        for y, row in enumerate(grid):
+            chars = ''.join(c for c, _ in row)
+            if '┐' in chars and '┌' in chars[:chars.index('┐')]:
+                x1 = chars.index('┐')           # the first corner on the row is the menu's, not a window's
+                box = (y, chars.rindex('┌', 0, x1), x1)
+                break
+        if not box:
+            return []
+        y0, x0, x1 = box
         rows = []
-        for i, l in enumerate(raw):
-            parts = l.split('│')
-            if len(parts) >= 3:
-                text = re.sub(r'\x1b\[[0-9;]*m', '', parts[1]).strip()
-                sgr = tuple(re.findall(r'\x1b\[([0-9;]*)m', parts[1]))[:2]
-                rows.append((i, text, sgr))
+        for y in range(y0 + 1, len(grid)):
+            row = grid[y]
+            if len(row) <= x1 or row[x0][0] not in '│├' or row[x1][0] not in '│┤':
+                break
+            if row[x0][0] == '├':
+                continue
+            text = ''.join(c for c, _ in row[x0 + 1:x1]).strip()
+            rows.append((y, text, row[x0 + 1][1]))   # the blank after the border: no hotkey colour
         if not rows:
             return []
         common = collections.Counter(r[2] for r in rows).most_common(1)[0][0]
-        return [(i, text, sgr != common) for i, text, sgr in rows]
+        return [(y, text, sgr != common) for y, text, sgr in rows]
 
     def menu(self, hotkey, label, timeout=4.0):
         """open the menu with its Alt-key and choose the item whose text starts with `label`

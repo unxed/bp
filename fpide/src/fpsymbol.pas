@@ -2026,9 +2026,8 @@ begin
 end;
 
 function TBrowserWindow.GetPalette: TPalette;
-const S: string[length(CBrowserWindow)] = CBrowserWindow;
 begin
-  GetPalette:=@S;
+  GetPalette:=MakePalette(CBrowserWindow);
 end;
 
 procedure OpenSymbolBrowser(X,Y: Sw_integer;const Name,Line: string;S : PSymbol;

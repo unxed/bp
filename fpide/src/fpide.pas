@@ -1515,7 +1515,9 @@ begin
   IOK:=true; SOK:=true; DOK:=true;
   if (AutoSaveOptions and asEnvironment)<>0 then
     begin
+      DbgLog('AutoSave: WriteINIFile');
       IOK:=WriteINIFile(false);
+      DbgLog('AutoSave: WriteINIFile ok='+IntToStr(Ord(IOK)));
       if IOK=false then
         ErrorBox(error_saving_cfg_file,nil);
     end;
@@ -1531,7 +1533,9 @@ begin
       {$ENDIF}
       CloseHelpWindows;
       CloseAllBrowsers;
+      DbgLog('AutoSave: SaveDesktop');
       DOK:=SaveDesktop;
+      DbgLog('AutoSave: SaveDesktop done ok='+IntToStr(Ord(DOK)));
       if DOK=false then
         ErrorBox(error_saving_dsk_file,nil);
     end;
@@ -1557,8 +1561,10 @@ begin
        Exit;
      end;
 
+    DbgLog('DoExecute: before ShowUserScreen');
     if ExecType<>exNoSwap then
       ShowUserScreen;
+    DbgLog('DoExecute: after ShowUserScreen');
     SaveConsoleMode(ConsoleMode);
 
     if ExecType=exDosShell then
@@ -1577,7 +1583,7 @@ begin
       begin
 {$endif Unix}
         if (InFile='') and (OutFile='') and (ErrFile='') then
-          DosExecute(ProgramPath,Params)
+          begin DbgLog('DoExecute: DosExecute'); DosExecute(ProgramPath,Params); DbgLog('DoExecute: DosExecute done'); end
         else
           begin
             if ErrFile='' then
@@ -1874,7 +1880,7 @@ end;
 
 function TIDEApp.GetPalette: TPalette;
 begin
-  GetPalette:=@AppPalette;
+  GetPalette:=MakePalette(AppPalette);
 end;
 
 function TIDEApp.IsClosing: Boolean;

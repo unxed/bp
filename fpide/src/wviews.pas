@@ -1817,7 +1817,7 @@ begin
     Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
     R.Assign(X2-7,H,X2+3,H+2);
     Insert(TButton.Create(R, btn_Cancel, cmCancel, bfNormal));
-    SelectNext(true);
+    SelectNext(false); { tv3: false = the first inserted control gets the focus }
   end;
 end;
 
@@ -1833,7 +1833,7 @@ begin
     R.A.Y:=R.B.Y-2; R.B.Y:=R.A.Y+2;
     R.A.X:=R.A.X+(R.B.X-R.A.X-BW) div 2; R.B.X:=R.A.X+BW;
     Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
-    SelectNext(true);
+    SelectNext(false);
   end;
 end;
 

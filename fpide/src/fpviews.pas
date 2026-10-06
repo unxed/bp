@@ -4539,9 +4539,8 @@ begin
 end;
 
 function TFPToolTip.GetPalette: TPalette;
-const S: string[length(CFPToolTip)] = CFPToolTip;
 begin
-  GetPalette:=@S;
+  GetPalette:=MakePalette(CFPToolTip);
 end;
 
 constructor TFPMemo.Create(var Bounds: TRect; AHScrollBar, AVScrollBar:

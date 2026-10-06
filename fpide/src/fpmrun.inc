@@ -245,6 +245,7 @@ begin
        chdir(GetRunDir);
       {$I+}
       EatIO;
+      DbgLog('DoRun exe='+ExeFile+' dir='+GetRunDir+' params='+GetRunParameters);
 {$ifdef Unix}
       if (DebuggeeTTY<>'') then
         DoExecute(ExeFile,GetRunParameters,DebuggeeTTY,DebuggeeTTY,DebuggeeTTY,exNormal)

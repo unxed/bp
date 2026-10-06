@@ -220,7 +220,7 @@ var T: TCodeTemplate;
     P: PCodeTemplate;
 begin
   T := TCodeTemplate.Create(ShortCut,nil);
-  if Search(@T,Index)=false then P:=nil else
+  if Search(T,Index)=false then P:=nil else
     P:=TCodeTemplate(At(Index));
   T.Free;
   SearchByShortCut:=P;
