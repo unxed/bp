@@ -980,8 +980,8 @@ type
      TVideoModeCollection = class;
      PVideoModeCollection = TVideoModeCollection;
      TVideoModeCollection = class(TSortedCollection)
-       function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
-       procedure FreeItem(Item: Pointer); virtual;
+       function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
+       procedure FreeItem(Item: Pointer); override;
      end;
 
 function TVideoModeCollection.Compare(Key1, Key2: Pointer): Sw_Integer;

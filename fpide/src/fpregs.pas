@@ -88,8 +88,8 @@ uses
       first : boolean;
       LastOK : boolean;
       constructor Create(var Bounds: TRect);
-      procedure   Draw;virtual;
-      destructor Destroy; virtual;
+      procedure   Draw;override;
+      destructor Destroy; override;
     end;
 
     TRegistersWindow = class;
@@ -99,8 +99,8 @@ uses
       constructor Create;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   Update; virtual;
-      destructor Destroy; virtual;
+      procedure   Update; override;
+      destructor Destroy; override;
     end;
 
     TFPURegs = record
@@ -138,8 +138,8 @@ uses
       first : boolean;
       LastOK : boolean;
       constructor Create(var Bounds: TRect);
-      procedure   Draw;virtual;
-      destructor Destroy; virtual;
+      procedure   Draw;override;
+      destructor Destroy; override;
     end;
 
     TFPUWindow = class;
@@ -149,8 +149,8 @@ uses
       constructor Create;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   Update; virtual;
-      destructor Destroy; virtual;
+      procedure   Update; override;
+      destructor Destroy; override;
     end;
 
     tssereg = record
@@ -202,8 +202,8 @@ uses
       first : boolean;
       LastOK : boolean;
       constructor Create(var Bounds: TRect);
-      procedure   Draw;virtual;
-      destructor Destroy; virtual;
+      procedure   Draw;override;
+      destructor Destroy; override;
     end;
 
     TVectorWindow = class;
@@ -213,8 +213,8 @@ uses
       constructor Create;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   Update; virtual;
-      destructor Destroy; virtual;
+      procedure   Update; override;
+      destructor Destroy; override;
     end;
 
 

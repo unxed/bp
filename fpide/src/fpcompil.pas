@@ -51,13 +51,13 @@ type
     TCompilerMessage = class;
     PCompilerMessage = TCompilerMessage;
     TCompilerMessage = class(TMessageItem)
-      function GetText(MaxLen: Sw_Integer): String; virtual;
+      function GetText(MaxLen: Sw_Integer): String; override;
     end;
 
     TCompilerMessageListBox = class;
     PCompilerMessageListBox = TCompilerMessageListBox;
     TCompilerMessageListBox = class(TMessageListBox)
-      function  GetPalette: TPalette; virtual;
+      function  GetPalette: TPalette; override;
       procedure SelectFirstError;
     end;
 
@@ -65,17 +65,17 @@ type
     PCompilerMessageWindow = TCompilerMessageWindow;
     TCompilerMessageWindow = class(TFPWindow)
       constructor Create;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: TPalette; virtual;
-      procedure   Close;virtual;
-      destructor Destroy; virtual;
-      procedure   SizeLimits(var Min, Max: TPoint); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      function    GetPalette: TPalette; override;
+      procedure   Close;override;
+      destructor Destroy; override;
+      procedure   SizeLimits(out Min, Max: TPoint); override;
       procedure   AddMessage(AClass: longint;const Msg, Module: string; Line, Column: longint);
       procedure   ClearMessages;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
-      procedure   UpdateCommands; virtual;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
+      procedure   UpdateCommands; override;
     private
       {CompileShowed : boolean;}
       {Mode   : TCompileMode;}
@@ -91,7 +91,7 @@ type
       KeyST : PColorStaticText;
       starttime : real;
       constructor Create;
-      destructor Destroy;virtual;
+      destructor Destroy;override;
       procedure   Update;
       procedure SetStartTime(r : real);
     end;
@@ -483,7 +483,7 @@ begin
 end;
 
 
-procedure TCompilerMessageWindow.SizeLimits(var Min, Max: TPoint);
+procedure TCompilerMessageWindow.SizeLimits(out Min, Max: TPoint);
 begin
   inherited SizeLimits(Min,Max);
   Min.X:=20;

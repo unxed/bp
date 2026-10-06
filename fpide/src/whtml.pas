@@ -35,8 +35,8 @@ type
     TMemoryTextFile = class(TTextFile)
       constructor Create;
       procedure   AddLine(const S: string); virtual;
-      function    GetLine(Idx: sw_integer; var S: string): boolean; virtual;
-      function    GetFileName : string; virtual;
+      function    GetLine(Idx: sw_integer; var S: string): boolean; override;
+      function    GetFileName : string; override;
       function    GetLineCount : sw_integer;
       destructor Destroy; virtual;
     private
@@ -47,7 +47,7 @@ type
     PDOSTextFile = TDOSTextFile;
     TDOSTextFile = class(TMemoryTextFile)
       constructor Create(AFileName: string);
-      function GetFileName : string; virtual;
+      function GetFileName : string; override;
     private
       DosFileName : string;
     end;
@@ -77,12 +77,12 @@ type
     THTMLParser = class;
     PHTMLParser = THTMLParser;
     THTMLParser = class(TSGMLParser)
-      procedure   DocSoftBreak; virtual;
-      function    DocAddTextChar(C: char): boolean; virtual;
-      procedure   DocProcessTag(Tag: string); virtual;
+      procedure   DocSoftBreak; override;
+      function    DocAddTextChar(C: char): boolean; override;
+      procedure   DocProcessTag(Tag: string); override;
       function    DocGetTagParam(Name: string; var Value: string): boolean; virtual;
-      procedure   DocProcessComment(Comment: string); virtual;
-      function    DocDecodeNamedEntity(Name: string; var E: string): boolean; virtual;
+      procedure   DocProcessComment(Comment: string); override;
+      function    DocDecodeNamedEntity(Name: string; var E: string): boolean; override;
     public
       TagName,TagParams: string;
       DisableCrossIndexing : boolean;
@@ -128,7 +128,7 @@ Type
     TTopicLinkCollection = class;
     PTopicLinkCollection = TTopicLinkCollection;
     TTopicLinkCollection = class(TStringCollection)
-      procedure   Insert(Item: Pointer); virtual;
+      procedure   Insert(Item: Pointer); override;
       function    At(Index: sw_Integer): PString;
       function    AddItem(Item: string): sw_integer;
     end;

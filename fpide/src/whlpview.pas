@@ -63,13 +63,13 @@ type
       TLinkCollection = class;
       PLinkCollection = TLinkCollection;
       TLinkCollection = class(TCollection)
-        procedure FreeItem(Item: Pointer); virtual;
+        procedure FreeItem(Item: Pointer); override;
       end;
 
       TColorAreaCollection = class;
       PColorAreaCollection = TColorAreaCollection;
       TColorAreaCollection = class(TCollection)
-        procedure FreeItem(Item: Pointer); virtual;
+        procedure FreeItem(Item: Pointer); override;
       end;
 
       TKeywordCollection = class;
@@ -103,7 +103,7 @@ type
       PNamedMarkCollection = TNamedMarkCollection;
       TNamedMarkCollection = class(TSortedCollection)
         function At(Index: sw_Integer): PNamedMark;
-        function Compare(Key1, Key2: Pointer): sw_Integer; virtual;
+        function Compare(Key1, Key2: Pointer): sw_Integer; override;
         function SearchMark(const Name: string): PNamedMark;
         function GetMarkPos(const Name: string; var P: TPoint): boolean;
         procedure Add(const Name: string; P: TPoint);
@@ -113,7 +113,7 @@ type
       PLinePosCollection = TLinePosCollection;
       TLinePosCollection = class(TNoDisposeCollection)
         function At(Index: sw_Integer): sw_integer;
-        procedure Insert (Item: pointer);virtual;
+        procedure Insert (Item: pointer);override;
       end;
 
       THelpTopic = class;
@@ -160,9 +160,9 @@ type
         HelpTopic: PHelpTopic;
         CurLink: sw_integer;
         constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
-        procedure   ChangeBounds(var Bounds: TRect); virtual;
-        procedure   Draw; virtual;
-        procedure   HandleEvent(var Event: TEvent); virtual;
+        procedure   ChangeBounds(const Bounds: TRect); override;
+        procedure   Draw; override;
+        procedure   HandleEvent(var Event: TEvent); override;
         procedure   SetCurPtr(X,Y: sw_integer); virtual;
         function    GetLineCount: sw_integer; virtual;
         function    GetLine(LineNo: sw_integer): PCustomLine; virtual;
@@ -187,10 +187,10 @@ type
         procedure   PrevTopic; virtual;
         procedure   RenderTopic; virtual;
         procedure   Lookup(S: string); virtual;
-        function    GetPalette: TPalette; virtual;
+        function    GetPalette: TPalette; override;
         constructor Load(S: TStream);
         procedure   Store(S: TStream);
-        destructor Destroy; virtual;
+        destructor Destroy; override;
       private
         History    : array[0..HistorySize] of THelpHistoryEntry;
         HistoryPtr : integer;
@@ -208,7 +208,7 @@ type
       THelpFrame = class;
       PHelpFrame = THelpFrame;
       THelpFrame = class(TFrame)
-        function GetPalette: TPalette; virtual;
+        function GetPalette: TPalette; override;
       end;
 
       THelpWindow = class;
@@ -218,15 +218,15 @@ type
         HelpView: PHelpViewer;
         HideOnClose: boolean;
         constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
-        procedure   InitFrame; virtual;
+        procedure   InitFrame; override;
         procedure   InitScrollBars; virtual;
         procedure   InitHelpView; virtual;
         procedure   ShowIndex; virtual;
         procedure   ShowDebugInfos; virtual;
         procedure   ShowTopic(SourceFileID: word; Context: THelpCtx); virtual;
-        procedure   HandleEvent(var Event: TEvent); virtual;
-        procedure   Close; virtual;
-        function    GetPalette: TPalette; virtual; { needs to be overridden }
+        procedure   HandleEvent(var Event: TEvent); override;
+        procedure   Close; override;
+        function    GetPalette: TPalette; override; { needs to be overridden }
       end;
 
 implementation
@@ -751,7 +751,7 @@ begin
   Margin:=1; CurLink:=-1;
 end;
 
-procedure THelpViewer.ChangeBounds(var Bounds: TRect);
+procedure THelpViewer.ChangeBounds(const Bounds: TRect);
 var
   LinePos,NewLineIndex,I : longint;
   ymin, ymax : sw_integer;

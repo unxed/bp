@@ -50,7 +50,7 @@ type
     TCodeTemplateCollection = class;
   PCodeTemplateCollection = TCodeTemplateCollection;
     TCodeTemplateCollection = class(TSortedCollection)
-      function Compare(Key1, Key2: Pointer): sw_Integer; virtual;
+      function Compare(Key1, Key2: Pointer): sw_Integer; override;
       function SearchByShortCut(const ShortCut: string): PCodeTemplate; virtual;
       function LookUp(const S: string; AcceptMulti: boolean; var Idx: sw_integer): string; virtual;
     end;
@@ -58,14 +58,14 @@ type
     TCodeTemplateListBox = class;
   PCodeTemplateListBox = TCodeTemplateListBox;
     TCodeTemplateListBox = class(TAdvancedListBox)
-      function GetText(Item,MaxLen: Sw_Integer): String; virtual;
+      function GetText(Item,MaxLen: Sw_Integer): String; override;
     end;
 
     TCodeTemplateDialog = class;
   PCodeTemplateDialog = TCodeTemplateDialog;
     TCodeTemplateDialog = class(TCenterDialog)
       constructor Create(const ATitle: string; ATemplate: PCodeTemplate);
-      function    Execute: Word; virtual;
+      function    Execute: Word; override;
     private
       Template   : PCodeTemplate;
       ShortcutIL : PInputLine;
@@ -77,8 +77,8 @@ type
     TCodeTemplatesDialog = class(TCenterDialog)
       SelMode: boolean;
       constructor Create(ASelMode: boolean;const AShortCut : string);
-      function    Execute: Word; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      function    Execute: Word; override;
+      procedure   HandleEvent(var Event: TEvent); override;
       function    GetSelectedShortCut: string;
     private
       CodeTemplatesLB : PCodeTemplateListBox;

@@ -126,10 +126,10 @@ type
         Header       : THLPFileHeader;
         Compression  : THLPCompression;
         constructor Create(AFileName: string; AID: word);
-        destructor Destroy; virtual;
+        destructor Destroy; override;
       public
         function    LoadIndex: boolean; virtual;
-        function    ReadTopic(T: PTopic): boolean; virtual;
+        function    ReadTopic(T: PTopic): boolean; override;
       public { protected }
         F: PStream;
         TopicsRead     : boolean;

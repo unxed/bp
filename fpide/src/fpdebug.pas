@@ -89,13 +89,13 @@ type
     procedure ResetBreakpointsValues;
     procedure DoDebuggerScreen;virtual;
     procedure DoUserScreen;virtual;
-    procedure Reset;virtual;
+    procedure Reset;override;
     procedure ResetDebuggerRows;
-    procedure Run;virtual;
-    procedure Continue;virtual;
-    procedure UntilReturn;virtual;
-    procedure CommandBegin(const s:string);virtual;
-    procedure CommandEnd(const s:string);virtual;
+    procedure Run;override;
+    procedure Continue;override;
+    procedure UntilReturn;override;
+    procedure CommandBegin(const s:string);override;
+    procedure CommandEnd(const s:string);override;
     function  IsRunning : boolean;
     function  AllowQuit : boolean;virtual;
     function  GetValue(Const expr : string) : pchar;
@@ -174,19 +174,19 @@ type
       (* ModuleNames : PStoreCollection; *)
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
       procedure   AddBreakpoint(P: PBreakpointItem); virtual;
-      function    GetText(Item,MaxLen: Sw_Integer): String; virtual;
-      function    GetLocalMenu: PMenu;virtual;
+      function    GetText(Item,MaxLen: Sw_Integer): String; override;
+      function    GetLocalMenu: PMenu;override;
       procedure   Clear; virtual;
       procedure   TrackSource; virtual;
       procedure   EditNew; virtual;
       procedure   EditCurrent; virtual;
       procedure   DeleteCurrent; virtual;
       procedure   ToggleCurrent;
-      procedure   Draw; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   Draw; override;
+      procedure   HandleEvent(var Event: TEvent); override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     TBreakpointsWindow = class;
@@ -197,13 +197,13 @@ type
       procedure   AddBreakpoint(ABreakpoint : PBreakpoint);
       procedure   ClearBreakpoints;
       procedure   ReloadBreakpoints;
-      procedure   Close; virtual;
-      procedure   SizeLimits(var Min, Max: TPoint);virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   Update; virtual;
+      procedure   Close; override;
+      procedure   SizeLimits(out Min, Max: TPoint);override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure   Update; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     TBreakpointItemDialog = class;
@@ -211,7 +211,7 @@ type
 
     TBreakpointItemDialog = class(TCenterDialog)
       constructor Create(ABreakpoint: PBreakpoint);
-      function    Execute: Word; virtual;
+      function    Execute: Word; override;
     private
       Breakpoint : PBreakpoint;
       TypeRB   : PRadioButtons;
@@ -241,7 +241,7 @@ type
   PWatchesCollection = TWatchesCollection;
     TWatchesCollection = class(TCollection)
       constructor Create;
-      procedure Insert(Item: Pointer); virtual;
+      procedure Insert(Item: Pointer); override;
       function  At(Index: Integer): PWatch;
       procedure Update;
     private
@@ -256,9 +256,9 @@ type
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
       (* procedure   AddWatch(P: PWatch); virtual; *)
       procedure   Update(AMaxWidth : integer);
-      function    GetText (Item: Sw_Integer; MaxLen: Sw_Integer): String; Virtual;
+      function    GetText (Item: Sw_Integer; MaxLen: Sw_Integer): String; override;
       function    GetIndentedText(Item,Indent,MaxLen: Sw_Integer;var Modified : boolean): String; virtual;
-      function    GetLocalMenu: PMenu;virtual;
+      function    GetLocalMenu: PMenu;override;
       (* procedure   Clear; virtual;
       procedure   TrackSource; virtual;*)
       procedure   EditNew; virtual;
@@ -266,10 +266,10 @@ type
       procedure   DeleteCurrent; virtual;
       (*procedure   ToggleCurrent; *)
       procedure   Draw; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     TWatchItemDialog = class;
@@ -277,7 +277,7 @@ type
 
     TWatchItemDialog = class(TCenterDialog)
       constructor Create(AWatch: PWatch);
-      function    Execute: Word; virtual;
+      function    Execute: Word; override;
     private
       Watch : PWatch;
       NameIL  : PEditorInputLine;
@@ -291,8 +291,8 @@ type
       constructor Create;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   Update; virtual;
-      destructor Destroy; virtual;
+      procedure   Update; override;
+      destructor Destroy; override;
     end;
 
     TFramesListBox = class;
@@ -300,11 +300,11 @@ type
     TFramesListBox = class(TMessageListBox)
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
       procedure   Update;
-      function    GetLocalMenu: PMenu;virtual;
-      procedure   GotoSource; virtual;
+      function    GetLocalMenu: PMenu;override;
+      procedure   GotoSource; override;
       procedure   GotoAssembly; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      destructor Destroy; virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      destructor Destroy; override;
     end;
 
     TStackWindow = class;
@@ -314,8 +314,8 @@ type
       constructor Create;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   Update; virtual;
-      destructor Destroy; virtual;
+      procedure   Update; override;
+      destructor Destroy; override;
     end;
 
   procedure InitStackWindow;
@@ -2581,7 +2581,7 @@ begin
   ReDraw;
 end;
 
-procedure TBreakpointsWindow.SizeLimits(var Min, Max: TPoint);
+procedure TBreakpointsWindow.SizeLimits(out Min, Max: TPoint);
 begin
   inherited SizeLimits(Min,Max);
   Min.X:=40; Min.Y:=18;

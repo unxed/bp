@@ -63,8 +63,8 @@ type
     PTemplateCollection = TTemplateCollection;
     TTemplateCollection = class(TSortedCollection)
       function  At(Index: Integer): PTemplate;
-      procedure FreeItem(Item: Pointer); virtual;
-      function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
+      procedure FreeItem(Item: Pointer); override;
+      function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
     end;
 
 const Templates : PTemplateCollection = nil;

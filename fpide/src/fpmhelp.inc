@@ -72,15 +72,15 @@ type
     THelpFileListBox = class;
     PHelpFileListBox = THelpFileListBox;
     THelpFileListBox = class(TListBox)
-      function GetText(Item: sw_Integer; MaxLen: sw_Integer): String; virtual;
+      function GetText(Item: sw_Integer; MaxLen: sw_Integer): String; override;
     end;
 
     THelpFilesDialog = class;
     PHelpFilesDialog = THelpFilesDialog;
     THelpFilesDialog = class(TCenterDialog)
       constructor Create;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      destructor Destroy; virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      destructor Destroy; override;
     private
       LB: PHelpFileListBox;
       C : PUnsortedStringCollection;

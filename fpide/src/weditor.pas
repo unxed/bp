@@ -480,8 +480,8 @@ type
 {      constructor Load(S: TStream);
       procedure   Store(S: TStream);}
       procedure   ConvertEvent(var Event: TEvent); virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   LocalMenu(P: TPoint); virtual;
       function    GetLocalMenu: PMenu; virtual;
       function    GetCommandTarget: PView; virtual;
@@ -492,7 +492,7 @@ type
       procedure   DrawCursor; virtual;
       { this is the only way I found to avoid
         having the cursor being updated if lock is on PM }
-      procedure   ResetCursor; virtual;
+      procedure   ResetCursor; override;
       procedure   DrawIndicator; virtual;
     public
    {a}function    GetFlags: longint; virtual;
@@ -522,7 +522,7 @@ type
       procedure   ChangeCaseArea(StartP,EndP: TPoint; CaseAction: TCaseAction); virtual;
       procedure   SetLineFlagState(LineNo: sw_integer; Flags: longint; ASet: boolean);
       procedure   SetLineFlagExclusive(Flags: longint; LineNo: sw_integer);
-      procedure   Update; virtual;
+      procedure   Update; override;
       procedure   ScrollTo(X, Y: sw_Integer);
       procedure   TrackCursor(centre:Tcentre); virtual;
       procedure   Lock; virtual;
@@ -724,13 +724,13 @@ type
     TCodeEditorDialog = function(Dialog: Integer; Info: Pointer): Word;
 
     TEditorInputLine = class(TInputLine)
-         Procedure   HandleEvent(var Event : TEvent);virtual;
+         Procedure   HandleEvent(var Event : TEvent);override;
     end;
     PEditorInputLine = TEditorInputLine;
 
     TSearchHelperDialog = class(TDialog)
              OkButton: PButton;
-             Procedure   HandleEvent(var Event : TEvent);virtual;
+             Procedure   HandleEvent(var Event : TEvent);override;
     end;
 
     PSearchHelperDialog = TSearchHelperDialog;

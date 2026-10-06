@@ -40,9 +40,9 @@ type
       UseTabs : Boolean;
 {$endif debug}
       constructor Create(var Bounds: TRect);
-      procedure   Draw; virtual;
-      function    GetPalette: TPalette; virtual;
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
+      procedure   Draw; override;
+      function    GetPalette: TPalette; override;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   SetValue(ALocation: TPoint; AModified: Boolean);
     end;
 
@@ -56,15 +56,15 @@ type
       Flags       : longint;
       Owner       : PCustomCodeEditorCore;
       procedure AddEditorInfo(Index: sw_integer; AEditor: PCustomCodeEditor); virtual;
-      procedure RemoveEditorInfo(AEditor: PCustomCodeEditor); virtual;
+      procedure RemoveEditorInfo(AEditor: PCustomCodeEditor); override;
     public
       constructor Create(AOwner: PCustomCodeEditorCore; const AText: string; AFlags: longint);
-      function    GetText: string; virtual;
-      procedure   SetText(const AText: string); virtual;
-      function    GetEditorInfo(Editor: PCustomCodeEditor): PEditorLineInfo; virtual;
-      function    GetFlags: longint; virtual;
-      procedure   SetFlags(AFlags: longint); virtual;
-      destructor Destroy; virtual;
+      function    GetText: string; override;
+      procedure   SetText(const AText: string); override;
+      function    GetEditorInfo(Editor: PCustomCodeEditor): PEditorLineInfo; override;
+      function    GetFlags: longint; override;
+      procedure   SetFlags(AFlags: longint); override;
+      destructor Destroy; override;
     end;
 
     TCodeEditorCore = class;
@@ -83,49 +83,49 @@ type
       UndoList   : PEditorActionCollection;
       RedoList   : PEditorActionCollection;
       constructor Create;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
       procedure   ChangeLinesTo(ALines : PLineCollection); virtual;
       function    GetModified: boolean; virtual;
-      procedure   SetModified(AModified: boolean); virtual;
+      procedure   SetModified(AModified: boolean); override;
       function    GetModifyTime: cardinal; virtual;
-      function    GetTabSize: integer; virtual;
-      procedure   SetTabSize(ATabSize: integer); virtual;
-      function    GetIndentSize: integer; virtual;
-      procedure   SetIndentSize(AIndentSize: integer); virtual;
-      function    GetStoreUndo: boolean; virtual;
-      procedure   SetStoreUndo(AStore: boolean); virtual;
-      function    GetSyntaxCompleted: boolean; virtual;
-      procedure   SetSyntaxCompleted(SC : boolean); virtual;
+      function    GetTabSize: integer; override;
+      procedure   SetTabSize(ATabSize: integer); override;
+      function    GetIndentSize: integer; override;
+      procedure   SetIndentSize(AIndentSize: integer); override;
+      function    GetStoreUndo: boolean; override;
+      procedure   SetStoreUndo(AStore: boolean); override;
+      function    GetSyntaxCompleted: boolean; override;
+      procedure   SetSyntaxCompleted(SC : boolean); override;
       function    GetLastSyntaxedLine: sw_integer; virtual;
       procedure   SetLastSyntaxedLine(ALine: sw_integer); virtual;
       { Storage }
     protected
       { Text & info storage abstraction }
       procedure   ISetLineFlagState(Binding: PEditorBinding; LineNo: sw_integer; Flag: longint; ASet: boolean); virtual;
-      procedure   IGetDisplayTextFormat(Binding: PEditorBinding; LineNo: sw_integer;var DT,DF:string); virtual;
-      function    IGetLineFormat(Binding: PEditorBinding; LineNo: sw_integer): string; virtual;
-      procedure   ISetLineFormat(Binding: PEditorBinding; LineNo: sw_integer;const S: string); virtual;
+      procedure   IGetDisplayTextFormat(Binding: PEditorBinding; LineNo: sw_integer;var DT,DF:string); override;
+      function    IGetLineFormat(Binding: PEditorBinding; LineNo: sw_integer): string; override;
+      procedure   ISetLineFormat(Binding: PEditorBinding; LineNo: sw_integer;const S: string); override;
     public
       { Text & info storage abstraction }
       function    GetLineCount: sw_integer; virtual;
-      function    GetLine(LineNo: sw_integer): PCustomLine; virtual;
-      function    GetLineText(LineNo: sw_integer): string; virtual;
-      procedure   SetDisplayText(I: sw_integer;const S: string); virtual;
-      function    GetDisplayText(I: sw_integer): string; virtual;
-      procedure   SetLineText(I: sw_integer;const S: string); virtual;
-      procedure   DeleteAllLines; virtual;
-      procedure   DeleteLine(I: sw_integer); virtual;
-      function    InsertLine(LineNo: sw_integer; const S: string): PCustomLine; virtual;
-      procedure   AddLine(const S: string); virtual;
-      procedure   GetContent(ALines: PUnsortedStringCollection); virtual;
-      procedure   SetContent(ALines: PUnsortedStringCollection); virtual;
+      function    GetLine(LineNo: sw_integer): PCustomLine; override;
+      function    GetLineText(LineNo: sw_integer): string; override;
+      procedure   SetDisplayText(I: sw_integer;const S: string); override;
+      function    GetDisplayText(I: sw_integer): string; override;
+      procedure   SetLineText(I: sw_integer;const S: string); override;
+      procedure   DeleteAllLines; override;
+      procedure   DeleteLine(I: sw_integer); override;
+      function    InsertLine(LineNo: sw_integer; const S: string): PCustomLine; override;
+      procedure   AddLine(const S: string); override;
+      procedure   GetContent(ALines: PUnsortedStringCollection); override;
+      procedure   SetContent(ALines: PUnsortedStringCollection); override;
    public
      { Undo info storage }
       procedure   AddAction(AAction: byte; AStartPos, AEndPos: TPoint; AText: string;AFlags : longint); virtual;
-      procedure   AddGroupedAction(AAction : byte); virtual;
-      procedure   CloseGroupedAction(AAction : byte); virtual;
-      function    GetUndoActionCount: sw_integer; virtual;
-      function    GetRedoActionCount: sw_integer; virtual;
+      procedure   AddGroupedAction(AAction : byte); override;
+      procedure   CloseGroupedAction(AAction : byte); override;
+      function    GetUndoActionCount: sw_integer; override;
+      function    GetRedoActionCount: sw_integer; override;
     private
       OnDiskLoadTime : cardinal;
       SystemLoadTime : cardinal;
@@ -152,83 +152,83 @@ type
       procedure   DrawIndicator; virtual;
     public
       function    GetFlags: longint; virtual;
-      procedure   SetFlags(AFlags: longint); virtual;
-      function    GetModified: boolean; virtual;
-      procedure   SetModified(AModified: boolean); virtual;
-      function    GetStoreUndo: boolean; virtual;
-      procedure   SetStoreUndo(AStore: boolean); virtual;
+      procedure   SetFlags(AFlags: longint); override;
+      function    GetModified: boolean; override;
+      procedure   SetModified(AModified: boolean); override;
+      function    GetStoreUndo: boolean; override;
+      procedure   SetStoreUndo(AStore: boolean); override;
       procedure   ClearUndoList;
-      function    GetSyntaxCompleted: boolean; virtual;
-      procedure   SetSyntaxCompleted(SC : boolean); virtual;
-      function    GetLastSyntaxedLine: sw_integer; virtual;
-      procedure   SetLastSyntaxedLine(ALine: sw_integer); virtual;
-      function    GetTabSize: integer; virtual;
-      procedure   SetTabSize(ATabSize: integer); virtual;
-      function    GetIndentSize: integer; virtual;
-      procedure   SetIndentSize(AIndentSize: integer); virtual;
-      function    IsReadOnly: boolean; virtual;
+      function    GetSyntaxCompleted: boolean; override;
+      procedure   SetSyntaxCompleted(SC : boolean); override;
+      function    GetLastSyntaxedLine: sw_integer; override;
+      procedure   SetLastSyntaxedLine(ALine: sw_integer); override;
+      function    GetTabSize: integer; override;
+      procedure   SetTabSize(ATabSize: integer); override;
+      function    GetIndentSize: integer; override;
+      procedure   SetIndentSize(AIndentSize: integer); override;
+      function    IsReadOnly: boolean; override;
     public
       procedure   UpdateIndicator; virtual;
-      procedure   ModifiedChanged; virtual;
-      procedure   PositionChanged; virtual;
-      procedure   LimitsChanged; virtual;
-      function    IsClipboard: Boolean; virtual;
-      function    LoadFromStream(Stream: PFastBufStream): boolean; virtual;
-      function    SaveToStream(Stream: PStream): boolean; virtual;
-      function    SaveAreaToStream(Stream: PStream; StartP,EndP: TPoint): boolean;virtual;
-      destructor Destroy; virtual;
+      procedure   ModifiedChanged; override;
+      procedure   PositionChanged; override;
+      procedure   LimitsChanged; override;
+      function    IsClipboard: Boolean; override;
+      function    LoadFromStream(Stream: PFastBufStream): boolean; override;
+      function    SaveToStream(Stream: PStream): boolean; override;
+      function    SaveAreaToStream(Stream: PStream; StartP,EndP: TPoint): boolean;override;
+      destructor Destroy; override;
     public
 {      ChangedLine : sw_integer;}
       { Text & info storage abstraction }
       function    GetLineCount: sw_integer; virtual;
-      function    GetLine(LineNo: sw_integer): PCustomLine; virtual;
-      function    CharIdxToLinePos(Line,CharIdx: sw_integer): sw_integer; virtual;
-      function    LinePosToCharIdx(Line,X: sw_integer): sw_integer; virtual;
-      function    GetLineText(I: sw_integer): string; virtual;
-      procedure   SetDisplayText(I: sw_integer;const S: string); virtual;
-      function    GetDisplayText(I: sw_integer): string; virtual;
-      procedure   SetLineText(I: sw_integer;const S: string); virtual;
-      procedure   GetDisplayTextFormat(I: sw_integer;var DT,DF:string); virtual;
-      function    GetLineFormat(I: sw_integer): string; virtual;
-      procedure   SetLineFormat(I: sw_integer;const S: string); virtual;
-      procedure   DeleteAllLines; virtual;
-      procedure   DeleteLine(I: sw_integer); virtual;
-      function    InsertLine(LineNo: sw_integer; const S: string): PCustomLine; virtual;
-      procedure   AddLine(const S: string); virtual;
-      function    GetErrorMessage: string; virtual;
-      procedure   SetErrorMessage(const S: string); virtual;
-      procedure   GetContent(ALines: PUnsortedStringCollection); virtual;
-      procedure   SetContent(ALines: PUnsortedStringCollection); virtual;
-      procedure   Lock; virtual;
-      procedure   UnLock; virtual;
+      function    GetLine(LineNo: sw_integer): PCustomLine; override;
+      function    CharIdxToLinePos(Line,CharIdx: sw_integer): sw_integer; override;
+      function    LinePosToCharIdx(Line,X: sw_integer): sw_integer; override;
+      function    GetLineText(I: sw_integer): string; override;
+      procedure   SetDisplayText(I: sw_integer;const S: string); override;
+      function    GetDisplayText(I: sw_integer): string; override;
+      procedure   SetLineText(I: sw_integer;const S: string); override;
+      procedure   GetDisplayTextFormat(I: sw_integer;var DT,DF:string); override;
+      function    GetLineFormat(I: sw_integer): string; override;
+      procedure   SetLineFormat(I: sw_integer;const S: string); override;
+      procedure   DeleteAllLines; override;
+      procedure   DeleteLine(I: sw_integer); override;
+      function    InsertLine(LineNo: sw_integer; const S: string): PCustomLine; override;
+      procedure   AddLine(const S: string); override;
+      function    GetErrorMessage: string; override;
+      procedure   SetErrorMessage(const S: string); override;
+      procedure   GetContent(ALines: PUnsortedStringCollection); override;
+      procedure   SetContent(ALines: PUnsortedStringCollection); override;
+      procedure   Lock; override;
+      procedure   UnLock; override;
     public
      { CodeComplete support }
       function    GetCodeCompleteWord: string; virtual;
-      procedure   SetCodeCompleteWord(const S: string); virtual;
-      function    GetCodeCompleteFrag: string; virtual;
-      procedure   SetCodeCompleteFrag(const S: string); virtual;
-      function    GetCompleteState: TCompleteState; virtual;
-      procedure   SetCompleteState(AState: TCompleteState); virtual;
+      procedure   SetCodeCompleteWord(const S: string); override;
+      function    GetCodeCompleteFrag: string; override;
+      procedure   SetCodeCompleteFrag(const S: string); override;
+      function    GetCompleteState: TCompleteState; override;
+      procedure   SetCompleteState(AState: TCompleteState); override;
    public
       { Syntax highlight }
    {a}function    UpdateAttrs(FromLine: sw_integer; Attrs: byte): sw_integer; virtual;
-   {a}function    UpdateAttrsRange(FromLine, ToLine: sw_integer; Attrs: byte): sw_integer; virtual;
+   {a}function    UpdateAttrsRange(FromLine, ToLine: sw_integer; Attrs: byte): sw_integer; override;
    public
      { Undo info storage }
       procedure   AddAction(AAction: byte; AStartPos, AEndPos: TPoint; AText: string;AFlags : longint); virtual;
-      procedure   AddGroupedAction(AAction : byte); virtual;
-      procedure   CloseGroupedAction(AAction : byte); virtual;
-      function    GetUndoActionCount: sw_integer; virtual;
-      function    GetRedoActionCount: sw_integer; virtual;
-      procedure   JumpToLastCursorPos; virtual;
-      procedure   Undo; virtual;
-      procedure   Redo; virtual;
+      procedure   AddGroupedAction(AAction : byte); override;
+      procedure   CloseGroupedAction(AAction : byte); override;
+      function    GetUndoActionCount: sw_integer; override;
+      function    GetRedoActionCount: sw_integer; override;
+      procedure   JumpToLastCursorPos; override;
+      procedure   Undo; override;
+      procedure   Redo; override;
      { Fold support }
-      function    GetMaxFoldLevel: sw_integer; virtual;
-      function    GetFoldCount: sw_integer; virtual;
-      function    GetFold(Index: sw_integer): PFold; virtual;
-      procedure   RegisterFold(AFold: PFold); virtual;
-      procedure   UnRegisterFold(AFold: PFold); virtual;
+      function    GetMaxFoldLevel: sw_integer; override;
+      function    GetFoldCount: sw_integer; override;
+      function    GetFold(Index: sw_integer): PFold; override;
+      procedure   RegisterFold(AFold: PFold); override;
+      procedure   UnRegisterFold(AFold: PFold); override;
     end;
 
     TFileEditor = class;
@@ -243,8 +243,8 @@ type
       function    LoadFile: boolean; virtual;
       function    ReloadFile: boolean; virtual;
       function    SaveFile: boolean; virtual;
-      function    Valid(Command: Word): Boolean; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      function    Valid(Command: Word): Boolean; override;
+      procedure   HandleEvent(var Event: TEvent); override;
       function    ShouldSave: boolean; virtual;
       function    IsChangedOnDisk : boolean;
     public

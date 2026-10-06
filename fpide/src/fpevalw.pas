@@ -31,7 +31,7 @@ type
         expr_input,expr_output:Pinputline;
         constructor Create(var bounds:Trect);
         procedure evaluate;
-        procedure handleevent(var event:Tevent);virtual;
+        procedure handleevent(var event:Tevent);override;
         destructor Destroy;
       end;
 

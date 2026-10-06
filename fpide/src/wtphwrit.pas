@@ -39,7 +39,7 @@ type
       procedure   AddLinkToTopic(P: PTopic; AHelpCtx: THelpCtx);
       procedure   AddIndexEntry(Tag: string; P: PTopic); virtual;
       function    WriteFile: boolean; virtual;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     private
       procedure   CompleteContextNo;
       procedure   CalcTopicOfs;

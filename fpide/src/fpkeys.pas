@@ -46,7 +46,7 @@ type
       KeyOK : Array [1..NumWantedKeys] of boolean;
       PST,PST2 : PAdvancedStaticText;
       constructor Create(Const ATitle : String);
-     {Procedure HandleEvent(var E : TEvent);virtual;}
+     {Procedure HandleEvent(var E : TEvent);override;}
      function Execute : Word;Virtual;
    end;
 

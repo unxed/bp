@@ -107,10 +107,10 @@ type
       PNGHelpFile = TNGHelpFile;
       TNGHelpFile = class(THelpFile)
         constructor Create(AFileName: string; AID: word);
-        destructor Destroy; virtual;
+        destructor Destroy; override;
       public
         function    LoadIndex: boolean; virtual;
-        function    ReadTopic(T: PTopic): boolean; virtual;
+        function    ReadTopic(T: PTopic): boolean; override;
       private
         F: PStream;
         Header: TNGFileHeader;

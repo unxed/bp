@@ -34,8 +34,8 @@ type
      PHTMLLinkScanDocument = THTMLLinkScanDocument;
 
      TCustomHTMLLinkScanner = class(THTMLParser)
-       function    DocAddTextChar(C: char): boolean; virtual;
-       procedure   DocAnchor(Entered: boolean); virtual;
+       function    DocAddTextChar(C: char): boolean; override;
+       procedure   DocAnchor(Entered: boolean); override;
      public
     {a}function    CheckURL(const URL: string): boolean; virtual;
     {a}function    CheckText(const Text: string): boolean; virtual;
@@ -82,7 +82,7 @@ type
      PNameIDCollection = TNameIDCollection;
      TNameIDCollection = class(TSortedCollection)
        function At(Index: sw_Integer): PNameID;
-       function Compare(Key1, Key2: Pointer): sw_Integer; virtual;
+       function Compare(Key1, Key2: Pointer): sw_Integer; override;
      end;
 
 
@@ -106,7 +106,7 @@ type
      PHTMLLinkScanDocumentCollection = THTMLLinkScanDocumentCollection;
      THTMLLinkScanDocumentCollection = class(TSortedCollection)
        constructor Create(AScanner: PHTMLLinkScanner; ALimit, ADelta: Integer);
-       function    Compare(Key1, Key2: Pointer): sw_Integer; virtual;
+       function    Compare(Key1, Key2: Pointer): sw_Integer; override;
        function    At(Index: sw_Integer): PHTMLLinkScanDocument;
        function    SearchDocument(const DocName: string): PHTMLLinkScanDocument;
        procedure   MoveAliasesToSynonym;
@@ -125,7 +125,7 @@ type
        function    GetDocumentAlias(DocIndex, AliasIndex: sw_integer): string;
        constructor LoadDocuments(S: TStream);
        procedure   StoreDocuments(S: TStream);
-       destructor Destroy; virtual;
+       destructor Destroy; override;
      public
        procedure   AddLink(const LinkText, LinkURL: string); virtual;
      private
@@ -159,7 +159,7 @@ type
      PHTMLLinkScanFileCollection = THTMLLinkScanFileCollection;
      THTMLLinkScanFileCollection = class(TSortedCollection)
        function   At(Index: sw_Integer): PHTMLLinkScanFile;
-       function   Compare(Key1, Key2: Pointer): sw_Integer; virtual;
+       function   Compare(Key1, Key2: Pointer): sw_Integer; override;
        function   SearchFile(const DocURL: string): PHTMLLinkScanFile;
        function   FindFileWithState(AState: THTMLLinkScanState): PHTMLLinkScanFile;
        procedure  CheckNameIDLists;
@@ -171,14 +171,14 @@ type
      THTMLFileLinkScanner = class(THTMLLinkScanner)
        constructor Create(const ABaseDir: string);
        procedure   ProcessDocument(const DocumentURL: string; AOptions: THTMLLinkScanOptions);
-       destructor Destroy; virtual;
+       destructor Destroy; override;
      public
        function    GetDocumentBaseURL: string; virtual;
-       function    FindID(const AName : string) : PNameID; virtual;
-       procedure   AddLink(const LinkText, LinkURL: string); virtual;
-       procedure   AddRef(LinkURL: string); virtual;
-       procedure   AddNameID(AName: string); virtual;
-       procedure   AddID(AName: string); virtual;
+       function    FindID(const AName : string) : PNameID; override;
+       procedure   AddLink(const LinkText, LinkURL: string); override;
+       procedure   AddRef(LinkURL: string); override;
+       procedure   AddNameID(AName: string); override;
+       procedure   AddID(AName: string); override;
        function    CheckURL(const URL: string): boolean; virtual;
      private
        Options: THTMLLinkScanOptions;

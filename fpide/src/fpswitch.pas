@@ -77,10 +77,10 @@ type
     TBooleanItem = class(TSwitchItem)
       IsSet : array[TSwitchMode] of boolean;
       constructor Create(const n,p:string; AID: TParamID);
-      function  NeedParam:boolean;virtual;
-      procedure Reset;virtual;
-      function  GetSwitchStr(SM: TSwitchMode): string; virtual;
-      function  ParamValueBool(SM: TSwitchMode):boolean;virtual;
+      function  NeedParam:boolean;override;
+      procedure Reset;override;
+      function  GetSwitchStr(SM: TSwitchMode): string; override;
+      function  ParamValueBool(SM: TSwitchMode):boolean;override;
     end;
 
     TStringItem = class;
@@ -90,9 +90,9 @@ type
       multiple : boolean;
       SeparateSpaces : boolean;
       constructor Create(const n,p:string;AID: TParamID; mult,allowspaces:boolean);
-      function  NeedParam:boolean;virtual;
-      function  ParamValue(nr:sw_integer):string;virtual;
-      procedure Reset;virtual;
+      function  NeedParam:boolean;override;
+      function  ParamValue(nr:sw_integer):string;override;
+      procedure Reset;override;
     end;
 
     TMultiStringItem = class;
@@ -100,10 +100,10 @@ type
     TMultiStringItem = class(TSwitchItem)
       MultiStr : array[TSwitchMode] of PunsortedStringCollection;
       constructor Create(const n,p:string;AID: TParamID);
-      function  NeedParam:boolean;virtual;
-      function  ParamValue(nr:sw_integer):string;virtual;
-      function  ParamCount:sw_integer;virtual;
-      procedure Reset;virtual;
+      function  NeedParam:boolean;override;
+      function  ParamValue(nr:sw_integer):string;override;
+      function  ParamCount:sw_integer;override;
+      procedure Reset;override;
       destructor Destroy;virtual;
     end;
 
@@ -113,10 +113,10 @@ type
     TLongintItem = class(TSwitchItem)
       Val : array[TSwitchMode] of longint;
       constructor Create(const n,p:string; AID: TParamID);
-      function  NeedParam:boolean;virtual;
-      function  ParamValue(nr:sw_integer):string;virtual;
-      function  GetNumberStr(SM: TSwitchMode): string; virtual;
-      procedure Reset;virtual;
+      function  NeedParam:boolean;override;
+      function  ParamValue(nr:sw_integer):string;override;
+      function  GetNumberStr(SM: TSwitchMode): string; override;
+      procedure Reset;override;
     end;
 
     TSwitches = class;

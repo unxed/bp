@@ -35,7 +35,7 @@ type
   TCalcButton = class;
   PCalcButton = TCalcButton;
   TCalcButton = class(TButton)
-    procedure HandleEvent(var Event: TEvent); virtual;
+    procedure HandleEvent(var Event: TEvent); override;
   end;
 
   TCalcDisplay = class;
@@ -55,9 +55,9 @@ type
     constructor Load(S: TStream);
     function  CalcKey(Key: string): boolean;
     procedure Clear;
-    procedure Draw; virtual;
-    function  GetPalette: TPalette; virtual;
-    procedure HandleEvent(var Event: TEvent); virtual;
+    procedure Draw; override;
+    function  GetPalette: TPalette; override;
+    procedure HandleEvent(var Event: TEvent); override;
     procedure Store(S: TStream);
   private
     procedure GetDisplay(var R: extended);
@@ -70,8 +70,8 @@ type
   TCalculator = class(TCenterDialog)
     CD : PCalcDisplay;
     constructor Create;
-    procedure   HandleEvent(var Event: TEvent); virtual;
-    procedure   Show; {virtual;}
+    procedure   HandleEvent(var Event: TEvent); override;
+    procedure   Show; {override;}
     procedure   Close; virtual;
     constructor Load(S: TStream);
     procedure   Store(S: TStream);

@@ -145,16 +145,16 @@ type
      PCrtConsole = TCrtConsole;
      TCrtConsole = class(TANSIConsole)
        constructor Create(AReplyHook, AKeyHook, AWriteHook: PHookProc);
-       procedure   CursorOn; virtual;
-       procedure   CursorOff; virtual;
-       procedure   ClrScr; virtual;
-       procedure   ClrEol; virtual;
-       procedure   WriteChar(C: char); virtual;
-       procedure   DelLine(LineCount: integer); virtual;
-       procedure   InsLine(LineCount: integer); virtual;
-       procedure   UpdateCursor; virtual;
-       procedure   TextBackground(Color: byte); virtual;
-       procedure   TextColor(Color: byte); virtual;
+       procedure   CursorOn; override;
+       procedure   CursorOff; override;
+       procedure   ClrScr; override;
+       procedure   ClrEol; override;
+       procedure   WriteChar(C: char); override;
+       procedure   DelLine(LineCount: integer); override;
+       procedure   InsLine(LineCount: integer); override;
+       procedure   UpdateCursor; override;
+       procedure   TextBackground(Color: byte); override;
+       procedure   TextColor(Color: byte); override;
      end;
 {$endif WITH_CRT}
 
@@ -173,16 +173,16 @@ type
      TANSIViewConsole = class(TANSIConsole)
        Owner : PANSIView;
        constructor Create(AOwner: PANSIView);
-       procedure   CursorOn; virtual;
-       procedure   CursorOff; virtual;
-       procedure   ClrScr; virtual;
-       procedure   ClrEol; virtual;
-       procedure   WriteChar(C: char); virtual;
-       procedure   WriteCharRaw(C: char); virtual;
-       procedure   DelLine(LineCount: integer); virtual;
-       procedure   InsLine(LineCount: integer); virtual;
-       procedure   UpdateCursor; virtual;
-       procedure   GotoXY(X,Y: integer); virtual;
+       procedure   CursorOn; override;
+       procedure   CursorOff; override;
+       procedure   ClrScr; override;
+       procedure   ClrEol; override;
+       procedure   WriteChar(C: char); override;
+       procedure   WriteCharRaw(C: char); override;
+       procedure   DelLine(LineCount: integer); override;
+       procedure   InsLine(LineCount: integer); override;
+       procedure   UpdateCursor; override;
+       procedure   GotoXY(X,Y: integer); override;
      end;
 
      TANSIView = class(TScroller)
@@ -191,14 +191,14 @@ type
        LockCount : word;
        constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:PScrollBar);
        function    LoadFile(const FileName: string): boolean;
-       procedure   Draw; virtual;
-       destructor Destroy; virtual;
+       procedure   Draw; override;
+       destructor Destroy; override;
        procedure   Write(Const S: string); virtual;
        procedure   WriteLn(Const S: string); virtual;
        procedure   Lock; virtual;
        procedure   UnLock; virtual;
-       procedure   ChangeBounds(var Bounds: TRect); virtual;
-       procedure   HandleEvent(var Event: TEvent); virtual;
+       procedure   ChangeBounds(const Bounds: TRect); override;
+       procedure   HandleEvent(var Event: TEvent); override;
        private
      end;
 
@@ -210,15 +210,15 @@ type
      TANSIBackgroundConsole = class(TANSIConsole)
        Owner : PANSIBackground;
        constructor Create(AOwner: PANSIBackground);
-       procedure   CursorOn; virtual;
-       procedure   CursorOff; virtual;
-       procedure   ClrScr; virtual;
-       procedure   ClrEol; virtual;
-       procedure   WriteChar(C: char); virtual;
-       procedure   DelLine(LineCount: integer); virtual;
-       procedure   InsLine(LineCount: integer); virtual;
-       procedure   UpdateCursor; virtual;
-       procedure   GotoXY(X,Y: integer); virtual;
+       procedure   CursorOn; override;
+       procedure   CursorOff; override;
+       procedure   ClrScr; override;
+       procedure   ClrEol; override;
+       procedure   WriteChar(C: char); override;
+       procedure   DelLine(LineCount: integer); override;
+       procedure   InsLine(LineCount: integer); override;
+       procedure   UpdateCursor; override;
+       procedure   GotoXY(X,Y: integer); override;
      end;
 
      TANSIBackground = class(TBackground)
@@ -227,14 +227,14 @@ type
        LockCount : word;
        constructor Create(var Bounds: TRect);
        function    LoadFile(const FileName: string): boolean;
-       procedure   Draw; virtual;
-       destructor Destroy; virtual;
+       procedure   Draw; override;
+       destructor Destroy; override;
        procedure   Write(Const S: string); virtual;
        procedure   WriteLn(Const S: string); virtual;
        procedure   Lock; virtual;
        procedure   UnLock; virtual;
-       procedure   ChangeBounds(var Bounds: TRect); virtual;
-       procedure   HandleEvent(var Event: TEvent); virtual;
+       procedure   ChangeBounds(const Bounds: TRect); override;
+       procedure   HandleEvent(var Event: TEvent); override;
        private
      end;
 
@@ -871,7 +871,7 @@ begin
   if LockCount=0 then DrawView;
 end;
 
-procedure TANSIView.ChangeBounds(var Bounds: TRect);
+procedure TANSIView.ChangeBounds(const Bounds: TRect);
 begin
   inherited ChangeBounds(Bounds);
 {  Console.Size.X:=Size.X; Console.Size.Y:=Size.Y;}
@@ -1076,7 +1076,7 @@ begin
   if LockCount=0 then DrawView;
 end;
 
-procedure TANSIBackground.ChangeBounds(var Bounds: TRect);
+procedure TANSIBackground.ChangeBounds(const Bounds: TRect);
 begin
   inherited ChangeBounds(Bounds);
 {  Console.Size.X:=Size.X; Console.Size.Y:=Size.Y;}

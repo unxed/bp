@@ -61,27 +61,27 @@ type
     TFPHeapView = class(THeapView)
       constructor Create(var Bounds: TRect);
       constructor InitKb(var Bounds: TRect);
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
     end;
 
     TFPClockView = class;
     PFPClockView = TFPClockView;
     TFPClockView = class(TClockView)
       constructor Create(var Bounds: TRect);
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: TPalette; virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      function    GetPalette: TPalette; override;
     end;
 
     TFPWindow = class;
     PFPWindow = TFPWindow;
     TFPWindow = class(TWindow)
       AutoNumber: boolean;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   UpdateCommands; virtual;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   Update; virtual;
+      procedure   Update; override;
       procedure   SelectInDebugSession;
     end;
 
@@ -96,12 +96,12 @@ type
     PFPHelpWindow = TFPHelpWindow;
     TFPHelpWindow = class(THelpWindow)
       constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
-      destructor Destroy;virtual;
+      destructor Destroy;override;
       procedure   InitHelpView; virtual;
       procedure   Show; {virtual;}
-      procedure   Hide; {virtual;}
+      procedure   Hide; {override;}
       procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: TPalette; virtual;
+      function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
     end;
@@ -115,12 +115,12 @@ type
       constructor Create(var Bounds: TRect; ASpeed: integer; AText: PUnsortedStringCollection);
       function    GetLineCount: integer; virtual;
       function    GetLine(I: integer): string; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   Update; virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure   Update; override;
       procedure   Reset; virtual;
       procedure   Scroll; virtual;
-      procedure   Draw; virtual;
-      destructor Destroy; virtual;
+      procedure   Draw; override;
+      destructor Destroy; override;
     private
       LastTT: longint;
     end;
@@ -131,13 +131,13 @@ type
     PFPToolTip = TFPToolTip;
     TFPToolTip = class(TView)
       constructor Create(var Bounds: TRect; const AText: string; AAlign: TAlign);
-      procedure   Draw; virtual;
+      procedure   Draw; override;
       function    GetText: string;
       procedure   SetText(const AText: string);
       function    GetAlign: TAlign;
       procedure   SetAlign(AAlign: TAlign);
-      function    GetPalette: TPalette; virtual;
-      destructor Destroy; virtual;
+      function    GetPalette: TPalette; override;
+      destructor Destroy; override;
     private
       Text: PString;
       Align: TAlign;
@@ -157,38 +157,38 @@ type
     public
       { Syntax highlight }
       function  IsReservedWord(const S: string): boolean; virtual;
-      function  IsAsmReservedWord(const S: string): boolean; virtual;
+      function  IsAsmReservedWord(const S: string): boolean; override;
       function  GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; virtual;
-      function  GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; virtual;
+      function  GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; override;
       { CodeTemplates }
       function    TranslateCodeTemplate(var Shortcut: string; ALines: PUnsortedStringCollection): boolean; virtual;
-      function    SelectCodeTemplate(var ShortCut: string): boolean; virtual;
+      function    SelectCodeTemplate(var ShortCut: string): boolean; override;
       { CodeComplete }
-      function    CompleteCodeWord(const WordS: string; var Text: string): boolean; virtual;
-      procedure   FindMatchingDelimiter(ScanForward: boolean); virtual;
-      procedure   SetCodeCompleteWord(const S: string); virtual;
+      function    CompleteCodeWord(const WordS: string; var Text: string): boolean; override;
+      procedure   FindMatchingDelimiter(ScanForward: boolean); override;
+      procedure   SetCodeCompleteWord(const S: string); override;
       procedure   AlignCodeCompleteTip;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
 {$ifdef DebugUndo}
       procedure   DumpUndo;
       procedure   UndoAll;
       procedure   RedoAll;
 {$endif DebugUndo}
-      function    Valid(Command: Word): Boolean;virtual;
-      function    GetLocalMenu: PMenu; virtual;
-      function    GetCommandTarget: PView; virtual;
-      function    CreateLocalMenuView(var Bounds: TRect; M: PMenu): PMenuPopup; virtual;
-      procedure   ModifiedChanged; virtual;
-      procedure   InsertOptions; virtual;
-      procedure   PushInfo(Const st : string);virtual;
-      procedure   PopInfo;virtual;
-      procedure   DeleteLine(I: sw_integer); virtual;
-      procedure   BackSpace; virtual;
-      procedure   DelChar; virtual;
-      procedure   DelSelect; virtual;
-      function    InsertNewLine : Sw_integer;virtual;
-      function    InsertLine(LineNo: sw_integer; const S: string): PCustomLine; virtual;
-      procedure   AddLine(const S: string); virtual;
+      function    Valid(Command: Word): Boolean;override;
+      function    GetLocalMenu: PMenu; override;
+      function    GetCommandTarget: PView; override;
+      function    CreateLocalMenuView(var Bounds: TRect; M: PMenu): PMenuPopup; override;
+      procedure   ModifiedChanged; override;
+      procedure   InsertOptions; override;
+      procedure   PushInfo(Const st : string);override;
+      procedure   PopInfo;override;
+      procedure   DeleteLine(I: sw_integer); override;
+      procedure   BackSpace; override;
+      procedure   DelChar; override;
+      procedure   DelSelect; override;
+      function    InsertNewLine : Sw_integer;override;
+      function    InsertLine(LineNo: sw_integer; const S: string): PCustomLine; override;
+      procedure   AddLine(const S: string); override;
     end;
 
     TSourceWindow = class;
@@ -198,29 +198,29 @@ type
       Indicator : PIndicator;
       NoNameCount : longint;
       constructor Create(var Bounds: TRect; AFileName: string);
-      function    GetTitle(MaxSize: sw_Integer): TTitleStr; virtual;
+      function    GetTitle(MaxSize: sw_Integer): TTitleStr; override;
       procedure   SetTitle(ATitle: string); virtual;
       procedure   UpdateTitle; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   Update; virtual;
-      procedure   UpdateCommands; virtual;
-      function    GetPalette: TPalette; virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure   Update; override;
+      procedure   UpdateCommands; override;
+      function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   Close; virtual;
-      destructor Destroy; virtual;
+      procedure   Close; override;
+      destructor Destroy; override;
     end;
 
 {$ifndef NODEBUG}
     TGDBSourceEditor = class;
     PGDBSourceEditor = TGDBSourceEditor;
     TGDBSourceEditor = class(TSourceEditor)
-      function   InsertNewLine : Sw_integer;virtual;
-      function   Valid(Command: Word): Boolean; virtual;
-      procedure  AddLine(const S: string); virtual;
+      function   InsertNewLine : Sw_integer;override;
+      function   Valid(Command: Word): Boolean; override;
+      procedure  AddLine(const S: string); override;
       procedure  AddErrorLine(const S: string); virtual;
       { Syntax highlight }
-      function  IsReservedWord(const S: string): boolean; virtual;
+      function  IsReservedWord(const S: string): boolean; override;
     private
       Silent,
       AutoRepeat,
@@ -234,17 +234,17 @@ type
       Editor    : PGDBSourceEditor;
       Indicator : PIndicator;
       constructor Create(var Bounds: TRect);
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
       procedure   WriteText(Buf : pchar;IsError : boolean);
       procedure   WriteString(Const S : string);
       procedure   WriteErrorString(Const S : string);
       procedure   WriteOutputText(Buf : pchar);
       procedure   WriteErrorText(Buf : pchar);
-      function    GetPalette: TPalette;virtual;
+      function    GetPalette: TPalette;override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   UpdateCommands; virtual;
-      destructor Destroy; virtual;
+      procedure   UpdateCommands; override;
+      destructor Destroy; override;
     end;
 
     TDisasLine = class;
@@ -267,7 +267,7 @@ type
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator;const AFileName: string);
       procedure  ReleaseSource;
-      destructor Destroy;virtual;
+      destructor Destroy;override;
       procedure  AddSourceLine(const AFileName: string;line : longint); virtual;
       procedure  AddAssemblyLine(const S: string;AAddress : CORE_ADDR); virtual;
       function   GetCurrentLine(address : CORE_ADDR) : PDisasLine;
@@ -288,13 +288,13 @@ type
       procedure   LoadFunction(Const FuncName : string);
       procedure   LoadAddress(Addr : CORE_ADDR);
       function    ProcessPChar(p : pchar) : boolean;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
       procedure   WriteSourceString(Const S : string;line : longint);
       procedure   WriteDisassemblyString(Const S : string;address : CORE_ADDR);
       procedure   SetCurAddress(address : CORE_ADDR);
-      procedure   UpdateCommands; virtual;
-      function    GetPalette: TPalette;virtual;
-      destructor Destroy; virtual;
+      procedure   UpdateCommands; override;
+      function    GetPalette: TPalette;override;
+      destructor Destroy; override;
     end;
 {$endif NODEBUG}
 
@@ -302,10 +302,10 @@ type
     PClipboardWindow = TClipboardWindow;
     TClipboardWindow = class(TSourceWindow)
       constructor Create;
-      procedure   Close; virtual;
+      procedure   Close; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     TMessageItem = class;
@@ -330,26 +330,26 @@ type
       MaxWidth    : Sw_integer;
       ModuleNames : PStoreCollection;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   AddItem(P: PMessageItem); virtual;
       function    AddModuleName(const Name: string): PString; virtual;
-      function    GetText(Item,MaxLen: Sw_Integer): String; virtual;
+      function    GetText(Item,MaxLen: Sw_Integer): String; override;
       procedure   Clear; virtual;
       procedure   TrackSource; virtual;
       procedure   GotoSource; virtual;
-      procedure   Draw; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetLocalMenu: PMenu; virtual;
+      procedure   Draw; override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      function    GetLocalMenu: PMenu; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
 
     TFPDlgWindow = class;
     PFPDlgWindow = TFPDlgWindow;
     TFPDlgWindow = class(TDlgWindow)
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
     end;
 
 PTabItem = ^TTabItem;
@@ -379,13 +379,13 @@ PTabItem = ^TTabItem;
       procedure   SelectTab(Index: integer); virtual;
       function    TabCount: integer;
       procedure   SelectNextTab(Forwards: boolean);
-      function    Valid(Command: Word): Boolean; virtual;
-      procedure   ChangeBounds(var Bounds: TRect); virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: TPalette; virtual;
-      procedure   Draw; virtual;
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
-      destructor Destroy; virtual;
+      function    Valid(Command: Word): Boolean; override;
+      procedure   ChangeBounds(const Bounds: TRect); override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      function    GetPalette: TPalette; override;
+      procedure   Draw; override;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
+      destructor Destroy; override;
     private
       InDraw: boolean;
     end;
@@ -397,9 +397,9 @@ PTabItem = ^TTabItem;
       Screen: PScreen;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar;
                     AScreen: PScreen);
-      procedure   Draw; virtual;
-      procedure   Update; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   Draw; override;
+      procedure   Update; override;
+      procedure   HandleEvent(var Event: TEvent); override;
     end;
 
     TScreenWindow = class;
@@ -407,7 +407,7 @@ PTabItem = ^TTabItem;
     TScreenWindow = class(TFPWindow)
       ScreenView : PScreenView;
       constructor Create(AScreen: PScreen; ANumber: integer);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     TFPAboutDialog = class;
@@ -415,7 +415,7 @@ PTabItem = ^TTabItem;
     TFPAboutDialog = class(TCenterDialog)
       constructor Create;
       procedure   ToggleInfo;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
     private
       Scroller: PTextScroller;
       TitleST : PStaticText;
@@ -427,21 +427,21 @@ PTabItem = ^TTabItem;
       constructor Create;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      destructor Destroy; virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      destructor Destroy; override;
     end;
 
     TVideoModeListBox = class;
     PVideoModeListBox = TVideoModeListBox;
     TVideoModeListBox = class(TDropDownListBox)
-      function    GetText(Item: pointer; MaxLen: sw_integer): string; virtual;
+      function    GetText(Item: pointer; MaxLen: sw_integer): string; override;
     end;
 
     TFPDesktop = class;
     PFPDesktop = TFPDesktop;
     TFPDesktop = class(TDesktop)
       constructor Create(var Bounds: TRect);
-      procedure   InitBackground; virtual;
+      procedure   InitBackground; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
     end;
@@ -451,11 +451,11 @@ PTabItem = ^TTabItem;
     TFPMemo = class(TCodeEditor)
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
                     PScrollBar; AIndicator: PIndicator);
-      function    IsReservedWord(const S: string): boolean; virtual;
+      function    IsReservedWord(const S: string): boolean; override;
       function    GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; virtual;
-      function    GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; virtual;
-      function    GetPalette: TPalette; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      function    GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; override;
+      function    GetPalette: TPalette; override;
+      procedure   HandleEvent(var Event: TEvent); override;
     end;
 
     TFPCodeMemo = class;
@@ -463,9 +463,9 @@ PTabItem = ^TTabItem;
     TFPCodeMemo = class(TFPMemo)
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
                     PScrollBar; AIndicator: PIndicator);
-      function    IsReservedWord(const S: string): boolean; virtual;
-      function    GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; virtual;
-      function    GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; virtual;
+      function    IsReservedWord(const S: string): boolean; override;
+      function    GetSpecSymbolCount(SpecClass: TSpecSymbolClass): integer; override;
+      function    GetSpecSymbol(SpecClass: TSpecSymbolClass; Index: integer): pstring; override;
     end;
 
 function  SearchFreeWindowNo: integer;
@@ -3447,7 +3447,7 @@ begin
   end;
 end;
 
-procedure TTab.ChangeBounds(var Bounds: TRect);
+procedure TTab.ChangeBounds(const Bounds: TRect);
 var D: TPoint;
 procedure DoCalcChange(P: PView);
 var

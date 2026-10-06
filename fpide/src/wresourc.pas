@@ -79,7 +79,7 @@ type
      PResourceEntryCollection = TResourceEntryCollection;
      TResourceEntryCollection = class(TSortedCollection)
        function  At(Index: Sw_Integer): PResourceEntry;
-       function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
+       function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
        function  SearchEntryForLang(ALangID: longint): PResourceEntry;
      end;
 
@@ -87,7 +87,7 @@ type
      PGlobalResourceEntryCollection = TGlobalResourceEntryCollection;
      TGlobalResourceEntryCollection = class(TSortedCollection)
        function  At(Index: Sw_Integer): PResourceEntry;
-       function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
+       function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
      end;
 
      TResource = class(TObject)
@@ -106,7 +106,7 @@ type
 
      TResourceCollection = class(TSortedCollection)
        function  At(Index: Sw_Integer): PResource;
-       function  Compare(Key1, Key2: Pointer): Sw_Integer; virtual;
+       function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
        function  SearchResourceByName(const AName: string): PResource;
      end;
      PResourceCollection = TResourceCollection;

@@ -68,13 +68,13 @@ type
     PSymbolView = TSymbolView;
     TSymbolView = class(TLocalMenuListBox)
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
-      destructor Destroy;virtual;
-      procedure    HandleEvent(var Event: TEvent); virtual;
-      procedure    SetState(AState: Word; Enable: Boolean); virtual;
+      destructor Destroy;override;
+      procedure    HandleEvent(var Event: TEvent); override;
+      procedure    SetState(AState: Word; Enable: Boolean); override;
       function     GotoItem(Item: sw_integer): boolean; virtual;
       function     TrackItem(Item: sw_integer; AutoTrack: boolean): boolean; virtual;
-      function     GetPalette: TPalette; virtual;
-      function     GetLocalMenu: PMenu; virtual;
+      function     GetPalette: TPalette; override;
+      function     GetLocalMenu: PMenu; override;
       procedure    ClearHighlights;
       procedure    AutoTrackSource; virtual;
       procedure    Browse; virtual;
@@ -91,14 +91,14 @@ type
     PSymbolScopeView = TSymbolScopeView;
     TSymbolScopeView = class(TSymbolView)
       constructor Create(var Bounds: TRect; ASymbols: PSymbolCollection; AHScrollBar, AVScrollBar: PScrollBar);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
       procedure   SetGDBCol;
-      function    GetText(Item,MaxLen: Sw_Integer): String; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   Draw; virtual;
+      function    GetText(Item,MaxLen: Sw_Integer): String; override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure   Draw; override;
       procedure   LookUp(S: string); virtual;
-      function    GotoItem(Item: sw_integer): boolean; virtual;
-      function    TrackItem(Item: sw_integer; AutoTrack: boolean): boolean; virtual;
+      function    GotoItem(Item: sw_integer): boolean; override;
+      function    TrackItem(Item: sw_integer; AutoTrack: boolean): boolean; override;
     private
       Symbols: PSymbolCollection;
       SymbolsValue : PGDBValueCollection;
@@ -109,13 +109,13 @@ type
     PSymbolReferenceView = TSymbolReferenceView;
     TSymbolReferenceView = class(TSymbolView)
       constructor Create(var Bounds: TRect; AReferences: PReferenceCollection; AHScrollBar, AVScrollBar: PScrollBar);
-      destructor Destroy; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetText(Item,MaxLen: Sw_Integer): String; virtual;
-      procedure   SelectItem(Item: Sw_Integer); virtual;
-      function    GotoItem(Item: sw_integer): boolean; virtual;
-      function    TrackItem(Item: sw_integer; AutoTrack: boolean): boolean; virtual;
-      procedure   Browse; virtual;
+      destructor Destroy; override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      function    GetText(Item,MaxLen: Sw_Integer): String; override;
+      procedure   SelectItem(Item: Sw_Integer); override;
+      function    GotoItem(Item: sw_integer): boolean; override;
+      function    TrackItem(Item: sw_integer; AutoTrack: boolean): boolean; override;
+      procedure   Browse; override;
     private
       References: PReferenceCollection;
     end;
@@ -124,9 +124,9 @@ type
     PSymbolMemInfoView = TSymbolMemInfoView;
     TSymbolMemInfoView = class(TStaticText)
       constructor Create(var Bounds: TRect; AMemInfo: PSymbolMemInfo);
-      destructor Destroy; virtual;
-      procedure    GetText(var S: String); virtual;
-      function     GetPalette: TPalette; virtual;
+      destructor Destroy; override;
+      procedure    GetText(var S: String); override;
+      function     GetPalette: TPalette; override;
     private
       MemInfo: PSymbolMemInfo;
       MyBW   : PBrowserWindow;
@@ -135,7 +135,7 @@ type
     TSymbolMemoView = class;
     PSymbolMemoView = TSymbolMemoView;
     TSymbolMemoView = class(TFPMemo)
-      function    GetPalette: TPalette; virtual;
+      function    GetPalette: TPalette; override;
     end;
 
     TSymbolInheritanceView = class;
@@ -146,7 +146,7 @@ type
     TSymbolInheritanceView = class(TLocalMenuListBox)
 {$endif HASOUTLINE}
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar; ARoot: PObjectSymbol);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
       function     GetRoot: Pointer; virtual;
       function     HasChildren(Node: Pointer): Boolean; virtual;
       function     GetChild(Node: Pointer; I: sw_Integer): Pointer; virtual;
@@ -155,17 +155,17 @@ type
       procedure    Adjust(Node: Pointer; Expand: Boolean); virtual;
       function     IsExpanded(Node: Pointer): Boolean; virtual;
 {$ifdef HASOUTLINE}
-      function     GetText(Node: Pointer): String; virtual;
+      function     GetText(Node: Pointer): String; override;
 {$else not HASOUTLINE}
       procedure    ExpandAll(Node: Pointer);
       function     GetNode(I : sw_Integer) : Pointer; virtual;
       function     GetLineNode(Item : sw_Integer) : Pointer; virtual;
-      function     GetText(Item,MaxLen: Sw_Integer): String; virtual;
+      function     GetText(Item,MaxLen: Sw_Integer): String; override;
 {$endif HASOUTLINE}
       procedure    NodeSelected(P: pointer); virtual;
       procedure    Selected(I: sw_Integer); virtual;
-      procedure    HandleEvent(var Event: TEvent); virtual;
-      function     GetPalette: TPalette; virtual;
+      procedure    HandleEvent(var Event: TEvent); override;
+      function     GetPalette: TPalette; override;
     private
       Root         : PObjectSymbol;
       MyBW         : PBrowserWindow;
@@ -187,10 +187,10 @@ type
       function    GetItem(Index: sw_integer): PBrowserTabItem; virtual;
       procedure   SetParams(AFlags: word; ACurrent: Sw_integer); virtual;
       procedure   SelectItem(Index: Sw_integer); virtual;
-      procedure   Draw; virtual;
-      function    GetPalette: TPalette; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      destructor Destroy; virtual;
+      procedure   Draw; override;
+      function    GetPalette: TPalette; override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      destructor Destroy; override;
     private
       Flags   : word;
       Current : Sw_integer;
@@ -200,20 +200,20 @@ type
     PUnitInfoPanel = TUnitInfoPanel;
     TUnitInfoPanel = class(TPanel)
       InOwnerCall: boolean;
-      procedure HandleEvent(var Event: TEvent); virtual;
+      procedure HandleEvent(var Event: TEvent); override;
     end;
 
     TBrowserWindow = class(TFPWindow)
       constructor Create(var Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer;ASym : PSymbol;
                     const AName,APrefix: string; ASymbols: PSymbolCollection; AReferences: PReferenceCollection;
                     AInheritance: PObjectSymbol; AMemInfo: PSymbolMemInfo);
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   SetState(AState: Word; Enable: Boolean); virtual;
-      procedure   Close; virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      procedure   SetState(AState: Word; Enable: Boolean); override;
+      procedure   Close; override;
       procedure   SelectTab(BrowserTab: Sw_integer); virtual;
-      function    GetPalette: TPalette; virtual;
+      function    GetPalette: TPalette; override;
       function    Disassemble : boolean;
-      destructor Destroy;virtual;
+      destructor Destroy;override;
     private
       PageTab       : PBrowserTab;
       ST            : PStaticText;

@@ -65,22 +65,22 @@ type
     TNWLScreen = class;
     PNWLScreen = TNWLScreen;
     TNWLScreen = class(TScreen)
-      function    GetWidth: integer; virtual;
-      function    GetHeight: integer; virtual;
-      procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
-      procedure   GetCursorPos(var P: TPoint); virtual;
+      function    GetWidth: integer; override;
+      function    GetHeight: integer; override;
+      procedure   GetLine(Line: integer; var Text, Attr: string); override;
+      procedure   GetCursorPos(var P: TPoint); override;
       { remember the initial video screen }
-      procedure   Capture; virtual;
+      procedure   Capture; override;
       { restore the initial video mode }
-      procedure   Restore; virtual;
+      procedure   Restore; override;
       { saves the current IDE screen }
-      procedure   SaveIDEScreen; virtual;
+      procedure   SaveIDEScreen; override;
       { saves the current console screen }
-      procedure   SaveConsoleScreen; virtual;
+      procedure   SaveConsoleScreen; override;
       { restores the saved console screen }
-      procedure   SwitchToConsoleScreen; virtual;
+      procedure   SwitchToConsoleScreen; override;
       { restores the saved IDE screen }
-      procedure   SwitchBackToIDEScreen; virtual;
+      procedure   SwitchBackToIDEScreen; override;
     end;
 {$ENDIF}
 
@@ -101,22 +101,22 @@ type
     TAmigaScreen = class;
     PAmigaScreen = TAmigaScreen;
     TAmigaScreen = class(TScreen)
-      function    GetWidth: integer; virtual;
-      function    GetHeight: integer; virtual;
-      procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
-      procedure   GetCursorPos(var P: TPoint); virtual;
+      function    GetWidth: integer; override;
+      function    GetHeight: integer; override;
+      procedure   GetLine(Line: integer; var Text, Attr: string); override;
+      procedure   GetCursorPos(var P: TPoint); override;
       { remember the initial video screen }
-      procedure   Capture; virtual;
+      procedure   Capture; override;
       { restore the initial video mode }
-      procedure   Restore; virtual;
+      procedure   Restore; override;
       { saves the current IDE screen }
-      procedure   SaveIDEScreen; virtual;
+      procedure   SaveIDEScreen; override;
       { saves the current console screen }
-      procedure   SaveConsoleScreen; virtual;
+      procedure   SaveConsoleScreen; override;
       { restores the saved console screen }
-      procedure   SwitchToConsoleScreen; virtual;
+      procedure   SwitchToConsoleScreen; override;
       { restores the saved IDE screen }
-      procedure   SwitchBackToIDEScreen; virtual;
+      procedure   SwitchBackToIDEScreen; override;
     end;
 {$ENDIF}
 
@@ -128,23 +128,23 @@ type
       destructor Destroy; virtual;
     public
       function    GetWidth: integer; virtual;
-      function    GetHeight: integer; virtual;
-      procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
-      procedure   GetCursorPos(var P: TPoint); virtual;
+      function    GetHeight: integer; override;
+      procedure   GetLine(Line: integer; var Text, Attr: string); override;
+      procedure   GetCursorPos(var P: TPoint); override;
       { remember the initial video screen }
-      procedure   Capture; virtual;
+      procedure   Capture; override;
       { restore the initial video mode }
-      procedure   Restore; virtual;
+      procedure   Restore; override;
       { move up or down if supported by OS }
-      function    Scroll(i : integer) : integer; virtual;
+      function    Scroll(i : integer) : integer; override;
       { saves the current IDE screen }
-      procedure   SaveIDEScreen; virtual;
+      procedure   SaveIDEScreen; override;
       { saves the current console screen }
-      procedure   SaveConsoleScreen; virtual;
+      procedure   SaveConsoleScreen; override;
       { restores the saved console screen }
-      procedure   SwitchToConsoleScreen; virtual;
+      procedure   SwitchToConsoleScreen; override;
       { restores the saved IDE screen }
-      procedure   SwitchBackToIDEScreen; virtual;
+      procedure   SwitchBackToIDEScreen; override;
     end;
 {$ENDIF}
 
@@ -168,15 +168,15 @@ type
       destructor Destroy; virtual;
     public
       function    GetWidth: integer; virtual;
-      function    GetHeight: integer; virtual;
-      procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
-      procedure   GetCursorPos(var P: TPoint); virtual;
-      procedure   Capture; virtual;
-      procedure   Restore; virtual;
-      procedure   SaveIDEScreen; virtual;
-      procedure   SaveConsoleScreen; virtual;
-      procedure   SwitchToConsoleScreen; virtual;
-      procedure   SwitchBackToIDEScreen; virtual;
+      function    GetHeight: integer; override;
+      procedure   GetLine(Line: integer; var Text, Attr: string); override;
+      procedure   GetCursorPos(var P: TPoint); override;
+      procedure   Capture; override;
+      procedure   Restore; override;
+      procedure   SaveIDEScreen; override;
+      procedure   SaveConsoleScreen; override;
+      procedure   SwitchToConsoleScreen; override;
+      procedure   SwitchBackToIDEScreen; override;
       procedure   FreeGraphBuffer;
     private
       LastTextConsoleVideoInfo,
@@ -215,15 +215,15 @@ type
       destructor Destroy; virtual;
     public
       function    GetWidth: integer; virtual;
-      function    GetHeight: integer; virtual;
-      procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
-      procedure   GetCursorPos(var P: TPoint); virtual;
-      procedure   Capture; virtual;
-      procedure   Restore; virtual;
-      procedure   SaveIDEScreen; virtual;
-      procedure   SaveConsoleScreen; virtual;
-      procedure   SwitchToConsoleScreen; virtual;
-      procedure   SwitchBackToIDEScreen; virtual;
+      function    GetHeight: integer; override;
+      procedure   GetLine(Line: integer; var Text, Attr: string); override;
+      procedure   GetCursorPos(var P: TPoint); override;
+      procedure   Capture; override;
+      procedure   Restore; override;
+      procedure   SaveIDEScreen; override;
+      procedure   SaveConsoleScreen; override;
+      procedure   SwitchToConsoleScreen; override;
+      procedure   SwitchBackToIDEScreen; override;
     private
       IdeScreen: PByteArray;
       IdeSize : longint;
@@ -247,17 +247,17 @@ type
       destructor Destroy; virtual;
     public
       function    GetWidth: integer; virtual;
-      function    GetHeight: integer; virtual;
-      procedure   GetLine(Line: integer; var Text, Attr: string); virtual;
-      procedure   GetCursorPos(var P: TPoint); virtual;
-      function    CanScroll : boolean; virtual;
-      function    Scroll(i : integer) : integer; virtual;
-      procedure   Capture; virtual;
-      procedure   Restore; virtual;
-      procedure   SaveIDEScreen; virtual;
-      procedure   SaveConsoleScreen; virtual;
-      procedure   SwitchToConsoleScreen; virtual;
-      procedure   SwitchBackToIDEScreen; virtual;
+      function    GetHeight: integer; override;
+      procedure   GetLine(Line: integer; var Text, Attr: string); override;
+      procedure   GetCursorPos(var P: TPoint); override;
+      function    CanScroll : boolean; override;
+      function    Scroll(i : integer) : integer; override;
+      procedure   Capture; override;
+      procedure   Restore; override;
+      procedure   SaveIDEScreen; override;
+      procedure   SaveConsoleScreen; override;
+      procedure   SwitchToConsoleScreen; override;
+      procedure   SwitchBackToIDEScreen; override;
     private
       DosScreenBufferHandle,
       IDEScreenBufferHandle,

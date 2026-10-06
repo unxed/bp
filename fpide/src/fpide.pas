@@ -46,28 +46,28 @@ type
       IsRunning : boolean;
       displaymode : Tdisplaymode;
       constructor Create;
-      procedure   InitDesktop; virtual;
+      procedure   InitDesktop; override;
       procedure   LoadMenuBar;
-      procedure   InitMenuBar; virtual;
+      procedure   InitMenuBar; override;
       procedure   reload_menubar;
-      procedure   InitStatusLine; virtual;
+      procedure   InitStatusLine; override;
       procedure   Open(FileName: string;FileDir:string);
       function    OpenSearch(FileName: string) : boolean;
       function    AskSaveAll: boolean;
       function    SaveAll: boolean;
       function    AutoSave: boolean;
-      procedure   Idle; virtual;
+      procedure   Idle; override;
       procedure   Update;
       procedure   UpdateMode;
       procedure   UpdateRunMenu(DebuggeeRunning : boolean);
       procedure   UpdateTarget;
-      procedure   GetEvent(var Event: TEvent); virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      procedure   GetTileRect(var R: TRect); virtual;
-      function    GetPalette: TPalette; virtual;
+      procedure   GetEvent(var Event: TEvent); override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      function    GetTileRect: TRect; override;
+      function    GetPalette: TPalette; override;
       procedure   DosShell; {virtual;}
       procedure   ShowReadme;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
       procedure   ShowUserScreen;
       procedure   ShowIDEScreen;
       function    IsClosing : boolean;
@@ -1414,7 +1414,8 @@ begin
 end;
 
 
-procedure TIDEApp.GetTileRect(var R: TRect);
+function TIDEApp.GetTileRect: TRect;
+var R: TRect;
 begin
   Desktop.GetExtent(R);
 { Leave the compiler messages window in the bottom }
@@ -1428,6 +1429,7 @@ begin
   if assigned(WatchesWindow) and (WatchesWindow.GetState(sfVisible)) then
    R.B.Y:=Min(WatchesWindow.Origin.Y,R.B.Y);
 {$endif NODEBUG}
+  GetTileRect:=R;
 end;
 
 

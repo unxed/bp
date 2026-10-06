@@ -74,50 +74,50 @@ type
       procedure AddElement(PTE : PTableElement);
       procedure TextInsert(Pos : sw_word;const S : string);
       procedure FormatTable;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     end;
 
     THTMLTopicRenderer = class(THTMLParser)
       function  BuildTopic(P: PTopic; AURL: string; HTMLFile: PTextFile; ATopicLinks: PTopicLinkCollection): boolean;
     public
       function  DocAddTextChar(C: char): boolean; virtual;
-      procedure DocSoftBreak; virtual;
-      procedure DocTYPE; virtual;
-      procedure DocHTML(Entered: boolean); virtual;
-      procedure DocHEAD(Entered: boolean); virtual;
-      procedure DocMETA; virtual;
-      procedure DocTITLE(Entered: boolean); virtual;
-      procedure DocBODY(Entered: boolean); virtual;
-      procedure DocAnchor(Entered: boolean); virtual;
-      procedure DocUnknownTag; virtual;
-      procedure DocHeading(Level: integer; Entered: boolean); virtual;
-      procedure DocParagraph(Entered: boolean); virtual;
-      procedure DocBreak; virtual;
-      procedure DocImage; virtual;
-      procedure DocProcessComment(Comment: string); virtual;
-      procedure DocBold(Entered: boolean); virtual;
-      procedure DocCite(Entered: boolean); virtual;
-      procedure DocCode(Entered: boolean); virtual;
-      procedure DocEmphasized(Entered: boolean); virtual;
-      procedure DocItalic(Entered: boolean); virtual;
-      procedure DocKbd(Entered: boolean); virtual;
-      procedure DocPreformatted(Entered: boolean); virtual;
-      procedure DocSample(Entered: boolean); virtual;
-      procedure DocStrong(Entered: boolean); virtual;
-      procedure DocTeleType(Entered: boolean); virtual;
-      procedure DocVariable(Entered: boolean); virtual;
-      procedure DocSpan(Entered: boolean); virtual;
-      procedure DocList(Entered: boolean); virtual;
-      procedure DocOrderedList(Entered: boolean); virtual;
-      procedure DocListItem(Entered: boolean); virtual;
-      procedure DocDefList(Entered: boolean); virtual;
-      procedure DocDefTerm(Entered: boolean); virtual;
-      procedure DocDefExp(Entered: boolean); virtual;
-      procedure DocTable(Entered: boolean); virtual;
-      procedure DocTableRow(Entered: boolean); virtual;
-      procedure DocTableHeaderItem(Entered: boolean); virtual;
-      procedure DocTableItem(Entered: boolean); virtual;
-      procedure DocHorizontalRuler; virtual;
+      procedure DocSoftBreak; override;
+      procedure DocTYPE; override;
+      procedure DocHTML(Entered: boolean); override;
+      procedure DocHEAD(Entered: boolean); override;
+      procedure DocMETA; override;
+      procedure DocTITLE(Entered: boolean); override;
+      procedure DocBODY(Entered: boolean); override;
+      procedure DocAnchor(Entered: boolean); override;
+      procedure DocUnknownTag; override;
+      procedure DocHeading(Level: integer; Entered: boolean); override;
+      procedure DocParagraph(Entered: boolean); override;
+      procedure DocBreak; override;
+      procedure DocImage; override;
+      procedure DocProcessComment(Comment: string); override;
+      procedure DocBold(Entered: boolean); override;
+      procedure DocCite(Entered: boolean); override;
+      procedure DocCode(Entered: boolean); override;
+      procedure DocEmphasized(Entered: boolean); override;
+      procedure DocItalic(Entered: boolean); override;
+      procedure DocKbd(Entered: boolean); override;
+      procedure DocPreformatted(Entered: boolean); override;
+      procedure DocSample(Entered: boolean); override;
+      procedure DocStrong(Entered: boolean); override;
+      procedure DocTeleType(Entered: boolean); override;
+      procedure DocVariable(Entered: boolean); override;
+      procedure DocSpan(Entered: boolean); override;
+      procedure DocList(Entered: boolean); override;
+      procedure DocOrderedList(Entered: boolean); override;
+      procedure DocListItem(Entered: boolean); override;
+      procedure DocDefList(Entered: boolean); override;
+      procedure DocDefTerm(Entered: boolean); override;
+      procedure DocDefExp(Entered: boolean); override;
+      procedure DocTable(Entered: boolean); override;
+      procedure DocTableRow(Entered: boolean); override;
+      procedure DocTableHeaderItem(Entered: boolean); override;
+      procedure DocTableItem(Entered: boolean); override;
+      procedure DocHorizontalRuler; override;
       function CanonicalizeURL(const Base,Relative:String):string; virtual;
       procedure Resolve( href: ansistring; var AFileId,ALinkId : sw_integer); virtual;
     public
@@ -158,20 +158,20 @@ type
     TCHMTopicRenderer = class;
     PCHMTopicRenderer = TCHMTopicRenderer;
     TCHMTopicRenderer = class(THTMLTopicRenderer)
-      function CanonicalizeURL(const Base,Relative:String):string; virtual;
-      procedure Resolve( href: ansistring; var AFileId,ALinkId : sw_integer); virtual;
+      function CanonicalizeURL(const Base,Relative:String):string; override;
+      procedure Resolve( href: ansistring; var AFileId,ALinkId : sw_integer); override;
       end;
 
     TCustomHTMLHelpFile = class;
     PCustomHTMLHelpFile = TCustomHTMLHelpFile;
     TCustomHTMLHelpFile = class(THelpFile)
       constructor Create(AID: word);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     public
       Renderer: PHTMLTopicRenderer;
-      function    GetTopicInfo(T: PTopic) : string; virtual;
-      function    SearchTopic(HelpCtx: THelpCtx): PTopic; virtual;
-      function    ReadTopic(T: PTopic): boolean; virtual;
+      function    GetTopicInfo(T: PTopic) : string; override;
+      function    SearchTopic(HelpCtx: THelpCtx): PTopic; override;
+      function    ReadTopic(T: PTopic): boolean; override;
       function    FormatLink(const s:String):string; virtual;
     private
       DefaultFileName: string;
@@ -193,13 +193,13 @@ type
     PCHMHelpFile = TCHMHelpFile;
     TCHMHelpFile = class(TCustomHTMLHelpFile)
       constructor Create(AFileName: string; AID: word);
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     public
       function    LoadIndex: boolean; virtual;
-      function    ReadTopic(T: PTopic): boolean; virtual;
-      function    GetTopicInfo(T: PTopic) : string; virtual;
-      function    SearchTopic(HelpCtx: THelpCtx): PTopic; virtual;
-      function    FormatLink(const s:String):string; virtual;
+      function    ReadTopic(T: PTopic): boolean; override;
+      function    GetTopicInfo(T: PTopic) : string; override;
+      function    SearchTopic(HelpCtx: THelpCtx): PTopic; override;
+      function    FormatLink(const s:String):string; override;
     private
       Chmw: TCHMWrapper;
     end;
@@ -220,7 +220,7 @@ type
 
     THTMLAnsiConsole = class(TAnsiViewConsole)
       MaxX,MaxY : integer;
-      procedure   GotoXY(X,Y: integer); virtual;
+      procedure   GotoXY(X,Y: integer); override;
     end;
 
     THTMLAnsiView = class(TAnsiView)

@@ -56,14 +56,14 @@ type
     TToolListBox = class;
   PToolListBox = TToolListBox;
     TToolListBox = class(TAdvancedListBox)
-      function GetText(Item,MaxLen: Sw_Integer): String; virtual;
+      function GetText(Item,MaxLen: Sw_Integer): String; override;
     end;
 
     TToolParamValidator = class;
   PToolParamValidator = TToolParamValidator;
     TToolParamValidator = class(TValidator)
-      function  IsValid(const S: string): Boolean; virtual;
-      procedure Error; virtual;
+      function  IsValid(const S: string): Boolean; override;
+      procedure Error; override;
     private
       ErrorPos: integer;
     end;
@@ -72,7 +72,7 @@ type
   PToolItemDialog = TToolItemDialog;
     TToolItemDialog = class(TCenterDialog)
       constructor Create(ATool: PTool);
-      function    Execute: Word; virtual;
+      function    Execute: Word; override;
     private
       Tool     : PTool;
       TitleIL  : PEditorInputLine;
@@ -85,8 +85,8 @@ type
   PToolsDialog = TToolsDialog;
     TToolsDialog = class(TCenterDialog)
       constructor Create;
-      function    Execute: Word; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      function    Execute: Word; override;
+      procedure   HandleEvent(var Event: TEvent); override;
     private
       ToolsLB : PToolListBox;
       procedure Add;
@@ -98,16 +98,16 @@ type
   PToolMessage = TToolMessage;
     TToolMessage = class(TMessageItem)
       constructor Create(AModule: PString; ALine: string; ARow, ACol: sw_integer);
-      function    GetText(MaxLen: Sw_integer): string; virtual;
+      function    GetText(MaxLen: Sw_integer): string; override;
     end;
 
     TToolMessageListBox = class;
   PToolMessageListBox = TToolMessageListBox;
     TToolMessageListBox = class(TMessageListBox)
       procedure   NewList(AList: PCollection); virtual;
-      procedure   Clear; virtual;
-      procedure   Update; virtual;
-      function    GetPalette: TPalette; virtual;
+      procedure   Clear; override;
+      procedure   Update; override;
+      function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
       destructor Destroy; override;
@@ -117,14 +117,14 @@ type
   PMessagesWindow = TMessagesWindow;
     TMessagesWindow = class(TFPWindow)
       constructor Create;
-      procedure   Update; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      function    GetPalette: TPalette; virtual;
+      procedure   Update; override;
+      procedure   HandleEvent(var Event: TEvent); override;
+      function    GetPalette: TPalette; override;
       constructor Load(S: TStream);
       procedure   Store(S: TStream);
       destructor Destroy; override;
       procedure   FocusItem(i : sw_integer);
-      procedure   SizeLimits(var Min, Max: TPoint); virtual;
+      procedure   SizeLimits(out Min, Max: TPoint); override;
     private
       MsgLB : PToolMessageListBox;
     end;
@@ -1615,7 +1615,7 @@ begin
   inherited HandleEvent(Event);
 end;
 
-procedure TMessagesWindow.SizeLimits(var Min, Max: TPoint);
+procedure TMessagesWindow.SizeLimits(out Min, Max: TPoint);
 begin
   inherited SizeLimits(Min,Max);
   Min.X:=20;

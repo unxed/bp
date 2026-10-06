@@ -212,7 +212,7 @@ type
   PHelpFileTypeCollection = THelpFileTypeCollection;
   THelpFileTypeCollection = class(TCollection)
     function At(Index: sw_Integer): PHelpFileType;
-    procedure FreeItem(Item: Pointer); virtual;
+    procedure FreeItem(Item: Pointer); override;
   end;
 
 {$ifdef HASAMIGA}

@@ -48,15 +48,15 @@ type
     PWindowListBox = TWindowListBox;
     TWindowListBox = class(TAdvancedListBox)
       constructor Create(var Bounds: TRect; AScrollBar: PScrollBar);
-      function    GetText(Item,MaxLen: Sw_Integer): String; virtual;
+      function    GetText(Item,MaxLen: Sw_Integer): String; override;
     end;
 
     TWindowListDialog = class;
     PWindowListDialog = TWindowListDialog;
     TWindowListDialog = class(TCenterDialog)
       constructor Create;
-      procedure   HandleEvent(var Event: TEvent); virtual;
-      destructor Destroy; virtual;
+      procedure   HandleEvent(var Event: TEvent); override;
+      destructor Destroy; override;
     private
       LB: PWindowListBox;
       C : PCollection;

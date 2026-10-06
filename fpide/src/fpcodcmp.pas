@@ -32,8 +32,8 @@ type
     PCodeCompleteDialog = TCodeCompleteDialog;
     TCodeCompleteDialog = class(TCenterDialog)
       constructor Create;
-      function    Execute: Word; virtual;
-      procedure   HandleEvent(var Event: TEvent); virtual;
+      function    Execute: Word; override;
+      procedure   HandleEvent(var Event: TEvent); override;
     private
       CodeCompleteLB : PAdvancedListBox;
       RB : PRadioButtons;

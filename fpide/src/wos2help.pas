@@ -109,10 +109,10 @@ type
       POS2HelpFile = TOS2HelpFile;
       TOS2HelpFile = class(THelpFile)
         constructor Create(AFileName: string; AID: word);
-        destructor Destroy; virtual;
+        destructor Destroy; override;
       public
         function    LoadIndex: boolean; virtual;
-        function    ReadTopic(T: PTopic): boolean; virtual;
+        function    ReadTopic(T: PTopic): boolean; override;
       private
         F: PStream;
         Header: TINFFileHeader;

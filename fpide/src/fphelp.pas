@@ -32,15 +32,15 @@ type
     TIDEStatusLine = class;
     PIDEStatusLine = TIDEStatusLine;
     TIDEStatusLine = class(TAdvancedStatusLine)
-      function  Hint(AHelpCtx: Word): String; virtual;
-      procedure HandleEvent(var Event: TEvent); virtual;
+      function  Hint(AHelpCtx: Word): String; override;
+      procedure HandleEvent(var Event: TEvent); override;
     end;
 
     TFPHTMLFileLinkScanner = class;
     PFPHTMLFileLinkScanner = TFPHTMLFileLinkScanner;
     TFPHTMLFileLinkScanner = class(THTMLFileLinkScanner)
-       function    CheckURL(const URL: string): boolean; virtual;
-       function    CheckText(const Text: string): boolean; virtual;
+       function    CheckURL(const URL: string): boolean; override;
+       function    CheckText(const Text: string): boolean; override;
        procedure   ProcessDoc(Doc: PHTMLLinkScanFile); virtual;
     end;
 

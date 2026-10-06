@@ -61,14 +61,14 @@ type
     PAdvancedMenuBox = TAdvancedMenuBox;
     TAdvancedMenuBox = class(TMenuBox)
       function NewSubView(const Bounds: TRect; AMenu: PMenu;
-                 AParentMenu: PMenuView): PMenuView; virtual;
+                 AParentMenu: PMenuView): PMenuView; override;
       function Execute: Word; override;
     end;
     TAdvancedMenuPopUp = class;
     PAdvancedMenuPopUp = TAdvancedMenuPopUp;
     TAdvancedMenuPopUp = class(TMenuPopup)
       function NewSubView(const Bounds: TRect; AMenu: PMenu;
-                 AParentMenu: PMenuView): PMenuView; virtual;
+                 AParentMenu: PMenuView): PMenuView; override;
       function Execute: Word; override;
     end;
 
@@ -77,7 +77,7 @@ type
     TAdvancedMenuBar = class(TMenuBar)
       constructor Create(const Bounds: TRect; AMenu: PMenu);
       function  NewSubView(const Bounds: TRect; AMenu: PMenu;
-                  AParentMenu: PMenuView): PMenuView; virtual;
+                  AParentMenu: PMenuView): PMenuView; override;
       procedure Update; override;
       function  GetMenuItem(cm : word) : PMenuItem;
       procedure HandleEvent(var Event: TEvent); override;
@@ -165,10 +165,10 @@ type
       constructor Create(ALink: TDropDownListBox; var Bounds: TRect; ANumCols: Word; AScrollBar: PScrollBar);
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   SetState(AState: Word; Enable: Boolean); override;
-      procedure   SelectItem(Item: Sw_Integer); virtual;
+      procedure   SelectItem(Item: Sw_Integer); override;
       function    GetText(Item,MaxLen: Sw_Integer): String; override;
-      function    GetLocalMenu: PMenu; virtual;
-      function    GetCommandTarget: PView; virtual;
+      function    GetLocalMenu: PMenu; override;
+      function    GetCommandTarget: PView; override;
     private
       Link : TDropDownListBox;
       LastTT: longint;
@@ -192,7 +192,7 @@ type
       procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   Draw; override;
       function    GetPalette: TPalette; override;
-      destructor Destroy; virtual;
+      destructor Destroy; override;
     private
       DropLineCount: Sw_integer;
       ListDropped : boolean;
