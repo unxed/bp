@@ -13,6 +13,7 @@
 
  **********************************************************************}
 unit WConsole;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 {$ifdef UNIX}

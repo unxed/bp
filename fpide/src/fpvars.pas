@@ -15,6 +15,7 @@
 {$i globdir.inc}
 
 unit FPVars;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

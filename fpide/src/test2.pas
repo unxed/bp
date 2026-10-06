@@ -1,5 +1,6 @@
 {$L+}
 unit Test2;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

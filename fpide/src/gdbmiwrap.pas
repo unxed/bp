@@ -14,6 +14,7 @@
  **********************************************************************}
 
 unit gdbmiwrap;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 {$MODE objfpc}{$H+}
 {$ASSERTIONS on}

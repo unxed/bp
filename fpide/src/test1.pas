@@ -1,4 +1,5 @@
 unit test1;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 {$mode objfpc}
 

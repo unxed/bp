@@ -15,6 +15,7 @@
 {$i globdir.inc}
 
 unit FPIntf;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 {$mode objfpc}
 

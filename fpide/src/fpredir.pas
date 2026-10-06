@@ -15,6 +15,7 @@
 
  **********************************************************************}
 Unit FpRedir;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 Interface
 
 {$R-}

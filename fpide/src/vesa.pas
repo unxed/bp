@@ -13,6 +13,7 @@
 
  **********************************************************************}
 unit VESA;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 {$ifdef DEBUG}
 {$define TESTGRAPHIC}

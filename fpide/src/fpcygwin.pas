@@ -1,4 +1,5 @@
 unit fpcygwin;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

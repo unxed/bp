@@ -14,6 +14,7 @@
  **********************************************************************}
 
 unit FPCodTmp; { Code Templates }
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 {2.0 compatibility}
 {$ifdef VER2_0}
@@ -153,7 +154,7 @@ begin
 end;
 begin
   if Assigned(AList) and Assigned(Text) then
-    Text.ForEach(@CopyIt);
+    Text.ForEach(TNestedActionProc(@CopyIt));
 end;
 
 procedure TCodeTemplate.SetShortCut(const AShortCut: string);
@@ -218,10 +219,10 @@ var T: TCodeTemplate;
     Index: sw_integer;
     P: PCodeTemplate;
 begin
-  T.Init(ShortCut,nil);
+  T := TCodeTemplate.Create(ShortCut,nil);
   if Search(@T,Index)=false then P:=nil else
-    P:=At(Index);
-  T.Done;
+    P:=TCodeTemplate(At(Index));
+  T.Free;
   SearchByShortCut:=P;
 end;
 
@@ -239,7 +240,7 @@ begin
     begin
       OLI:=Left; ORI:=Right;
       Mid:=Left+(Right-Left) div 2;
-      MidP:=At(Mid);
+      MidP:=TCodeTemplate(At(Mid));
       MidS:=UpCaseStr(MidP.GetShortCut);
       if copy(MidS,1,length(UpS))=UpS then
         begin
@@ -272,7 +273,7 @@ begin
     return '' in that case }
   if (Idx<>-1) and (Idx<Count-1) and not AcceptMulti then
     begin
-      MidP:=At(Idx+1);
+      MidP:=TCodeTemplate(At(Idx+1));
       MidS:=UpCaseStr(MidP.GetShortCut);
       if copy(MidS,1,length(UpS))=UpS then
         begin
@@ -299,7 +300,7 @@ begin
         CompleteName:=CodeTemplates.Lookup(ShortCut,false,Idx);
         if Idx<>-1 then
           begin
-            P:=CodeTemplates.At(Idx);
+            P:=TCodeTemplate(CodeTemplates.At(Idx));
             ShortCut:=CompleteName;
           end;
       end;
@@ -355,7 +356,7 @@ end;
 function TCodeTemplateListBox.GetText(Item,MaxLen: Sw_Integer): String;
 var P: PCodeTemplate;
 begin
-  P:=List.At(Item);
+  P:=TCodeTemplate(List.At(Item));
   GetText:=P.GetShortCut;
 end;
 
@@ -529,7 +530,7 @@ begin
   if Assigned(CodeTemplates) then
   for I:=0 to CodeTemplates.Count-1 do
     begin
-      P:=CodeTemplates.At(I);
+      P:=TCodeTemplate(CodeTemplates.At(I));
       L := TUnsortedStringCollection.Create(10,50);
       P.GetText(L);
       C.Insert(TCodeTemplate.Create(P.GetShortCut,L));
@@ -562,7 +563,7 @@ begin
   IC:=CodeTemplatesLB.Range=0;
   if IC=false then
     begin
-      P:=CodeTemplatesLB.List.At(CodeTemplatesLB.Focused);
+      P:=TCodeTemplate(CodeTemplatesLB.List.At(CodeTemplatesLB.Focused));
       P.GetParams(S,L);
     end
   else
@@ -607,7 +608,7 @@ begin
   if CodeTemplatesLB.Range=0 then Exit;
   L := TUnsortedStringCollection.Create(10,10);
   I:=CodeTemplatesLB.Focused;
-  O:=CodeTemplatesLB.List.At(I);
+  O:=TCodeTemplate(CodeTemplatesLB.List.At(I));
   O.GetParams(S,L);
   P := TCodeTemplate.Create(S, L);
   repeat

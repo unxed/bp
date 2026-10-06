@@ -14,6 +14,7 @@
  **********************************************************************}
 {$I globdir.inc}
 unit FPCalc;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

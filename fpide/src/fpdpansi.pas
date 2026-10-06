@@ -13,6 +13,7 @@
 
  **********************************************************************}
 unit fpdpansi;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

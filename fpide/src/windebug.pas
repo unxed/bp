@@ -13,6 +13,7 @@
 
  **********************************************************************}
 Unit windebug;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

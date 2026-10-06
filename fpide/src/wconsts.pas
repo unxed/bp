@@ -13,6 +13,7 @@
 
 {$mode objfpc}
 unit wconsts;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
   interface
 

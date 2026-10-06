@@ -22,7 +22,7 @@ fi
 
 # Matches packages/ide/fpmake.pp for a native linux64 IDE with GDB/MI.
 # GEN + tv/src must be first: FPC's default path has rtl-extra/Objects and fv/Drivers.
-FPIDE_OPTS="-Mobjfpc -Sh- -Se1 -Sg -Ur"
+FPIDE_OPTS="-Mobjfpc -Sh- -Se1 -Sg"
 FPIDE_OPTS="$FPIDE_OPTS -dNOCATCH -dBrowserCol -dGDB -d$FPIDE_CPU"
 FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_GEN -Fu$here/tv/src -Fu$FPIDE_COMPAT"
 FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_STAGE -Fu$FPIDE_STAGE/compiler"

@@ -13,6 +13,7 @@
 
  **********************************************************************}
 unit FPConst;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

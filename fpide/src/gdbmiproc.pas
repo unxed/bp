@@ -14,6 +14,7 @@
  **********************************************************************}
 
 unit GDBMIProc;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 {$MODE objfpc}{$H+}
 

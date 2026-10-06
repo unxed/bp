@@ -1,4 +1,5 @@
 unit fpmingw;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 {
     This file is part of the Free Pascal Integrated Development Environment
     Copyright (c) 2009 by Marco van de Voort

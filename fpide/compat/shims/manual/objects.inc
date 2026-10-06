@@ -22,6 +22,8 @@ type
   PCollection = TCollection;
   PStream = TStream;
   PBufStream = TBufStream;
+  PMemoryStream = TMemoryStream;
+  PDosStream = TDosStream;
   PSortedCollection = TSortedCollection;
   PStringCollection = TStringCollection;
 

@@ -13,6 +13,7 @@
 
  **********************************************************************}
 Unit fpcatch;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 interface
 
 {$i globdir.inc}

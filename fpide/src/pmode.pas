@@ -13,6 +13,7 @@
 
  **********************************************************************}
 unit PMode;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

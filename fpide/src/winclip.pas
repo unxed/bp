@@ -15,6 +15,7 @@
  **********************************************************************}
 {$i globdir.inc}
 unit WinClip;
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 

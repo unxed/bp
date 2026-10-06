@@ -15,6 +15,7 @@
 
 
 unit FPCodCmp; { CodeComplete }
+{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
 
@@ -222,7 +223,7 @@ var
   Level : longint;
   UpStandardUnits : string;
 
-  procedure InsertInS(P: PSymbol);
+  procedure InsertInS(Item: Pointer);
 
     procedure InsertItemsInS(P: PSymbolCollection);
     var I: Sw_integer;
@@ -231,9 +232,11 @@ var
         InsertInS(P.At(I));
     end;
   Var
+    P : PSymbol;
     st : string;
     CIndex : sw_integer;
   begin
+    P:=PSymbol(Item);
     Inc(level);
     if UnitsCodeCompleteWords.Count=MaxCollectionSize then
        begin Overflow:=true; Exit; end;
@@ -270,7 +273,7 @@ begin
       UnitsCodeCompleteWords := TCodeCompleteWordList.Create(10,10);
       level:=0;
       Overflow:=false;
-      BrowCol.Modules.ForEach(@InsertInS);
+      BrowCol.Modules.ForEach(TNestedActionProc(@InsertInS));
       { if Overflow then
         WarningBox(msg_toomanysymbolscantdisplayall,nil); }
     end;
@@ -289,7 +292,7 @@ begin
   HiddenSource.Hide;
   CompilingHiddenFile:=HiddenSource;
   { compile a dummy file to get symbol info }
-  with HiddenSource.Editor^ do
+  with HiddenSource.Editor do
     begin
       FileName:=CodeCompleteUnitName+'.pp';
       Addline('unit '+CodeCompleteUnitName+';');
