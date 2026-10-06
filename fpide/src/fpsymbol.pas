@@ -1205,6 +1205,7 @@ end;
 
 procedure TSymbolInheritanceView.HandleEvent(var Event: TEvent);
 var DontClear: boolean;
+    KbEvent: TEvent;
 {$ifndef HASOUTLINE}
         P: TPoint;
 {$endif HASOUTLINE}
@@ -1236,7 +1237,8 @@ begin
 {$endif HASOUTLINE}
         if ((Event.EventFlags and meDoubleClick)<>0) then
           begin
-            Message(Self,evKeyDown,kbEnter,nil);
+            MakeKeyEvent(KbEvent,kbEnter,0);
+            HandleEvent(KbEvent);
             ClearEvent(Event);
           end;
       end;

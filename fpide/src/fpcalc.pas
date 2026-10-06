@@ -520,7 +520,10 @@ begin
     evCommand :
      case Event.Command of
        cmCalculatorPaste :
-         Message(Self,evKeyDown,kbCtrlEnter,nil);
+         begin
+           MakeKeyEvent(CDEvent,kbCtrlEnter,0);
+           HandleEvent(CDEvent);
+         end;
      end;
     evKeyDown :
      case Event.KeyCode of
