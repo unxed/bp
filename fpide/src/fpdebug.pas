@@ -31,7 +31,7 @@ uses
   Objects,Dialogs,Drivers,Views,
 {$ifndef NODEBUG}
   {$ifdef GDBMI}
-    GDBMICon,GDBMIInt,
+    GDBMICon,GDBMIInt,GdbPty,
   {$else GDBMI}
     GDBCon,GDBInt,
   {$endif GDBMI}
@@ -811,6 +811,7 @@ const
 var
   Debuggeefile : text;
   ResetOK, TTYUsed  : boolean;
+  PtyName : string;
 {$endif Unix}
 {$ifdef PALMOSGDB}
 const
@@ -935,7 +936,11 @@ begin
     end
   else
     begin
-      if TTYName(input)<>'' then
+      { the debuggee gets a terminal of its own (gdb cannot take over the one of the IDE); the IDE relays it }
+      PtyName:=PtyOpen;
+      if PtyName<>'' then
+        Command(SetTTYCommand+' '+PtyName)
+      else if TTYName(input)<>'' then
         Command(SetTTYCommand+' '+TTYName(input));
       NoSwitch := false;
     end;
@@ -961,6 +966,9 @@ begin
     begin
       { Set cwd for debuggee }
       SetDir(GetRunDir);
+      { the breakpoints of the list (changed while nothing ran) go to gdb now }
+      RemoveBreakpoints;
+      InsertBreakpoints;
       inherited Run;
       { Restore cwd for IDE }
       SetDir(StartupDir);
@@ -1910,7 +1918,9 @@ end;
 procedure TBreakpointCollection.Update;
 begin
 {$ifndef NODEBUG}
-  if assigned(Debugger) then
+  { gdb gets the changes at once only while the program runs; otherwise at the next Run (the exe that is loaded
+    may be that of another program: its symbols know nothing of the new breakpoint) }
+  if assigned(Debugger) and Debugger.IsRunning then
     begin
       Debugger.RemoveBreakpoints;
       Debugger.InsertBreakpoints;

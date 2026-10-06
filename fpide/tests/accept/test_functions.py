@@ -482,8 +482,14 @@ def section_debug(t):
     # Run builds with symbols and starts gdb; the program stops at the breakpoint
     t.menu('M-r', 'Run', exact=True)
     check(t.wait_until(lambda: line_colors(t)[5] != plain[5], 45), 'Run stops at the breakpoint: line 6 is painted as the debugger row', t)
-    menu(t, 'M-d', 'Call stack')
-    check(t.wait_for('dbgt.pas(6) main()', 5), 'Debug > Call stack shows main() on line 6', t)
+    shown = False
+    for _ in range(3):                       # the IDE may still be busy with the stop: ask again
+        close_dialogs(t, 1)
+        menu(t, 'M-d', 'Call stack')
+        shown = t.wait_for('dbgt.pas(6) main()', 4)
+        if shown:
+            break
+    check(shown, 'Debug > Call stack shows main() on line 6', t)
     t.key('Escape'); t.pump(0.3)
     # Step over executes the line: s becomes 1
     t.key('F8')
@@ -503,6 +509,23 @@ def section_debug(t):
     check(t.wait_for('Program exited with', 8) and 'exitcode = 0' in t.text(), 'Run/Continue lets the program finish: "Program exited with exitcode = 0"', t)
     t.key('Enter')
     check(t.wait_gone('Program exited', 3) and t.alive(), 'the IDE is back in control after the program ends', t)
+
+    # a program that reads: it runs on a terminal of its own, which the IDE relays (the keys reach it, nothing
+    # of gdb is printed over the screen)
+    close_all(t)
+    new_file(t)
+    type_lines(t, 'program rd;', 'var s: string;', 'begin', "write('name? ');", 'readln(s);', "writeln('hello ', s);", 'end.')
+    t.key('F2'); t.wait_for('Save File As'); t.type('rd.pas'); t.key('Enter'); t.pump(0.8)
+    t.key('C-Home', 'Down', 'Down', 'Down', 'Down', 'Down', 'Home')
+    menu(t, 'M-d', 'Breakpoint')
+    t.menu('M-r', 'Run', exact=True)
+    check(t.wait_until(lambda: 'GDB Version' in t.text() and 'name?' in t.text(), 45), 'a debugged program shows its output on the user screen', t)
+    check('controlling terminal' not in t.text() and 'GDB:' not in t.text().replace('GDB Version', ''),
+          'no gdb warning is printed on the user screen', t)
+    t.type('abc')
+    check(t.wait_for('name? abc', 5), 'the typed text is echoed on the user screen (the keys are relayed)', t); t.key('Enter')
+    check(t.wait_for('Window  Help', 10) and t.wait_until(lambda: t.indicator() == (6, 1), 10),
+          'the typed line reaches the program; it runs on to the breakpoint and the IDE returns: %r' % (t.indicator(),), t)
 
 
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),

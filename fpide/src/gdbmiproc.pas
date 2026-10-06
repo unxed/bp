@@ -49,7 +49,7 @@ var
 implementation
 
 uses
-  fputils;
+  fputils, GdbPty;
 
 var
   DebugLogEnabled: Boolean = False;
@@ -66,6 +66,8 @@ begin
   Result := '';
   while FProcess.Running do
   begin
+    { while the debuggee runs, its terminal is served here }
+    PtyWait(FProcess.Output.Handle);
     FProcess.Output.Read(C, 1);
 {$ifdef windows}
     { On windows we expect both #13#10 and #10 }

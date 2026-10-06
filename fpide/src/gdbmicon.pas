@@ -361,6 +361,11 @@ begin
   if bfHardware in BreakpointFlags then
     Options := Options + '-h ';
   Command('-break-insert ' + Options + location);
+  { a breakpoint in a source that is not part of the loaded program stays pending (not an error: the list of
+    breakpoints may hold those of other programs) }
+  if (not GDB.ResultRecord.Success) and
+     (Pos('No source file named', GDB.ResultRecord.Parameters['msg'].AsString) > 0) then
+    Command('-break-insert -f ' + Options + location);
   if GDB.ResultRecord.Success then
     BreakpointInsert := GDB.ResultRecord.Parameters['bkpt'].AsTuple['number'].AsLongInt
   else

@@ -24,7 +24,7 @@ unit gdbmiwrap;
 interface
 
 uses
-  SysUtils, Classes, GDBMIProc;
+  SysUtils, Classes, GDBMIProc, GdbPty;
 
 type
 {$ifdef TARGET_IS_64BIT}
@@ -552,9 +552,14 @@ end;
 
 procedure TGDBWrapper.WaitForProgramStop;
 begin
-  repeat
-    ReadResponse;
-  until (ExecAsyncOutput.AsyncClass = 'stopped') or not FProcess.Alive;
+  PtyRelayBegin;
+  try
+    repeat
+      ReadResponse;
+    until (ExecAsyncOutput.AsyncClass = 'stopped') or not FProcess.Alive;
+  finally
+    PtyRelayEnd;
+  end;
 end;
 
 end.
