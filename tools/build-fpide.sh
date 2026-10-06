@@ -16,6 +16,7 @@ export FPIDE_EXTRA="${FPIDE_OPTS_EXTRA} ${FPIDE_EXTRA:-}"
 echo "== shims (FV names → tv3)"
 fpide_gen_shims
 echo "== compile fp.pas ($target)"
+rm -f "$out/fp"   # a failed compile must not leave (and report) the previous binary
 fpide_compile fp.pas
 log="$FPIDE_OBJ/fp.log"
 grep -a -E 'Error|Fatal|Warning:' "$log" | head -40 || true

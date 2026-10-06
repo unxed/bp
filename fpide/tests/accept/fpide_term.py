@@ -82,9 +82,11 @@ class TmuxTerm:
         box = None
         for y, row in enumerate(grid):
             chars = ''.join(c for c, _ in row)
-            if '┐' in chars and '┌' in chars[:chars.index('┐')]:
-                x1 = chars.index('┐')           # the first corner on the row is the menu's, not a window's
-                box = (y, chars.rindex('┌', 0, x1), x1)
+            for m in re.finditer(r'┌─+┐', chars):
+                if m.end() - m.start() <= 40:     # a menu box is narrow; an unfocused window's frame is not
+                    box = (y, m.start(), m.end() - 1)
+                    break
+            if box:
                 break
         if not box:
             return []

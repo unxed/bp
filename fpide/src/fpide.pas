@@ -1164,10 +1164,31 @@ begin
     nil)))))))))));
 end;
 
+var
+  LastAnyEditor, LastAnyWindow, LastVisWindow: integer;
+
 procedure TIDEApp.Idle;
+  function B2I(B: boolean): integer;
+  begin
+    if B then B2I:=1 else B2I:=0;
+  end;
+var E,W,V: integer;
 begin
   inherited Idle;
   Message(Application,evIdle,0,nil);
+  { windows come and go without a cmUpdate: keep the window commands in step with the desktop }
+  if Assigned(Desktop) and not IsClosing then
+    begin
+      E:=B2I(IsThereAnyEditor); W:=B2I(IsThereAnyWindow); V:=B2I(IsThereAnyVisibleWindow);
+      if (E<>LastAnyEditor) or (W<>LastAnyWindow) or (V<>LastVisWindow) then
+        begin
+          LastAnyEditor:=E; LastAnyWindow:=W; LastVisWindow:=V;
+          SetCmdState([cmSaveAll],E<>0);
+          SetCmdState([cmCloseAll,cmWindowList],W<>0);
+          SetCmdState([cmTile,cmCascade],V<>0);
+          Message(Application,evBroadcast,cmCommandSetChanged,nil);
+        end;
+    end;
 end;
 
 procedure TIDEApp.GetEvent(var Event: TEvent);

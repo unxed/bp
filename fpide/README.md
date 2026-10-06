@@ -29,6 +29,7 @@ tools/fpide-preflight.sh              # layout + shims + smoke-link; fp — ин
 ```sh
 git submodule update --init tv
 tools/build-fpide.sh linux64          # результат: out/fpide/linux64/fp
+tools/fpide-setup-build.sh [test]     # одной командой: пакеты (apt), сабмодуль, исходники FPC, сборка, [тесты]
 ```
 
 Переменные: `FPIDE_TV=/path/to/tv3`, `FPIDE_GDBMI=1` (по умолчанию, как апстрим на Linux), `FPIDE_NOGDB=1` — только явный отказ от отладчика, `FPIDE_EXTRA` — доп. флаги FPC.
