@@ -1,7 +1,6 @@
 #!/bin/sh
 # Fast local gate before pushing fpide changes (avoids burning GitHub runners).
 # usage: tools/fpide-preflight.sh
-# env:   FPIDE_PREFLIGHT_STRICT=1 — also require tools/build-fpide.sh to link fp
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 cd "$here"
@@ -40,24 +39,25 @@ fi
 grep -q 'fpide-smoke: shims+tv3 OK' "$out/smoke.run"
 echo "smoke OK"
 
-echo "== ensure FPC compiler/ (fetch, not in git)"
-"$here/fpide/bootstrap/ensure-compiler.sh"
-
-echo "== compile fp.pas (informational unless STRICT)"
+echo "== compile fp.pas (system fpc; no compiler sources needed)"
 export out
 . "$here/tools/fpide-env.sh"
 fpide_gen_shims
 fpide_compile fp.pas
 log=$FPIDE_OBJ/fp.log
-if [ -f "$out/fp" ]; then
-  echo "fp linked"
-elif [ "${FPIDE_PREFLIGHT_STRICT:-0}" = 1 ]; then
-  echo "STRICT: fp not linked" >&2
+if [ ! -f "$out/fp" ]; then
+  echo "fp was not linked" >&2
   grep -a -E 'Error|Fatal' "$log" | head -40 >&2 || true
   exit 1
-else
-  echo "fp not linked yet (expected until object→class). Top errors:"
-  grep -a -E 'Error|Fatal' "$log" | head -20 || echo "(see $log)"
+fi
+echo "fp linked"
+if grep -a -q 'inherited method is hidden' "$log" 2>/dev/null; then
+  grep -a 'inherited method is hidden' "$log" | grep -v 'Update(LongInt)' | sort -u > "$FPIDE_OBJ/hidden.txt" || true
+  if [ -s "$FPIDE_OBJ/hidden.txt" ]; then
+    echo "a method lost its override:" >&2
+    cat "$FPIDE_OBJ/hidden.txt" >&2
+    exit 1
+  fi
 fi
 
 echo "PREFLIGHT OK"

@@ -1,6 +1,8 @@
 name: fpide
 
-# Text Mode IDE port: bootstrap reproducibility, tv3 tests, layout, compile attempt (linux64).
+# Text Mode IDE port: tv3 tests, layout, shims smoke, manual full build (linux64). The full build and the
+# click-through tests of the IDE itself run in fpide-accept.yml. (The old job that diffed fpide/src with FPC
+# upstream is gone: the port diverged on purpose.)
 on:
   workflow_dispatch:
   push:
@@ -25,15 +27,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  bootstrap:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Reproduce IDE + compiler trees from FPC upstream
-        run: fpide/bootstrap/run.sh out/bootstrap-fpide
-      - name: Match committed IDE tree (compiler is not in git)
-        run: diff -rq out/bootstrap-fpide/staging-ide fpide/src
-
   layout:
     runs-on: ubuntu-24.04
     steps:
@@ -53,17 +46,16 @@ jobs:
       - name: tv3 unit tests (memory backend)
         run: tools/tv-test.sh
 
-  # Heavy IDE compile: manual only until local tools/fpide-preflight.sh is green
-  # and milestone 1 links. Push CI stays on bootstrap/layout/tv (+ smoke below).
+  # Smoke link of the shims on tv3; the full IDE build is in fpide-accept.yml.
   preflight:
     runs-on: ubuntu-24.04
-    needs: [bootstrap, layout, tv]
+    needs: [layout, tv]
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Packages
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-base fp-units-misc python3
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-base fp-units-misc fp-units-fcl fp-units-gfx python3
       - name: Local-equivalent preflight (shims + smoke)
         run: tools/fpide-preflight.sh
 
@@ -76,7 +68,7 @@ jobs:
         with:
           submodules: true
       - name: Packages
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-base fp-units-misc python3
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-base fp-units-misc fp-units-fcl fp-units-gfx python3
       - name: Build fp (linux64, GDB/MI as upstream)
         run: tools/build-fpide.sh linux64 out/fpide/linux64
       - name: Upload compiler log on failure
