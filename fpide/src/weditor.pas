@@ -477,8 +477,8 @@ type
       NoSelect   : Boolean;
       AlwaysShowScrollBars: boolean;
    public
-{      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);}
+{      constructor Load(S: TStream);
+      procedure   Store(S: TStream);}
       procedure   ConvertEvent(var Event: TEvent); virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
       procedure   SetState(AState: Word; Enable: Boolean); virtual;

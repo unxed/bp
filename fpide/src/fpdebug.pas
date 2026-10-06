@@ -132,8 +132,8 @@ type
      constructor Init_Empty;
      constructor Init_file_line(AFile : String; ALine : longint);
      constructor Init_type(atyp : BreakpointType;Const AnExpr : String);
-     constructor Load(var S: TStream);
-     procedure   Store(var S: TStream);
+     constructor Load(S: TStream);
+     procedure   Store(S: TStream);
      procedure  Insert;
      procedure  Remove;
      procedure  Enable;
@@ -184,8 +184,8 @@ type
       procedure   ToggleCurrent;
       procedure   Draw; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       destructor Destroy; virtual;
     end;
 
@@ -201,8 +201,8 @@ type
       procedure   SizeLimits(var Min, Max: TPoint);virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
       procedure   Update; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       destructor Destroy; virtual;
     end;
 
@@ -227,8 +227,8 @@ type
       expr : pstring;
       last_value,current_value : pchar;
       constructor Create(s : string);
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure rename(s : string);
       procedure Get_new_value;
       procedure Force_new_value;
@@ -267,8 +267,8 @@ type
       (*procedure   ToggleCurrent; *)
       procedure   Draw; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       destructor Destroy; virtual;
     end;
 
@@ -289,8 +289,8 @@ type
     TWatchesWindow = class(TFPDlgWindow)
       WLB : PWatchesListBox;
       constructor Create;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   Update; virtual;
       destructor Destroy; virtual;
     end;
@@ -312,8 +312,8 @@ type
     TStackWindow = class(TFPDlgWindow)
       FLB : PFramesListBox;
       constructor Create;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   Update; virtual;
       destructor Destroy; virtual;
     end;
@@ -1677,7 +1677,7 @@ begin
   CurrentValue:=nil;
 end;
 
-constructor TBreakpoint.Load(var S: TStream);
+constructor TBreakpoint.Load(S: TStream);
 var
   FName : PString;
 begin
@@ -1709,7 +1709,7 @@ begin
   CurrentValue:=nil;
 end;
 
-procedure TBreakpoint.Store(var S: TStream);
+procedure TBreakpoint.Store(S: TStream);
 var
   St : String;
 begin
@@ -2443,12 +2443,12 @@ begin
   end;
 end;
 
-constructor TBreakpointsListBox.Load(var S: TStream);
+constructor TBreakpointsListBox.Load(S: TStream);
 begin
   inherited Load(S);
 end;
 
-procedure TBreakpointsListBox.Store(var S: TStream);
+procedure TBreakpointsListBox.Store(S: TStream);
 var OL: PCollection;
     OldR : integer;
 begin
@@ -2547,13 +2547,13 @@ begin
   BreakpointsWindow:=Self;
 end;
 
-constructor TBreakpointsWindow.Load(var S: TStream);
+constructor TBreakpointsWindow.Load(S: TStream);
 begin
   inherited Load(S);
   GetSubViewPtr(S,BreakLB);
 end;
 
-procedure TBreakpointsWindow.Store(var S: TStream);
+procedure TBreakpointsWindow.Store(S: TStream);
 begin
   inherited Store(S);
   PutSubViewPtr(S,BreakLB);
@@ -2789,7 +2789,7 @@ constructor TWatch.Create(s : string);
     GDBRunCount:=-1;
   end;
 
-constructor TWatch.Load(var S: TStream);
+constructor TWatch.Load(S: TStream);
   begin
     expr:=S.ReadStr;
     last_value:=nil;
@@ -2798,7 +2798,7 @@ constructor TWatch.Load(var S: TStream);
     GDBRunCount:=-1;
   end;
 
-procedure TWatch.Store(var S: TStream);
+procedure TWatch.Store(S: TStream);
   begin
     S.WriteStr(expr);
   end;
@@ -3266,7 +3266,7 @@ begin
   inherited HandleEvent(Event);
 end;
 
-      constructor TWatchesListBox.Load(var S: TStream);
+      constructor TWatchesListBox.Load(S: TStream);
         begin
           inherited Load(S);
           If assigned(List) then
@@ -3276,7 +3276,7 @@ end;
           SetRange(List.count+1);
         end;
 
-      procedure   TWatchesListBox.Store(var S: TStream);
+      procedure   TWatchesListBox.Store(S: TStream);
         var OL: PCollection;
             OldRange : Sw_integer;
         begin
@@ -3345,7 +3345,7 @@ end;
       Draw;
     end;
 
-  constructor TWatchesWindow.Load(var S: TStream);
+  constructor TWatchesWindow.Load(S: TStream);
     begin
       inherited Load(S);
       GetSubViewPtr(S,WLB);
@@ -3354,7 +3354,7 @@ end;
       WatchesWindow:=Self;
     end;
 
-  procedure TWatchesWindow.Store(var S: TStream);
+  procedure TWatchesWindow.Store(S: TStream);
     begin
       inherited Store(S);
       PutSubViewPtr(S,WLB);
@@ -3595,7 +3595,7 @@ end;
       DrawView;
     end;
 
-  constructor TStackWindow.Load(var S: TStream);
+  constructor TStackWindow.Load(S: TStream);
     begin
       inherited Load(S);
       GetSubViewPtr(S,FLB);
@@ -3604,7 +3604,7 @@ end;
       StackWindow:=Self;
     end;
 
-  procedure TStackWindow.Store(var S: TStream);
+  procedure TStackWindow.Store(S: TStream);
     begin
       inherited Store(S);
       PutSubViewPtr(S,FLB);

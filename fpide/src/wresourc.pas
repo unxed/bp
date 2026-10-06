@@ -124,11 +124,11 @@ type
        function    AddResourceEntry(const ResName: string; ALangID, AFlags: longint; var Data;
                    ADataSize: sw_integer): boolean; virtual;
        function    AddResourceEntryFromStream(const ResName: string; ALangID, AFlags: longint;
-                   var Source: TStream; ADataSize: longint): boolean; virtual;
+                   Source: TStream; ADataSize: longint): boolean; virtual;
        function    DeleteResourceEntry(const ResName: string; ALangID: longint): boolean; virtual;
        function    DeleteResource(const ResName: string): boolean; virtual;
        function    ReadResourceEntry(const ResName: string; ALangID: longint; var Buf; BufSize: sw_word): boolean;
-       function    ReadResourceEntryToStream(const ResName: string; ALangID: longint; var DestS: TStream): boolean;
+       function    ReadResourceEntryToStream(const ResName: string; ALangID: longint; DestS: TStream): boolean;
        procedure   Flush; virtual;
        destructor Destroy; virtual;
      public
@@ -456,7 +456,7 @@ begin
 end;
 
 function TResourceFile.AddResourceEntryFromStream(const ResName: string; ALangID, AFlags: longint;
-           var Source: TStream; ADataSize: longint): boolean;
+           Source: TStream; ADataSize: longint): boolean;
 const BufSize = 4096;
 var OK: boolean;
     P: PResource;
@@ -565,7 +565,7 @@ begin
   ReadResourceEntry:=OK;
 end;
 
-function TResourceFile.ReadResourceEntryToStream(const ResName: string; ALangID: longint; var DestS: TStream): boolean;
+function TResourceFile.ReadResourceEntryToStream(const ResName: string; ALangID: longint; DestS: TStream): boolean;
 var E: PResourceEntry;
     P: PResource;
     OK: boolean;

@@ -72,8 +72,8 @@ type
       procedure   SizeLimits(var Min, Max: TPoint); virtual;
       procedure   AddMessage(AClass: longint;const Msg, Module: string; Line, Column: longint);
       procedure   ClearMessages;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   SetState(AState: Word; Enable: Boolean); virtual;
       procedure   UpdateCommands; virtual;
     private
@@ -477,7 +477,7 @@ begin
     evBroadcast :
       case Event.Command of
         cmListFocusChanged :
-          if Event.InfoPtr=MsgLB then
+          if Event.InfoPtr=Pointer(MsgLB) then
             Message(Application,evBroadcast,cmClearLineHighlights,Self);
       end;
   end;
@@ -507,14 +507,14 @@ begin
 end;
 
 
-constructor TCompilerMessageWindow.Load(var S: TStream);
+constructor TCompilerMessageWindow.Load(S: TStream);
 begin
   inherited Load(S);
   GetSubViewPtr(S,MsgLB);
 end;
 
 
-procedure TCompilerMessageWindow.Store(var S: TStream);
+procedure TCompilerMessageWindow.Store(S: TStream);
 begin
   if MsgLB.List=nil then
     MsgLB.NewList(TCollection.Create(100,100));
@@ -823,7 +823,7 @@ begin
   if assigned(CompilingHiddenFile) then
     P:=CompilingHiddenFile
   else
-    P:=Message(Desktop,evBroadcast,cmSearchWindow,nil);
+    P:=TSourceWindow(Message(Desktop,evBroadcast,cmSearchWindow,nil));
   if (PrimaryFileMain='') and (P=nil) then
     FileName:='' { nothing to compile }
   else

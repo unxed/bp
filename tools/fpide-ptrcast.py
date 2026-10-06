@@ -52,8 +52,11 @@ def expr_start(b, col, is_arg):
             s = i + 2
             while b[s:s + 1] == b' ':
                 s += 1
+            seg = b[s:col].lower()
+            if b';' in seg or re.search(rb'\b(then|do|else|and|or)\b|=|<|>', seg):
+                return None  # a comparison or another statement: not a plain assignment, leave it
             return s
-        return col
+        return None
     depth = 0
     i = col
     while i > 0:
@@ -83,6 +86,9 @@ def main(log, src):
         for line, col, typ, is_arg in sorted(items, key=lambda x: (x[0], -x[1])):
             b = lines[line - 1]
             s = expr_start(b, col - 1, is_arg)
+            if s is None:
+                print(f'ptrcast: skipped {f}:{line}', file=sys.stderr)
+                continue
             e = expr_end(b, s)
             expr = b[s:e].rstrip()
             if not expr or expr.lower().startswith(typ.lower().encode() + b'('):

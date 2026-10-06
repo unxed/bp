@@ -188,8 +188,8 @@ type
         procedure   RenderTopic; virtual;
         procedure   Lookup(S: string); virtual;
         function    GetPalette: TPalette; virtual;
-        constructor Load(var S: TStream);
-        procedure   Store(var S: TStream);
+        constructor Load(S: TStream);
+        procedure   Store(S: TStream);
         destructor Destroy; virtual;
       private
         History    : array[0..HistorySize] of THelpHistoryEntry;
@@ -1341,12 +1341,12 @@ begin
   Result := MakePalette(CHelpViewer);
 end;
 
-constructor THelpViewer.Load(var S: TStream);
+constructor THelpViewer.Load(S: TStream);
 begin
   inherited Load(S);
 end;
 
-procedure THelpViewer.Store(var S: TStream);
+procedure THelpViewer.Store(S: TStream);
 begin
   inherited Store(S);
 end;

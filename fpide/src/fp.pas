@@ -249,7 +249,7 @@ begin
   end;
 end;
 
-Procedure MyStreamError(Var S: TStream);
+Procedure MyStreamError(S: TStream);
 var ErrS: string;
 begin
   case S.Status of

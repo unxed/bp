@@ -838,14 +838,14 @@ begin
   end;
 end;
 
-{constructor TIndicator.Load(var S: TStream);
+{constructor TIndicator.Load(S: TStream);
 begin
   inherited Load(S);
   S.Read(Location,SizeOf(Location));
   S.Read(Modified,SizeOf(Modified));
 end;
 
-procedure TIndicator.Store(var S: TStream);
+procedure TIndicator.Store(S: TStream);
 begin
   inherited Store(S);
   S.Write(Location,SizeOf(Location));
@@ -1583,7 +1583,7 @@ begin
   Unlock;
 end;
 
-(*constructor TCodeEditor.Load(var S: TStream);
+(*constructor TCodeEditor.Load(S: TStream);
 var TS: PSubStream;
     TSize: longint;
 begin
@@ -1628,7 +1628,7 @@ begin
   UpdateIndicator;
 end;
 
-procedure TCodeEditor.Store(var S: TStream);
+procedure TCodeEditor.Store(S: TStream);
 var {NS: TNulStream;}
     TSizePos,TSize,EndPos: longint;
 begin
@@ -1987,7 +1987,7 @@ begin
   Valid:=OK;
 end;
 
-(* constructor TFileEditor.Load(var S: TStream);
+(* constructor TFileEditor.Load(S: TStream);
 var P: PString;
     SSP,SEP,CP,DP: TPoint;
     HR: TRect;
@@ -2029,7 +2029,7 @@ begin
   SetStoreUndo(HoldUndo);
 end;
 
-procedure TFileEditor.Store(var S: TStream);
+procedure TFileEditor.Store(S: TStream);
 begin
   inherited Store(S);
   S.WriteStr(@FileName);

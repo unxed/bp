@@ -108,8 +108,8 @@ type
       procedure   Clear; virtual;
       procedure   Update; virtual;
       function    GetPalette: TPalette; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       destructor Destroy; override;
     end;
 
@@ -120,8 +120,8 @@ type
       procedure   Update; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
       function    GetPalette: TPalette; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       destructor Destroy; override;
       procedure   FocusItem(i : sw_integer);
       procedure   SizeLimits(var Min, Max: TPoint); virtual;
@@ -1543,12 +1543,12 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TToolMessageListBox.Load(var S: TStream);
+constructor TToolMessageListBox.Load(S: TStream);
 begin
   inherited Load(S);
 end;
 
-procedure TToolMessageListBox.Store(var S: TStream);
+procedure TToolMessageListBox.Store(S: TStream);
 var OL: PCollection;
 begin
   OL:=List;
@@ -1628,7 +1628,7 @@ begin
   GetPalette:=@S;
 end;
 
-constructor TMessagesWindow.Load(var S: TStream);
+constructor TMessagesWindow.Load(S: TStream);
 begin
   inherited Load(S);
 
@@ -1638,7 +1638,7 @@ begin
   MessagesWindow:=Self;
 end;
 
-procedure TMessagesWindow.Store(var S: TStream);
+procedure TMessagesWindow.Store(S: TStream);
 begin
   inherited Store(S);
 

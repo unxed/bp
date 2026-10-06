@@ -47,10 +47,10 @@ type
 function FPCompleteCodeWord(const WordS: string; var Text: string): boolean;
 
 procedure InitCodeComplete;
-function  LoadCodeComplete(var S: TStream): boolean;
+function  LoadCodeComplete(S: TStream): boolean;
 procedure AddStandardUnitsToCodeComplete;
 procedure AddAvailableUnitsToCodeComplete(OnlyStandard : boolean);
-function  StoreCodeComplete(var S: TStream): boolean;
+function  StoreCodeComplete(S: TStream): boolean;
 procedure DoneCodeComplete;
 
 const CodeCompleteWords : PCodeCompleteWordList = nil;
@@ -318,7 +318,7 @@ begin
   HiddenSource.Free;
 end;
 
-function LoadCodeComplete(var S: TStream): boolean;
+function LoadCodeComplete(S: TStream): boolean;
 var C: PCodeCompleteWordList;
     OK: boolean;
     NewCodeCompleteMinLen : byte;
@@ -377,7 +377,7 @@ begin
   LoadCodeComplete:=OK;
 end;
 
-function StoreCodeComplete(var S: TStream): boolean;
+function StoreCodeComplete(S: TStream): boolean;
 var OK: boolean;
 begin
   OK:=Assigned(CodeCompleteWords);

@@ -79,8 +79,8 @@ type
       procedure   HandleEvent(var Event: TEvent); virtual;
       procedure   SetState(AState: Word; Enable: Boolean); virtual;
       procedure   UpdateCommands; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   Update; virtual;
       procedure   SelectInDebugSession;
     end;
@@ -102,8 +102,8 @@ type
       procedure   Hide; {virtual;}
       procedure   HandleEvent(var Event: TEvent); virtual;
       function    GetPalette: TPalette; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
     end;
 
     TTextScroller = class;
@@ -205,8 +205,8 @@ type
       procedure   Update; virtual;
       procedure   UpdateCommands; virtual;
       function    GetPalette: TPalette; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   Close; virtual;
       destructor Destroy; virtual;
     end;
@@ -241,8 +241,8 @@ type
       procedure   WriteOutputText(Buf : pchar);
       procedure   WriteErrorText(Buf : pchar);
       function    GetPalette: TPalette;virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   UpdateCommands; virtual;
       destructor Destroy; virtual;
     end;
@@ -303,8 +303,8 @@ type
     TClipboardWindow = class(TSourceWindow)
       constructor Create;
       procedure   Close; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       destructor Destroy; virtual;
     end;
 
@@ -340,8 +340,8 @@ type
       procedure   Draw; virtual;
       procedure   HandleEvent(var Event: TEvent); virtual;
       function    GetLocalMenu: PMenu; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       destructor Destroy; virtual;
     end;
 
@@ -425,8 +425,8 @@ PTabItem = ^TTabItem;
     PFPASCIIChart = TFPASCIIChart;
     TFPASCIIChart = class(TASCIIChart)
       constructor Create;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   HandleEvent(var Event: TEvent); virtual;
       destructor Destroy; virtual;
     end;
@@ -442,8 +442,8 @@ PTabItem = ^TTabItem;
     TFPDesktop = class(TDesktop)
       constructor Create(var Bounds: TRect);
       procedure   InitBackground; virtual;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
     end;
 
     TFPMemo = class;
@@ -2054,13 +2054,13 @@ begin
 end;
 
 
-constructor TFPWindow.Load(var S: TStream);
+constructor TFPWindow.Load(S: TStream);
 begin
   inherited Load(S);
   S.Read(AutoNumber,SizeOf(AutoNumber));
 end;
 
-procedure TFPWindow.Store(var S: TStream);
+procedure TFPWindow.Store(S: TStream);
 begin
   inherited Store(S);
   S.Write(AutoNumber,SizeOf(AutoNumber));
@@ -2153,12 +2153,12 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TFPHelpWindow.Load(var S: TStream);
+constructor TFPHelpWindow.Load(S: TStream);
 begin
   Abstract;
 end;
 
-procedure TFPHelpWindow.Store(var S: TStream);
+procedure TFPHelpWindow.Store(S: TStream);
 begin
   Abstract;
 end;
@@ -2308,7 +2308,7 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TSourceWindow.Load(var S: TStream);
+constructor TSourceWindow.Load(S: TStream);
 begin
   Title:=S.ReadStr;
   PushStatus(FormatStrStr(msg_loadingfile,GetStr(Title)));
@@ -2322,7 +2322,7 @@ begin
   PopStatus;
 end;
 
-procedure TSourceWindow.Store(var S: TStream);
+procedure TSourceWindow.Store(S: TStream);
 begin
   S.WriteStr(Title);
   PushStatus(FormatStrStr(msg_storingfile,GetStr(Title)));
@@ -2506,7 +2506,7 @@ begin
   inherited Destroy;
 end;
 
-constructor TGDBWindow.Load(var S: TStream);
+constructor TGDBWindow.Load(S: TStream);
 begin
   inherited Load(S);
   GetSubViewPtr(S,Indicator);
@@ -2514,7 +2514,7 @@ begin
   GDBWindow:=Self;
 end;
 
-procedure TGDBWindow.Store(var S: TStream);
+procedure TGDBWindow.Store(S: TStream);
 begin
   inherited Store(S);
   PutSubViewPtr(S,Indicator);
@@ -2950,14 +2950,14 @@ begin
   Hide;
 end;
 
-constructor TClipboardWindow.Load(var S: TStream);
+constructor TClipboardWindow.Load(S: TStream);
 begin
   inherited Load(S);
 
   Clipboard:=Editor;
 end;
 
-procedure TClipboardWindow.Store(var S: TStream);
+procedure TClipboardWindow.Store(S: TStream);
 begin
   inherited Store(S);
 end;
@@ -3280,14 +3280,14 @@ begin
   end;
 end;
 
-constructor TMessageListBox.Load(var S: TStream);
+constructor TMessageListBox.Load(S: TStream);
 begin
   inherited Load(S);
   ModuleNames := TStoreCollection.Create(50,100);
   NoSelection:=true;
 end;
 
-procedure TMessageListBox.Store(var S: TStream);
+procedure TMessageListBox.Store(S: TStream);
 var OL: PCollection;
     ORV: sw_integer;
 begin
@@ -4355,12 +4355,12 @@ begin
   ASCIIChart:=Self;
 end;
 
-procedure TFPASCIIChart.Store(var S: TStream);
+procedure TFPASCIIChart.Store(S: TStream);
 begin
   inherited Store(S);
 end;
 
-constructor TFPASCIIChart.Load(var S: TStream);
+constructor TFPASCIIChart.Load(S: TStream);
 begin
   inherited Load(S);
 end;
@@ -4455,12 +4455,12 @@ begin
     inherited InitBackground;
 end;
 
-constructor TFPDesktop.Load(var S: TStream);
+constructor TFPDesktop.Load(S: TStream);
 begin
   inherited Load(S);
 end;
 
-procedure TFPDesktop.Store(var S: TStream);
+procedure TFPDesktop.Store(S: TStream);
 begin
   inherited Store(S);
 end;

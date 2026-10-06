@@ -50,8 +50,8 @@ type
      function Execute : Word;Virtual;
    end;
 
-Procedure LoadKeys(var S : TStream);
-Procedure StoreKeys(var S : TStream);
+Procedure LoadKeys(S : TStream);
+Procedure StoreKeys(S : TStream);
 Procedure SetKnownKeys;
 
 implementation
@@ -95,7 +95,7 @@ var
   KeyEscape : Array[1..NumWantedKeys] of String[10];
 
 
-Procedure StoreKeys(var S : TStream);
+Procedure StoreKeys(S : TStream);
 var
   i,index : longint;
   l : byte;
@@ -112,7 +112,7 @@ begin
       end;
 end;
 
-Procedure LoadKeys(var S : TStream);
+Procedure LoadKeys(S : TStream);
 var
   i : longint;
   l : byte;

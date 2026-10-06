@@ -56,7 +56,7 @@ uses Dos,
      FPKeys,
 {$endif Unix}
      FPConst,FPVars,FPTools,FPUtils,FPViews,FPHelp,
-     FPCompil,FPCodCmp,FPCodTmp;
+     FPCompil,FPCodCmp,FPCodTmp,FPRegs,AsciiTab;
 
 type
      TWindowInfo =
@@ -150,10 +150,10 @@ var S: PMemoryStream;
 begin
   PushStatus(msg_readinghistory);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F.ReadResourceEntryToStream(resHistory,langDefault,S^);
+  OK:=F.ReadResourceEntryToStream(resHistory,langDefault,S);
   S.Seek(0);
   if OK then
-    LoadHistory(S^);
+    HistoryLoad(S);
   S.Free;
   if OK=false then
     ErrorBox(msg_errorloadinghistory,nil);
@@ -168,10 +168,10 @@ begin
   PushStatus(msg_storinghistory);
 
   S := TMemoryStream.Create(10*1024,4096);
-  StoreHistory(S^);
+  HistoryStore(S);
   S.Seek(0);
   F.CreateResource(resHistory,rcBinary,0);
-  OK:=F.AddResourceEntryFromStream(resHistory,langDefault,0,S^,S.GetSize);
+  OK:=F.AddResourceEntryFromStream(resHistory,langDefault,0,S,S.GetSize);
   S.Free;
   if OK=false then
     ErrorBox(msg_errorstoringhistory,nil);
@@ -185,10 +185,10 @@ var S: PMemoryStream;
     OK: boolean;
 begin
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F.ReadResourceEntryToStream(resKeys,langDefault,S^);
+  OK:=F.ReadResourceEntryToStream(resKeys,langDefault,S);
   S.Seek(0);
   if OK then
-    LoadKeys(S^);
+    LoadKeys(S);
   S.Free;
   if OK=false then
     ErrorBox(msg_errorloadingkeys,nil);
@@ -200,10 +200,10 @@ var S: PMemoryStream;
     OK: boolean;
 begin
   S := TMemoryStream.Create(10*1024,4096);
-  StoreKeys(S^);
+  StoreKeys(S);
   S.Seek(0);
   F.CreateResource(resKeys,rcBinary,0);
-  OK:=F.AddResourceEntryFromStream(resKeys,langDefault,0,S^,S.GetSize);
+  OK:=F.AddResourceEntryFromStream(resKeys,langDefault,0,S,S.GetSize);
   S.Free;
   if OK=false then
     ErrorBox(msg_errorstoringkeys,nil);
@@ -244,7 +244,7 @@ begin
 {$ifndef NODEBUG}
   PushStatus(msg_readingwatches);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F.ReadResourceEntryToStream(resWatches,langDefault,S^);
+  OK:=F.ReadResourceEntryToStream(resWatches,langDefault,S);
   S.Seek(0);
   if OK then
     begin
@@ -283,7 +283,7 @@ begin
       S.Put(WatchesCollection);
       S.Seek(0);
       F.CreateResource(resWatches,rcBinary,0);
-      OK:=F.AddResourceEntryFromStream(resWatches,langDefault,0,S^,S.GetSize);
+      OK:=F.AddResourceEntryFromStream(resWatches,langDefault,0,S,S.GetSize);
       S.Free;
       if OK=false then
         ErrorBox(msg_errorstoringwatches,nil);
@@ -303,7 +303,7 @@ begin
 {$ifndef NODEBUG}
   PushStatus(msg_readingbreakpoints);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F.ReadResourceEntryToStream(resBreakpoints,langDefault,S^);
+  OK:=F.ReadResourceEntryToStream(resBreakpoints,langDefault,S);
   S.Seek(0);
   if OK then
     begin
@@ -346,7 +346,7 @@ begin
       S.Put(BreakpointsCollection);
       S.Seek(0);
       F.CreateResource(resBreakpoints,rcBinary,0);
-      OK:=F.AddResourceEntryFromStream(resBreakpoints,langDefault,0,S^,S.GetSize);
+      OK:=F.AddResourceEntryFromStream(resBreakpoints,langDefault,0,S,S.GetSize);
       S.Free;
       if OK=false then
         ErrorBox(msg_errorstoringbreakpoints,nil);
@@ -508,7 +508,7 @@ begin
        begin
          if ASCIIChart=nil then
            begin
-             ASCIIChart := TASCIIChart.Create;
+             ASCIIChart := TFPASCIIChart.Create;
              Desktop.Insert(ASCIIChart);
            end;
          W:=ASCIIChart;
@@ -573,7 +573,7 @@ end;
 begin
   PushStatus(msg_readingdesktopcontents);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F.ReadResourceEntryToStream(resDesktop,langDefault,S^);
+  OK:=F.ReadResourceEntryToStream(resDesktop,langDefault,S);
   S.Seek(0);
   if OK then
   begin
@@ -751,7 +751,7 @@ begin
     begin
       S.Seek(0);
       OK:=F.CreateResource(resDesktop,rcBinary,0);
-      OK:=OK and F.AddResourceEntryFromStream(resDesktop,langDefault,0,S^,S.GetSize);
+      OK:=OK and F.AddResourceEntryFromStream(resDesktop,langDefault,0,S,S.GetSize);
     end;
     S.Free;
   end;
@@ -779,10 +779,10 @@ var S: PMemoryStream;
 begin
   PushStatus(msg_readingcodecompletewordlist);
   S := TMemoryStream.Create(1024,1024);
-  OK:=F.ReadResourceEntryToStream(resCodeComplete,langDefault,S^);
+  OK:=F.ReadResourceEntryToStream(resCodeComplete,langDefault,S);
   S.Seek(0);
   if OK then
-    OK:=LoadCodeComplete(S^);
+    OK:=LoadCodeComplete(S);
   S.Free;
   if OK=false then
     ErrorBox(msg_errorloadingcodecompletewordlist,nil);
@@ -796,12 +796,12 @@ var OK: boolean;
 begin
   PushStatus(msg_storingcodecompletewordlist);
   S := TMemoryStream.Create(1024,1024);
-  OK:=StoreCodeComplete(S^);
+  OK:=StoreCodeComplete(S);
   if OK then
   begin
     S.Seek(0);
     F.CreateResource(resCodeComplete,rcBinary,0);
-    OK:=F.AddResourceEntryFromStream(resCodeComplete,langDefault,0,S^,S.GetSize);
+    OK:=F.AddResourceEntryFromStream(resCodeComplete,langDefault,0,S,S.GetSize);
   end;
   S.Free;
   if OK=false then
@@ -816,10 +816,10 @@ var S: PMemoryStream;
 begin
   PushStatus(msg_readingcodetemplates);
   S := TMemoryStream.Create(1024,4096);
-  OK:=F.ReadResourceEntryToStream(resCodeTemplates,langDefault,S^);
+  OK:=F.ReadResourceEntryToStream(resCodeTemplates,langDefault,S);
   S.Seek(0);
   if OK then
-    OK:=LoadCodeTemplates(S^);
+    OK:=LoadCodeTemplates(S);
   S.Free;
   if OK=false then
     ErrorBox(msg_errorloadingcodetemplates,nil);
@@ -833,12 +833,12 @@ var OK: boolean;
 begin
   PushStatus(msg_storingcodetemplates);
   S := TMemoryStream.Create(1024,4096);
-  OK:=StoreCodeTemplates(S^);
+  OK:=StoreCodeTemplates(S);
   if OK then
   begin
     S.Seek(0);
     F.CreateResource(resCodeTemplates,rcBinary,0);
-    OK:=F.AddResourceEntryFromStream(resCodeTemplates,langDefault,0,S^,S.GetSize);
+    OK:=F.AddResourceEntryFromStream(resCodeTemplates,langDefault,0,S,S.GetSize);
   end;
   S.Free;
   if OK=false then
@@ -858,12 +858,23 @@ begin
   ReadFlags:=OK;
 end;
 
+{ tv3 port: ScreenMode is a mode number; the IDE desktop file stores a TVideoMode record,
+  so the current mode is built from the terminal size. A terminal cannot be switched. }
+function CurVideoMode: TVideoMode;
+begin
+  CurVideoMode.Col:=ScreenWidth;
+  CurVideoMode.Row:=ScreenHeight;
+  CurVideoMode.Color:=true;
+end;
+
 function WriteVideoMode(F: PResourceFile): boolean;
 var
     OK: boolean;
+    VM: TVideoMode;
 begin
+  VM:=CurVideoMode;
   F.CreateResource(resVideo,rcBinary,0);
-  OK:=F.AddResourceEntry(resVideo,langDefault,0,ScreenMode,
+  OK:=F.AddResourceEntry(resVideo,langDefault,0,VM,
     SizeOf(TVideoMode));
   if OK=false then
     ErrorBox(msg_errorstoringvideomode,nil);
@@ -877,7 +888,7 @@ begin
   test:=F.ReadResourceEntry(resVideo,langDefault,NewScreenMode,
     sizeof(NewScreenMode));
   if not test then
-    NewScreenMode:=ScreenMode;
+    NewScreenMode:=CurVideoMode;
   OK:=test;
   if OK=false then
     ErrorBox(msg_errorreadingvideomode,nil);
@@ -895,7 +906,7 @@ begin
     exit;
   PushStatus(msg_readingsymbolinformation);
   S := TMemoryStream.Create(32*1024,4096);
-  OK:=F.ReadResourceEntryToStream(resSymbols,langDefault,S^);
+  OK:=F.ReadResourceEntryToStream(resSymbols,langDefault,S);
   S.Seek(0);
   if OK then
     OK:=LoadBrowserCol(S);
@@ -924,7 +935,7 @@ begin
       begin
         S.Seek(0);
         F.CreateResource(resSymbols,rcBinary,0);
-        OK:=F.AddResourceEntryFromStream(resSymbols,langDefault,0,S^,S.GetSize);
+        OK:=F.AddResourceEntryFromStream(resSymbols,langDefault,0,S,S.GetSize);
       end;
     S.Free;
     if OK=false then
@@ -948,11 +959,11 @@ begin
   begin
     OK:=ReadFlags(F);
     VOK:=ReadVideoMode(F,VM);
-    if VOK and ((VM.Col<>ScreenMode.Col) or
-       (VM.Row<>ScreenMode.Row) or (VM.Color<>ScreenMode.Color)) then
+    if VOK and ((VM.Col<>CurVideoMode.Col) or
+       (VM.Row<>CurVideoMode.Row) or (VM.Color<>CurVideoMode.Color)) then
       begin
-        if Assigned(Application) then
-          Application.SetScreenVideoMode(VM);
+        { a terminal cannot switch its size: the saved mode is ignored (docs/known issues) }
+        ;
       end;
     if ((DesktopFileFlags and dfHistoryLists)<>0) then
       OK:=ReadHistory(F) and OK;

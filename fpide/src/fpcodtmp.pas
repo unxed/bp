@@ -39,8 +39,8 @@ type
       procedure   SetText(AList: PUnsortedStringCollection);
       procedure   GetParams(var AShortCut: string; Lines: PUnsortedStringCollection);
       procedure   SetParams(const AShortCut: string; Lines: PUnsortedStringCollection);
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       destructor Destroy; virtual;
     private
       ShortCut: PString;
@@ -95,8 +95,8 @@ const CodeTemplates : PCodeTemplateCollection = nil;
 function FPTranslateCodeTemplate(var Shortcut: string; ALines: PUnsortedStringCollection): boolean;
 
 procedure InitCodeTemplates;
-function  LoadCodeTemplates(var S: TStream): boolean;
-function  StoreCodeTemplates(var S: TStream): boolean;
+function  LoadCodeTemplates(S: TStream): boolean;
+function  StoreCodeTemplates(S: TStream): boolean;
 procedure DoneCodeTemplates;
 
 procedure RegisterCodeTemplates;
@@ -181,13 +181,13 @@ begin
   SetText(Lines);
 end;
 
-constructor TCodeTemplate.Load(var S: TStream);
+constructor TCodeTemplate.Load(S: TStream);
 begin
   ShortCut:=S.ReadStr;
   Text := TUnsortedStringCollection.Load(S);
 end;
 
-procedure TCodeTemplate.Store(var S: TStream);
+procedure TCodeTemplate.Store(S: TStream);
 begin
   S.WriteStr(ShortCut);
   Text.Store(S);
@@ -318,7 +318,7 @@ begin
   CodeTemplates := TCodeTemplateCollection.Create(10,10);
 end;
 
-function LoadCodeTemplates(var S: TStream): boolean;
+function LoadCodeTemplates(S: TStream): boolean;
 var C: PCodeTemplateCollection;
     OK: boolean;
 begin
@@ -335,7 +335,7 @@ begin
   LoadCodeTemplates:=OK;
 end;
 
-function StoreCodeTemplates(var S: TStream): boolean;
+function StoreCodeTemplates(S: TStream): boolean;
 var OK: boolean;
 begin
   OK:=Assigned(CodeTemplates);

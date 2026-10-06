@@ -43,12 +43,12 @@ type
     private
       procedure   CompleteContextNo;
       procedure   CalcTopicOfs;
-      procedure   WriteHeader(var S: TStream);
-      procedure   WriteCompressionRecord(var S: TStream);
-      procedure   WriteContextTable(var S: TStream);
-      procedure   WriteIndexTable(var S: TStream);
-      procedure   WriteTopic(var S: TStream; T: PTopic);
-      procedure   WriteRecord(var S: TStream; RecType: byte; var Buf; Size: word);
+      procedure   WriteHeader(S: TStream);
+      procedure   WriteCompressionRecord(S: TStream);
+      procedure   WriteContextTable(S: TStream);
+      procedure   WriteIndexTable(S: TStream);
+      procedure   WriteTopic(S: TStream; T: PTopic);
+      procedure   WriteRecord(S: TStream; RecType: byte; var Buf; Size: word);
     end;
 
 implementation
@@ -139,7 +139,7 @@ begin
   WriteContextTable(F^);
 end;
 
-procedure THelpFileWriter.WriteHeader(var S: TStream);
+procedure THelpFileWriter.WriteHeader(S: TStream);
 var St: string;
 begin
   Version.FormatVersion:=DefFormatVersion;
@@ -153,14 +153,14 @@ begin
   WriteRecord(F^,rtFileHeader,Header,SizeOf(Header));
 end;
 
-procedure THelpFileWriter.WriteCompressionRecord(var S: TStream);
+procedure THelpFileWriter.WriteCompressionRecord(S: TStream);
 var CR: THLPCompression;
 begin
   FillChar(CR,SizeOf(CR),0);
   WriteRecord(F^,rtCompression,CR,SizeOf(CR));
 end;
 
-procedure THelpFileWriter.WriteIndexTable(var S: TStream);
+procedure THelpFileWriter.WriteIndexTable(S: TStream);
 const BufSize = 65000;
 var P: ^THLPIndexTable;
     TableSize: word;
@@ -194,7 +194,7 @@ begin
   FreeMem(P,BufSize);
 end;
 
-procedure THelpFileWriter.WriteContextTable(var S: TStream);
+procedure THelpFileWriter.WriteContextTable(S: TStream);
 var Ctxs: ^THLPContexts;
     CtxSize,I: word;
     T: PTopic;
@@ -218,7 +218,7 @@ begin
   FreeMem(Ctxs,CtxSize);
 end;
 
-procedure THelpFileWriter.WriteTopic(var S: TStream; T: PTopic);
+procedure THelpFileWriter.WriteTopic(S: TStream; T: PTopic);
 var TextBuf: PByteArray;
     TextSize: word;
     KWBuf: ^THLPKeywordRecord;
@@ -263,7 +263,7 @@ procedure THelpFileWriter.CalcTopicOfs;
 begin
 end;
 
-procedure THelpFileWriter.WriteRecord(var S: TStream; RecType: byte; var Buf; Size: word);
+procedure THelpFileWriter.WriteRecord(S: TStream; RecType: byte; var Buf; Size: word);
 var RH: THLPRecordHeader;
 begin
   RH.RecType:=RecType; RH.RecLength:=Size;

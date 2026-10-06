@@ -97,8 +97,8 @@ uses
     TRegistersWindow = class(TFPDlgWindow)
       RV : PRegistersView;
       constructor Create;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   Update; virtual;
       destructor Destroy; virtual;
     end;
@@ -147,8 +147,8 @@ uses
     TFPUWindow = class(TFPDlgWindow)
       RV : PFPUView;
       constructor Create;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   Update; virtual;
       destructor Destroy; virtual;
     end;
@@ -211,8 +211,8 @@ uses
     TVectorWindow = class(TFPDlgWindow)
       RV : PVectorView;
       constructor Create;
-      constructor Load(var S: TStream);
-      procedure   Store(var S: TStream);
+      constructor Load(S: TStream);
+      procedure   Store(S: TStream);
       procedure   Update; virtual;
       destructor Destroy; virtual;
     end;
@@ -800,7 +800,7 @@ const
        Update;
     end;
 
-  constructor TRegistersWindow.Load(var S: TStream);
+  constructor TRegistersWindow.Load(S: TStream);
 
     begin
        inherited load(S);
@@ -810,7 +810,7 @@ const
        RegistersWindow:=Self;
     end;
 
-  procedure TRegistersWindow.Store(var S: TStream);
+  procedure TRegistersWindow.Store(S: TStream);
 
     begin
        inherited Store(s);
@@ -1229,7 +1229,7 @@ const
        Update;
     end;
 
-  constructor TFPUWindow.Load(var S: TStream);
+  constructor TFPUWindow.Load(S: TStream);
 
     begin
        inherited load(S);
@@ -1239,7 +1239,7 @@ const
        FPUWindow:=Self;
     end;
 
-  procedure TFPUWindow.Store(var S: TStream);
+  procedure TFPUWindow.Store(S: TStream);
 
     begin
        inherited Store(s);
@@ -1560,7 +1560,7 @@ const
        Update;
     end;
 
-  constructor TVectorWindow.Load(var S: TStream);
+  constructor TVectorWindow.Load(S: TStream);
 
     begin
        inherited load(S);
@@ -1570,7 +1570,7 @@ const
        VectorWindow:=Self;
     end;
 
-  procedure TVectorWindow.Store(var S: TStream);
+  procedure TVectorWindow.Store(S: TStream);
 
     begin
        inherited Store(s);
