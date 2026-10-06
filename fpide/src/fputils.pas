@@ -52,6 +52,8 @@ function Center(const S: string; Len: byte): string;
 function FitStr(const S: string; Len: byte): string;
 { tv3 port: FV's directory picker was not carried over; a one-line input box asks for the path. }
 procedure SelectDir(var S: string; HistoryID: word);
+{ Debug aid: appends a line to the file named by $FP_DEBUG_LOG (tv3 owns stderr and the screen, so writeln is no use). }
+procedure DbgLog(const S: string);
 function KillTilde(S: string): string;
 function LowercaseStr(const S: string): string;
 {function DirOf(const S: string): string;
@@ -81,6 +83,22 @@ uses Dos,
      Views,Dialogs,
      WUtils,
      FPVars,FPSwitch;
+
+procedure DbgLog(const S: string);
+var F: Text;
+    N: string;
+begin
+  N:=GetEnvironmentVariable('FP_DEBUG_LOG');
+  if N='' then Exit;
+  Assign(F,N);
+  {$I-}
+  Append(F);
+  if IOResult<>0 then Rewrite(F);
+  {$I+}
+  if IOResult<>0 then Exit;
+  writeln(F,S);
+  Close(F);
+end;
 
 procedure SelectDir(var S: string; HistoryID: word);
 var T: ShortString;

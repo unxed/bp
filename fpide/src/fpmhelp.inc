@@ -101,7 +101,7 @@ var R,R2: TRect;
     SB: PScrollBar;
     I: integer;
 begin
-  R.Assign(0,0,round(ScreenWidth*5/8),ScreenHeight-10);
+  R.Assign(0,0,round(Drivers.ScreenWidth*5/8),Drivers.ScreenHeight-10);
   inherited Create(R, dialog_helpfiles);
 
   C := TUnsortedStringCollection.Create(20,10);

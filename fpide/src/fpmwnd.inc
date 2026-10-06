@@ -109,7 +109,7 @@ constructor TWindowListDialog.Create;
 var R,R2: TRect;
     SB: PScrollBar;
 begin
-  R.Assign(0,0,round(ScreenWidth*5/8),15);
+  R.Assign(0,0,round(Drivers.ScreenWidth*5/8),15);
   inherited Create(R, dialog_windowlist);
   HelpCtx:=hcWindowList;
   C := TCollection.Create(20,10);

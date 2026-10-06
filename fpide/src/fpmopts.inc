@@ -731,7 +731,7 @@ var tab:Ptab;
 const LW=25;
 
 begin
-  R.assign(0,0,screenwidth*64 div 80,18);
+  R.assign(0,0,Drivers.screenwidth*64 div 80,18);
   D := TCenterDialog.Create(R,dialog_directories);
   if d.size.x<72 then
     misc_string:='~M~isc.'
@@ -846,7 +846,8 @@ begin
   tab.growmode:=0;
   d.insert(tab);
   insertbuttons(D);
-  if desktop.execview(D)=cmOK then
+  j:=desktop.execview(D);
+  if j=cmOK then
     begin
       {Move the data from the window back into the switches.}
       for i:=0 to count-1 do

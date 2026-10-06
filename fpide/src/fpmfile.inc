@@ -228,7 +228,7 @@ var R,R2: TRect;
     D: PCenterDialog;
     IL: PEditorInputLine;
 begin
-  R.Assign(0,0,round(ScreenWidth*54/80),4);
+  R.Assign(0,0,round(Drivers.ScreenWidth*54/80),4);
   D := TCenterDialog.Create(R, dialog_setupprinter);
   with D do
   begin

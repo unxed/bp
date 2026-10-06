@@ -1513,9 +1513,9 @@ begin
     CodeCompleteTip.Owner.MakeLocal(P,P);
 
   { ensure that the tooltip stays in screen }
-  P.X:=Min(Max(0,P.X),ScreenWidth-length(S)-2-1);
+  P.X:=Min(Max(0,P.X),Drivers.ScreenWidth-length(S)-2-1);
   { align it vertically }
-  if P.Y>round(ScreenHeight*3/4) then
+  if P.Y>round(Drivers.ScreenHeight*3/4) then
     Dec(P.Y)
   else
     Inc(P.Y);
@@ -3625,6 +3625,7 @@ begin
   MoveChar(B,' ',C1,Size.X);
 end;
 begin
+  DbgLog('TTab.Draw size='+IntToStr(Size.X)+'x'+IntToStr(Size.Y)+' indraw='+IntToStr(Ord(InDraw)));
   if InDraw then Exit;
   InDraw:=true;
   { - Start of TGroup.Draw - }

@@ -1117,7 +1117,7 @@ var
   WriteRegion : SMALL_RECT;
 begin
   GetMem(LineBuf,SizeOf(CharInfoArray));
-  LineSize:=ScreenWidth;
+  LineSize:=Drivers.ScreenWidth;
   If LineSize>256 then
     LineSize:=256;
   BufSize.X:=LineSize;

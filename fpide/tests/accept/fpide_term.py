@@ -1,7 +1,9 @@
 """A terminal for driving fpide in tests: the IDE runs inside a detached tmux session and is
 looked at with `tmux capture-pane`. Keys go in with `send-keys` (names or raw bytes), so no
 terminal emulator has to be written. Needs: tmux, python3.  Used by test_accept.py."""
+import collections
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -43,6 +45,42 @@ class TmuxTerm:
         for b in s.encode('utf-8'):
             self._tmux('send-keys', '-t', self.session, '-H', '%02x' % b)
         time.sleep(0.15)
+
+    def _menu_rows(self):
+        """[(row, text, highlighted)] of the drop-down box on screen. The highlighted row is the one
+        whose colour attributes differ from the others'."""
+        raw = self._tmux('capture-pane', '-t', self.session, '-p', '-e').split('\n')
+        rows = []
+        for i, l in enumerate(raw):
+            parts = l.split('│')
+            if len(parts) >= 3:
+                text = re.sub(r'\x1b\[[0-9;]*m', '', parts[1]).strip()
+                sgr = tuple(re.findall(r'\x1b\[([0-9;]*)m', parts[1]))[:2]
+                rows.append((i, text, sgr))
+        if not rows:
+            return []
+        common = collections.Counter(r[2] for r in rows).most_common(1)[0][0]
+        return [(i, text, sgr != common) for i, text, sgr in rows]
+
+    def menu(self, hotkey, label, timeout=4.0):
+        """open the menu with its Alt-key and choose the item whose text starts with `label`
+        (arrow keys only, so it works whatever the item's hotkey is). False if there is no such item."""
+        self.key(hotkey)
+        self.pump(0.4)
+        for _ in range(40):
+            rows = self._menu_rows()
+            cur = [r for r in rows if r[2]]
+            if not rows or not cur:
+                return False
+            if cur[0][1].startswith(label):
+                self.key('Enter')
+                return True
+            self.key('Down')
+            self.pump(0.1)
+        return False
+
+    def pump(self, secs):
+        time.sleep(secs)
 
     def wait_for(self, needle, timeout=6.0):
         end = time.time() + timeout
