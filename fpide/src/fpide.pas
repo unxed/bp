@@ -183,7 +183,7 @@ uses
   WinClip,
 {$endif WinClipSupported}
 {$ifdef Unix}
-  fpKeys,
+  fpKeys,TvUnix,
 {$endif Unix}
   FpDpAnsi,WConsts,
   Video,Mouse,Keyboard,
@@ -1464,6 +1464,12 @@ end;
 procedure TIDEApp.ShowUserScreen;
 begin
   displaymode:=dmUser;
+{$ifdef Unix}
+  { tv3 owns the terminal (the FPC Video/Keyboard units are not used): flush, leave the alternate screen,
+    give the terminal back as it was; the program then writes to the normal screen }
+  UnixSuspend;
+  Exit;
+{$endif Unix}
   if Assigned(UserScreen) then
     UserScreen.SaveIDEScreen;
   DoneSysError;
@@ -1487,6 +1493,15 @@ end;
 
 procedure TIDEApp.ShowIDEScreen;
 begin
+{$ifdef Unix}
+  { the alternate screen again and the raw mode; tv3 draws the whole screen anew from its buffer }
+  UnixResume;
+  CurDirChanged;
+  Message(Application,evBroadcast,cmUpdate,nil);
+  SetKnownKeys;
+  displaymode:=dmIDE;
+  Exit;
+{$endif Unix}
   if Assigned(UserScreen) then
     UserScreen.SaveConsoleScreen;
 {  InitDosMem;}
@@ -1539,9 +1554,7 @@ begin
   IOK:=true; SOK:=true; DOK:=true;
   if (AutoSaveOptions and asEnvironment)<>0 then
     begin
-      DbgLog('AutoSave: WriteINIFile');
       IOK:=WriteINIFile(false);
-      DbgLog('AutoSave: WriteINIFile ok='+IntToStr(Ord(IOK)));
       if IOK=false then
         ErrorBox(error_saving_cfg_file,nil);
     end;
@@ -1557,9 +1570,7 @@ begin
       {$ENDIF}
       CloseHelpWindows;
       CloseAllBrowsers;
-      DbgLog('AutoSave: SaveDesktop');
       DOK:=SaveDesktop;
-      DbgLog('AutoSave: SaveDesktop done ok='+IntToStr(Ord(DOK)));
       if DOK=false then
         ErrorBox(error_saving_dsk_file,nil);
     end;
@@ -1585,10 +1596,8 @@ begin
        Exit;
      end;
 
-    DbgLog('DoExecute: before ShowUserScreen');
     if ExecType<>exNoSwap then
       ShowUserScreen;
-    DbgLog('DoExecute: after ShowUserScreen');
     SaveConsoleMode(ConsoleMode);
 
     if ExecType=exDosShell then
@@ -1607,7 +1616,7 @@ begin
       begin
 {$endif Unix}
         if (InFile='') and (OutFile='') and (ErrFile='') then
-          begin DbgLog('DoExecute: DosExecute'); DosExecute(ProgramPath,Params); DbgLog('DoExecute: DosExecute done'); end
+          begin DosExecute(ProgramPath,Params); end
         else
           begin
             if ErrFile='' then

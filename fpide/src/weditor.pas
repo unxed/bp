@@ -1868,7 +1868,7 @@ begin
   A.Y:=0; A.X:=0;
   B.Y:=GetLineCount-1;
   if GetLineCount>0 then
-    B.X:=length(GetDisplayText(B.Y))
+    B.X:=U8Len(GetDisplayText(B.Y))
   else
     B.X:=0;
   SaveToStream:=SaveAreaToStream(Editor,Stream,A,B);
@@ -2937,7 +2937,7 @@ begin
   A.Y:=0; A.X:=0;
   B.Y:=GetLineCount-1;
   if GetLineCount>0 then
-    B.X:=length(GetDisplayText(B.Y))
+    B.X:=U8Len(GetDisplayText(B.Y))
   else
     B.X:=0;
   SaveToStream:=SaveAreaToStream(Stream,A,B);
@@ -2979,7 +2979,7 @@ end;
 
 function TCustomCodeEditor.InsertFrom(Editor: PCustomCodeEditor): Boolean;
 var OK: boolean;
-    CP,RX,RSX,LineDelta,LineCount: Sw_integer;
+    CP,RX,RSX,LineDelta,LineCount,CL: Sw_integer;
     StartPos,DestPos,BPos,EPos: TPoint;
     LineStartX,LineEndX: Sw_integer;
     TabSize,CharIdxStart,CharIdxEnd: Sw_integer;
@@ -3018,7 +3018,7 @@ begin
           Inc(RX,TabSize-(RX mod TabSize))
         else
           Inc(RX);
-        Inc(CP);
+        Inc(CP,U8CharBytes(BeforeS,CP));
       end;
     BeforeS:=BeforeS+CharStr(' ',DestPos.X-RX);
     AfterS:=Copy(OrigS,LinePosToCharIdx(DestPos.Y,DestPos.X),High(OrigS));
@@ -3047,6 +3047,9 @@ begin
 
       CharIdxStart:=Editor.LinePosToCharIdx(Editor.SelStart.Y+LineDelta,LineStartX);
       CharIdxEnd:=Editor.LinePosToCharIdx(Editor.SelStart.Y+LineDelta,LineEndX);
+      { the index of the last byte of the character that ends the copied text }
+      if (CharIdxEnd>0) and (CharIdxEnd<=length(Editor.GetLineText(Editor.SelStart.Y+LineDelta))) then
+        CharIdxEnd:=CharIdxEnd+U8CharBytes(Editor.GetLineText(Editor.SelStart.Y+LineDelta),CharIdxEnd)-1;
       if LineEndX<LineStartX then
         S:=''
       else if VerticalBlock then
@@ -3061,13 +3064,14 @@ begin
           RSX :=0;
           while (CP<=length(DS)) do
             begin
+              CL:=U8CharBytes(DS,CP);
               if (DS[CP]=TAB) then
                 Inc(RX,TabSize-(RX mod TabSize))
               else
                 Inc(RX);
-              if CP=length(BeforeS) then
+              if CP+CL-1=length(BeforeS) then
                 RSX:=RX;
-              Inc(CP);
+              Inc(CP,CL);
             end;
 
           if LineDelta=LineCount-1 then
@@ -3115,7 +3119,7 @@ begin
     SetSelection(CurPos,SEnd);
     if IsClipboard then
      begin
-       Inc(DestPos.X,length(S));
+       Inc(DestPos.X,U8Len(S));
        SetCurPtr(DestPos.X,DestPos.Y);
      end;
     DrawView;
@@ -3301,13 +3305,27 @@ end;
 
 procedure TCustomCodeEditor.TrackCursor(centre:Tcentre);
 var D,CP: TPoint;
+    LT: string;
 begin
   D:=Delta;
   EditorToViewPoint(D,D); EditorToViewPoint(CurPos,CP);
   if CP.Y<Delta.Y then D.Y:=CP.Y else
    if CP.Y>Delta.Y+Size.Y-1 then D.Y:=CP.Y-Size.Y+1;
   if CP.X<Delta.X then D.X:=CP.X else
-   if CP.X>Delta.X+Size.X-1 then D.X:=CP.X-Size.X+1;
+   begin
+     if (CurPos.Y>=0) and (CurPos.Y<GetLineCount) then LT:=GetDisplayText(CurPos.Y) else LT:='';
+     if U8IsAscii(LT) then
+       begin
+         if CP.X>Delta.X+Size.X-1 then D.X:=CP.X-Size.X+1;
+       end
+     else
+       begin
+         { characters of two cells: scroll until the cursor cell is in the view }
+         D.X:=Delta.X;
+         while (U8Cells(LT,0,CP.X)-U8Cells(LT,0,D.X)>Size.X-1) and (D.X<CP.X) do
+           Inc(D.X);
+       end;
+   end;
   if {((Delta.X<>D.X) or (Delta.Y<>D.Y)) and }centre=do_centre then
   begin
      { loose centering for debugger PM }
@@ -3454,12 +3472,21 @@ var DontClear : boolean;
   end;
 
   procedure GetMousePos(var P: TPoint);
+  var DT: string;
   begin
     MakeLocal(Event.Where,P);
-    Inc(P.X,Delta.X); Inc(P.Y,Delta.Y);
+    Inc(P.Y,Delta.Y);
     Dec(P.X,GetReservedColCount);
-    if P.X<0 then P.X:=0;
     if P.Y<0 then P.Y:=0;
+    { P.X is a cell of the screen: the column that is there (characters of two cells) }
+    if (P.Y<GetLineCount) then
+      begin
+        DT:=GetDisplayText(P.Y);
+        P.X:=U8ColAtCell(DT,P.X+U8Cells(DT,0,Delta.X));
+      end
+    else
+      Inc(P.X,Delta.X);
+    if P.X<0 then P.X:=0;
   end;
 type TCCAction = (ccCheck,ccClear,ccDontCare);
 var
@@ -3589,7 +3616,12 @@ begin
         DontClear:=false;
         case Event.Command of
           cmASCIIChar   : InASCIIMode:=not InASCIIMode;
-          cmAddChar     : AddChar(chr(longint(Event.InfoPtr)));
+          cmAddChar     :
+            { a code of the ASCII table: the Unicode character with that code (U+0000..U+00FF) in a UTF-8 editor }
+            if Utf8Text and (longint(Event.InfoPtr)>=128) then
+              AddCharStr(U8Encode(longint(Event.InfoPtr)))
+            else
+              AddChar(chr(longint(Event.InfoPtr)));
           cmCharLeft    : CharLeft;
           cmCharRight   : CharRight;
           cmWordLeft    : WordLeft;
@@ -3922,7 +3954,7 @@ begin
       begin
         MoveChar(B,' ',ErrorMessageColor,Size.X);
         MoveStr(B,ErrorMsg,ErrorMessageColor);
-        WriteLineW(0,Y,Size.X,1,B);
+        WriteLineC(0,Y,Size.X,1,B);
       end
     else
       begin
@@ -5716,10 +5748,10 @@ begin
   CP.X:=-1; CP.Y:=-1;
   Line:=GetDisplayText(CurPos.Y);
   X:=CurPos.X; ShortCut:='';
-  if X<=length(Line) then
-  while (X>0) and (Line[X] in (NumberChars+AlphaChars)) do
+  if X<=U8Len(Line) then
+  while (X>0) and (U8ColChar(Line,X-1) in (NumberChars+AlphaChars)) do
   begin
-    ShortCut:=Line[X]+ShortCut;
+    ShortCut:=U8ColChar(Line,X-1)+ShortCut;
     Dec(X);
   end;
   ShortCutInEditor:=ShortCut;
@@ -6303,33 +6335,42 @@ var S: string;
     BT : BTable;
     Overwriting : boolean;
 
+  { Start is a (1-based) column of S; the result is the BYTE index of the match in S (0: none).
+    The text is UTF-8: the case-insensitive search is done in the upper-case copy of S (the same bytes, see WUtf8) }
   function ContainsText(const SubS:string;var S: string; Start: Sw_integer): Sw_integer;
   var
     P: Sw_Integer;
+    SU: string;
   begin
     if Start<=0 then
      P:=0
     else
      begin
+       if FindFlags and ffCaseSensitive=0 then
+         SU:=U8Upper(S)
+       else
+         SU:=S;
        if SForward then
         begin
+          Start:=U8Idx(S,Start-1);
           if Start>length(s) then
            P:=0
           else if FindFlags and ffCaseSensitive<>0 then
            P:=BMFScan(S[Start],length(s)+1-Start,FindStr,Bt)+1
           else
-           P:=BMFIScan(S[Start],length(s)+1-Start,IFindStr,Bt)+1;
+           P:=BMFIScan(SU[Start],length(s)+1-Start,IFindStr,Bt)+1;
           if P>0 then
            Inc(P,Start-1);
         end
        else
         begin
+          Start:=U8Idx(S,Start)-1;
           if start>length(s) then
            start:=length(s);
           if FindFlags and ffCaseSensitive<>0 then
            P:=BMBScan(S[1],Start,FindStr,Bt)+1
           else
-           P:=BMBIScan(S[1],Start,IFindStr,Bt)+1;
+           P:=BMBIScan(SU[1],Start,IFindStr,Bt)+1;
         end;
      end;
     ContainsText:=P;
@@ -6391,7 +6432,7 @@ begin
    begin
      AreaStart.X:=0;
      AreaStart.Y:=0;
-     AreaEnd.X:=length(GetDisplayText(Count-1));
+     AreaEnd.X:=U8Len(GetDisplayText(Count-1));
      AreaEnd.Y:=Count-1;
    end
   else
@@ -6408,7 +6449,7 @@ begin
   else
     { if you change this, pleas check that repeated backward searching for single chars still works
       and that data is still found if searching starts outside the current line }
-    X:=Min(CurPos.X,length(GetDisplayText(Y)));
+    X:=Min(CurPos.X,U8Len(GetDisplayText(Y)));
 
   if SearchRunCount=1 then
     if (FindFlags and ffmOrigin)=ffEntireScope then
@@ -6432,7 +6473,7 @@ begin
    end
   else
    begin
-     IFindStr:=upcase(FindStr);
+     IFindStr:=U8Upper(FindStr);
      if SForward then
       BMFMakeTable(IFindStr,bt)
      else
@@ -6447,8 +6488,8 @@ begin
     repeat
       CurDY:=DY;
       S:=GetDisplayText(Y);
-      if X>length(S)-1 then
-        X:=length(S)-1;
+      if X>U8Len(S)-1 then
+        X:=U8Len(S)-1;
 {$ifdef TEST_REGEXP}
       if UseRegExp then
          begin
@@ -6470,7 +6511,7 @@ begin
         end;
       if Found then
         begin
-          A.X:=P-1;
+          A.X:=U8Col(S,P);
           A.Y:=Y;
           B.Y:=Y;
 {$ifdef TEST_REGEXP}
@@ -6478,14 +6519,14 @@ begin
             B.X:=A.X+regexplen
           else
 {$endif TEST_REGEXP}
-            B.X:=A.X+length(FindStr);
+            B.X:=A.X+U8Len(FindStr);
         end;
       Found:=Found and InArea(A.X,A.Y);
 
       if Found and ((FindFlags and ffWholeWordsOnly)<>0) then
        begin
-         LeftOK:=(A.X<=0) or (not( (S[A.X] in AlphaChars+NumberChars) ));
-         RightOK:=(B.X>=length(S)) or (not( (S[B.X+1] in AlphaChars+NumberChars) ));
+         LeftOK:=(A.X<=0) or (not( (U8ColChar(S,A.X-1) in AlphaChars+NumberChars) or (U8ColChar(S,A.X-1)>=#128) ));
+         RightOK:=(B.X>=U8Len(S)) or (not( (U8ColChar(S,B.X) in AlphaChars+NumberChars) or (U8ColChar(S,B.X)>=#128) ));
          Found:=LeftOK and RightOK;
          if not Found then
            begin
@@ -6493,7 +6534,7 @@ begin
              If SForward then
                begin
                  X:=B.X+1;
-                 if X>length(S) then
+                 if X>U8Len(S) then
                    CurDY:=DY;
                end
              else
@@ -6773,10 +6814,10 @@ begin
 
   Line:=GetDisplayText(CurPos.Y);
   X:=CurPos.X; CurWord:='';
-  if X<=length(Line) then
-  while (X>0) and (Line[X] in (NumberChars+AlphaChars)) do
+  if X<=U8Len(Line) then
+  while (X>0) and (U8ColChar(Line,X-1) in (NumberChars+AlphaChars)) do
   begin
-    CurWord:=Line[X]+CurWord;
+    CurWord:=U8ColChar(Line,X-1)+CurWord;
     Dec(X);
   end;
 
@@ -6819,7 +6860,7 @@ begin
   if EndP.X=0 then
     begin
       Dec(EndP.Y);
-      EndP.X:=length(GetDisplayText(EndP.Y))-1;
+      EndP.X:=U8Len(GetDisplayText(EndP.Y))-1;
     end
   else
    Dec(EndP.X);
@@ -6889,7 +6930,7 @@ begin
      if (SelEnd.Y<>GetLineCount) or (SelEnd.X<>0) then
       begin
         SelEnd.Y:=GetLineCount-1;
-        SelEnd.X:=length(GetDisplayText(SelEnd.Y));
+        SelEnd.X:=U8Len(GetDisplayText(SelEnd.Y));
       end;
 
   { we change the CurCommandSet, but only if we are top view }
@@ -6980,13 +7021,13 @@ end;
 function TCustomCodeEditorCore.SaveAreaToStream(Editor: PCustomCodeEditor; Stream: PStream; StartP,EndP: TPoint): boolean;
 var S: string;
     OK: boolean;
-    Line: Sw_integer;
+    Line,CI: Sw_integer;
 begin
   if EndP.X=0 then
     begin
       if EndP.Y>0 then
         begin
-          EndP.X:=length(GetDisplayText(EndP.Y));
+          EndP.X:=U8Len(GetDisplayText(EndP.Y));
         end
       else
         EndP.X:=0;
@@ -7003,7 +7044,13 @@ begin
     { if FlagSet(efUseTabCharacters) then
       S:=CompressUsingTabs(S,TabSize);
       }
-    if Line=EndP.Y then S:=copy(S,1,LinePosToCharIdx(Line,EndP.X));
+    if Line=EndP.Y then
+      begin
+        CI:=LinePosToCharIdx(Line,EndP.X);
+        if (CI>0) and (CI<=length(S)) then
+          CI:=CI+U8CharBytes(S,CI)-1;       { the whole character that ends the area }
+        S:=copy(S,1,CI);
+      end;
     if Line=StartP.Y then S:=copy(S,LinePosToCharIdx(Line,StartP.X),High(S));
     Stream.Write(S[1],length(S));
     if Line<EndP.Y then

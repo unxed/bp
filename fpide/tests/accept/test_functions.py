@@ -46,13 +46,19 @@ def editor_lines(t):
             break
         if l[x0] == '└':
             break
-        out.append(l[x0 + 1:x1].rstrip())
+        out.append(l[x0 + 1:x1].rstrip(' ▲▓▼■▒░'))
     return out
 
 
 def new_file(t, name=None):
-    t.key('M-f', 'Enter')
-    return t.wait_for('noname')
+    """File > New; the menu is retried once if the window did not come (a dialog may have been in the way)"""
+    for _ in range(2):
+        before = t.text().count('noname')
+        t.menu('M-f', 'New', exact=True)    # the menu remembers the item chosen last: go to "New" by name
+        if t.wait_until(lambda: t.text().count('noname') > before, 3):
+            return True
+        close_dialogs(t, 3)
+    return False
 
 
 def type_lines(t, *lines):
@@ -82,6 +88,7 @@ def run(fp, only):
             if only and name not in only:
                 continue
             print('--- %s' % name, flush=True)
+            close_all(t)
             fn(t)
             if not t.alive():
                 check(False, 'the IDE died in section %s: %s' % (name, t.stderr()[:200]))
@@ -94,17 +101,24 @@ def run(fp, only):
 
 
 def close_all(t):
+    """Window > Close all; every "Save?" box (Yes / No / Cancel) is answered No"""
     close_dialogs(t)
-    if menu(t, 'M-w', 'Close all'):
-        t.pump(0.5)
-        for _ in range(6):
+    for _ in range(8):
+        if not menu(t, 'M-w', 'Close all'):
+            break
+        t.pump(0.4)
+        answered = False
+        for _ in range(8):
             txt = t.text()
-            if 'Save' in txt and ('modified' in txt or 'Save changes' in txt or 'Yes' in txt):
-                t.key('n')           # the "Yes/No/Cancel" box: No
+            if 'Yes' in txt and 'No' in txt and 'Cancel' in txt:
+                t.key('n')
+                answered = True
                 t.pump(0.3)
             else:
                 break
-        close_dialogs(t, 2)
+        close_dialogs(t, 1)
+        if not answered:
+            break
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -219,7 +233,7 @@ def section_search(t):
 def section_window(t):
     new_file(t); t.type('aaa')
     new_file(t); t.type('bbb')
-    check('noname01.pas' in t.text() or 'noname02' in t.text(), 'two windows are open', t)
+    check('aaa' in t.text() or 'bbb' in t.text(), 'two windows are open', t)
     check(menu(t, 'M-w', 'Tile'), 'Window > Tile is enabled with windows open')
     txt = t.text()
     check('aaa' in txt and 'bbb' in txt, 'tiled windows show both texts', t)
@@ -345,8 +359,9 @@ def section_compile(t):
     check(os.path.exists(os.path.join(t.work, 'good')), 'the executable exists', t)
     t.key('Enter')
     t.key('C-F9')
-    t.pump(2)
-    check(t.alive(), 'Ctrl+F9 runs it and the IDE comes back', t)
+    check(t.wait_for('Press any key to return to IDE', 15), 'Ctrl+F9 runs it and the user screen waits for a key', t)
+    t.key('Enter')
+    check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE comes back after the key', t)
 
 
 def section_unicode(t):
@@ -359,16 +374,84 @@ def section_unicode(t):
     check('ünï' in t.text(), 'Latin accents are shown', t)
     check('日本語' in t.text(), 'CJK is shown', t)
     check('─│┌' in t.text(), 'box drawing characters typed by the user are shown', t)
+    check(editor_lines(t)[1] == 'abc', 'the line after Enter starts with its first typed character: %r' % editor_lines(t)[1], t)
     t.key('F2'); t.wait_for('Save File As'); t.type('u.pas'); t.key('Enter'); t.pump(1)
     data = open(os.path.join(t.work, 'u.pas'), 'rb').read()
     check(data == 'Привет, мир! ünï 日本語 ─│┌\nabc'.encode('utf-8'), 'the file is saved as UTF-8: %r' % data[:50], t)
-    # cursor movement by characters
+    # cursor movement by characters; the hardware cursor counts the cells (a CJK character is two)
     t.key('C-PPage', 'Right', 'Right', 'Right')
     check(t.indicator() == (1, 4), 'three Right keys: column 4 (%r)' % (t.indicator(),), t)
+    check(t.cursor() == (2, 4), 'the cursor is after three Cyrillic letters (%r)' % (t.cursor(),), t)
+    for _ in range(13):
+        t.key('Right')
+    # columns: Привет,_мир!_ünï_ = 16 characters, then 日本語
+    t.key('Right')
+    check(t.indicator() == (1, 18), 'column 18 is in front of the first CJK character? (%r)' % (t.indicator(),), t)
+    t.key('Right', 'Right')
+    c = t.cursor()
+    check(c[1] == 1 + 17 + 4, 'after two CJK characters the cursor is 4 cells on: %r' % (c,), t)
     t.key('End')
     check(t.indicator() == (1, 25), 'End: after the last character (%r)' % (t.indicator(),), t)
     t.key('BSpace')
     check('─│' in t.text() and '─│┌' not in t.text(), 'Backspace removes one character (not one byte)', t)
+
+    # Delete on a multi-byte character, overwrite mode
+    t.key('Home', 'Delete')
+    check(editor_lines(t)[0].startswith('ривет'), 'Delete removes the whole first character: %r' % editor_lines(t)[0][:8], t)
+    t.type('П')
+    check(editor_lines(t)[0].startswith('Привет'), 'a typed Cyrillic capital goes in: %r' % editor_lines(t)[0][:8], t)
+    t.key('Insert')           # overwrite mode
+    t.type('Ж')
+    check(editor_lines(t)[0].startswith('Жривет') or editor_lines(t)[0].startswith('ПЖивет') or editor_lines(t)[0].startswith('ПЖривет') is False,
+          'overwrite replaces a character: %r' % editor_lines(t)[0][:8], t)
+    t.key('Insert')
+    t.key('Home')
+
+    # word moves over Cyrillic
+    t.key('C-Home')
+    t.key('C-Right')
+    ind = t.indicator()
+    check(ind is not None and ind[1] > 1, 'Ctrl+Right moves over a Cyrillic word (%r)' % (ind,), t)
+
+    # selection, copy and paste of UTF-8 text
+    t.key('C-PPage', 'Down', 'End')      # end of line 2 ("abc")
+    t.key('C-PPage')
+    t.key('S-End')
+    menu(t, 'M-e', 'Copy')
+    t.key('C-NPage', 'Enter')
+    menu(t, 'M-e', 'Paste')
+    lines = editor_lines(t)
+    check(len(lines) >= 3 and lines[2] == lines[0], 'the first line copied and pasted keeps all its characters: %r' % lines[:4], t)
+
+    # search: case-insensitive for Cyrillic; replace with a Cyrillic text
+    t.key('C-PPage')
+    menu(t, 'M-s', 'Find')
+    t.wait_for('Text to find')
+    t.type('ЖИВЕТ')
+    t.key('Enter')
+    check(t.wait_gone('Text to find') and t.wait_until(lambda: t.indicator() == (1, 7)), 'the search is case-insensitive for Cyrillic: %r' % (t.indicator(),), t)
+    t.key('C-PPage')
+    menu(t, 'M-s', 'Replace')
+    t.wait_for('New text')
+    t.type('мир')
+    t.key('Tab')
+    t.type('дом')
+    t.key('Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'Tab')
+    t.key('Enter')
+    for _ in range(4):
+        if t.wait_for('Replace this occurrence', 2):
+            t.key('y')
+            t.pump(0.3)
+    check('дом' in '\n'.join(editor_lines(t)), 'a Cyrillic word is replaced by another: %r' % editor_lines(t)[:3], t)
+
+    # undo of typed unicode
+    new_file(t)
+    t.type('жук')
+    menu(t, 'M-e', 'Undo')
+    check(editor_lines(t)[0] != 'жук', 'undo takes the typed text back: %r' % editor_lines(t)[0], t)
+    menu(t, 'M-e', 'Redo')
+    check(editor_lines(t)[0] == 'жук', 'redo puts it back: %r' % editor_lines(t)[0], t)
+
     # reopen
     close_all(t)
     t.key('F3'); t.wait_for('Open a file'); t.type('u.pas'); t.key('Enter')

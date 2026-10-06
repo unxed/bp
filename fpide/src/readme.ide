@@ -1,12 +1,12 @@
              Welcome to the Free Pascal IDE!
-            ßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßßß
+            â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€
 
  Please take the time to read this file to avoid most
  common installation problems, and to get the most out of
  this software!
 
-  General information Ü
- ßßßßßßßßßßßßßßßßßßßßßß
+  General information â–„
+ â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€
  First of all: note that the IDE is currently still in
  beta state! That means that some functions may not work,
  or may not work as expected. We do our best to fix all
@@ -32,8 +32,8 @@
  serious purposes, and read all available docs before
  reporting a "bug"!
 
-  Version conflicts Ü
- ßßßßßßßßßßßßßßßßßßßß
+  Version conflicts â–„
+ â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€
  IDE snapshots are created on a regular basis. That means,
  that the IDE and it's embedded compiler are always the
  most up-to-date versions.
@@ -55,8 +55,8 @@
  contains a new bug or is incompatible in some aspects
  with your previous one.
 
-  Configuration Ü
- ßßßßßßßßßßßßßßßß
+  Configuration â–„
+ â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€
  Once you have installed the IDE, it requires two
  configuration changes before it can compile. This is due
  to the fact that the IDE includes its own compiler; it
@@ -73,8 +73,8 @@
  try again one or two days later or ask for help on one of
  the mailing lists (see later!).
 
-  Documentation Ü
- ßßßßßßßßßßßßßßßß
+  Documentation â–„
+ â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€
  Although the IDE itself has no kind of "native"
  documentation or help, it is capable of reading HTML,
  Turbo Pascal (TPH), and Norton Guide (NG) format files.
@@ -86,8 +86,8 @@
  help system by going to Help menu, selecting Files and
  adding them to the list.
 
-  Linux and FreeBSD Ü
- ßßßßßßßßßßßßßßßßßßßß
+  Linux and FreeBSD â–„
+ â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€
  Free Vision, the windowing library on which the IDE is
  based, is more advanced than a VT100 terminal can
  handle. Unfortunately, Unix terminal emulators provide
@@ -125,11 +125,11 @@
  high resolutions, i.e. 1024x768, the IDE becomes very
  pleasant to work with.
 
-  More information Ü
- ßßßßßßßßßßßßßßßßßßß
+  More information â–„
+ â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€â–€
  If you need more informations you can:
-  þ read the FAQ and the documentation
-  þ join one or more of the 4 mailing lists
+  â–  read the FAQ and the documentation
+  â–  join one or more of the 4 mailing lists
 
  For the FAQ, for the on-line version of the docs,
  and for information on joining the mailing lists go to

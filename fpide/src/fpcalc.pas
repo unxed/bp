@@ -430,7 +430,7 @@ begin
   MoveChar(B, ' ', Color, Size.X);
   MoveChar(B[I], Sign, Color, 1);
   MoveStr(B[I + 1], Number, Color);
-  WriteBufW(0, 0, Size.X, 1, B);
+  WriteBufC(0, 0, Size.X, 1, B);
 end;
 
 function TCalcDisplay.GetPalette: TPalette;

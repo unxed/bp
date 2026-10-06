@@ -40,6 +40,14 @@ class TmuxTerm:
             self._tmux('send-keys', '-t', self.session, n)
             time.sleep(0.12)
 
+    def click(self, col, row, button=0, double=False):
+        """a mouse click at the screen cell (col, row), 0-based, as the terminal sends it (xterm SGR mouse reports)"""
+        seqs = [b'\x1b[<%d;%d;%dM' % (button, col + 1, row + 1), b'\x1b[<%d;%d;%dm' % (button, col + 1, row + 1)]
+        for q in seqs * (2 if double else 1):
+            self._tmux('send-keys', '-t', self.session, '-H', *['%02x' % b for b in q])
+            time.sleep(0.05)
+        time.sleep(0.2)
+
     def type(self, s):
         """literal text, one byte at a time as hex (so ';' and the like are not tmux syntax)"""
         for b in s.encode('utf-8'):
@@ -105,7 +113,7 @@ class TmuxTerm:
         common = collections.Counter(r[2] for r in rows).most_common(1)[0][0]
         return [(y, text, sgr != common) for y, text, sgr in rows]
 
-    def menu(self, hotkey, label, timeout=4.0):
+    def menu(self, hotkey, label, timeout=4.0, exact=False):
         """open the menu with its Alt-key and choose the item whose text starts with `label`
         (arrow keys only, so it works whatever the item's hotkey is). False if there is no such item."""
         self.key(hotkey)
@@ -115,7 +123,8 @@ class TmuxTerm:
             cur = [r for r in rows if r[2]]
             if not rows or not cur:
                 return False
-            if cur[0][1].startswith(label):
+            name = re.split(r'\s{2,}', cur[0][1])[0].rstrip('.►').strip()
+            if (name == label) if exact else cur[0][1].startswith(label):
                 self.key('Enter')
                 return True
             self.key('Down')

@@ -7,7 +7,7 @@ unit Outline;
 interface
 
 uses
-  Objects, Drivers, Views;
+  Objects, Drivers, Views, WUtf8;
 
 type
   PNode = ^TNode;
@@ -243,7 +243,7 @@ var
     Flags: Word): Boolean;
   var
     C, I: Byte;
-    S, T: String;
+    S, T, G: String;
   begin
     Result := Position >= Delta.Y + Size.Y;
     if (Position < Delta.Y) or Result then
@@ -259,17 +259,19 @@ var
       C := CNormalX
     else
       C := CNormal;
-    for I := 0 to Size.X - 1 do
-    begin
-      B[I] := Word(C) shl 8;
-      if I + Delta.X < Length(S) then
-        B[I] := B[I] or Ord(S[1 + I + Delta.X])
-      else if 1 + I + Delta.X - Length(S) <= Length(T) then
-        B[I] := B[I] or Ord(T[1 + I + Delta.X - Length(S)])
+    G := '';
+    for I := 1 to Length(S) do
+      case S[I] of
+        #1: G := G + '│';
+        #2: G := G + '├';
+        #3: G := G + '└';
+        #4: G := G + '─';
       else
-        B[I] := B[I] or Ord(' ');
-    end;
-    WriteLineW(0, Position - Delta.Y, Size.X, 1, B);
+        G := G + S[I];
+      end;
+    MoveChar(B, ' ', C, Size.X);
+    MoveStr(B, U8Copy(G + T, Delta.X, Size.X * 4), C);
+    WriteLineC(0, Position - Delta.Y, Size.X, 1, B);
   end;
 
 begin
@@ -280,7 +282,7 @@ begin
   MaxPos := -1;
   ForEach(@DrawItem);
   MoveChar(B, ' ', CNormal, Size.X);
-  WriteLineW(0, MaxPos + 1, Size.X, Size.Y - (MaxPos - Delta.Y), B);
+  WriteLineC(0, MaxPos + 1, Size.X, Size.Y - (MaxPos - Delta.Y), B);
 end;
 
 procedure TOutlineViewer.ExpandAll(Node: Pointer);
@@ -318,9 +320,10 @@ end;
 
 function TOutlineViewer.GetGraph(Level: Integer; Lines: LongInt; Flags: Word): String;
 begin
-  { CP437: space, │, ├, └, ─, ─, +, ─ }
+  { one byte per piece (the graph is made by byte positions): space, vertical bar, tee, corner, horizontal bar, horizontal bar, +, horizontal bar;
+    Draw turns #1..#4 into the line-drawing characters of Unicode }
   Result := CreateGraph(Level, Lines, Flags, 3, 3,
-    ' ' + Char(179) + Char(195) + Char(192) + Char(196) + Char(196) + '+' + Char(196));
+    ' ' + #1 + #2 + #3 + #4 + #4 + '+' + #4);
 end;
 
 function TOutlineViewer.GetNode(I: Sw_Integer): Pointer;

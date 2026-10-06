@@ -6,7 +6,10 @@ const
   kbSpaceBar = $3920;
 
 type
-  TFVDrawBuffer = array[0..MaxViewWidth - 1] of Word;
+  { The draw buffer of the IDE is a row of tv3 cells (UTF-8 text, wide characters take two cells); the FV Word buffer
+    (a byte and a BIOS attribute) could not hold more than a code page of 256 characters. MoveChar/MoveStr/MoveCStr
+    below fill it: the strings are UTF-8, a character that is not valid UTF-8 is a byte of the code page. }
+  TFVDrawBuffer = array[0..MaxViewWidth - 1] of TScreenCell;
   TWordArray = array[0..MaxViewWidth - 1] of Word;
   PWordArray = ^TWordArray;
 
@@ -14,6 +17,16 @@ procedure MoveChar(var Dest; C: Char; Attr: Byte; Count: Word);
 procedure MoveStr(var Dest; const Str: String; Attr: Byte);
 procedure MoveCStr(var Dest; const Str: String; Attrs: Word);
 procedure MoveBuf(var Dest, Source; Attr: Byte; Count: Word);
+{ Str is UTF-8 (or a single byte): the cells of Count characters from C }
+procedure MoveFill(var Dest; const Ch: String; Attr: Byte; Count: Word);
+{ the character of one cell (a byte of the code page); the attribute is kept }
+procedure SetCellChar(var Cell: TScreenCell; C: Char);
+{ the character that starts at Str[I] into Cells[P] (two cells if it is wide, none if it combines); P is advanced, the result
+  is the number of bytes of Str used }
+function PutUtf8(var Cells: TFVDrawBuffer; var P: Integer; const Str: String; I: Integer; Attr: Byte; SetAttr: Boolean): Integer;
+{ the BIOS attribute (colour byte) of a cell }
+function CellBios(const Cell: TScreenCell): Byte;
+procedure SetCellBios(var Cell: TScreenCell; Attr: Byte);
 
 { ~18.2 Hz tick counter (DOS BIOS style), for idle/timing loops in the IDE. }
 function GetDosTicks: LongInt;

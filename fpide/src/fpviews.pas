@@ -27,7 +27,7 @@ uses
   FVConsts,
   Views,Menus,Dialogs,App,Gadgets,Tabs,
   ASCIITAB,
-  WEditor,WCEdit,
+  WEditor,WCEdit,WUtf8,
   WUtils,WHelp,WHlpView,WViews,WANSI,
   Comphook,
 {$ifndef NODEBUG}
@@ -1406,13 +1406,13 @@ begin
               exit;
             repeat
               Inc(X);
-              if X<length(LineText) then
+              if X<U8Len(LineText) then
                begin
                  AddIt:=ord(LineAttr[X+1])=coReservedWordColor;
                  if AddIt then
-                   NextResWord:=NextResWord+UpCase(LineText[X+1]);
+                   NextResWord:=NextResWord+UpCase(U8ColChar(LineText,X));
                end;
-              if ((X=length(LineText)) or (Not AddIt)) and
+              if ((X=U8Len(LineText)) or (Not AddIt)) and
                  (NextResWord<>'') and
                  IsReservedWord(NextResWord) then
                 begin
@@ -1425,7 +1425,7 @@ begin
                     end;
                   NextResWord:='';
                 end;
-            until (X>=length(LineText)) or (JumpPos.X<>-1);
+            until (X>=U8Len(LineText)) or (JumpPos.X<>-1);
             Inc(Y);
           until (Y>=GetLineCount) or (JumpPos.X<>-1);
           if (Y=GetLineCount) and (JumpPos.X=-1) then
@@ -1441,7 +1441,7 @@ begin
             NextResWord:='';
             GetDisplayTextFormat(Y,LineText,LineAttr);
             if LineCount<>1 then
-              X:=Length(LineText)
+              X:=U8Len(LineText)
             else if ord(LineAttr[X+1])<>coReservedWordColor then
               exit;
             repeat
@@ -1450,7 +1450,7 @@ begin
                begin
                  AddIt:=ord(LineAttr[X+1])=coReservedWordColor;
                  if AddIt then
-                   NextResWord:=UpCase(LineText[X+1])+NextResWord;
+                   NextResWord:=UpCase(U8ColChar(LineText,X))+NextResWord;
                end;
               if ((X=0) or (Not AddIt)) and
                  (NextResWord<>'') and
@@ -3293,13 +3293,13 @@ begin
         MoveStr(B[CurCol+1], Text, Color);
         if ShowMarkers then
         begin
-          WordRec(B[CurCol]).Lo := Byte(SpecialChars[SCOff]);
-          WordRec(B[CurCol+ColWidth-2]).Lo := Byte(SpecialChars[SCOff+1]);
+          SetCellChar(B[CurCol], Char(SpecialChars[SCOff]));
+          SetCellChar(B[CurCol+ColWidth-2], Char(SpecialChars[SCOff+1]));
         end;
       end;
-      MoveChar(B[CurCol+ColWidth-1], #179, GetColorW(5), 1);
+      MoveFill(B[CurCol+ColWidth-1], '│', GetColorW(5), 1);
     end;
-    WriteLineW(0, I, Size.X, 1, B);
+    WriteLineC(0, I, Size.X, 1, B);
   end;
 end;
 
@@ -3624,24 +3624,23 @@ var B     : TFVDrawBuffer;
     Name       : PString;
     ActiveKPos : integer;
     ActiveVPos : integer;
-    FC   : char;
+    FC   : string[3];
     ClipR      : TRect;
 procedure SWriteBuf(X,Y,W,H: integer; var Buf);
 var i,j: integer;
 begin
   if Y+H>Size.Y then H:=Size.Y-Y;
   if X+W>Size.X then W:=Size.X-X;
-  if Buffer=nil then WriteBufW(X,Y,W,H,Buf)
+  if Buffer=nil then WriteBufC(X,Y,W,H,Buf)
                 else for i:=1 to H do
                          for j:=0 to W-1 do
-                           Buffer[X+j+(Y+i-1)*Size.X]:=CellFromBIOS(PWord(@Buf)[j]);
+                           Buffer[X+j+(Y+i-1)*Size.X]:=TFVDrawBuffer(Buf)[j];
 end;
 procedure ClearBuf;
 begin
   MoveChar(B,' ',C1,Size.X);
 end;
 begin
-  DbgLog('TTab.Draw size='+IntToStr(Size.X)+'x'+IntToStr(Size.Y)+' indraw='+IntToStr(Ord(InDraw)));
   if InDraw then Exit;
   InDraw:=true;
   { - Start of TGroup.Draw - }
@@ -3656,7 +3655,7 @@ begin
   if HeaderLen>Size.X-2 then HeaderLen:=Size.X-2;
 
   { --- 1. sor --- }
-  ClearBuf; MoveChar(B[0],#179,C1,1); MoveChar(B[HeaderLen+1],#179,C1,1);
+  ClearBuf; MoveFill(B[0], '│',C1,1); MoveFill(B[HeaderLen+1], '│',C1,1);
   X:=1;
   for i:=0 to DefCount-1 do
       begin
@@ -3669,47 +3668,47 @@ begin
                 end
            else C:=C2;
         MoveCStr(B[X],' '+Name^+' ',C); X:=X+X2+3;
-        MoveChar(B[X-1],#179,C1,1);
+        MoveFill(B[X-1], '│',C1,1);
       end;
   SWriteBuf(0,1,Size.X,1,B);
 
   { --- 0. sor --- }
-  ClearBuf; MoveChar(B[0],#218,C1,1);
+  ClearBuf; MoveFill(B[0], '┌',C1,1);
   X:=1;
   for i:=0 to DefCount-1 do
       begin
-        if I<ActiveDef then FC:=#218
-                       else FC:=#191;
+        if I<ActiveDef then FC:='┌'
+                       else FC:='┐';
         X2:=CStrLen(AtTab(i).Name^)+2;
-        MoveChar(B[X+X2],{#194}FC,C1,1);
+        MoveFill(B[X+X2],FC,C1,1);
         if i=DefCount-1 then X2:=X2+1;
         if X2>0 then
-        MoveChar(B[X],#196,C1,X2);
+        MoveFill(B[X], '─',C1,X2);
         X:=X+X2+1;
       end;
-  MoveChar(B[HeaderLen+1],#191,C1,1);
-  MoveChar(B[ActiveKPos],#218,C1,1); MoveChar(B[ActiveVPos],#191,C1,1);
+  MoveFill(B[HeaderLen+1], '┐',C1,1);
+  MoveFill(B[ActiveKPos], '┌',C1,1); MoveFill(B[ActiveVPos], '┐',C1,1);
   SWriteBuf(0,0,Size.X,1,B);
 
   { --- 2. sor --- }
-  MoveChar(B[1],#196,C1,Max(HeaderLen,0)); MoveChar(B[HeaderLen+2],#196,C1,Max(Size.X-HeaderLen-3,0));
-  MoveChar(B[Size.X-1],#191,C1,1);
-  MoveChar(B[ActiveKPos],#217,C1,1);
-  if ActiveDef=0 then MoveChar(B[0],#179,C1,1)
-                 else MoveChar(B[0],{#195}#218,C1,1);
-  MoveChar(B[HeaderLen+1],#196{#193},C1,1); MoveChar(B[ActiveVPos],#192,C1,1);
+  MoveFill(B[1], '─',C1,Max(HeaderLen,0)); MoveFill(B[HeaderLen+2], '─',C1,Max(Size.X-HeaderLen-3,0));
+  MoveFill(B[Size.X-1], '┐',C1,1);
+  MoveFill(B[ActiveKPos], '┘',C1,1);
+  if ActiveDef=0 then MoveFill(B[0], '│',C1,1)
+                 else MoveFill(B[0],'┌',C1,1);
+  MoveFill(B[HeaderLen+1],'─',C1,1); MoveFill(B[ActiveVPos], '└',C1,1);
   MoveChar(B[ActiveKPos+1],' ',C1,Max(ActiveVPos-ActiveKPos-1,0));
   SWriteBuf(0,2,Size.X,1,B);
 
   { --- maradék sor --- }
-  ClearBuf; MoveChar(B[0],#179,C1,1); MoveChar(B[Size.X-1],#179,C1,1);
+  ClearBuf; MoveFill(B[0], '│',C1,1); MoveFill(B[Size.X-1], '│',C1,1);
   for i:=3 to Size.Y-1 do
     SWriteBuf(0,i,Size.X,1,B);
   { SWriteBuf(0,3,Size.X,Size.Y-4,B); this was wrong
     because WriteBuf then expect a buffer of size size.x*(size.y-4)*2 PM }
 
   { --- Size.X . sor --- }
-  MoveChar(B[0],#192,C1,1); MoveChar(B[1],#196,C1,Max(Size.X-2,0)); MoveChar(B[Size.X-1],#217,C1,1);
+  MoveFill(B[0], '└',C1,1); MoveFill(B[1], '─',C1,Max(Size.X-2,0)); MoveFill(B[Size.X-1], '┘',C1,1);
   SWriteBuf(0,Size.Y-1,Size.X,1,B);
 
   { - End of TGroup.Draw - }
@@ -3719,7 +3718,7 @@ begin
     Redraw;
     UnLock;
   end;
-  if Buffer <> nil then WriteBufW(0, 0, Size.X, Size.Y, Buffer^) else
+  if Buffer <> nil then WriteBufC(0, 0, Size.X, Size.Y, Buffer^) else
   begin
     GetClipRect(ClipR);
     Redraw;
@@ -3820,7 +3819,7 @@ begin
     MoveChar(B,' ',GetColorW(1),Size.X);
     for X:=1 to length(Text) do
       MoveChar(B[X-1],Text[X],ord(Attr[X]),1);
-    WriteLineW(0,Y-Delta.Y,Size.X,1,B);
+    WriteLineC(0,Y-Delta.Y,Size.X,1,B);
   end;
   SetCursor(P.X-Delta.X,P.Y-Delta.Y);
 end;
@@ -4232,7 +4231,7 @@ begin
         S:=CharStr(' ',Max(0,(Size.X-(length(S)-1)) div 2))+copy(S,2,255);
       MoveChar(B,' ',C,Size.X);
       MoveStr(B,S,C);
-      WriteLineW(0,Y,Size.X,1,B);
+      WriteLineC(0,Y,Size.X,1,B);
     end;
 end;
 
@@ -4518,7 +4517,7 @@ begin
   end;
   MoveChar(B,' ',C,Size.X);
   MoveStr(B,S,C);
-  WriteLineW(0,Y,Size.X,1,B);
+  WriteLineC(0,Y,Size.X,1,B);
 end;
 var S: string;
     Y: integer;

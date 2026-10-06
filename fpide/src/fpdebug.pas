@@ -2437,13 +2437,13 @@ begin
         MoveStr(B[CurCol+1], Text, Color);
         if ShowMarkers then
         begin
-          WordRec(B[CurCol]).Lo := Byte(SpecialChars[SCOff]);
-          WordRec(B[CurCol+ColWidth-2]).Lo := Byte(SpecialChars[SCOff+1]);
+          SetCellChar(B[CurCol], Char(SpecialChars[SCOff]));
+          SetCellChar(B[CurCol+ColWidth-2], Char(SpecialChars[SCOff+1]));
         end;
       end;
-      MoveChar(B[CurCol+ColWidth-1], #179, GetColorW(5), 1);
+      MoveFill(B[CurCol+ColWidth-1], '│', GetColorW(5), 1);
     end;
-    WriteLineW(0, I, Size.X, 1, B);
+    WriteLineC(0, I, Size.X, 1, B);
   end;
 end;
 
@@ -3193,14 +3193,14 @@ begin
         MoveStr(B[CurCol], Text, Color);
         if {ShowMarkers or } Modified then
         begin
-          WordRec(B[CurCol]).Lo := Byte(SpecialChars[SCOff]);
-          WordRec(B[CurCol+ColWidth-2]).Lo := Byte(SpecialChars[SCOff+1]);
-          WordRec(B[CurCol+ColWidth-2]).Hi := Color and $ff;
+          SetCellChar(B[CurCol], Char(SpecialChars[SCOff]));
+          SetCellChar(B[CurCol+ColWidth-2], Char(SpecialChars[SCOff+1]));
+          SetCellBios(B[CurCol+ColWidth-2], Color and $ff);
         end;
       end;
-      MoveChar(B[CurCol+ColWidth-1], #179, GetColorW(5), 1);
+      MoveFill(B[CurCol+ColWidth-1], '│', GetColorW(5), 1);
     end;
-    WriteLineW(0, I, Size.X, 1, B);
+    WriteLineC(0, I, Size.X, 1, B);
   end;
 end;
 

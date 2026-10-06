@@ -107,7 +107,10 @@ try:
     while time.time() < end and not os.path.exists(ran):
         time.sleep(0.2)
     check(os.path.exists(ran), 'Ctrl+F9 runs the program (it wrote ran.txt)', t)
-    check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE is back after the program ended', t)
+    # on Unix the IDE waits for a key after the program (as the original does): "Press any key to return to IDE"
+    check(t.wait_for('Press any key to return to IDE', 10), 'the IDE waits for a key after the program ended', t)
+    t.key('Enter')
+    check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE is back after the key', t)
     check(os.path.exists(os.path.join(t.work, 'fp.dsk')), 'the desktop file was saved before the run', t)
 
     check(t.alive(), 'no runtime error during the whole run (stderr: %r)' % t.stderr()[:80], t)

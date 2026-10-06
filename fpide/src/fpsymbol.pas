@@ -1485,7 +1485,7 @@ begin
 end;
 begin
   NormColor:=GetColorW(1); SelColor:=GetColorW(2);
-  MoveChar(B,#196,SelColor,Size.X);
+  MoveFill(B, '─',SelColor,Size.X);
   CurX:=0; Count:=0;
   for I:=0 to GetItemCount-1 do
     if (Flags and (1 shl I))<>0 then
@@ -1493,14 +1493,14 @@ begin
       Inc(Count);
       if Current=I then C:=SelColor
                    else C:=NormColor;
-      if Count=1 then MoveChar(B[CurX],#180,SelColor,1)
-                 else MoveChar(B[CurX],#179,SelColor,1);
+      if Count=1 then MoveFill(B[CurX], '┤',SelColor,1)
+                 else MoveFill(B[CurX], '│',SelColor,1);
       MoveCStr(B[CurX+1],' '+Names(I)+' ',C);
       Inc(CurX,4);
     end;
   if Count>0 then
-    MoveChar(B[CurX],#195,SelColor,1);
-  WriteLineW(0,0,Size.X,Size.Y,B);
+    MoveFill(B[CurX], '├',SelColor,1);
+  WriteLineC(0,0,Size.X,Size.Y,B);
 end;
 
 procedure TBrowserTab.HandleEvent(var Event: TEvent);

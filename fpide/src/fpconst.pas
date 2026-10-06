@@ -95,7 +95,7 @@ const
      WinHelpExt           = '.hlp';
      HelpFileExts         = '*.tph;*.htm*;*'+HTMLIndexExt+';*'+NGExt+';*'+WinHelpExt+';*'+INFExt+';*'+ExtChm;
 
-     EnterSign            = #17#196#217;
+     EnterSign            = '◄─┘';
 
      { Main menu submenu indexes }
      menuFile             = 0;

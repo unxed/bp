@@ -2,6 +2,7 @@ name: fpide-accept
 
 # Builds fp (the Free Pascal IDE on tv3) and clicks through it in tmux: fpide/tests/accept.
 # test_accept.py: the main functions (start, menus, editor, save, directories, make, run);
+# test_functions.py: the click-through of the functions (editor, search, windows, tools, options, files, compiler, UTF-8 text);
 # test_menu_sweep.py: every menu item is activated and the IDE must stay alive.
 on:
   workflow_dispatch:

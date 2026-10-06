@@ -3,59 +3,133 @@ type
     Lo, Hi: Byte;
   end;
 
+type
+  PFVCells = ^TFVDrawBuffer;
+
+function FVAttr(Attr: Byte): TColorAttr;
+begin
+  Result := CellFromBIOS(Word(Attr) shl 8).Attribute;
+end;
+
+procedure SetCellChar(var Cell: TScreenCell; C: Char);
+begin
+  ScInitChar(Cell.Character, Byte(C));
+end;
+
+function CellBios(const Cell: TScreenCell): Byte;
+begin
+  Result := AttrAsBIOSByte(Cell.Attribute);
+end;
+
+procedure SetCellBios(var Cell: TScreenCell; Attr: Byte);
+begin
+  Cell.Attribute := FVAttr(Attr);
+end;
+
+{ writes the character that starts at Str[I] into Cells[P..] (a wide one takes two cells, a combining one none);
+  returns the number of bytes used; P is advanced }
+function PutUtf8(var Cells: TFVDrawBuffer; var P: Integer; const Str: String; I: Integer; Attr: Byte; SetAttr: Boolean): Integer;
+var
+  CP: LongWord;
+  Used, W: Integer;
+  A: TColorAttr;
+begin
+  Result := 1;
+  if P > High(Cells) then
+    Exit;
+  if SetAttr then
+    A := FVAttr(Attr);
+  if (Byte(Str[I]) < $80) or (not Utf8Enabled) or
+     (not Utf8Decode(@Str[I], Length(Str) - I + 1, CP, Used)) or (Used <= 1) then
+  begin
+    ScInitChar(Cells[P].Character, Byte(Str[I]));
+    if SetAttr then Cells[P].Attribute := A;
+    Inc(P);
+    Exit;
+  end;
+  Result := Used;
+  W := CharWidth(CP);
+  if W <= 0 then
+  begin
+    { a combining character goes onto the cell before }
+    if P > 0 then
+      ScAppendZeroWidth(Cells[P - 1].Character, @Str[I], Used);
+    Exit;
+  end;
+  if (W >= 2) and (P + 1 > High(Cells)) then
+    W := 1;
+  ScInitText(Cells[P].Character, @Str[I], Used, W >= 2);
+  if SetAttr then Cells[P].Attribute := A;
+  Inc(P);
+  if W >= 2 then
+  begin
+    ScInitWideTrail(Cells[P].Character);
+    if SetAttr then Cells[P].Attribute := A;
+    Inc(P);
+  end;
+end;
+
 procedure MoveChar(var Dest; C: Char; Attr: Byte; Count: Word);
 var
   I: Word;
-  P: PWord;
+  Cells: PFVCells;
 begin
-  for I := 1 to Count do
+  Cells := @Dest;
+  for I := 0 to Count - 1 do
   begin
-    P := @TWordArray(Dest)[I - 1];
     if Attr <> 0 then
-      TWordRec(P^).Hi := Attr;
+      Cells^[I].Attribute := FVAttr(Attr);
     if Ord(C) <> 0 then
-      TWordRec(P^).Lo := Byte(C);
+      ScInitChar(Cells^[I].Character, Byte(C));
   end;
+end;
+
+procedure MoveFill(var Dest; const Ch: String; Attr: Byte; Count: Word);
+var
+  I, P: Integer;
+  Cells: PFVCells;
+begin
+  Cells := @Dest;
+  P := 0;
+  if Ch = '' then
+    Exit;
+  for I := 1 to Count do
+    PutUtf8(Cells^, P, Ch, 1, Attr, Attr <> 0);
 end;
 
 procedure MoveStr(var Dest; const Str: String; Attr: Byte);
 var
-  I: Word;
-  P: PWord;
+  I, P: Integer;
+  Cells: PFVCells;
 begin
-  for I := 1 to Length(Str) do
-  begin
-    P := @TWordArray(Dest)[I - 1];
-    if Attr <> 0 then
-      TWordRec(P^).Hi := Attr;
-    TWordRec(P^).Lo := Byte(Str[I]);
-  end;
+  Cells := @Dest;
+  P := 0;
+  I := 1;
+  while I <= Length(Str) do
+    Inc(I, PutUtf8(Cells^, P, Str, I, Attr, Attr <> 0));
 end;
 
 procedure MoveCStr(var Dest; const Str: String; Attrs: Word);
 var
   B: Byte;
-  I, J: Word;
-  P: PWord;
+  I, P: Integer;
   A: Word;
+  Cells: PFVCells;
 begin
+  Cells := @Dest;
   A := Attrs;
-  J := 0;
-  for I := 1 to Length(Str) do
+  P := 0;
+  I := 1;
+  while I <= Length(Str) do
   begin
     if Str[I] <> '~' then
-    begin
-      P := @TWordArray(Dest)[J];
-      if Lo(A) <> 0 then
-        TWordRec(P^).Hi := Lo(A);
-      TWordRec(P^).Lo := Byte(Str[I]);
-      Inc(J);
-    end
+      Inc(I, PutUtf8(Cells^, P, Str, I, Lo(A), Lo(A) <> 0))
     else
     begin
       B := Hi(A);
       TWordRec(A).Hi := Lo(A);
       TWordRec(A).Lo := B;
+      Inc(I);
     end;
   end;
 end;
@@ -63,16 +137,16 @@ end;
 procedure MoveBuf(var Dest, Source; Attr: Byte; Count: Word);
 var
   I: Word;
-  P: PWord;
   S: PByte;
+  Cells: PFVCells;
 begin
+  Cells := @Dest;
   S := @Source;
-  for I := 1 to Count do
+  for I := 0 to Count - 1 do
   begin
-    P := @TWordArray(Dest)[I - 1];
     if Attr <> 0 then
-      TWordRec(P^).Hi := Attr;
-    TWordRec(P^).Lo := S^;
+      Cells^[I].Attribute := FVAttr(Attr);
+    ScInitChar(Cells^[I].Character, S^);
     Inc(S);
   end;
 end;

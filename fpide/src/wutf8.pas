@@ -46,6 +46,8 @@ function U8PrevIdx(const S: string; Idx: integer): integer;
 function U8ColChar(const S: string; Col: integer): char;
 { S padded with blanks to Cols columns (S is not cut) }
 function U8Pad(const S: string; Cols: integer): string;
+{ the column that covers screen cell Cell (0-based, counted from column 0); beyond the end one column per cell }
+function U8ColAtCell(const S: string; Cell: integer): integer;
 { does the string consist of single-byte columns only? }
 function U8IsAscii(const S: string): boolean;
 { upper/lower case of the characters (the letters of Latin, Greek, Cyrillic, ...; the rest is left alone) }
@@ -103,6 +105,24 @@ begin
   Result := S;
   if N < Cols then
     Result := Result + StringOfChar(' ', Cols - N);
+end;
+
+function U8ColAtCell(const S: string; Cell: integer): integer;
+var
+  Col, Acc, W: integer;
+begin
+  if Cell <= 0 then Exit(0);
+  if (not Utf8Text) or U8IsAscii(S) then Exit(Cell);
+  Col := 0;
+  Acc := 0;
+  while (Col < U8Len(S)) do
+  begin
+    W := U8Cells(S, Col, 1);
+    if Acc + W > Cell then Exit(Col);
+    Inc(Acc, W);
+    Inc(Col);
+  end;
+  Result := Col + (Cell - Acc);
 end;
 
 function U8IsAscii(const S: string): boolean;

@@ -780,7 +780,7 @@ end;
 procedure TIndicator.Draw;
 var
   Color: Byte;
-  Frame: Char;
+  Frame: string[3];
   L: array[0..1] of PtrInt;
   S: String[15];
   B: TFVDrawBuffer;
@@ -794,7 +794,7 @@ begin
   if (State and sfDragging = 0) and (State and sfActive <> 0) then
    begin
      Color := Lo(GetColorW(1));
-     Frame := #205;
+     Frame := '═';
    end
   else
    begin
@@ -802,27 +802,27 @@ begin
       Color := Lo(GetColorW(2))
      else
       Color := Lo(GetColorW(3));
-     Frame := #196;
+     Frame := '─';
    end;
-  MoveChar(B, Frame, Color, Size.X);
+  MoveFill(B, Frame, Color, Size.X);
   if State and sfActive<>0 then
    begin
      if Modified then
-       B[0] := (B[0] and $FF00) or Ord('*');
+       SetCellChar(B[0], '*');
 {$ifdef debug}
      if StoreUndo then
-       B[1] := (B[1] and $FF00) or Ord('S');
+       SetCellChar(B[1], 'S');
      if SyntaxComplete then
-       B[2] := (B[2] and $FF00) or Ord('C');
+       SetCellChar(B[2], 'C');
      if UseTabs then
-       B[3] := (B[3] and $FF00) or Ord('T');
+       SetCellChar(B[3], 'T');
 {$endif debug}
      L[0] := Location.Y + 1;
      L[1] := Location.X + 1;
      FormatStr(S, ' %d:%d ', L);
      MoveStr(B[8 - Pos(':', S)], S, Color);
    end;
-  WriteBufW(0, 0, Size.X, 1, B);
+  WriteBufC(0, 0, Size.X, 1, B);
 end;
 
 function TIndicator.GetPalette: TPalette;
@@ -1284,7 +1284,7 @@ var
   UndoTime : longint;
   WasInserting,IsGrouped,HadefNoIndent : boolean;
   MaxY,MinY : sw_integer;
-  Line : String;
+  Line,NewText : String;
 
   procedure SetMinMax(y : sw_integer);
     begin
@@ -1332,7 +1332,7 @@ begin
               begin
                 SetCurPtr(StartPos.X,StartPos.Y);
                 if assigned(text) then
-                  for Temp := 1 to length(Text^) do
+                  for Temp := 1 to U8Len(Text^) do
                     DelChar;
                 SetMinMax(StartPos.Y);
               end;
@@ -1343,8 +1343,7 @@ begin
                 WasInserting:=GetInsertMode;
                 SetInsertMode(true);
                 if assigned(text) then
-                  for Temp := 1 to length(Text^) do
-                    AddChar(Text^[Temp]);
+                  AddString(Text^);
                 SetInsertMode(WasInserting);
                 SetMinMax(EndPos.Y);
                 SetCurPtr(StartPos.X,StartPos.Y);
@@ -1356,14 +1355,19 @@ begin
                 WasInserting:=GetInsertMode;
                 SetInsertMode(false);
                 if assigned(text) then
-                  for Temp := 1 to length(Text^) do
-                    begin
-                      AddChar(Text^[Temp]);
-                      if StartPos.X+Temp>Length(Line) then
-                        Text^[Temp]:=' '
-                      else
-                        Text^[Temp]:=Line[StartPos.X+Temp];
-                    end;
+                  begin
+                    NewText:='';
+                    for Temp := 0 to U8Len(Text^)-1 do
+                      begin
+                        AddCharStr(U8Char(Text^,Temp));
+                        if StartPos.X+Temp>=U8Len(Line) then
+                          NewText:=NewText+' '
+                        else
+                          NewText:=NewText+U8Char(Line,StartPos.X+Temp);
+                      end;
+                    DisposeStr(Text);
+                    Text:=NewStr(NewText);
+                  end;
                 SetInsertMode(WasInserting);
                 SetMinMax(EndPos.Y);
                 SetCurPtr(StartPos.X,StartPos.Y);
@@ -1371,10 +1375,10 @@ begin
             eaInsertLine :
               begin
                 SetCurPtr(EndPos.X,EndPos.Y);
-                Line:=Copy(GetDisplayText(StartPos.Y),1,StartPos.X);
-                If Length(Line)<StartPos.X then
-                  Line:=Line+CharStr(' ',StartPos.X-length(Line))+GetStr(Text);
-                SetDisplayText(StartPos.Y,Line+Copy(GetDisplayText(EndPos.Y),EndPos.X+1,255));
+                Line:=U8Copy(GetDisplayText(StartPos.Y),0,StartPos.X);
+                If U8Len(Line)<StartPos.X then
+                  Line:=Line+CharStr(' ',StartPos.X-U8Len(Line))+GetStr(Text);
+                SetDisplayText(StartPos.Y,Line+U8Copy(GetDisplayText(EndPos.Y),EndPos.X,255));
                 SetMinMax(EndPos.Y);
                 SetCurPtr(0,EndPos.Y);
                 DeleteLine(EndPos.Y);
@@ -1394,7 +1398,7 @@ begin
                 {DelEnd; wrong for eaCut at least }
                 SetCurPtr(StartPos.X,StartPos.Y);
                 if StartPos.Y > EndPos.Y then
-                   SetLineText(EndPos.Y,Copy(GetDisplayText(EndPos.Y),1,EndPos.X));
+                   SetLineText(EndPos.Y,U8Copy(GetDisplayText(EndPos.Y),0,EndPos.X));
                 SetMinMax(StartPos.Y);
               end;
             eaSelectionChanged :
@@ -1450,7 +1454,7 @@ var
   Temp,Idx,i,Last,Count : Longint;
   StoredFlags : longint;
   WasInserting,IsGrouped,ShouldInsertText : boolean;
-  Line : String;
+  Line,NewText : String;
   MaxY,MinY : sw_integer;
   procedure SetMinMax(y : sw_integer);
     begin
@@ -1500,7 +1504,7 @@ begin
         eaDeleteText :
           begin
             SetCurPtr(EndPos.X,EndPos.Y);
-            for Temp := 1 to length(GetStr(Text)) do
+            for Temp := 1 to U8Len(GetStr(Text)) do
               DelChar;
             SetMinMax(EndPos.Y);
           end;
@@ -1511,14 +1515,19 @@ begin
             WasInserting:=GetInsertMode;
             SetInsertMode(false);
             if assigned(text) then
-              for Temp := 1 to length(Text^) do
-                begin
-                  AddChar(Text^[Temp]);
-                  if StartPos.X+Temp>Length(Line) then
-                    Text^[Temp]:=' '
-                  else
-                    Text^[Temp]:=Line[StartPos.X+Temp];
-                end;
+              begin
+                NewText:='';
+                for Temp := 0 to U8Len(Text^)-1 do
+                  begin
+                    AddCharStr(U8Char(Text^,Temp));
+                    if StartPos.X+Temp>=U8Len(Line) then
+                      NewText:=NewText+' '
+                    else
+                      NewText:=NewText+U8Char(Line,StartPos.X+Temp);
+                  end;
+                DisposeStr(Text);
+                Text:=NewStr(NewText);
+              end;
             SetInsertMode(WasInserting);
             SetCurPtr(EndPos.X,EndPos.Y);
             SetMinMax(StartPos.Y);
@@ -1547,8 +1556,8 @@ begin
             DeleteLine(StartPos.Y);
             SetCurPtr(EndPos.X,EndPos.Y);
             if EndPos.Y=StartPos.Y-1 then
-            SetDisplayText(EndPos.Y,RExpand(
-              copy(GetDisplayText(EndPos.Y),1,EndPos.X),EndPos.X)
+            SetDisplayText(EndPos.Y,U8Pad(
+              U8Copy(GetDisplayText(EndPos.Y),0,EndPos.X),EndPos.X)
               +GetStr(Text));
             SetCurPtr(EndPos.X,EndPos.Y);
             SetMinMax(StartPos.Y);

@@ -1283,45 +1283,43 @@ procedure TColorStaticText.Draw;
 
   procedure MoveColorTxt(var b;const curs:string;c:word);
   var
-    p : ^word;
-    i : sw_integer;
+    Cells : ^TFVDrawBuffer;
+    P,i : sw_integer;
     col : byte;
     tilde : boolean;
   begin
     tilde:=false;
     col:=lo(c);
-    p:=@b;
-    i:=0;
-    while (i<length(Curs)) do
-     begin
-       Inc(i);
-       case CurS[i] of
-         #1 :
-           begin
-             Inc(i);
-             Col:=ord(curS[i]);
-           end;
-         #2 :
-           begin
-             if tilde then
-              col:=hi(Color)
-             else
-              col:=lo(Color)
-           end;
-         '~' :
-           begin
-             tilde:=not tilde;
-             if tilde then
-              col:=hi(Color)
-             else
-              col:=lo(Color)
-           end;
-         else
-           begin
-             p^:=(col shl 8) or ord(curs[i]);
-             inc(p);
-           end;
-       end;
+    Cells:=@b;
+    P:=0;
+    i:=1;
+    while (i<=length(Curs)) do
+     case CurS[i] of
+       #1 :
+         begin
+           Inc(i);
+           if i<=length(Curs) then col:=ord(curS[i]);
+           Inc(i);
+         end;
+       #2 :
+         begin
+           if tilde then
+            col:=hi(Color)
+           else
+            col:=lo(Color);
+           Inc(i);
+         end;
+       '~' :
+         begin
+           tilde:=not tilde;
+           if tilde then
+            col:=hi(Color)
+           else
+            col:=lo(Color);
+           Inc(i);
+         end;
+     else
+       Inc(i,PutUtf8(Cells^,P,curs,i,col,true));
      end;
   end;
 
@@ -1381,7 +1379,7 @@ begin
         if (P <= L) and (S[P] = #10) then Inc(P);
       end;
     end;
-    WriteLineW(0, Y, Size.X, 1, B);
+    WriteLineC(0, Y, Size.X, 1, B);
     Inc(Y);
   end;
  end { Wrap=false } else
@@ -1403,7 +1401,7 @@ begin
     end;
     if CurS<>'' then
       MoveColorTxt(B,CurS,C);
-    WriteLineW(0,Y,Size.X,1,B);
+    WriteLineC(0,Y,Size.X,1,B);
   end;
  end;
 end;
@@ -1606,7 +1604,7 @@ begin
     C:=GetColorW(1);
     MoveChar(B,' ',C,Size.X);
     MoveStr(B[1],S,C);
-    WriteLineW(0,0,Size.X,Size.Y,B);
+    WriteLineC(0,0,Size.X,Size.Y,B);
   end;
 end;
 
@@ -2262,7 +2260,7 @@ begin
   MoveStr(B[1],copy(Text,1,Size.X-2),TextC);
   if ListDropped then LC:='^' else LC:='v';
   MoveChar(B[Size.X-2],LC,C,1);
-  WriteLineW(0,0,Size.X,Size.Y,B);
+  WriteLineC(0,0,Size.X,Size.Y,B);
 end;
 
 function TDropDownListBox.GetPalette: TPalette;
@@ -2298,17 +2296,17 @@ begin
     begin
       MoveCStr(B[1],' '+Text^+' ',LabelC);
     end;
-  WriteLineW(0,0,Size.X,1,B);
+  WriteLineC(0,0,Size.X,1,B);
   { Mid Lines }
   MoveChar(B[0],Char(179),FrameC,1);
   MoveChar(B[1],' ',FrameC,Size.X-2);
   MoveChar(B[Size.X-1],Char(179),FrameC,1);
-  WriteLineW(0,1,Size.X,Size.Y-2,B);
+  WriteLineC(0,1,Size.X,Size.Y-2,B);
   { Last Line }
   MoveChar(B[0],Char(192),FrameC,1);
   MoveChar(B[1],Char(196),FrameC,Size.X-2);
   MoveChar(B[Size.X-1],Char(217),FrameC,1);
-  WriteLineW(0,Size.Y-1,Size.X,1,B);
+  WriteLineC(0,Size.Y-1,Size.X,1,B);
 end;
 
 function TPlainCheckBoxes.GetPalette: TPalette;
@@ -2500,7 +2498,7 @@ begin
     end;
     if length(CurLine)>MaxCols then
       MaxCols:=length(CurLine);
-{    WriteLineW(0, Y, Size.X, 1, B);}
+{    WriteLineC(0, Y, Size.X, 1, B);}
     Inc(Y);
   end;
   Rows:=Y;

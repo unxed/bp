@@ -1287,9 +1287,7 @@ begin
 {              CurP.X:=X; CurP.Y:=Y;
               if LinkAreaContainsPoint(R,CurP) then}
 (*              B[ScreenX]:=(B[ScreenX] and $f0ff) or (C shl 8);*)
-              ANDSB:=(Mask shl 8)+$ff;
-              ORSB:=(C shl 8);
-              B[ScreenX]:=(B[ScreenX] and ANDSB) or ORSB;
+              SetCellBios(B[ScreenX],(CellBios(B[ScreenX]) and Mask) or (C and $ff));
             end;
           end;
         end;
@@ -1312,7 +1310,7 @@ begin
               CurP.X:=X; CurP.Y:=Y;
               if LinkContainsPoint(R,CurP) then
                 if I=CurLink then C:=SelectColor else C:=LinkColor;
-              B[ScreenX]:=(B[ScreenX] and $ff) or (C shl 8);
+              SetCellBios(B[ScreenX],C and $ff);
             end;
           end;
       end;
@@ -1326,12 +1324,12 @@ begin
           X:=DX;
           ScreenX:=X-(Delta.X);
           if (ScreenX>=0) and (ScreenX<High(B)) then
-            B[ScreenX]:=(B[ScreenX] and $0fff) or ((SelectionColor and $f0) shl 8);
+            SetCellBios(B[ScreenX],(CellBios(B[ScreenX]) and $0f) or (SelectionColor and $f0));
         end;
       end;
 
     end;
-    WriteLineW(0,DY,Size.X,1,B);
+    WriteLineC(0,DY,Size.X,1,B);
   end;
   DrawCursor;
 end;

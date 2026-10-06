@@ -63,8 +63,14 @@ begin
     for X := 0 to Pred(Size.X) do
     begin
       Ch := Y * 32 + X;
-      if Ch <= 255 then
-        B.MoveChar(X, Ch, C.Lo, 1);
+      { the Unicode characters U+0000..U+00FF (the editor is UTF-8); the control characters of the first 32 are
+        shown by their symbols, the C1 controls U+0080..U+009F as a dot }
+      if Ch < 128 then
+        B.MoveChar(X, Ch, C.Lo, 1)
+      else if Ch < 160 then
+        B.MoveChar(X, Ord('.'), C.Lo, 1)
+      else if Ch <= 255 then
+        B.MoveStrS(X, Chr($C0 or (Ch shr 6)) + Chr($80 or (Ch and $3F)), C.Lo);
     end;
     WriteLineD(0, Y, Size.X, 1, B);
   end;

@@ -11,5 +11,6 @@ if [ -z "$fp" ]; then
 fi
 status=0
 python3 "$here/fpide/tests/accept/test_accept.py" "$fp" || status=1
+python3 "$here/fpide/tests/accept/test_functions.py" "$fp" || status=1
 python3 "$here/fpide/tests/accept/test_menu_sweep.py" "$fp" || status=1
 exit $status
