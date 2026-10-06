@@ -18,6 +18,7 @@ unit WNGHelp;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses Objects,
@@ -495,7 +496,7 @@ begin
           TranslateLines(Lines);
           AddLine('');
           { include copyright info }
-{          AddLine(CharStr('�',80));
+{          AddLine(CharStr('─',80));
           AddLine(ExtractStr(Header.GuideName,sizeof(Header.GuideName)));
           AddLine(ExtractStr(Header.Credits,sizeof(Header.Credits)));}
           RenderTopic(Lines,T);

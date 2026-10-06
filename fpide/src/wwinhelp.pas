@@ -18,6 +18,7 @@ unit WWinHelp;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses Objects,
@@ -1412,8 +1413,8 @@ begin
         Move(P.LinkData2^,S[1],ord(S[0]));
         if S<>'' then
         begin
-          EmitText('  '+S+' �'+hscLineBreak);
-          EmitText(' '+CharStr('�',length(S)+3)+hscLineBreak);
+          EmitText('  '+S+' ▄'+hscLineBreak);
+          EmitText(' '+CharStr('▀',length(S)+3)+hscLineBreak);
         end;
       end;
     $20,$23 :
@@ -1482,7 +1483,7 @@ begin
           if (P.TopicPos=(TH.ScrollRgnOfs and $3fff)) then
             begin
               EmitText(hscLineBreak);
-              EmitText(CharStr('�',80));
+              EmitText(CharStr('─',80));
               EmitText(hscLineBreak);
             end;
 }

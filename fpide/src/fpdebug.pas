@@ -16,6 +16,7 @@ unit FPDebug;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 {$ifdef NODEBUG}
 interface
 implementation
@@ -2554,7 +2555,7 @@ begin
   ST.GrowMode:=gfGrowHiX;
   Insert(ST);
   GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,1); R.B.Y:=R.A.Y+1;
-  ST := TStaticText.Create(R, CharStr('�', MaxViewWidth));
+  ST := TStaticText.Create(R, CharStr('─', MaxViewWidth));
   ST.GrowMode:=gfGrowHiX;
   Insert(ST);
   GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,2);Dec(R.B.Y,5);

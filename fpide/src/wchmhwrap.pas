@@ -18,6 +18,7 @@ unit wchmhwrap;
 
 {$mode delphi}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 Uses  wutils,whelp,whtml,SysUtils,ChmReader,ChmSiteMap,Classes;

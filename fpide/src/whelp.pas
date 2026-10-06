@@ -18,6 +18,7 @@ unit WHelp;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses
@@ -547,7 +548,7 @@ var T: TTopic;
     Index: sw_integer;
 begin
   FillChar(T, SizeOf(T), 0);
-  T^.HelpCtx:=AHelpCtx;
+  T.HelpCtx:=AHelpCtx;
   if Search(@T,Index) then
     P:=At(Index)
   else

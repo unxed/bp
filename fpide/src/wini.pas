@@ -17,6 +17,7 @@ unit WINI;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses Objects;

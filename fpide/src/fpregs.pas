@@ -16,6 +16,7 @@ unit FPRegs;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 {$ifdef NODEBUG}
 interface
 implementation

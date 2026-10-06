@@ -19,7 +19,7 @@ def convert(text: str) -> str:
     if "{$mode objfpc}" not in text:
         text = re.sub(
             r"(unit\s+\w+\s*;\s*\n)",
-            r"\1\n{$mode objfpc}{$H-}\n{$modeswitch nestedprocvars}\n",
+            r"\1\n{$mode objfpc}{$H-}\n{$modeswitch nestedprocvars}\n{$modeswitch autoderef}\n",
             text,
             count=1,
             flags=re.I,

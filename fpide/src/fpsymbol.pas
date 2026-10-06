@@ -18,6 +18,7 @@ unit FPSymbol;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses Objects,Drivers,Views,Menus,Dialogs,
@@ -1482,7 +1483,7 @@ begin
 end;
 begin
   NormColor:=GetColorW(1); SelColor:=GetColorW(2);
-  MoveChar(B,'�',SelColor,Size.X);
+  MoveChar(B,'─',SelColor,Size.X);
   CurX:=0; Count:=0;
   for I:=0 to GetItemCount-1 do
     if (Flags and (1 shl I))<>0 then
@@ -1490,13 +1491,13 @@ begin
       Inc(Count);
       if Current=I then C:=SelColor
                    else C:=NormColor;
-      if Count=1 then MoveChar(B[CurX],'�',SelColor,1)
-                 else MoveChar(B[CurX],'�',SelColor,1);
+      if Count=1 then MoveChar(B[CurX],'┤',SelColor,1)
+                 else MoveChar(B[CurX],'│',SelColor,1);
       MoveCStr(B[CurX+1],' '+Names(I)+' ',C);
       Inc(CurX,4);
     end;
   if Count>0 then
-    MoveChar(B[CurX],'�',SelColor,1);
+    MoveChar(B[CurX],'├',SelColor,1);
   WriteLineW(0,0,Size.X,Size.Y,B);
 end;
 
@@ -1699,7 +1700,7 @@ begin
       if Assigned(UsedUnits) then
       begin
         Inc(R2.A.Y,R2.B.Y-R2.A.Y); R2.B.Y:=R2.A.Y+1;
-        CST := TColorStaticText.Create(R2,'� Used units �'+CharStr('�',255),ColorIndex(12),false);
+        CST := TColorStaticText.Create(R2,'┤ Used units ├'+CharStr('─',255),ColorIndex(12),false);
         CST.GrowMode:=gfGrowHiX;
         UnitInfo.Insert(CST);
 
@@ -1719,7 +1720,7 @@ begin
       if Assigned(DependentUnits) then
       begin
         Inc(R2.A.Y,R2.B.Y-R2.A.Y); R2.B.Y:=R2.A.Y+1;
-        CST := TColorStaticText.Create(R2,'� Dependent units �'+CharStr('�',255),ColorIndex(12),false);
+        CST := TColorStaticText.Create(R2,'┤ Dependent units ├'+CharStr('─',255),ColorIndex(12),false);
         CST.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY;
         UnitInfo.Insert(CST);
 

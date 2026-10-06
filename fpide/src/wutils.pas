@@ -14,6 +14,7 @@ unit WUtils;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 
 interface
 
@@ -144,7 +145,7 @@ procedure ReadlnFromFile(var f : file; var S:string;
 function Min(A,B: longint): longint;
 function Max(A,B: longint): longint;
 
-function CharStr(C: char; Count: integer): string;
+function CharStr(const C: string; Count: integer): string;
 function UpcaseStr(const S: string): string;
 function LowCase(C: char): char;
 function LowcaseStr(S: string): string;
@@ -394,18 +395,20 @@ begin
   if A<B then Min:=A else Min:=B;
 end;
 
-function CharStr(C: char; Count: integer): string;
+function CharStr(const C: string; Count: integer): string;
+{ UTF-8 port: C may be a multi-byte character; the result is capped at the
+  255 bytes of a shortstring, on a character boundary. }
+var I: integer;
 begin
-  if Count<=0 then
+  CharStr:='';
+  if (Count<=0) or (C='') then exit;
+  for I:=1 to Count do
     begin
-      CharStr:='';
-      exit;
-    end
-  else if Count>255 then
-    Count:=255;
-  setlength(CharStr,Count);
-  FillChar(CharStr[1],Count,C);
+      if Length(CharStr)+Length(C)>255 then break;
+      CharStr:=CharStr+C;
+    end;
 end;
+
 
 function UpcaseStr(const S: string): string;
 var

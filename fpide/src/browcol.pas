@@ -28,6 +28,7 @@ unit browcol;
 
 {$i fpcdefs.inc}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 { $define use_refs}
 {$H-}
 

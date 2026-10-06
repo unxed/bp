@@ -18,6 +18,7 @@ unit WVPHelp;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses Objects,
@@ -132,7 +133,7 @@ var OK: boolean;
     C: char;
 begin
   F.Read(C,sizeof(C));
-  OK:=(F.Status=stOK) and (C='�');
+  OK:=(F.Status=stOK) and (C='■');
   if OK then
   begin
     if Assigned(Data) then

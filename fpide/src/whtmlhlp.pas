@@ -15,6 +15,7 @@ unit WHTMLHlp;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses Objects,Drivers,WHTML,WAnsi,WHelp,WChmHWrap;
@@ -246,6 +247,7 @@ uses
 
 
 
+
 constructor TTableElement.Create(AAlignment : TParagraphAlign);
 begin
   Alignment:=AAlignment;
@@ -397,7 +399,7 @@ begin
       TextInsert(TextBegin,#218);
       For j:=1 to NumCols do
         begin
-          TextInsert(TextBegin,CharStr(#196,ColLengthArray^[j]));
+          TextInsert(TextBegin,CharStr('─',ColLengthArray^[j]));
           if j<NumCols then
             TextInsert(TextBegin,#194);
         end;
@@ -456,7 +458,7 @@ begin
       TextInsert(TextEnd,#192);
       For j:=1 to NumCols do
         begin
-          TextInsert(TextEnd,CharStr(#196,ColLengthArray^[j]));
+          TextInsert(TextEnd,CharStr('─',ColLengthArray^[j]));
           if j<NumCols then
             TextInsert(TextEnd,#193);
         end;
@@ -558,15 +560,6 @@ begin
   DefHTMLGetSectionColor:=false;
 end;
 
-function CharStr(C: char; Count: byte): string;
-var S: string;
-begin
-  setlength(s,count);
-  if Count>0 then FillChar(S[1],Count,C);
-  CharStr:=S;
-end;
-
-
 function THTMLTopicRenderer.DocAddTextChar(C: char): boolean;
 var Added: boolean;
 begin
@@ -627,8 +620,8 @@ begin
       { render topic title here }
       if TopicTitle<>'' then
         begin
-          AddText('  '+TopicTitle+' �'); DocBreak;
-          AddText(' '+CharStr('�',length(TopicTitle)+3)); DocBreak;
+          AddText('  '+TopicTitle+' ▄'); DocBreak;
+          AddText(' '+CharStr('▀',length(TopicTitle)+3)); DocBreak;
         end;
     end;
   InTitle:=Entered;
@@ -1045,7 +1038,7 @@ begin
     exit;
   if AnyCharsInLine then
     DocBreak;
-  AddText('�'+hscLineStart);
+  AddText('■'+hscLineStart);
 end;
 
 procedure THTMLTopicRenderer.DocDefList(Entered: boolean);
@@ -1193,7 +1186,7 @@ begin
   OAlign:=PAlign;
   if AnyCharsInLine then DocBreak;
   PAlign:=paCenter;
-  DocAddText(' '+CharStr('�',60)+' ');
+  DocAddText(' '+CharStr('─',60)+' ');
   DocBreak;
   PAlign:=OAlign;
 end;

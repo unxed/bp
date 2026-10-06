@@ -17,6 +17,7 @@ unit FPViews;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 {$i globdir.inc}
 
 interface
@@ -3698,7 +3699,7 @@ begin
   if HeaderLen>Size.X-2 then HeaderLen:=Size.X-2;
 
   { --- 1. sor --- }
-  ClearBuf; MoveChar(B[0],'�',C1,1); MoveChar(B[HeaderLen+1],'�',C1,1);
+  ClearBuf; MoveChar(B[0],'│',C1,1); MoveChar(B[HeaderLen+1],'│',C1,1);
   X:=1;
   for i:=0 to DefCount-1 do
       begin
@@ -3711,47 +3712,47 @@ begin
                 end
            else C:=C2;
         MoveCStr(B[X],' '+Name^+' ',C); X:=X+X2+3;
-        MoveChar(B[X-1],'�',C1,1);
+        MoveChar(B[X-1],'│',C1,1);
       end;
   SWriteBuf(0,1,Size.X,1,B);
 
   { --- 0. sor --- }
-  ClearBuf; MoveChar(B[0],'�',C1,1);
+  ClearBuf; MoveChar(B[0],'┌',C1,1);
   X:=1;
   for i:=0 to DefCount-1 do
       begin
-        if I<ActiveDef then FC:='�'
-                       else FC:='�';
+        if I<ActiveDef then FC:='┌'
+                       else FC:='┐';
         X2:=CStrLen(AtTab(i).Name^)+2;
-        MoveChar(B[X+X2],{'�'}FC,C1,1);
+        MoveChar(B[X+X2],{'┬'}FC,C1,1);
         if i=DefCount-1 then X2:=X2+1;
         if X2>0 then
-        MoveChar(B[X],'�',C1,X2);
+        MoveChar(B[X],'─',C1,X2);
         X:=X+X2+1;
       end;
-  MoveChar(B[HeaderLen+1],'�',C1,1);
-  MoveChar(B[ActiveKPos],'�',C1,1); MoveChar(B[ActiveVPos],'�',C1,1);
+  MoveChar(B[HeaderLen+1],'┐',C1,1);
+  MoveChar(B[ActiveKPos],'┌',C1,1); MoveChar(B[ActiveVPos],'┐',C1,1);
   SWriteBuf(0,0,Size.X,1,B);
 
   { --- 2. sor --- }
-  MoveChar(B[1],'�',C1,Max(HeaderLen,0)); MoveChar(B[HeaderLen+2],'�',C1,Max(Size.X-HeaderLen-3,0));
-  MoveChar(B[Size.X-1],'�',C1,1);
-  MoveChar(B[ActiveKPos],'�',C1,1);
-  if ActiveDef=0 then MoveChar(B[0],'�',C1,1)
-                 else MoveChar(B[0],{'�'}'�',C1,1);
-  MoveChar(B[HeaderLen+1],'�'{'�'},C1,1); MoveChar(B[ActiveVPos],'�',C1,1);
+  MoveChar(B[1],'─',C1,Max(HeaderLen,0)); MoveChar(B[HeaderLen+2],'─',C1,Max(Size.X-HeaderLen-3,0));
+  MoveChar(B[Size.X-1],'┐',C1,1);
+  MoveChar(B[ActiveKPos],'┘',C1,1);
+  if ActiveDef=0 then MoveChar(B[0],'│',C1,1)
+                 else MoveChar(B[0],{'├'}'┌',C1,1);
+  MoveChar(B[HeaderLen+1],'─'{'┴'},C1,1); MoveChar(B[ActiveVPos],'└',C1,1);
   MoveChar(B[ActiveKPos+1],' ',C1,Max(ActiveVPos-ActiveKPos-1,0));
   SWriteBuf(0,2,Size.X,1,B);
 
-  { --- marad�k sor --- }
-  ClearBuf; MoveChar(B[0],'�',C1,1); MoveChar(B[Size.X-1],'�',C1,1);
+  { --- maradék sor --- }
+  ClearBuf; MoveChar(B[0],'│',C1,1); MoveChar(B[Size.X-1],'│',C1,1);
   for i:=3 to Size.Y-1 do
     SWriteBuf(0,i,Size.X,1,B);
   { SWriteBuf(0,3,Size.X,Size.Y-4,B); this was wrong
     because WriteBuf then expect a buffer of size size.x*(size.y-4)*2 PM }
 
   { --- Size.X . sor --- }
-  MoveChar(B[0],'�',C1,1); MoveChar(B[1],'�',C1,Max(Size.X-2,0)); MoveChar(B[Size.X-1],'�',C1,1);
+  MoveChar(B[0],'└',C1,1); MoveChar(B[1],'─',C1,Max(Size.X-2,0)); MoveChar(B[Size.X-1],'┘',C1,1);
   SWriteBuf(0,Size.Y-1,Size.X,1,B);
 
   { - End of TGroup.Draw - }
@@ -4337,7 +4338,7 @@ begin
     R2.Move(0,2);
   Insert(TStaticText.Create(R2, ^C'Copyright (C) 1998-2021 by'));
   R2.Move(0,2);
-  Insert(TStaticText.Create(R2, ^C'B�rczi G�bor'));
+  Insert(TStaticText.Create(R2, ^C'Bérczi Gábor'));
   R2.Move(0,1);
   Insert(TStaticText.Create(R2, ^C'Pierre Muller'));
   R2.Move(0,1);
@@ -4353,14 +4354,14 @@ begin
   AddLine(^C'< Compiler development >');
   AddLine(^C'Carl-Eric Codere');
   AddLine(^C'Daniel Mantione');
-  AddLine(^C'Florian Kl�mpfl');
+  AddLine(^C'Florian Klämpfl');
   AddLine(^C'Jonas Maebe');
-  AddLine(^C'Mich�el Van Canneyt');
+  AddLine(^C'Michäel Van Canneyt');
   AddLine(^C'Peter Vreman');
   AddLine(^C'Pierre Muller');
   AddLine('');
   AddLine(^C'< IDE development >');
-  AddLine(^C'B�rczi G�bor');
+  AddLine(^C'Bérczi Gábor');
   AddLine(^C'Peter Vreman');
   AddLine(^C'Pierre Muller');
   AddLine('');

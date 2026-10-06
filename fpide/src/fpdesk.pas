@@ -17,6 +17,7 @@ unit FPDesk;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 const

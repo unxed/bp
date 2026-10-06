@@ -16,6 +16,7 @@ unit FPIni;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 {$i globdir.inc}

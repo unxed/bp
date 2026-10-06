@@ -17,6 +17,7 @@ unit FPTemplt;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses FPViews;

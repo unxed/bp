@@ -17,6 +17,7 @@ unit WEditor;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 
 interface
 {tes}

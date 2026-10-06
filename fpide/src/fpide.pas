@@ -17,6 +17,7 @@ unit fpide;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 {2.0 compatibility}
 {$ifdef VER2_0}
   {$macro on}

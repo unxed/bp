@@ -19,6 +19,7 @@ unit gdbmiint;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 
 {$I globdir.inc}
 

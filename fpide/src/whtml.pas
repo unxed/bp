@@ -15,6 +15,7 @@ unit WHTML;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 {$I globdir.inc}
 
 interface

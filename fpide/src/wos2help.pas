@@ -18,6 +18,7 @@ unit WOS2Help;
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
+{$modeswitch autoderef}
 interface
 
 uses Objects,
@@ -565,8 +566,8 @@ begin
   Title:=GetStr(T^.Param);
   if Title<>'' then
   begin
-    L.InsertStr('  '+Title+' �'+hscLineBreak);
-    L.InsertStr(' '+CharStr('�',length(Title)+3)+hscLineBreak);
+    L.InsertStr('  '+Title+' ▄'+hscLineBreak);
+    L.InsertStr(' '+CharStr('▀',length(Title)+3)+hscLineBreak);
   end;
   if 0<T^.HelpCtx then
   begin
