@@ -36,10 +36,13 @@ interface
 
 uses
   SysUtils,
+{$ifdef EMBED_COMPILER}
   CUtils,
-  Objects,
   cclasses,
-  symconst,symtable;
+  symtable,
+{$endif}
+  Objects,
+  symconst;
 
 const
   SymbolTypLen : integer = 6;
@@ -286,6 +289,7 @@ procedure RegisterSymbols;
 implementation
 
 uses
+{$ifdef EMBED_COMPILER}
   globtype,globals,comphook,constexp,
 {$ifdef DEBUG}
   verbose,
@@ -294,6 +298,17 @@ uses
   crefs,cpuinfo,cgbase,
   aasmbase,aasmtai,aasmdata,paramgr,
   symsym,symdef,symtype,symbase,defutil;
+{$else}
+  globtype;
+{$endif}
+
+{$ifndef EMBED_COMPILER}
+{ the two helpers of the compiler's cutils that are used here }
+function Upper(const s: string): string;
+begin
+  Upper:=UpperCase(s);
+end;
+{$endif}
 
 var
   RModuleNameCollection,
@@ -1197,6 +1212,7 @@ begin
 end;
 
 
+{$ifdef EMBED_COMPILER}
 procedure NewBrowserCol;
 begin
   Modules := TSymbolCollection.Create(50,50);
@@ -1810,6 +1826,18 @@ begin
   BuildSourceList;
 end;
 
+{$else}
+{ the symbol information comes from the tables of the embedded compiler: nothing in this build }
+procedure NewBrowserCol;
+begin
+  Modules := TSymbolCollection.Create(50,50);
+end;
+
+procedure CreateBrowserCol;
+begin
+end;
+{$endif EMBED_COMPILER}
+
 procedure BuildObjectInfo;
 var C,D: PIDSortedSymbolCollection;
     E : PCollection;
@@ -1958,6 +1986,7 @@ begin
   SearchObjectForSymbol:=ScanObjectCollection(ObjectTree);
 end;
 
+{$ifdef EMBED_COMPILER}
 procedure BuildSourceList;
 var m: tmodule;
     s: tinputfile;
@@ -1997,6 +2026,12 @@ begin
     end;
   end;
 end;
+
+{$else}
+procedure BuildSourceList;
+begin
+end;
+{$endif EMBED_COMPILER}
 
 {*****************************************************************************
                                  Initialize

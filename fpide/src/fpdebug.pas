@@ -376,7 +376,12 @@ uses
 {$ifdef Unix}
   baseunix, unix, termio,
 {$endif Unix}
-  Systems,Globals,
+  Systems,
+{$ifdef EMBED_COMPILER}
+  Globals,
+{$else}
+  FPExtComp,
+{$endif}
   FPRegs,FPTools,
   FPVars,FPUtils,FPConst,FPSwitch,
   FPIntf,FPCompil,FPIde,FPHelp,

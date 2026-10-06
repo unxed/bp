@@ -583,10 +583,13 @@ procedure RegisterFPViews;
 
 implementation
 
+
 uses
   Video,Strings,Keyboard,Validate,
   globtype,Tokens,Version,
-  systems,cpubase,
+  systems,
+{$ifdef EMBED_COMPILER}
+  cpubase,
   {$ifdef jvm}
   //itcpujas,
   {$else}
@@ -598,8 +601,11 @@ uses
   {$ifdef m68k}
      ag68kgas,
   {$endif}
+{$else}
+  FPAsmOps,
+{$endif}
   {$ifdef VESA}Vesa,{$endif}
-  FPSwitch,FPSymbol,FPDebug,FPVars,FPUtils,FPCompil,FPHelp,
+  FPSwitch,FPSymbol,FPDebug,FPVars,FPUtils,FPCompil,FPHelp,FPExtComp,
   FPTools,FPIDE,FPCodTmp,FPCodCmp;
 
 {$ifndef NOOBJREG}
@@ -934,6 +940,7 @@ begin
 end;
 
 
+{$ifdef EMBED_COMPILER}
 {$ifdef powerpc}
   {$define USE_TasmCondFlag}
   { powerpc only has A_B prefix }
@@ -1026,6 +1033,18 @@ begin
   GetAsmReservedWord:='';
 {$endif NOASM}
 end;
+
+{$else}
+function GetAsmReservedWordCount: integer;
+begin
+  GetAsmReservedWordCount:=AsmOpCount;
+end;
+
+function GetAsmReservedWord(Index: integer): string;
+begin
+  GetAsmReservedWord:=AsmOpName(Index);
+end;
+{$endif EMBED_COMPILER}
 
 procedure InitReservedWords;
 var WordS: string;
@@ -4223,6 +4242,16 @@ begin
   if Lines<>nil then Lines.Free;
 end;
 
+function AboutCompilerVersion: string;
+begin
+{$ifdef EMBED_COMPILER}
+  if not UseExternalCompiler then
+    AboutCompilerVersion:=Full_Version_String
+  else
+{$endif}
+    AboutCompilerVersion:=RunFirstLine(ExternalCompilerExe,['-iW']);
+end;
+
 constructor TFPAboutDialog.Create;
 var R,R2: TRect;
     C: PUnsortedStringCollection;
@@ -4248,7 +4277,7 @@ begin
   Insert(TStaticText.Create(R2, ^C'With Graphic Support'));
   R2.Move(0,1);
 {$endif USE_GRAPH_SWITCH}
-  Insert(TStaticText.Create(R2, FormatStrStr2(^C'(%s %s)',label_about_compilerversion,Full_Version_String)));
+  Insert(TStaticText.Create(R2, FormatStrStr2(^C'(%s %s)',label_about_compilerversion,AboutCompilerVersion)));
 {$ifndef NODEBUG}
   if pos('Fake',GDBVersion)=0 then
     begin

@@ -39,8 +39,11 @@ function  CompilerDescription: string;
 implementation
 
 uses
-  Compiler,Comphook,
-  sysutils,Process,Version,App,Views,Drivers,WEditor,FPConst,FPViews,
+{$ifdef EMBED_COMPILER}
+  Compiler,
+{$endif}
+  Comphook,
+  sysutils,Process,Version,FPExtComp,App,Views,Drivers,WEditor,FPConst,FPViews,
 {$ifndef NODEBUG}
   FPDebug,
 {$endif NODEBUG}
@@ -117,10 +120,28 @@ begin
       Exe:=DefaultExternalCompiler;
       UseExternalCompiler:=LocateExeFile(Exe);
       if UseExternalCompiler then
-        ExternalCompilerExe:=Exe;
+        ExternalCompilerExe:=Exe
+{$ifndef EMBED_COMPILER}
+      else
+        begin
+          ExternalCompilerExe:=DefaultExternalCompiler;
+          UseExternalCompiler:=true;
+        end
+{$endif}
+      ;
     end
   else if (LowerCase(S)='builtin') or (LowerCase(S)='built-in') then
-    UseExternalCompiler:=false
+    begin
+{$ifdef EMBED_COMPILER}
+      UseExternalCompiler:=false;
+{$else}
+      { no built-in compiler in this build: use the one of the system }
+      Exe:=DefaultExternalCompiler;
+      LocateExeFile(Exe);
+      ExternalCompilerExe:=Exe;
+      UseExternalCompiler:=true;
+{$endif}
+    end
   else
     begin
       Exe:=S;
@@ -134,44 +155,12 @@ begin
     end;
 end;
 
-function RunToString(const Exe, Args: AnsiString): AnsiString;
-var
-  P: TProcess;
-  Buf: array[0..1023] of char;
-  N: LongInt;
-begin
-  Result:='';
-  P:=TProcess.Create(nil);
-  try
-    P.Executable:=Exe;
-    P.Parameters.Add(Args);
-    P.Options:=[poUsePipes,poStderrToOutput,poNoConsole];
-    try
-      P.Execute;
-      repeat
-        N:=P.Output.Read(Buf,SizeOf(Buf));
-        if N>0 then
-          Result:=Result+Copy(AnsiString(Buf),1,N);
-      until N<=0;
-      P.WaitOnExit;
-    except
-      Result:='';
-    end;
-  finally
-    P.Free;
-  end;
-  while (Result<>'') and (Result[Length(Result)] in [#10,#13]) do
-    Delete(Result,Length(Result),1);
-  if Pos(#10,Result)>0 then
-    Result:=Copy(Result,1,Pos(#10,Result)-1);
-end;
-
 function CompilerDescription: string;
 begin
   if UseExternalCompiler then
-    CompilerDescription:=ExternalCompilerExe+' '+RunToString(ExternalCompilerExe,'-iV')
+    CompilerDescription:=ExternalCompilerExe+' '+RunFirstLine(ExternalCompilerExe,['-iV'])
   else
-    CompilerDescription:='built-in '+version_string;
+    CompilerDescription:='built-in '+Version.version_string;
 end;
 
 { the message of one line of the output of an external compiler:
@@ -415,36 +404,37 @@ begin
 end;
 
 procedure Compile(const FileName, ConfigFile: string);
+{$ifdef EMBED_COMPILER}
 var
   cmd : string;
+{$endif EMBED_COMPILER}
 begin
-  if UseExternalCompiler then
+{$ifdef EMBED_COMPILER}
+  if not UseExternalCompiler then
     begin
-      CompileExternal(FileName,ConfigFile);
+      cmd:='-d'+SwitchesModeStr[SwitchesMode];
+      if ConfigFile<>'' then
+        cmd:='['+ConfigFile+'] '+cmd;
+      { Add the switches from the primary file }
+      if PrimaryFileSwitches<>'' then
+        cmd:=cmd+' '+PrimaryFileSwitches;
+      cmd:=cmd+' '+FileName;
+      try
+        Compiler.Compile(cmd);
+      except
+        on e : exception do
+          begin
+            CompilationPhase:=cpFailed;
+            CompilerMessageWindow.AddMessage(V_Error,
+              'Compiler exited','',0,0);
+            CompilerMessageWindow.AddMessage(V_Error,
+              e.message,'',0,0);
+          end;
+      end;
       Exit;
     end;
-  cmd:='-d'+SwitchesModeStr[SwitchesMode];
-  if ConfigFile<>'' then
-    cmd:='['+ConfigFile+'] '+cmd;
-{ Add the switches from the primary file }
-  if PrimaryFileSwitches<>'' then
-    cmd:=cmd+' '+PrimaryFileSwitches;
-  cmd:=cmd+' '+FileName;
-{ call the compiler }
-  begin
-    try
-      Compiler.Compile(cmd);
-    except
-      on e : exception do
-        begin
-          CompilationPhase:=cpFailed;
-          CompilerMessageWindow.AddMessage(V_Error,
-            'Compiler exited','',0,0);
-          CompilerMessageWindow.AddMessage(V_Error,
-            e.message,'',0,0);
-        end;
-    end;
-  end;
+{$endif EMBED_COMPILER}
+  CompileExternal(FileName,ConfigFile);
 end;
 
 procedure SetPrimaryFile(const fn:string);

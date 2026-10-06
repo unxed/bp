@@ -6,7 +6,7 @@ set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 fp=${1:-}
 if [ -z "$fp" ]; then
-  "$here/tools/build-fpide.sh" linux64
+  "$here/tools/build-fpide.sh"
   fp=$here/out/fpide/linux64/fp
 fi
 status=0

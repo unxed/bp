@@ -65,6 +65,9 @@ uses
 {$endif HasSignal}
   Dos,Objects,
   BrowCol,Version,
+{$ifndef EMBED_COMPILER}
+  FPExtComp,
+{$endif}
 {$ifndef NODEBUG}
   {$ifdef GDBMI}
     gdbmiint,
@@ -93,7 +96,11 @@ uses
   FPTemplt,FPRedir,FPDesk,
   FPCodTmp,FPCodCmp,
 
+{$ifdef EMBED_COMPILER}
   systems,globtype,globals;
+{$else}
+  systems,globtype;
+{$endif}
 
 
 Const
@@ -336,9 +343,11 @@ end;
 
 procedure InitCompilerSwitches;
   begin
+{$ifdef EMBED_COMPILER}
     default_settings.globalswitches:=[cs_check_unit_name];
     default_settings.moduleswitches:=[cs_extsyntax,cs_implicit_exceptions];
     default_settings.localswitches:=[cs_typed_const_writable];
+{$endif EMBED_COMPILER}
   end;
 
 {$IFDEF HASAMIGA}
@@ -429,7 +438,11 @@ BEGIN
   InitCodeComplete;
 
   { init target information etc. }
+{$ifdef EMBED_COMPILER}
   InitSystems;
+{$else}
+  InitHostInfo;
+{$endif}
 
 {$ifdef Unix}
   if not UnixInit then

@@ -83,14 +83,14 @@ try:
     saved = os.path.join(t.work, 'hello.pas')
     check(os.path.exists(saved) and 'rewrite(f)' in open(saved).read(), 'with the typed content', t)
 
-    # --- compile: first without a unit directory (must say so, not crash) ----------------------------
+    # --- compile with the external compiler (fpc of the system) ------------------------------------------
     t.key('M-F9')
-    check(t.wait_for('Compiler Messages', 15), 'Alt+F9 runs the built-in compiler and shows its messages', t)
-    check(t.wait_for("Can't find unit system", 5), 'without a unit directory the compiler says so', t)
-    check(t.alive(), 'is still running after a failed compile', t)
-    t.key('Escape')
+    check(t.wait_for('Compile successful', 30), 'Alt+F9 runs the external compiler: Compile successful', t)
+    check(os.path.exists(os.path.join(t.work, 'hello')), 'the executable was linked', t)
+    check(t.alive(), 'is still running after the compile', t)
+    t.key('Enter')
 
-    # --- Options > Directories: set the unit directory -------------------------------------------------
+    # --- Options > Directories (the unit directories reach the compiler through fp.cfg) -----------------
     check(t.menu('M-o', 'Directories'), 'Options > Directories is found in the menu', t)
     check(t.wait_for('Unit directories:'), 'the Directories dialog opens with its tabs', t)
     rtl = find_rtl_units()
@@ -100,13 +100,7 @@ try:
     t.key('Tab', 'Enter')
     check(t.wait_gone('Unit directories:'), 'OK closes the dialog', t)
 
-    # --- make and run ---------------------------------------------------------------------------------
-    # (after a failed Alt+F9 the built-in compiler keeps its state, so Compile again still fails;
-    # Make (F9) starts clean. Same behaviour as the vanilla IDE as far as we know: not a port bug.)
-    t.key('F9')
-    check(t.wait_for('Compile successful', 20), 'F9 (Make) now compiles hello.pas successfully', t)
-    check(os.path.exists(os.path.join(t.work, 'hello')), 'the executable was linked', t)
-    t.key('Enter')
+    # --- run ---------------------------------------------------------------------------------------------
     t.key('C-F9')
     ran = os.path.join(t.work, 'ran.txt')
     end = time.time() + 15

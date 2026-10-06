@@ -187,7 +187,10 @@ uses
 {$endif Unix}
   FpDpAnsi,WConsts,
   Video,Mouse,Keyboard,
-  Compiler,Version,
+{$ifdef EMBED_COMPILER}
+  Compiler,
+{$endif}
+  Version,
   FVConsts,
   Dos{,Memory},Menus,Dialogs,StdDlg,timeddlg,
   Systems,

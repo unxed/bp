@@ -211,6 +211,7 @@ uses
   Dos,
   GlobType,
   CpuInfo,
+  FPExtComp,FPRedir,
   FPVars,FPUtils;
 
 var
@@ -1165,6 +1166,9 @@ var
   t : tsystem;
   cpu : tcputype;
   st : string;
+  Exe : string;
+  TargetList : AnsiString;
+  ti : integer;
 begin
   SyntaxSwitches := TSwitches.Create('S');
   with SyntaxSwitches do
@@ -1304,9 +1308,27 @@ begin
   with TargetSwitches do
    begin
      { better, we've a correct target list without "tilded" names instead a wrong one }
+{$ifdef EMBED_COMPILER}
      for t:=low(tsystem) to high(tsystem) do
        if assigned(targetinfos[t]) then
          AddSelectItem(targetinfos[t].name,targetinfos[t].shortname,idNone);
+{$else}
+     { the targets the external compiler knows (fpc -it) }
+     Exe:=ExternalCompilerExe;
+     if Exe='' then Exe:='fpc';
+     LocateExeFile(Exe);
+     TargetList:=ExternalTargets(Exe);
+     if TargetList='' then
+       TargetList:=source_info.name+#10;
+     while TargetList<>'' do
+       begin
+         ti:=Pos(#10,TargetList);
+         if ti=0 then ti:=Length(TargetList)+1;
+         if ti>1 then
+           AddSelectItem(Copy(TargetList,1,ti-1),LowerCase(Copy(TargetList,1,ti-1)),idNone);
+         Delete(TargetList,1,ti);
+       end;
+{$endif}
    end;
   AsmReaderSwitches := TSwitches.InitSelect('R');
   with AsmReaderSwitches do

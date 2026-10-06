@@ -38,7 +38,9 @@ uses
     Objects need to be used. Keep the order SysUtils,Objects }
   SysUtils,
   Objects,
+{$ifdef EMBED_COMPILER}
   FInput,
+{$endif}
   Drivers,Views,Dialogs,
   WUtils,WViews,WCEdit,
   FPSymbol,
@@ -96,6 +98,7 @@ type
       procedure SetStartTime(r : real);
     end;
 
+{$ifdef EMBED_COMPILER}
     TFPInputFile = class(tinputfile)
       constructor Create(AEditor: PFileEditor);
     protected
@@ -109,6 +112,7 @@ type
       Editor: PFileEditor;
       S: PStream;
     end;
+{$endif EMBED_COMPILER}
 
 const
     CompilerMessageWindow : PCompilerMessageWindow  = nil;
@@ -144,10 +148,18 @@ uses
 { $endif HasSignal}
   Dos,
   Video,
+{$ifdef EMBED_COMPILER}
   globals,
+{$endif}
   StdDlg,App,tokens,
   FVConsts,
-  CompHook, Compiler, systems, browcol,
+  CompHook,
+{$ifdef EMBED_COMPILER}
+  Compiler,
+{$else}
+  FPExtComp,
+{$endif}
+  systems, browcol,
   WEditor,
   FPRedir,FPDesk,
   FPUsrScr,FPHelp,
@@ -728,6 +740,7 @@ begin
   CompilerStatus:=false;
 end;
 
+{$ifdef EMBED_COMPILER}
 Function  CompilerGetNamedFileTime(const filename : ansistring) : Longint;
 var t: longint;
     W: PSourceWindow;
@@ -757,6 +770,8 @@ begin
     W.Editor.CompileStamp:=CompileStamp;
   CompilerOpenInputFile:=f;
 end;
+
+{$endif EMBED_COMPILER}
 
 function CompilerComment(Level:Longint; const s:ansistring):boolean;
 begin
@@ -936,11 +951,13 @@ begin
 { hook compiler output }
   do_status:=@CompilerStatus;
   do_comment:=@CompilerComment;
+{$ifdef EMBED_COMPILER}
   do_openinputfile:=@CompilerOpenInputFile;
   do_getnamedfiletime:=@CompilerGetNamedFileTime;
   do_initsymbolinfo:=@InitBrowserCol;
   do_donesymbolinfo:=@DoneBrowserCol;
   do_extractsymbolinfo:=@CreateBrowserCol;
+{$endif EMBED_COMPILER}
 { Compile ! }
 {$ifdef redircompiler}
   ChangeRedirOut(FPOutFileName,false);
@@ -1193,6 +1210,7 @@ begin
 end;
 
 
+{$ifdef EMBED_COMPILER}
 constructor TFPInputFile.Create(AEditor: PFileEditor);
 begin
   if not Assigned(AEditor) then Fail;
@@ -1277,6 +1295,8 @@ begin
   dos.gettime(dt.hour,dt.min,dt.sec,hsec);
   packtime(dt,filetime);
 end;
+
+{$endif EMBED_COMPILER}
 
 {$ifndef NOOBJREG}
 { tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }

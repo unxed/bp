@@ -8,7 +8,8 @@ UTF-8 внутри, модель **классов** вместо `object`/`New`/
 | Каталог | Назначение |
 |---|---|
 | [`fpide/src/`](src/) | исходники IDE (база — FPC `packages/ide` @ 3.2.2) |
-| [`fpide/bootstrap/`](bootstrap/) | pin FPC + fetch; **compiler/** не в git — в `build/…/staging-compiler` |
+| [`fpide/bootstrap/`](bootstrap/) | pin FPC + fetch исходников `compiler/` — только для `FPIDE_EMBED=1` |
+| [`fpide/compat/fpc/`](compat/fpc/) | несколько модулей компилятора FPC 3.2.2 (`globtype`, `systems`, `tokens`, …) — IDE нужны и без встроенного компилятора |
 | [`fpide/compat/shims/`](compat/shims/) | карта имён Free Vision → tv3 (`tools/gen-shim.py`) |
 | [`tv/`](../tv/) | git submodule tv3 (отдельная лицензия; код не смешивается с `fpide/`) |
 | [`tools/build-fpide.sh`](../tools/build-fpide.sh) | сборка (локально можно не гонять тяжёлое — см. CI) |
@@ -17,22 +18,30 @@ UTF-8 внутри, модель **классов** вместо `object`/`New`/
 
 ## Локальный preflight (перед push)
 
-Тяжёлую сборку IDE гоняем в CI только по `workflow_dispatch`. Перед push в `main`:
+Перед push: `tools/fpide-setup-build.sh test` (сборка ~15 с, тесты ~5 мин).
+
+## Сборка
+
+Нужны только Ubuntu/Debian с `apt` и git. Одной командой (ставит пакеты, берёт `tv/`, собирает, `test` — ещё и гоняет тесты):
 
 ```sh
-git submodule update --init tv
-tools/fpide-preflight.sh              # layout + shims + smoke-link; fp — информационно
+git clone --recurse-submodules https://github.com/unxed/sp && cd sp
+tools/fpide-setup-build.sh [test]     # результат: out/fpide/linux64/fp
 ```
 
-## Сборка (когда порт дойдёт до линковки)
+Или вручную, если `fpc` (3.2.x), `gdb` и `tmux` уже стоят: `git submodule update --init tv && tools/build-fpide.sh`.
+Цель определяется по текущей системе (сейчас — `linux64`); используется `fpc` из PATH (`FPC=/путь/к/fpc` — другой).
 
-```sh
-git submodule update --init tv
-tools/build-fpide.sh linux64          # результат: out/fpide/linux64/fp
-tools/fpide-setup-build.sh [test]     # одной командой: пакеты (apt), сабмодуль, исходники FPC, сборка, [тесты]
-```
+**Компилятор и отладчик внешние.** IDE запускает `fpc` и `gdb` из системы (как и остальные инструменты); компилятор ищется в PATH
+автоматически. Другой — переменной `FP_COMPILER=/путь/к/fpc` или строкой `Compiler=` в секции `[Compile]` файла `fp.ini`
+(`auto` — по умолчанию, путь, либо `builtin` для сборки с встроенным компилятором). Нескольких модулей компилятора, которые IDE
+нужно знать сама (`globtype`, `systems`, `tokens`, `comphook`, …), хватает в `fpide/compat/fpc/` — из репозитория, ничего не скачивается.
+Информации для браузера символов (Search > Objects/Modules/Globals/Symbol) внешний компилятор не даёт: эти пункты в такой сборке недоступны.
 
-Переменные: `FPIDE_TV=/path/to/tv3`, `FPIDE_GDBMI=1` (по умолчанию, как апстрим на Linux), `FPIDE_NOGDB=1` — только явный отказ от отладчика, `FPIDE_EXTRA` — доп. флаги FPC.
+`FPIDE_EMBED=1 tools/build-fpide.sh` — как в оригинале, со встроенным компилятором FPC (качает исходники `compiler/` FPC 3.2.2, ~400 МБ;
+результат — `out/fpide/linux64-embed/fp`).
+
+Переменные: `FPIDE_TV=/path/to/tv3`, `FPIDE_GDBMI=1` (по умолчанию), `FPIDE_NOGDB=1` — без отладчика, `FPIDE_EXTRA` — доп. флаги FPC.
 
 ## Приёмка
 

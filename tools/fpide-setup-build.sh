@@ -1,6 +1,6 @@
 #!/bin/sh
 # One command: everything needed to build fp (the IDE on tv3) and, if asked, to run its tests.
-#   tools/fpide-setup-build.sh          install missing packages (Debian/Ubuntu), fetch tv/ and FPC sources, build
+#   tools/fpide-setup-build.sh          install missing packages (Debian/Ubuntu), fetch tv/, build with the fpc of the system
 #   tools/fpide-setup-build.sh test     ... and then run the tmux acceptance tests (tools/fpide-accept.sh)
 # Result: out/fpide/linux64/fp.  Run it with TV_FAR2L=0 in terminals that do not answer far2l queries.
 set -eu
@@ -21,7 +21,7 @@ if ! command -v fpc >/dev/null 2>&1 || ! command -v tmux >/dev/null 2>&1; then
 fi
 
 git -C "$here" submodule update --init --depth 1 tv
-"$here/tools/build-fpide.sh" linux64
+"$here/tools/build-fpide.sh"
 fp=$here/out/fpide/linux64/fp
 [ -x "$fp" ] || { echo "build failed: see $here/out/fpide/linux64/obj/fp.log" >&2; exit 1; }
 # build-fpide.sh keeps an old fp if a rebuild fails: refuse a binary older than the sources
