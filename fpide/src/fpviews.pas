@@ -605,7 +605,7 @@ uses
   FPAsmOps,
 {$endif}
   {$ifdef VESA}Vesa,{$endif}
-  FPSwitch,FPSymbol,FPDebug,FPVars,FPUtils,FPCompil,FPHelp,FPExtComp,
+  FPSwitch,FPSymbol,FPDebug,FPVars,FPUtils,FPCompil,FPHelp,FPExtComp,TvProc,
   FPTools,FPIDE,FPCodTmp,FPCodCmp;
 
 {$ifndef NOOBJREG}

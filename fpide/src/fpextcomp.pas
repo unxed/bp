@@ -11,10 +11,6 @@ interface
 uses
   Classes;
 
-{ the whole output (stdout and stderr) of a program; '' if it could not be run }
-function RunCapture(const Exe: AnsiString; const Args: array of AnsiString): AnsiString;
-{ the first line of the output }
-function RunFirstLine(const Exe: AnsiString; const Args: array of AnsiString): AnsiString;
 { the OS targets the compiler supports (fpc -it): the names as the compiler gives them, separated by #10 }
 function ExternalTargets(const Exe: AnsiString): AnsiString;
 { the host the IDE runs on: tells source_info/target_info of the Systems unit }
@@ -25,54 +21,7 @@ procedure DefaultReplacements(var S: AnsiString);
 implementation
 
 uses
-  SysUtils, Process, Systems;
-
-function RunCapture(const Exe: AnsiString; const Args: array of AnsiString): AnsiString;
-var
-  P: TProcess;
-  Buf: array[0..4095] of char;
-  N, I: LongInt;
-  S: AnsiString;
-begin
-  Result := '';
-  P := TProcess.Create(nil);
-  try
-    P.Executable := Exe;
-    for I := 0 to High(Args) do
-      P.Parameters.Add(Args[I]);
-    P.Options := [poUsePipes, poStderrToOutput, poNoConsole];
-    try
-      P.Execute;
-      S := '';
-      repeat
-        N := P.Output.Read(Buf, SizeOf(Buf));
-        if N > 0 then
-        begin
-          SetLength(S, Length(S) + N);
-          Move(Buf, S[Length(S) - N + 1], N);
-        end;
-      until N <= 0;
-      P.WaitOnExit;
-      Result := S;
-    except
-      Result := '';
-    end;
-  finally
-    P.Free;
-  end;
-end;
-
-function RunFirstLine(const Exe: AnsiString; const Args: array of AnsiString): AnsiString;
-var
-  P: LongInt;
-begin
-  Result := RunCapture(Exe, Args);
-  P := Pos(#10, Result);
-  if P > 0 then
-    Result := Copy(Result, 1, P - 1);
-  while (Result <> '') and (Result[Length(Result)] = #13) do
-    Delete(Result, Length(Result), 1);
-end;
+  SysUtils, TvProc, Systems;
 
 function ExternalTargets(const Exe: AnsiString): AnsiString;
 var

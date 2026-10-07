@@ -43,7 +43,7 @@ uses
   Compiler,
 {$endif}
   Comphook,
-  sysutils,Process,Version,FPExtComp,App,Views,Drivers,WEditor,FPConst,FPViews,
+  sysutils,Process,Version,FPExtComp,TvProc,App,Views,Drivers,WEditor,FPConst,FPViews,
 {$ifndef NODEBUG}
   FPDebug,
 {$endif NODEBUG}
