@@ -227,7 +227,7 @@ uses
 {$IFDEF OS2}
   DosCalls,
 {$ENDIF OS2}
-  Strings, Drivers, WUtf8;
+  Strings, Drivers, TvUStr, TvUtf8;
 
 const
    SpaceStr = '                                                            '+
@@ -962,7 +962,7 @@ procedure TFastBufStream.Readline(var s:string;var linecomplete,hasCR : boolean)
     if (c=#10) then
       hasCR:=true; 
     { the end of the line buffer must not cut a UTF-8 character in two: the character goes to the next piece }
-    if Utf8Text and (not linecomplete) and (i=High(S)) then
+    if Utf8Enabled and (not linecomplete) and (i=High(S)) then
       begin
         j:=i;
         while (j>1) and (i-j<3) and ((Byte(s[j]) and $C0)=$80) do

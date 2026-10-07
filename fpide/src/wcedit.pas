@@ -271,7 +271,7 @@ implementation
 uses Dos,
      WConsts,
      FVConsts,
-     App,WViews,WUtf8;
+     App,WViews,TvUStr,TvUtf8;
 
 { Object-style TStreamRec typed consts (Ofs(TypeOf)) are invalid for classes.
   Load/Store for these types are currently commented out; registration deferred. }

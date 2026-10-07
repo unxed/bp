@@ -27,7 +27,7 @@ uses
   FVConsts,
   Views,Menus,Dialogs,App,Gadgets,Tabs,
   ASCIITAB,
-  WEditor,WCEdit,WUtf8,
+  WEditor,WCEdit,TvUStr,
   WUtils,WHelp,WHlpView,WViews,WANSI,
   Comphook,
 {$ifndef NODEBUG}

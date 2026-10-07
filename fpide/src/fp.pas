@@ -54,7 +54,7 @@ uses
   dbgheap,
 {$endif Use_DBGHEAP}
 {$ifdef go32v2}
-  dpmiexcp,
+  dpmiexcp,TvUtf8,
 {$endif go32v2}
 {$ifdef VESA}
   vesa,
@@ -451,6 +451,9 @@ BEGIN
       Halt(1);
     end;
 {$endif Unix}
+{$ifdef go32v2}
+  Utf8Enabled := false;   { a DOS build keeps the text in the code page: one byte, one column }
+{$endif}
   IDEApp := TIDEApp.Create;
   CheckINIFile;
   ReadSwitches(SwitchesPath);

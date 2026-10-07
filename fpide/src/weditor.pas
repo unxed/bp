@@ -792,7 +792,7 @@ uses
     regexpr,
   {$endif not USE_OLD_REGEXP}
 {$endif TEST_REGEXP}
-  WConsts,WCEdit,WUtf8;
+  WConsts,WCEdit,TvUStr,TvUtf8;
 
 type
     RecordWord = sw_word;
@@ -2308,7 +2308,7 @@ var
               cc:=ccAlpha
           end;
       end
-    else if (C in {$ifdef USE_UNTYPEDSET}['A'..'Z','a'..'z','_']{$else}AlphaChars{$endif}) or (Utf8Text and (C>=#128)) then CC:=ccAlpha else
+    else if (C in {$ifdef USE_UNTYPEDSET}['A'..'Z','a'..'z','_']{$else}AlphaChars{$endif}) or (Utf8Enabled and (C>=#128)) then CC:=ccAlpha else
       CC:=ccSymbol;
     GetCharClass:=CC;
   end;
@@ -3590,7 +3590,7 @@ begin
                 if IsModal then
                   DontClear:=true;
            else
-            if Utf8Text and (Event.TextLength>0) and (Byte(Event.Text[0])>=$80) then
+            if Utf8Enabled and (Event.TextLength>0) and (Byte(Event.Text[0])>=$80) then
               begin
                 { a character of the keyboard that is not ASCII: its UTF-8 text }
                 NoSelect:=true;
@@ -3629,7 +3629,7 @@ begin
           cmASCIIChar   : InASCIIMode:=not InASCIIMode;
           cmAddChar     :
             { a code of the ASCII table: the Unicode character with that code (U+0000..U+00FF) in a UTF-8 editor }
-            if Utf8Text and (longint(Event.InfoPtr)>=128) then
+            if Utf8Enabled and (longint(Event.InfoPtr)>=128) then
               AddCharStr(U8Encode(longint(Event.InfoPtr)))
             else
               AddChar(chr(longint(Event.InfoPtr)));
@@ -3835,7 +3835,7 @@ function ColumnCells(const Ch: string): sw_integer;
 var CP: longword;
     Used: integer;
 begin
-  if (length(Ch)<=1) or (not Utf8Text) then
+  if (length(Ch)<=1) or (not Utf8Enabled) then
     ColumnCells:=1
   else if Utf8Decode(@Ch[1],length(Ch),CP,Used) and (Used=length(Ch)) then
     ColumnCells:=CharWidth(CP)
@@ -6286,7 +6286,7 @@ var S: string;
     Overwriting : boolean;
 
   { Start is a (1-based) column of S; the result is the BYTE index of the match in S (0: none).
-    The text is UTF-8: the case-insensitive search is done in the upper-case copy of S (the same bytes, see WUtf8) }
+    The text is UTF-8: the case-insensitive search is done in the upper-case copy of S (the same bytes, see TvUStr) }
   function ContainsText(const SubS:string;var S: string; Start: Sw_integer): Sw_integer;
   var
     P: Sw_Integer;
