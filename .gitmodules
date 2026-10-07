@@ -1,3 +1,6 @@
 [submodule "tv"]
 	path = fpide/tv
 	url = https://github.com/unxed/tv3
+[submodule "fpide/tve"]
+	path = fpide/tve
+	url = https://github.com/unxed/tve

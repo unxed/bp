@@ -2634,7 +2634,6 @@ begin
   GrowMode:=gfGrowHiX+gfGrowHiY;
   SetFlags(efInsertMode+efSyntaxHighlight+efNoIndent+efExpandAllTabs{+efHighlightRow});
   DisasLines := TDisasLineCollection.Create(500,1000);
-  Core.ChangeLinesTo(DisasLines);
   { do not allow to write into that window }
   ReadOnly:=true;
   AddLine('');
@@ -2686,6 +2685,7 @@ begin
      S:='<source not found>';
    CurrentLine:=Line;
    inherited AddLine(AFileName+':'+IntToStr(line)+' '+S);
+   DisasLines.Insert(TDisasLine.Create('',0));
    { display differently }
    SetLineFlagState(GetLineCount-1,lfSpecialRow,true);
    LimitsChanged;
@@ -2694,17 +2694,14 @@ end;
 procedure  TDisassemblyEditor.AddAssemblyLine(const S: string;AAddress : CORE_ADDR);
 var
   PL : PDisasLine;
-  LI : PEditorLineInfo;
 begin
    if AAddress<>0 then
      inherited AddLine('$'+hexstr(AAddress,sizeof(CORE_ADDR)*2)+S)
    else
      inherited AddLine(S);
-   PL:=DisasLines.At(DisasLines.count-1);
+   PL:=TDisasLine.Create('',0);
    PL.Address:=AAddress;
-   LI:=PL.GetEditorInfo(Self);
-   if AAddress<>0 then
-     LI.BeginsWithAsm:=true;
+   DisasLines.Insert(PL);
    LimitsChanged;
    if ((AAddress<minaddress) or (minaddress=0)) and (AAddress<>0) then
      MinAddress:=AAddress;
@@ -2724,10 +2721,8 @@ begin
   PL:=TDisasLine(DisasLines.FirstThat(TNestedTestProc(@IsCorrectLine)));
   if Assigned(PL) then
     begin
-      if assigned(CurL) then
-        CurL.SetFlagState(lfDebuggerRow,false);
+      SetLineFlagExclusive(lfDebuggerRow,DisasLines.IndexOf(PL));
       SetCurPtr(0,DisasLines.IndexOf(PL));
-      PL.SetFlags(lfDebuggerRow);
       CurL:=PL;
       TrackCursor(do_not_centre);
     end;
@@ -2809,6 +2804,7 @@ begin
   ProcessPChar:=true;
   Lock;
   Editor.DisasLines.FreeAll;
+  Editor.DeleteAllLines;
   Editor.SetFlags(Editor.GetFlags or efSyntaxHighlight or efKeepLineAttr);
 
   Editor.MinAddress:=0;
