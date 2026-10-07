@@ -8,7 +8,7 @@ fail=0
 err() { echo "fpide-layout: $*" >&2; fail=1; }
 
 own=$(ls tv/src/*.pas 2>/dev/null | sed 's|.*/||; s|\.pas$||' | tr 'A-Z' 'a-z' | sort -u | tr '\n' ' ')
-allowed="system sysutils dos go32 objpas math strings classes baseunix unix termio typinfo variants windows"
+allowed="system sysutils dos go32 objpas math strings classes baseunix unix termio typinfo variants windows process"
 for f in tv/src/*.pas; do
     [ -f "$f" ] || continue
     units=$(awk 'BEGIN{IGNORECASE=1} /^[ \t]*uses[ \t]*$|^[ \t]*uses[ \t]/{u=1} u{print} u&&/;/{u=0}' "$f" \
