@@ -3,7 +3,7 @@
   с объяснением (код 232), а не дать потокам звать libc без её TLS. Только Linux. }
 program mf_libc_guard;
 {$mode objfpc}{$H+}
-uses SafeThreads, SysUtils, Safe;
+uses BP, SysUtils;
 function c_getpid: LongInt; cdecl; external 'c' name 'getpid';
 procedure Nop; begin end;
 var G: TGroup;

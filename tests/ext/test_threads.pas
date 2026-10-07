@@ -1,11 +1,11 @@
-{ Нагрузочный тест менеджера потоков (SafeThreads), годится для обоих режимов:
+{ Нагрузочный тест менеджера потоков (BPThreads), годится для обоих режимов:
   свои потоки без libc (Linux по умолчанию) и cthreads (-dSAFE_LIBC). Код возврата = число провалов. }
 program test_threads;
 
 {$mode objfpc}{$H+}
 
 uses
-  SafeThreads, SysUtils, Classes, Safe;
+  BP, SysUtils, Classes;
 
 type
   TIntChan = specialize TChan<Integer>;

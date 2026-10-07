@@ -4,8 +4,8 @@ program test_go;
 {$mode objfpc}{$H+}
 
 uses
-  SafeThreads, // менеджер потоков — первым в uses программы (SPEC §14)
-  SysUtils, Safe;
+  BP, // первым в uses программы: он же ставит менеджер потоков (ext/bpthreads.pas)
+  SysUtils;
 
 type
   TIntChan = specialize TChan<Integer>;

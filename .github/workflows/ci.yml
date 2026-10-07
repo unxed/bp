@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  # fpc-utf8/: UTF-8 Everywhere (the unit is injected by -Fa); independent of Safe Pascal
+  # ext/fpc-utf8/: UTF-8 Everywhere (the unit is injected by -Fa); independent of Better Pascal
   fpc-utf8:
     runs-on: ubuntu-latest
     steps:
@@ -17,7 +17,7 @@ jobs:
         run: |
           fpc -iV
           mkdir -p build
-          fpc @fpc-utf8/utf8.cfg -Fufpc-utf8 -FUbuild -FEbuild fpc-utf8/test_utf8.pas
+          fpc @ext/fpc-utf8/utf8.cfg -Fuext/fpc-utf8 -FUbuild -FEbuild ext/fpc-utf8/test_utf8.pas
       - name: Run test
         working-directory: build
         env:
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
         run: sudo apt-get update && sudo apt-get install -y fp-compiler
-      - name: Tests (no compiler options, safe.pas next to sources)
+      - name: Tests (no compiler options: layers safe and ext, units Safe and BP)
         env:
           LANG: C.UTF-8
           LC_ALL: C.UTF-8
@@ -41,7 +41,7 @@ jobs:
         run: bash tests/run.sh
       - name: Audit — static, no INTERP, no NEEDED (static-everywhere Profile S)
         run: |
-          for b in test_safe test_go test_threads test_sumtype; do
+          for b in safe-Safe/test_safe safe-BP/test_safe ext-BP/test_go ext-BP/test_threads safe-Safe/test_sumtype; do
             if readelf -lW "out/$b" | grep -q INTERP || readelf -dW "out/$b" | grep -q NEEDED; then
               echo "FAIL $b is dynamic"; readelf -dW "out/$b"; exit 1
             fi
@@ -52,7 +52,7 @@ jobs:
           for img in alpine:3.20 debian:12 ubuntu:16.04 centos:7; do
             echo "== $img"
             docker run --rm -e LANG=C -v "$PWD/out:/t:ro" "$img" \
-              sh -c 'cd /t && ./test_safe >/dev/null && ./test_go >/dev/null && ./test_threads >/dev/null && echo ok' || exit 1
+              sh -c 'cd /t && ./safe-BP/test_safe >/dev/null && ./ext-BP/test_go >/dev/null && ./ext-BP/test_threads >/dev/null && ./ext-BP/test_utf8 >/dev/null && echo ok' || exit 1
           done
 
   # Режим с libc (-dSAFE_LIBC, аналог cgo): cwstring + cthreads.
@@ -71,7 +71,7 @@ jobs:
         run: bash tests/run.sh
 
   # i386 и aarch64: кросс-компиляторы FPC 3.2.2 из официальных исходников, запуск под qemu-user
-  # (i386 — ещё и нативно). Проверяет ассемблер clone в safethreads.pas на каждой архитектуре.
+  # (i386 — ещё и нативно). Проверяет ассемблер clone в ext/bpthreads.pas на каждой архитектуре.
   cross:
     runs-on: ubuntu-latest
     steps:
@@ -109,4 +109,4 @@ jobs:
       - name: i386 natively (same binaries)
         run: |
           cd out386
-          for t in test_safe test_go test_threads; do LANG=C ./$t > /dev/null || { echo "FAIL $t"; exit 1; }; echo "ok   $t"; done
+          for t in safe-BP/test_safe ext-BP/test_go ext-BP/test_threads ext-BP/test_utf8; do LANG=C ./$t > /dev/null || { echo "FAIL $t"; exit 1; }; echo "ok   $t"; done

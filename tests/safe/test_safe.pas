@@ -318,13 +318,6 @@ begin
   Run('Leaks', @Leaks, '~leak');
   Run('DeferFailureIsCounted', @DeferFailureIsCounted, '');
 
-  WriteLn('-- UTF8');
-  Check(Length('aё😀') = 7, 'utf8: Length in bytes');
-  Check(CPLength('aё😀') = 3, 'utf8: CPLength in code points');
-  Check(Pos('ве', 'привет') = 7, 'utf8: Pos(literal, literal) in bytes');
-  Check(Copy('привет', Pos('ве', 'привет'), MaxInt) = 'вет', 'utf8: Copy from Pos');
-  Check(DefaultSystemCodePage = CP_UTF8, 'utf8: DefaultSystemCodePage');
-
   WriteLn(Failed, ' failed');
   Halt(Failed);
 end.

@@ -1,9 +1,9 @@
 { SPDX-License-Identifier: MIT }
 // UNSAFE-UNIT: менеджер потоков FPC. На Linux — свой, на системных вызовах без libc (как в Go); с -dSAFE_LIBC и на других Unix — cthreads.
-{ SafeThreads: одна строка для потоков на всех целях (SPEC §14).
+{ BPThreads: одна строка для потоков на всех целях (SPEC §14).
 
     program P;
-    uses SafeThreads, SysUtils, ..., Safe;   // SafeThreads — ПЕРВЫМ в uses программы
+    uses BP, SysUtils, ...;   // BP (а он тянет BPThreads) — ПЕРВЫМ в uses программы; в остальных юнитах BP — последним
 
   - Linux (x86_64, i386, aarch64) по умолчанию — собственный менеджер: clone + futex
     + mmap, libc не нужна; статический бинарник работает на любом дистрибутиве
@@ -25,17 +25,17 @@
     регион стека освобождает следующий BeginThread/CloseThread («сборщик зомби»);
   - главный поток узнаётся по диапазону [MainLow, MainHigh): сверху argv, снизу
     лимит стека; регион, попавший в диапазон, отбрасывается (так бывает под qemu-user). }
-unit SafeThreads;
+unit BPThreads;
 
 {$mode objfpc}{$H+}
 
 {$if defined(linux) and not defined(SAFE_LIBC)}
   {$define SAFE_RAW}
   {$if defined(FPC_USE_LIBC)}
-    {$error SafeThreads raw mode needs an RTL built without libc; build with -dSAFE_LIBC}
+    {$error BPThreads raw mode needs an RTL built without libc; build with -dSAFE_LIBC}
   {$endif}
   {$if not (defined(cpux86_64) or defined(cpui386) or defined(cpuaarch64))}
-    {$error SafeThreads raw mode: only x86_64, i386, aarch64 Linux; build with -dSAFE_LIBC}
+    {$error BPThreads raw mode: only x86_64, i386, aarch64 Linux; build with -dSAFE_LIBC}
   {$endif}
 {$endif}
 
@@ -502,7 +502,7 @@ begin
   begin
     if LibcLoaded then
     begin
-      WriteLn(StdErr, 'SafeThreads: libc is loaded (FFI?), but threads run without libc TLS.');
+      WriteLn(StdErr, 'BPThreads: libc is loaded (FFI?), but threads run without libc TLS.');
       WriteLn(StdErr, 'Build this program with -dSAFE_LIBC (SPEC section 13, F5).');
       Halt(232);
     end;
@@ -728,8 +728,8 @@ var
 begin
   if ThreadingAlreadyUsed then
   begin
-    WriteLn('SafeThreads: threading was used before SafeThreads was initialized.');
-    WriteLn('Put SafeThreads FIRST in the program uses clause.');
+    WriteLn('BPThreads: threading was used before BPThreads was initialized.');
+    WriteLn('In the program put BP (or BPThreads) FIRST in the uses clause: uses BP, SysUtils, ...');
     RunError(211);
   end;
   if SizeOf(TRTLCriticalSection) < SizeOf(TRawMutex) then

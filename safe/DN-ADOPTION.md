@@ -1,5 +1,8 @@
 # Safe Pascal в DOS Navigator: план перевода (RUP S0–S10)
 
+> **Better Pascal:** `safe.pas` разнесён на `safe/`, `ext/` и `bp.pas`; для DN подходит `unit Safe` (только безопасность) или `unit BP` (плюс UTF-8 и горутины). Ниже — исторический текст.
+
+
 Перенесено из `PLAN.md` репозитория [`unxed/dn`](https://github.com/unxed/dn) (2026-10-03); отсюда продолжать. Статус S1–S10 ведётся здесь, в `dn/PLAN.md` только ссылка.
 
 Концепция: этот репозиторий (`SPEC.md`, `safe.pas`, тесты, CI; раньше `safe-pascal/` в `unxed/sandbox`, PR #4, история перенесена; «правда на земле», дорабатываем по опыту).
