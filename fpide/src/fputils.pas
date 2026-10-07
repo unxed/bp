@@ -81,7 +81,7 @@ implementation
 
 uses Dos,
      Views,Dialogs,
-     WUtils,
+     WUtils,TvWild,
      FPVars,FPSwitch;
 
 procedure DbgLog(const S: string);
@@ -295,88 +295,13 @@ begin
 end;
 
 function MatchesMask(What, Mask: string): boolean;
-
-  function upper(const s : string) : string;
-  var
-    i  : Sw_integer;
-  begin
-     for i:=1 to length(s) do
-      if s[i] in ['a'..'z'] then
-       upper[i]:=char(byte(s[i])-32)
-      else
-       upper[i]:=s[i];
-     upper[0]:=s[0];
-  end;
-
-  Function CmpStr(const hstr1,hstr2:string):boolean;
-  var
-    found : boolean;
-    i1,i2 : Sw_integer;
-  begin
-    i1:=0;
-    i2:=0;
-    found:=true;
-    while found and (i1<length(hstr1)) and (i2<=length(hstr2)) do
-     begin
-       if found then
-        inc(i2);
-       inc(i1);
-       case hstr1[i1] of
-         '?' :
-           found:=true;
-         '*' :
-           begin
-             found:=true;
-             if (i1=length(hstr1)) then
-              i2:=length(hstr2)
-             else
-              if (i1<length(hstr1)) and (hstr1[i1+1]<>hstr2[i2]) then
-               begin
-                 if i2<length(hstr2) then
-                  dec(i1)
-               end
-             else
-              if i2>1 then
-               dec(i2);
-           end;
-         else
-           found:=(hstr1[i1]=hstr2[i2]) or (hstr2[i2]='?');
-       end;
-     end;
-    if found then
-      found:=(i1>=length(hstr1)) and (i2>=length(hstr2));
-    CmpStr:=found;
-  end;
-
-var
-  D1,D2 : DirStr;
-  N1,N2 : NameStr;
-  E1,E2 : Extstr;
 begin
-{$ifdef Unix}
-  FSplit(What,D1,N1,E1);
-  FSplit(Mask,D2,N2,E2);
-{$else}
-  FSplit(Upper(What),D1,N1,E1);
-  FSplit(Upper(Mask),D2,N2,E2);
-{$endif}
-  MatchesMask:=CmpStr(N2,N1) and CmpStr(E2,E1);
+  MatchesMask:=WildMatch(What,Mask);
 end;
 
 function MatchesMaskList(What, MaskList: string): boolean;
-var P: integer;
-    Match: boolean;
 begin
-  Match:=false;
-  if What<>'' then
-  repeat
-    P:=Pos(ListSeparator, MaskList);
-    if P=0 then
-      P:=length(MaskList)+1;
-    Match:=MatchesMask(What,copy(MaskList,1,P-1));
-    Delete(MaskList,1,P);
-  until Match or (MaskList='');
-  MatchesMaskList:=Match;
+  MatchesMaskList:=(What<>'') and WildMatchList(What,MaskList);
 end;
 
 function MatchesFileList(What, FileList: string): boolean;
