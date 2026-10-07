@@ -40,7 +40,7 @@ uses
   Dos,Objects,Drivers,
   FVConsts,
   Version,
-  WConsts,WUtils,WINI,WViews,WEditor,WCEdit,
+  WConsts,WUtils,TvIni,WViews,WEditor,WCEdit,
   {$ifndef NODEBUG}FPDebug,{$endif}FPConst,FPVars,
   FPIntf,FPTools,FPSwitch,fpccrc;
 
@@ -620,7 +620,7 @@ begin
   { Files }
   { avoid keeping old files }
   INIFile.DeleteSection(secFiles);
-  INIFile.SetEntry(secFiles,ieOpenExts,EscapeIniText(OpenExts));
+  INIFile.SetEntry(secFiles,ieOpenExts,OpenExts);
   for I:=1 to High(RecentFiles) do
     begin
       if I<=RecentFileCount then
@@ -693,7 +693,7 @@ begin
   for I := 1 to HelpFileCount do
     begin
       S:=HelpFiles.At(I-1)^;
-      INIFile.SetEntry(secHelp, ieHelpFile + IntToStr(I), EscapeIniText(S));
+      INIFile.SetEntry(secHelp, ieHelpFile + IntToStr(I), S);
     end;
   { Editor }
   INIFile.SetIntEntry(secEditor,ieDefaultTabSize,DefaultTabSize);
@@ -701,10 +701,10 @@ begin
   INIFile.SetIntEntry(secEditor,ieDefaultEditorFlags,DefaultCodeEditorFlags);
   INIFile.SetEntry(secEditor,ieDefaultSaveExt,DefaultSaveExt);
   { Highlight }
-  INIFile.SetEntry(secHighlight,ieHighlightExts,EscapeIniText(HighlightExts));
-  INIFile.SetEntry(secHighlight,ieTabsPattern,EscapeIniText(TabsPattern));
+  INIFile.SetEntry(secHighlight,ieHighlightExts,HighlightExts);
+  INIFile.SetEntry(secHighlight,ieTabsPattern,TabsPattern);
   { SourcePath }
-  INIFile.SetEntry(secSourcePath,ieSourceList,EscapeIniText(SourceDirs));
+  INIFile.SetEntry(secSourcePath,ieSourceList,SourceDirs);
   { Mouse }
   INIFile.SetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
   INIFile.SetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse));
@@ -734,9 +734,9 @@ begin
     begin
       S:=IntToStr(I);
       GetToolParams(I-1,S1,S2,S3,W);
-      if S1<>'' then S1:=EscapeIniText(S1);
-      if S2<>'' then S2:=EscapeIniText(S2);
-      if S3<>'' then S3:=EscapeIniText(S3);
+      if S1<>'' then S1:=S1;
+      if S2<>'' then S2:=S2;
+      if S3<>'' then S3:=S3;
       INIFile.SetEntry(secTools,ieToolName+S,S1);
       INIFile.SetEntry(secTools,ieToolProgram+S,S2);
       INIFile.SetEntry(secTools,ieToolParams+S,S3);

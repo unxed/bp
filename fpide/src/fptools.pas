@@ -171,7 +171,7 @@ implementation
 uses Dos,
      FVConsts,
      App,MsgBox,
-     WConsts,WUtils,WINI,
+     WConsts,WUtils,TvIni,
      FPConst,FPVars,FPUtils;
 
 {$ifndef NOOBJREG}
