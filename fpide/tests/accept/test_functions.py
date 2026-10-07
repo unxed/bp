@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard debug browser longlines misc exit
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard debug browser longlines misc mouse exit
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -824,9 +824,75 @@ def test_exit(fp):
         t.close()
 
 
+def section_mouse(t):
+    """the mouse (SGR reports, as a terminal sends them): the menu bar, the cursor, a selection by dragging, the wheel,
+    the status line, the close box, activating a window"""
+    subprocess.call(['tmux', 'set-option', '-g', 'set-clipboard', 'on'])
+    # menu bar: click File, click New
+    t.click(3, 0)
+    check(t.wait_for('New from template', 3), 'a click on File opens the menu', t)
+    rows = t._menu_rows()
+    new_row = next(r[0] for r in rows if r[1].startswith('New') and not r[1].startswith('New from'))
+    before = t.text().count('noname')
+    t.click(6, new_row)
+    check(t.wait_until(lambda: t.text().count('noname') > before, 3), 'a click on New opens a window', t)
+    type_lines(t, *['line %d some words here' % i for i in range(1, 61)])
+    t.key('C-PPage')
+    # the cursor goes where the click is (the text starts in the column after the frame, line 1 on the screen row 2)
+    t.click(1 + 7, 2)
+    check(t.wait_until(lambda: t.indicator() == (1, 8)), 'a click puts the cursor on that character: %r' % (t.indicator(),), t)
+    # a drag selects: "some words" is columns 8..17 of the first line
+    t.drag(1 + 7, 2, 1 + 17, 2)
+    menu(t, 'M-e', 'Copy to System')
+    t.pump(0.5)
+    buf = subprocess.run(['tmux', 'show-buffer'], capture_output=True, text=True).stdout
+    check(buf == 'some words', 'a drag selects text: %r' % buf, t)
+    # the wheel scrolls the view
+    first = editor_lines(t)[0]
+    for _ in range(3):
+        t.click(40, 10, button=65)
+    check(t.wait_until(lambda: editor_lines(t)[0] != first, 3), 'the wheel scrolls down: %r -> %r' % (first, editor_lines(t)[0]), t)
+    t.click(40, 10, button=64)
+    # the status line: a click on "F3 Open" opens the file dialog
+    last = t.lines()[-1]
+    x = last.find('F3 Open')
+    t.click(x + 2, len(t.lines()) - 1)
+    check(t.wait_for('Open a file', 3), 'a click on F3 Open in the status line opens the dialog', t)
+    t.key('Escape')
+    t.pump(0.3)
+    # the close box of an unmodified window
+    close_all(t)
+    new_file(t)
+    t.pump(0.3)
+    n = t.text().count('noname')
+    t.click(3, 1)
+    check(t.wait_until(lambda: t.text().count('noname') < n, 3), 'a click on the close box closes the window', t)
+    # two windows tiled: a click in the other one makes it the active one (the one with the double frame)
+    def active_title():
+        for l in t.lines():
+            m = re.search(r'╔═\[■\][═ ]*([\w.]+)', l)
+            if m:
+                return m.group(1)
+        return None
+    new_file(t)
+    t.type('first')
+    new_file(t)
+    t.type('second')
+    menu(t, 'M-w', 'Tile')
+    t.pump(0.6)
+    before = active_title()
+    lines = t.lines()
+    row = next(i for i, l in enumerate(lines) if 'first' in l and '[■]' not in l)
+    t.click(lines[row].index('first') + 2, row)
+    t.pump(0.4)
+    after = active_title()
+    check(before is not None and after is not None and before != after,
+          'a click in the other window activates it: %r -> %r' % (before, after), t)
+
+
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile),
-            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc)]
+            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])

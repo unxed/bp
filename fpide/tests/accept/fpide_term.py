@@ -49,6 +49,19 @@ class TmuxTerm:
             time.sleep(0.05)
         time.sleep(0.2)
 
+    def drag(self, col0, row0, col1, row1, button=0, steps=4):
+        """press at (col0,row0), move to (col1,row1) with the button held, release there (SGR mouse reports)"""
+        seqs = [b'\x1b[<%d;%d;%dM' % (button, col0 + 1, row0 + 1)]
+        for i in range(1, steps + 1):
+            c = col0 + (col1 - col0) * i // steps
+            r = row0 + (row1 - row0) * i // steps
+            seqs.append(b'\x1b[<%d;%d;%dM' % (button + 32, c + 1, r + 1))
+        seqs.append(b'\x1b[<%d;%d;%dm' % (button, col1 + 1, row1 + 1))
+        for q in seqs:
+            self._tmux('send-keys', '-t', self.session, '-H', *['%02x' % b for b in q])
+            time.sleep(0.05)
+        time.sleep(0.2)
+
     def type(self, s):
         """literal text, one byte at a time as hex (so ';' and the like are not tmux syntax)"""
         for b in s.encode('utf-8'):
