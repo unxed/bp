@@ -71,8 +71,9 @@ type
       procedure   ShowUserScreen;
       procedure   ShowIDEScreen;
       function    IsClosing : boolean;
-    private
+    public
       procedure NewEditor;
+    private
       procedure NewFromTemplate;
       procedure OpenRecentFile(RecentIndex: integer);
       procedure ChangeDir;

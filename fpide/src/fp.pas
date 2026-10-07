@@ -486,11 +486,11 @@ BEGIN
 
   ProcessParams(false);
 
-  if ShowReadme then
-  begin
-    PutCommand(Application,evCommand,cmShowReadme,nil);
-    ShowReadme:=false; { do not show next time }
-  end;
+  { like TP/BP: nothing opened on the command line or restored from the desktop file -> an empty file;
+    the readme is not forced on the first start, it is in the Help menu }
+  ShowReadme:=false;
+  if not IsThereAnyVisibleWindow then
+    IDEApp.NewEditor;
 
   StoreExitProc:=ExitProc;
   ExitProc:=@InterceptExit;

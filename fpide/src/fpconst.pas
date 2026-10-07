@@ -71,7 +71,6 @@ const
      SwitchesName         = FPBaseName+'.cfg';
      DesktopName          = FPBaseName+'.dsk';
      BrowserName          = FPBaseName+'.brw';
-     BackgroundName       = 'fp.ans';
      ReadmeName           = 'readme.ide';
 
      ToolCaptureName      = '__tool__.out'; { all '$' signs replaces with '_'s }

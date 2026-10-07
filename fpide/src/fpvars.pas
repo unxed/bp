@@ -101,7 +101,6 @@ const ClipboardWindow  : PClipboardWindow = nil;
       StartupOptions   : longint = 0;
       LastExitCode     : integer = 0;
       ASCIIChart       : PFPASCIIChart = nil;
-      BackgroundPath   : string = BackgroundName;
       DesktopPath      : string = DesktopName;
       DesktopFileFlags : longint = dfHistoryLists+dfOpenWindows+
                                    dfCodeCompleteWords+dfCodeTemplates;

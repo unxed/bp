@@ -34,8 +34,8 @@ fpide_compile fp.pas
 log="$FPIDE_OBJ/fp.log"
 grep -a -E 'Error|Fatal|Warning:' "$log" | head -40 || true
 if [ -f "$out/fp" ]; then
-    # the data files the IDE looks for next to its executable: desktop background, code templates, tool descriptions, readme
-    for f in fp.ans readme.ide; do cp "$here/fpide/src/$f" "$out/"; done
+    # the data files the IDE looks for next to its executable: readme
+    for f in readme.ide; do cp "$here/fpide/src/$f" "$out/"; done
     cp "$here/fpide/src/"*.pt "$here/fpide/src/"*.tdf "$out/"
     echo "built: $out/fp"
     exit 0

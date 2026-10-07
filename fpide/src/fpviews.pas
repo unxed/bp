@@ -4464,27 +4464,8 @@ begin
 end;
 
 procedure TFPDesktop.InitBackground;
-var AV: PANSIBackground;
-    FileName: string;
-    R: TRect;
 begin
-  AV:=nil;
-  FileName:=LocateFile(BackgroundPath);
-  if FileName<>'' then
-  begin
-    GetExtent(R);
-    AV := TANSIBackground.Create(R);
-    AV.GrowMode:=gfGrowHiX+gfGrowHiY;
-    if AV.LoadFile(FileName)=false then
-    begin
-      AV.Free; AV:=nil;
-    end;
-    if Assigned(AV) then
-      Insert(AV);
-  end;
-  Background:=AV;
-  if Assigned(Background)=false then
-    inherited InitBackground;
+  inherited InitBackground;
 end;
 
 constructor TFPDesktop.Load(S: TStream);
