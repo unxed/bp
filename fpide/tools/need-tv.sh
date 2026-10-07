@@ -5,10 +5,10 @@ if [ -n "${FPIDE_TV:-}" ] && [ ! -e "$here/tv/src" ]; then
     ln -s "$FPIDE_TV" "$here/tv"
 fi
 if [ ! -f "$here/tv/src/tvgeom.pas" ]; then
-    echo "tv/ is empty: git submodule update --init tv" >&2
+    echo "tv/ is empty: git submodule update --init fpide/tv" >&2
     git -C "$here" submodule update --init --depth 1 tv >&2 ||
-        { echo "ERROR: no tv/. Run: git submodule update --init tv" >&2; exit 1; }
+        { echo "ERROR: no tv/. Run: git submodule update --init tv  (in fpide/)" >&2; exit 1; }
 fi
 if [ -z "${FPIDE_TV:-}" ] && git -C "$here" submodule status tv 2>/dev/null | grep -q '^[+-]'; then
-    echo "NOTE: tv/ is not at the commit recorded in sp; git submodule update --init tv" >&2
+    echo "NOTE: tv/ is not at the commit recorded in sp; git submodule update --init fpide/tv" >&2
 fi

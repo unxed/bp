@@ -1,13 +1,13 @@
 #!/bin/sh
 # Fast local gate before pushing fpide changes (avoids burning GitHub runners).
-# usage: tools/fpide-preflight.sh
+# usage: fpide/tools/fpide-preflight.sh
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 cd "$here"
 export PATH="${FPC_BIN:-$HOME/fpc-local/bin}:/usr/bin:$PATH"
 command -v fpc >/dev/null || { echo "fpc not found; set FPC_BIN=" >&2; exit 1; }
 
-out=$here/out/fpide/preflight
+out=$here/out/preflight
 rm -rf "$out"
 mkdir -p "$out/obj" "$out/gen"
 
@@ -20,16 +20,16 @@ echo "== [2/4] layout"
 
 echo "== [3/4] generate shims"
 python3 "$here/tools/gen-shim.py" \
-  "$here/fpide/compat/shims/shims.map" "$out/gen" "$here/tv/src" | tee "$out/shims.txt"
+  "$here/compat/shims/shims.map" "$out/gen" "$here/tv/src" | tee "$out/shims.txt"
 rm -rf "$out/gen/manual"
-cp -a "$here/fpide/compat/shims/manual" "$out/gen/manual"
+cp -a "$here/compat/shims/manual" "$out/gen/manual"
 
 echo "== [4/4] smoke link (shims + tv3)"
 # shellcheck disable=SC2086
 fpc -Mobjfpc -Sh- -Se1 \
-  -Futv/src -Fu"$out/gen" -Fufpide/compat -Fi"$here/fpide/compat/shims" \
+  -Futv/src -Fu"$out/gen" -Fucompat -Fi"$here/compat/shims" \
   -FU"$out/obj" -FE"$out" \
-  fpide/compat/fpide_smoke.pas > "$out/smoke.log" 2>&1 || true
+  compat/fpide_smoke.pas > "$out/smoke.log" 2>&1 || true
 if [ ! -x "$out/fpide_smoke" ]; then
   echo "SMOKE FAIL — first errors:" >&2
   grep -a -E 'Error|Fatal' "$out/smoke.log" | head -40 >&2 || head -50 "$out/smoke.log" >&2

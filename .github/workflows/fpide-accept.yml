@@ -9,10 +9,10 @@ on:
   push:
     paths:
       - fpide/**
-      - tv/**
-      - tools/fpide-*.sh
-      - tools/fpide-*.py
-      - tools/build-fpide.sh
+      - fpide/tv/**
+      - fpide/tools/fpide-*.sh
+      - fpide/tools/fpide-*.py
+      - fpide/tools/build-fpide.sh
       - .github/workflows/fpide-accept.yml
 
 jobs:
@@ -25,4 +25,4 @@ jobs:
       - name: Packages
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-fcl fp-units-base fp-units-misc fp-units-gfx python3 tmux gdb git
       - name: Build and run the acceptance tests
-        run: tools/fpide-accept.sh
+        run: fpide/tools/fpide-accept.sh

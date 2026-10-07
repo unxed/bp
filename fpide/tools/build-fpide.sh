@@ -18,7 +18,7 @@ if [ "$target" = auto ]; then
 fi
 suffix=""
 [ "${FPIDE_EMBED:-0}" = 0 ] || suffix="-embed"
-out=${2:-$here/out/fpide/$target$suffix}
+out=${2:-$here/out/$target$suffix}
 mkdir -p "$out"
 case "$target" in
     linux64) FPIDE_OPTS_EXTRA="-Tlinux -Px86_64" ;;
@@ -35,8 +35,8 @@ log="$FPIDE_OBJ/fp.log"
 grep -a -E 'Error|Fatal|Warning:' "$log" | head -40 || true
 if [ -f "$out/fp" ]; then
     # the data files the IDE looks for next to its executable: readme
-    for f in readme.ide; do cp "$here/fpide/src/$f" "$out/"; done
-    cp "$here/fpide/src/"*.pt "$here/fpide/src/"*.tdf "$out/"
+    for f in readme.ide; do cp "$here/src/$f" "$out/"; done
+    cp "$here/src/"*.pt "$here/src/"*.tdf "$out/"
     echo "built: $out/fp"
     exit 0
 fi
