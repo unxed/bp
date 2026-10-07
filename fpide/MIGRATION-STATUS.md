@@ -10,7 +10,7 @@ Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external 
   the debugger are the system `fpc` and `gdb` (external programs); the FPC compiler sources are not needed (a handful of compiler units
   the IDE itself uses are vendored in `compat/fpc/`). `FPIDE_EMBED=1` keeps the original embedded-compiler build.
 - **Editor:** UTF-8 end to end (open/edit/save). A column is a character (valid UTF-8 sequence or a stray byte), wide characters take two
-  cells, drawing goes through tv3 cells; `WUtf8` has the helpers. Single byte mode only for go32v2 (`Utf8Text`).
+  cells, drawing goes through tv3 cells; `TvUStr` (tv3) has the helpers. Single byte mode only for go32v2 (`TvUtf8.Utf8Enabled`).
 - **Sources** are UTF-8; the box/frame characters are Unicode.
 - **Debugger:** gdb through GDB/MI (`gdbmi*.pas`); Run with a breakpoint stops on it (the program is rebuilt with `-g` for that),
   Call stack, Step/Trace, Watches, Evaluate, Continue to the exit are checked by the tests.

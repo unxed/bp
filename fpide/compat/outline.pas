@@ -7,7 +7,7 @@ unit Outline;
 interface
 
 uses
-  Objects, Drivers, Views, WUtf8;
+  Objects, Drivers, Views, TvUStr, TvUtf8;
 
 type
   PNode = ^TNode;
