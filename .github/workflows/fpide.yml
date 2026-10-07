@@ -10,6 +10,7 @@ on:
       - fpide/**
       - tv/**
       - tools/build-fpide.sh
+      - tools/tv-pty-test.sh
       - tools/fpide-env.sh
       - tools/need-tv.sh
       - tools/gen-shim.py
@@ -45,6 +46,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl python3
       - name: tv3 unit tests (memory backend)
         run: tools/tv-test.sh
+      - name: tv3 far2l extensions through a pty (client and server)
+        run: tools/tv-pty-test.sh
 
   # Smoke link of the shims on tv3; the full IDE build is in fpide-accept.yml.
   preflight:
