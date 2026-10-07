@@ -605,9 +605,7 @@ BEGIN
   DoneBreakpoints;
   DoneWatches;
 {$endif}
-{$ifdef unix}
-  Video.ClearScreen;
-{$endif unix}
+{ the terminal is given back by tv3 (the screen of before the IDE is restored): no ClearScreen of the FPC Video unit }
 {  Video.DoneVideo;
   Keyboard.DoneKeyboard;}
 {$ifdef VESA}

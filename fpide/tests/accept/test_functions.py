@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard debug browser longlines
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard debug browser longlines misc exit
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -582,6 +582,18 @@ def section_debug(t):
     check(t.wait_for('Window  Help', 10) and t.wait_until(lambda: t.indicator() == (6, 1), 10),
           'the typed line reaches the program; it runs on to the breakpoint and the IDE returns: %r' % (t.indicator(),), t)
 
+    # the program is stopped on the breakpoint: Run offers Continue; Program reset kills it and Run is Run again
+    t.key('M-r'); t.pump(0.4)
+    names = [r[1] for r in t._menu_rows()]
+    t.key('Escape')
+    check(names and names[0].startswith('Continue'), 'while the program is stopped the first Run item is Continue: %r' % (names[:1],), t)
+    menu(t, 'M-r', 'Program reset')
+    t.pump(1)
+    t.key('M-r'); t.pump(0.4)
+    names = [r[1] for r in t._menu_rows()]
+    t.key('Escape')
+    check(names and names[0].startswith('Run'), 'after Program reset it is Run again: %r' % (names[:1],), t)
+
 
 SHAPES = """unit shapes;
 interface
@@ -682,11 +694,143 @@ def section_longlines(t):
     check(max(len(l.encode('utf-8')) for l in out.split('\n')) <= 255, 'every line is at most 255 bytes', t)
 
 
+def section_misc(t):
+    """the rest of the menus: Compile (Build, Target, Primary file), Run (Parameters, Run Directory), File (Save all, Reload,
+    Command shell), Options > Save, Help, Window (Hide, Close, List)"""
+    w = t.work
+    with open(os.path.join(w, 'prim.pas'), 'w') as f:
+        f.write("program prim;\nuses SysUtils;\nbegin\n  writeln('arg=', paramstr(1));\n  writeln('dir=', GetCurrentDir);\nend.\n")
+    with open(os.path.join(w, 'other.pas'), 'w') as f:
+        f.write("program other;\nbegin\nend.\n")
+
+    # Compile > Target shows the platform of this system
+    menu(t, 'M-c', 'Target')
+    check(t.wait_for('Target', 4) and 'Linux' in t.text(), 'Compile > Target... lists the targets (Linux among them)', t)
+    close_dialogs(t, 2)
+
+    # Primary file: Make builds that one whatever window is current
+    t.key('F3'); t.wait_for('Open a file'); t.type('other.pas'); t.key('Enter')
+    t.wait_for('program other')
+    menu(t, 'M-c', 'Primary file')
+    check(t.wait_for('Primary file', 4), 'Compile > Primary file... opens', t)
+    t.type('prim.pas'); t.key('Enter')
+    t.pump(0.6)
+    t.key('F9')
+    check(t.wait_for('Compile successful', 30), 'Make with a primary file compiles it', t)
+    t.key('Enter')
+    check(os.path.exists(os.path.join(w, 'prim')) and not os.path.exists(os.path.join(w, 'other')),
+          'the primary file was built, the current one was not', t)
+    menu(t, 'M-c', 'Clear primary file')
+    t.pump(0.5)
+    # Build (everything again) of the current file
+    menu(t, 'M-c', 'Build')
+    check(t.wait_for('Compile successful', 30), 'Compile > Build compiles the current file', t)
+    t.key('Enter')
+    check(os.path.exists(os.path.join(w, 'other')), 'and the executable of the current file exists', t)
+
+    # Run > Parameters and Run Directory: the program sees both
+    t.key('F3'); t.wait_for('Open a file'); t.type('prim.pas'); t.key('Enter')
+    t.wait_for('program prim')
+    menu(t, 'M-r', 'Parameters')
+    check(t.wait_for('Program parameters', 4), 'Run > Parameters... opens', t)
+    t.key('End'); t.key(*['BSpace'] * 30); t.type('hello'); t.key('Enter')
+    t.pump(0.5)
+    menu(t, 'M-r', 'Run Directory')
+    check(t.wait_for('Directory', 4), 'Run > Run Directory... opens', t)
+    t.key('End'); t.key(*['BSpace'] * 60); t.type('/tmp'); t.key('Enter')
+    t.pump(0.5)
+    t.key('C-F9')
+    check(t.wait_until(lambda: 'Press any key' in t.text() or 'Program exited' in t.text(), 25), 'the program runs', t)
+    if 'Program exited' in t.text():        # with breakpoints in the list the debugger runs it: the output is on the user screen
+        t.key('Enter')
+        t.pump(0.5)
+        t.key('M-F5')
+        t.pump(1)
+    txt = t.text()
+    check('arg=hello' in txt, 'it got the parameter', t)
+    check('dir=/tmp' in txt, 'and ran in the chosen directory', t)
+    t.key('Enter')
+    t.wait_for('F9 Make')
+
+    # File > Save all saves every modified window; Reload takes the file from disk again
+    t.type('{x}')
+    new_file(t)
+    t.type('{y}')
+    t.key('F2'); t.wait_for('Save File As'); t.type('extra.pas'); t.key('Enter'); t.pump(0.6)
+    menu(t, 'M-w', 'Next')
+    t.pump(0.3)
+    menu(t, 'M-f', 'Save all')
+    t.pump(1)
+    check('{x}' in open(os.path.join(w, 'prim.pas')).read(), 'File > Save all saved the modified window', t)
+    for name in ('prim.pas', 'other.pas'):          # whichever window is the current one
+        with open(os.path.join(w, name), 'a') as f:
+            f.write('{ changed on disk }\n')
+    menu(t, 'M-f', 'Reload')
+    t.pump(1)
+    for _ in range(4):                      # "modified by another program: reload?" for each window; Yes
+        if t.wait_for('Reload new version', 1.5) or t.wait_for('Yes', 0.5):
+            t.key('y')
+            t.pump(0.4)
+    check(t.wait_for('changed on disk', 5), 'File > Reload reads the file again', t)
+
+    # File > Command shell: a real shell on the user screen, EXIT comes back
+    menu(t, 'M-f', 'Command shell')
+    check(t.wait_for('Type EXIT to return', 8), 'File > Command shell shows the shell', t)
+    t.type('echo shell' + 'ok'); t.key('Enter')
+    check(t.wait_for('shellok', 5), 'the shell works', t)
+    t.type('exit'); t.key('Enter')
+    check(t.wait_for('F9 Make', 8) and t.alive(), 'EXIT returns to the IDE', t)
+
+    for _ in range(3):                      # a window that changed on disk asks again when it gets the focus: No
+        if t.wait_for('Reload new version', 1):
+            t.key('n')
+            t.pump(0.4)
+
+    # Options > Save writes the settings
+    for name in ('fp.ini',):
+        if os.path.exists(os.path.join(w, name)):
+            os.remove(os.path.join(w, name))
+    menu(t, 'M-o', 'Save', exact=False)
+    t.pump(1)
+    check(os.path.exists(os.path.join(w, 'fp.ini')), 'Options > Save writes fp.ini', t)
+
+    # Help: the help files are not installed (as in the original): the IDE says so; Help > Files... lets add some
+    menu(t, 'M-h', 'Contents')
+    check(t.wait_for('CHM help', 5), 'Help > Contents explains that the help files are not installed', t)
+    close_dialogs(t, 2)
+    menu(t, 'M-h', 'Files')
+    check(t.wait_for('Install Help Files', 4), 'Help > Files... opens the list of help files', t)
+    close_dialogs(t, 2)
+
+    # Window > Hide, List, Close
+    menu(t, 'M-w', 'Hide')
+    t.pump(0.4)
+    menu(t, 'M-w', 'List')
+    check(t.wait_for('Window list', 4) or t.wait_for('prim.pas', 4), 'Window > List shows the windows (also the hidden one)', t)
+    close_dialogs(t, 2)
+    menu(t, 'M-w', 'Close', exact=True)
+    t.pump(0.5)
+    check(t.alive(), 'Window > Close closes the current window', t)
+
+
+def test_exit(fp):
+    """File > Exit (Alt+X) on a clean desktop ends the IDE with status 0"""
+    t = TmuxTerm(fp, env={'TV_FAR2L': '0'})
+    try:
+        t.wait_for('Window  Help')
+        t.key('M-x')
+        check(t.wait_until(lambda: not t.alive(), 6) and 'EXIT=0' in t.stderr(), 'Alt+X leaves the IDE with exit status 0 (%r)' % t.stderr()[-20:], t)
+    finally:
+        t.close()
+
+
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile),
-            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines)]
+            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])
+    if not sys.argv[2:] or 'exit' in sys.argv[2:]:
+        test_exit(sys.argv[1])
     print('%d checks, %d failed' % (count, fails))
     sys.exit(1 if fails else 0)

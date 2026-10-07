@@ -103,8 +103,36 @@ begin
     fpIOCtl(Master, TIOCSWINSZ, @ws);
 end;
 
+{ what the debuggee wrote last must reach the screen before the IDE takes the terminal back }
+procedure DrainMaster;
+var
+  pfd: TPollFD;
+  buf: array[0..4095] of byte;
+  r: ssize_t;
+  n: longint;
+begin
+  if (Master < 0) or not MasterOpen then
+    Exit;
+  for n := 1 to 64 do
+  begin
+    pfd.fd := Master; pfd.events := POLLIN; pfd.revents := 0;
+    if fpPoll(@pfd, 1, 50) <= 0 then
+      Break;
+    r := fpRead(Master, buf, SizeOf(buf));
+    if r <= 0 then
+    begin
+      if r = 0 then
+        MasterOpen := false;
+      Break;
+    end;
+    fpWrite(1, buf, r);
+  end;
+end;
+
 procedure PtyRelayEnd;
 begin
+  if Relaying then
+    DrainMaster;
   Relaying := false;
   if SavedOk then
     TCSetAttr(0, TCSANOW, Saved);
@@ -137,8 +165,9 @@ begin
         Continue;
       Exit;
     end;
-    if (fds[0].revents and (POLLIN or POLLHUP or POLLERR)) <> 0 then
-      Exit(true);
+    if ((fds[0].revents and (POLLIN or POLLHUP or POLLERR)) <> 0) and
+       not (MasterOpen and ((fds[1].revents and POLLIN) <> 0)) then
+      Exit(true);                          { gdb has something (and the debuggee has not): back to the reader }
     if MasterOpen then
     begin
       if (fds[1].revents and (POLLIN or POLLHUP or POLLERR)) <> 0 then
