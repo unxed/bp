@@ -135,6 +135,7 @@ const
 implementation
 
 uses
+  TvSys,
 {$ifdef Unix}
   Unix, BaseUnix,
 {$endif}
@@ -1091,6 +1092,12 @@ begin
     else
       CompilationPhase:=cpFailed;
 { Show end status }
+  { the desktop is told when the window is in the background (the terminals that report the focus: far2l, ...) }
+  if (CompilationPhase in [cpDone,cpFailed]) and not TvSys.AppFocused then
+    if CompilationPhase=cpDone then
+      TvSys.Notify('Free Pascal IDE','Compile successful')
+    else
+      TvSys.Notify('Free Pascal IDE','Compile failed: '+IntToStr(status.errorCount)+' error(s)');
   { reenable window closing }
   if assigned(CompilerStatusDialog) then
     begin
