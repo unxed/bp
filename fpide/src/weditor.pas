@@ -707,10 +707,8 @@ type
       procedure AddChar(C: char); virtual;
       procedure AddCharStr(const Ch: string); virtual;
       procedure AddString(const S: string);
-{$ifdef WinClipSupported}
-      function  ClipCopyWin: Boolean; virtual;
-      function  ClipPasteWin: Boolean; virtual;
-{$endif WinClipSupported}
+      function  SelectionText: AnsiString;
+      procedure InsertBlockText(const S: AnsiString);
       function  ClipCopy: Boolean; virtual;
       procedure ClipCut; virtual;
       procedure ClipPaste; virtual;
@@ -746,7 +744,7 @@ const
 
      CodeCompleteMinLen : byte = 4; { minimum length of text to try to complete }
 
-     ToClipCmds         : TCommandSet = ([cmCut,cmCopy,cmCopyWin,
+     ToClipCmds         : TCommandSet = ([cmCut,cmCopy,
        { cmUnselect should because like cut, copy, copywin:
          if there is a selection, it is active, else it isn't }
        cmUnselect]);
@@ -786,9 +784,7 @@ implementation
 
 uses
   Strings,Video,MsgBox,App,StdDlg,Validate,
-{$ifdef WinClipSupported}
-  WinClip,
-{$endif WinClipSupported}
+  TvClip,
 {$ifdef TEST_REGEXP}
   {$ifdef USE_OLD_REGEXP}
     oldregexpr,
@@ -3465,6 +3461,7 @@ end;
 
 procedure TCustomCodeEditor.HandleEvent(var Event: TEvent);
 var DontClear : boolean;
+    PasteStr : AnsiString;
 
   procedure CheckScrollBar(P: PScrollBar; var D: Sw_Integer);
   begin
@@ -3548,6 +3545,16 @@ begin
           DrawView;
         end;
     evKeyDown :
+      if ((Event.ControlKeyState and kbPaste)<>0) and not IsReadOnly and not InASCIIMode and
+         TextEvent(Event,PasteStr) then
+        begin
+          { the terminal pastes text (bracketed paste): inserted as it is, one undo step }
+          AddGroupedAction(eaPaste);
+          InsertBlockText(PasteStr);
+          CloseGroupedAction(eaPaste);
+          Event.What:=evNothing;
+        end
+      else
       begin
         { Scancode is almost never zero PM }
         { this is supposed to enable entering of ASCII chars below 32,
@@ -3696,10 +3703,6 @@ begin
 
           cmSelectAll   : SelectAll(true);
           cmUnselect    : SelectAll(false);
-{$ifdef WinClipSupported}
-          cmCopyWin     : ClipCopyWin;
-          cmPasteWin    : ClipPasteWin;
-{$endif WinClipSupported}
           cmUndo        : Undo;
           cmRedo        : Redo;
           cmClear       : DelSelect;
@@ -5952,135 +5955,15 @@ begin
   UnLock;
 end;
 
-{$ifdef WinClipSupported}
-
-const
-   linelimit = 200;
-
-function TCustomCodeEditor.ClipPasteWin: Boolean;
+{ The text of the selection, lines separated by LF. }
+function TCustomCodeEditor.SelectionText: AnsiString;
 var
-    StorePos : TPoint;
-    first : boolean;
-
-procedure InsertStringWrap(const s: string; var i : Longint);
-var
-    BPos,EPos: TPoint;
+  i,str_begin,str_end: longint;
+  s: string;
 begin
-  if first then
-    begin
-      { we need to cut the line in two
-      if not at end of line PM }
-      InsertNewLine;
-      SetCurPtr(StorePos.X,StorePos.Y);
-      InsertText(s);
-      first:=false;
-    end
-  else
-    begin
-      Inc(i);
-      InsertLine(i,s);
-      BPos.X:=0;BPos.Y:=i;
-      EPOS.X:=Length(s);EPos.Y:=i;
-      AddAction(eaInsertLine,BPos,EPos,GetDisplayText(i),GetFlags);
-    end;
-end;
-
-var
-    OK: boolean;
-    l,i,len,len10 : longint;
-    p,p10,p2,p13 : pchar;
-    s : string;
-begin
-  Lock;
-  OK:=WinClipboardSupported;
-  if OK then
-    begin
-
-      first:=true;
-      StorePos:=CurPos;
-      i:=CurPos.Y;
-      l:=GetTextWinClipboardSize;
-      if l=0 then
-        OK:=false
-      else
-        OK:=GetTextWinClipBoardData(p,l);
-      if OK then
-        begin
-          if l>500 then
-            PushInfo(msg_readingwinclipboard);
-          AddGroupedAction(eaPasteWin);
-          p2:=p;
-          len:=strlen(p2);
-          // issue lines ((#13)#10 terminated) of maximally "linelimit" chars.
-          // does not take initial X position into account
-          repeat
-            p13:=strpos(p2,#13);
-            p10:=strpos(p2,#10);
-            if len> linelimit then
-              len:=linelimit;
-            if assigned(p10) then
-              begin
-               len10:=p10-p2;
-               if len10<len then
-                 begin
-                   if p13+1=p10 then
-                     dec(len10);
-                   len:=len10;
-                 end
-               else
-                 p10:=nil;  // signal no cleanup
-              end;
-            setlength(s,len);
-            if len>0 then
-              move(p2^,s[1],len);
-            // cleanup
-            if assigned(p10) then
-              p2:=p10+1
-            else
-              inc(p2,len);
-            insertstringwrap(s,i);
-            len:=strlen(p2);
-          until len=0;
-
-          SetCurPtr(StorePos.X,StorePos.Y);  // y+i to get after paste?
-          SetModified(true);
-          UpdateAttrs(StorePos.Y,attrAll);
-          CloseGroupedAction(eaPasteWin);
-          Update;
-          if l>500 then
-            PopInfo;
-          { we must free the allocated memory }
-          freemem(p,l);
-          DrawView;
-        end;
-    end;
-  ClipPasteWin:=OK;
-  UnLock;
-end;
-
-function TCustomCodeEditor.ClipCopyWin: Boolean;
-var OK,ShowInfo: boolean;
-    p,p2 : pchar;
-    s : string;
-    i,str_begin,str_end,NumLines,PcLength : longint;
-begin
-  NumLines:=SelEnd.Y-SelStart.Y;
-  if (NumLines>0) or (SelEnd.X>SelStart.X) then
-    Inc(NumLines);
-  if NumLines=0 then
-    exit;
-  Lock;
-  ShowInfo:=SelEnd.Y-SelStart.Y>50;
-  if ShowInfo then
-    PushInfo(msg_copyingwinclipboard);
-  { First calculate needed size }
-  { for newlines first + 1 for terminal #0 }
-  PcLength:=Length(EOL)*(NumLines-1)+1;
-
-  { overestimated but can not be that big PM }
-  for i:=SelStart.Y to SelEnd.Y do
-    PCLength:=PCLength+Length(GetLineText(i));
-  getmem(p,PCLength);
+  Result:='';
+  if (SelEnd.Y<SelStart.Y) or ((SelEnd.Y=SelStart.Y) and (SelEnd.X<=SelStart.X)) then
+    Exit;
   i:=SelStart.Y;
   s:=GetLineText(i);
   str_begin:=LinePosToCharIdx(i,SelStart.X);
@@ -6088,33 +5971,93 @@ begin
     str_end:=High(S)
   else
     str_end:=LinePosToCharIdx(i,SelEnd.X)-1;
-  s:=copy(s,str_begin,str_end-str_begin+1);
-  strpcopy(p,s);
-  p2:=strend(p);
-  inc(i);
+  Result:=copy(s,str_begin,str_end-str_begin+1);
+  Inc(i);
   while i<SelEnd.Y do
     begin
-      strpcopy(p2,EOL+GetLineText(i));
-      p2:=strend(p2);
+      Result:=Result+#10+GetLineText(i);
       Inc(i);
     end;
   if SelEnd.Y>SelStart.Y then
-    begin
-      s:=copy(GetLineText(i),1,LinePosToCharIdx(i,SelEnd.X)-1);
-      strpcopy(p2,EOL+s);
-    end;
-  OK:=WinClipboardSupported;
-  if OK then
-    begin
-      OK:=SetTextWinClipBoardData(p,strlen(p));
-    end;
-  ClipCopyWin:=OK;
-  if ShowInfo then
-    PopInfo;
-  Freemem(p,PCLength);
-  UnLock;
+    Result:=Result+#10+copy(GetLineText(i),1,LinePosToCharIdx(i,SelEnd.X)-1);
 end;
-{$endif WinClipSupported}
+
+{ Inserts text as it is (no auto indent, no brackets): through a temporary editor, like ReadBlock. The caller groups the undo. }
+procedure TCustomCodeEditor.InsertBlockText(const S: AnsiString);
+var
+  Temp: PCodeEditor;
+  R: TRect;
+  T,Line: AnsiString;
+  p,q,n,c0: longint;
+begin
+  if (S='') or IsReadOnly then
+    Exit;
+  T:=ToLf(S);
+  GetExtent(R);
+  Temp:=TCodeEditor.Create(R,nil,nil,nil,nil);
+  n:=0;
+  p:=1;
+  repeat
+    q:=p;
+    while (q<=Length(T)) and (T[q]<>#10) do
+      Inc(q);
+    Line:=Copy(T,p,q-p);
+    if not IsFlagSet(efUseTabCharacters) then
+      begin
+        { the editor keeps no tabs: expand them here, so that what Undo takes back is what went in }
+        if n=0 then c0:=CurPos.X else c0:=0;
+        Line:=Copy(ExtractTabs(CharStr(' ',c0)+Line,GetTabSize),c0+1,MaxInt);
+      end;
+    Temp.InsertLine(n,Line);
+    Inc(n);
+    p:=q+1;
+  until p>Length(T)+1;
+  Temp.SetSelection(Point(0,0),Point(Temp.CharIdxToLinePos(n-1,Length(Line)+1),n-1));
+  InsertFrom(Temp);
+  Temp.Free;
+end;
+
+var
+  { what the system clipboard held when we last wrote it or looked at it: Paste takes the clipboard window, unless
+    another program has put something else onto the system clipboard since }
+  LastSystemClip: AnsiString = '';
+
+{ the system clipboard gets what the clipboard window got }
+procedure SendToSystemClipboard(const Text: AnsiString);
+begin
+  LastSystemClip:=ToLf(Text);
+  ClipboardSetText(Text);
+end;
+
+{ Something new on the system clipboard becomes the newest text of the clipboard window (and is selected there). }
+procedure TakeSystemClipboard;
+var
+  Text: AnsiString;
+  T: PCodeEditor;
+  n,p,q: longint;
+  Line: AnsiString;
+begin
+  if Clipboard=nil then
+    Exit;
+  Text:=ToLf(ClipboardGetText);
+  if (Text='') or (Text=LastSystemClip) then
+    Exit;
+  LastSystemClip:=Text;
+  n:=Clipboard.GetLineCount;
+  p:=1;
+  q:=0;
+  repeat
+    q:=p;
+    while (q<=Length(Text)) and (Text[q]<>#10) do
+      Inc(q);
+    Line:=ExtractTabs(Copy(Text,p,q-p),Clipboard.GetTabSize);
+    Clipboard.InsertLine(Clipboard.GetLineCount,Line);
+    p:=q+1;
+  until p>Length(Text)+1;
+  Clipboard.SetSelection(Point(0,n),Point(Clipboard.CharIdxToLinePos(Clipboard.GetLineCount-1,Length(Line)+1),Clipboard.GetLineCount-1));
+  Clipboard.LimitsChanged;
+  Clipboard.DrawView;
+end;
 
 function TCustomCodeEditor.ClipCopy: Boolean;
 
@@ -6133,15 +6076,12 @@ begin
       if ShowInfo then
         PushInfo(msg_copyingclipboard);
       clipcopy:=Clipboard.InsertFrom(Self);
-{$ifdef Unix}
       if clipcopy then
-        ClipCopyWin;                { the system clipboard gets it too }
-{$endif Unix}
+        SendToSystemClipboard(SelectionText);
       if ShowInfo then
         PopInfo;
       {Enable paste command.}
-      CanPaste:=((Clipboard.SelStart.X<>Clipboard.SelEnd.X) or
-                (Clipboard.SelStart.Y<>Clipboard.SelEnd.Y));
+      CanPaste:=true;               { the system clipboard may hold more }
       SetCmdState(FromClipCmds,CanPaste);
     end;
   UnLock;
@@ -6162,17 +6102,14 @@ begin
        PushInfo(msg_cutting);
      if Clipboard.InsertFrom(Self) then
       begin
-{$ifdef Unix}
-        ClipCopyWin;                { the system clipboard gets it too }
-{$endif Unix}
+        SendToSystemClipboard(SelectionText);
         if not IsClipBoard then
          DelSelect;
         SetModified(true);
       end;
      if ShowInfo then
        PopInfo;
-     CanPaste:=((Clipboard.SelStart.X<>Clipboard.SelEnd.X) or
-               (Clipboard.SelStart.Y<>Clipboard.SelEnd.Y));
+     CanPaste:=true;
      SetCmdState(FromClipCmds,CanPaste);
    end;
   CloseGroupedAction(eaCut);
@@ -6190,10 +6127,12 @@ begin
   AddGroupedAction(eaPaste);
   if Clipboard<>nil then
    begin
+     TakeSystemClipboard;
      ShowInfo:=Clipboard.SelEnd.Y-Clipboard.SelStart.Y>50;
      if ShowInfo then
        PushInfo(msg_pastingclipboard);
-     InsertFrom(Clipboard);
+     if (Clipboard.SelStart.X<>Clipboard.SelEnd.X) or (Clipboard.SelStart.Y<>Clipboard.SelEnd.Y) then
+       InsertFrom(Clipboard);
      if ShowInfo then
        PopInfo;
    end;
@@ -6950,8 +6889,7 @@ begin
       Enable:=((SelStart.X<>SelEnd.X) or (SelStart.Y<>SelEnd.Y)) and (Clipboard<>nil);
       SetCmdState(ToClipCmds,Enable and (Clipboard<>TCustomCodeEditor(Self)));
       SetCmdState(NulClipCmds,Enable);
-      CanPaste:=(Clipboard<>nil) and ((Clipboard.SelStart.X<>Clipboard.SelEnd.X) or
-           (Clipboard.SelStart.Y<>Clipboard.SelEnd.Y));
+      CanPaste:=Clipboard<>nil;     { the system clipboard is not asked for every key }
       SetCmdState(FromClipCmds,CanPaste  and (Clipboard<>TCustomCodeEditor(Self)));
       SetCmdState(UndoCmd,(GetUndoActionCount>0));
       SetCmdState(RedoCmd,(GetRedoActionCount>0));

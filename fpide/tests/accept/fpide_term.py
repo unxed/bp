@@ -12,9 +12,13 @@ import time
 
 
 class TmuxTerm:
+    count = 0
+
     def __init__(self, binary, cols=100, rows=30, args=(), env=None):
         binary = os.path.abspath(binary)
-        self.session = 'fpideacc%d' % os.getpid()
+        self.binary = binary
+        TmuxTerm.count += 1
+        self.session = 'fpideacc%d_%d' % (os.getpid(), TmuxTerm.count)
         self.work = tempfile.mkdtemp(prefix='fpide-acc-')
         self.err = os.path.join(self.work, 'stderr.log')
         e = {'TERM': 'xterm-256color', 'HOME': self.work}
@@ -61,6 +65,12 @@ class TmuxTerm:
             self._tmux('send-keys', '-t', self.session, '-H', *['%02x' % b for b in q])
             time.sleep(0.05)
         time.sleep(0.2)
+
+    def paste(self, s):
+        """text pasted by the terminal (bracketed paste, as Ctrl+Shift+V does): through a tmux buffer"""
+        subprocess.run(['tmux', 'set-buffer', '-b', 'fpideacc', s[:-1] + '\\;' if s.endswith(';') else s], check=True)   # a trailing ';' is tmux syntax
+        self._tmux('paste-buffer', '-p', '-d', '-b', 'fpideacc', '-t', self.session)
+        time.sleep(0.4)
 
     def type(self, s):
         """literal text, one byte at a time as hex (so ';' and the like are not tmux syntax)"""

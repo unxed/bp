@@ -179,9 +179,6 @@ uses
 {$ifdef HasSignal}
   fpcatch,
 {$endif HasSignal}
-{$ifdef WinClipSupported}
-  WinClip,
-{$endif WinClipSupported}
 {$ifdef Unix}
   fpKeys,TvUnix,
 {$endif Unix}
@@ -868,13 +865,6 @@ var R: TRect;
 begin
   GetExtent(R); R.B.Y:=R.A.Y+1;
   WinPMI:=nil;
-{$ifdef WinClipSupported}
-  if WinClipboardSupported then
-    WinPMI:=NewLine(
-      NewItem(menu_edit_copywin,'', kbNoKey, cmCopyWin, hcCopyWin,
-      NewItem(menu_edit_pastewin,'', kbNoKey, cmPasteWin, hcPasteWin,
-      nil)));
-{$endif WinClipSupported}
   MenuBar := TAdvancedMenuBar.Create(R, NewMenu(
     NewSubMenu(menu_file,hcFileMenu, NewMenu(
       NewItem(menu_file_new,'',kbNoKey,cmNew,hcNew,

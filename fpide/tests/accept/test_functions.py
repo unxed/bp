@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard debug browser longlines misc mouse exit
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard syscb debug browser longlines misc mouse exit
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -497,7 +497,7 @@ def section_templates(t):
 
 
 def section_clipboard(t):
-    """the clipboards: a paste after a two-byte last character, the system clipboard (OSC 52) on Copy, Paste from System"""
+    """the clipboard: a paste after a two-byte last character, one Cut/Copy/Paste in the menu, the system clipboard (OSC 52) on Copy"""
 
     # a selection that ends at the end of a line with a multi-byte last character: Paste appends, nothing is split
     new_file(t)
@@ -508,18 +508,64 @@ def section_clipboard(t):
     menu(t, 'M-e', 'Paste', exact=True)
     check(editor_lines(t)[0] == 'Привет мирвет мир', 'a paste after the last character (two bytes) keeps it whole: %r' % editor_lines(t)[0], t)
 
-    # the system clipboard (OSC 52) gets what Copy copies, Paste from System brings text in
+    # one clipboard in the menu: no second pair of "to System / from System" items
+    t.key('M-e')
+    check('to System' not in t.text() and 'from System' not in t.text(), 'Edit has Cut/Copy/Paste only (no system-clipboard duplicates)', t)
+    t.key('Escape', 'Escape')
+
+    # the terminal's own clipboard (OSC 52) gets what Copy copies
     subprocess.call(['tmux', 'set-option', '-g', 'set-clipboard', 'on'])
     t.key('Home', 'S-End')
     menu(t, 'M-e', 'Copy', exact=True)
     t.pump(0.5)
     buf = subprocess.run(['tmux', 'show-buffer'], capture_output=True, text=True).stdout
-    check(buf == 'Привет мирвет мир', 'Edit > Copy also sets the system clipboard: %r' % buf, t)
-    t.key('C-NPage', 'Enter')
-    menu(t, 'M-e', 'Paste from System', exact=False)
-    check(editor_lines(t)[-1].startswith('Привет мирвет мир') or 'Привет мирвет мир' in '\n'.join(editor_lines(t)[1:]),
-          'Edit > Paste from System inserts the text: %r' % editor_lines(t)[:3], t)
+    check(buf == 'Привет мирвет мир', 'Edit > Copy sets the system clipboard (OSC 52): %r' % buf, t)
 
+
+def section_syscb(t):
+    """the system clipboard through a program (a fake xsel on PATH, as tvision does): Copy writes it, a change made by
+    another program is what Paste takes, a bracketed paste is inserted as it is in one undo step"""
+    import os, stat
+    d = os.path.join(t.work, 'bin')
+    os.makedirs(d, exist_ok=True)
+    store = os.path.join(t.work, 'clip.txt')
+    with open(os.path.join(d, 'xsel'), 'w') as f:
+        f.write('#!/bin/sh\ncase "$*" in *--input*) cat > %s;; *--output*) cat %s 2>/dev/null;; esac\n' % (store, store))
+    os.chmod(os.path.join(d, 'xsel'), 0o755)
+    t2 = TmuxTerm(t.binary, env={'TV_FAR2L': '0', 'PATH': d + ':/usr/local/bin:/usr/bin:/bin', 'DISPLAY': ':99'})
+    try:
+        t2.wait_for('Window  Help')
+        new_file(t2)
+        t2.type('Привет')
+        t2.key('Home', 'S-End')
+        menu(t2, 'M-e', 'Copy', exact=True)
+        t2.pump(0.5)
+        got = open(store, encoding='utf-8').read() if os.path.exists(store) else None
+        check(got == 'Привет', 'Edit > Copy writes the system clipboard through xsel: %r' % got, t2)
+        # another program changes the clipboard: Paste takes that
+        with open(store, 'w', encoding='utf-8') as f:
+            f.write('снаружи\nвторая')
+        t2.key('C-NPage', 'Enter')
+        menu(t2, 'M-e', 'Paste', exact=True)
+        check(t2.wait_until(lambda: editor_lines(t2)[1:3] == ['снаружи', 'вторая'], 4),
+              'Edit > Paste takes what another program put on the system clipboard: %r' % editor_lines(t2)[:4], t2)
+        # no change since: Paste takes the clipboard window (the same text again)
+        t2.key('C-NPage', 'Enter')
+        menu(t2, 'M-e', 'Paste', exact=True)
+        check('\n'.join(editor_lines(t2)).count('снаружи') == 2, 'a second Paste inserts it again: %r' % editor_lines(t2)[:6], t2)
+        # the terminal pastes (bracketed paste): as it is, no auto indent, one undo step
+        t2.key('C-NPage', 'Enter')
+        t2.paste('  begin\n      x := 1;\n\tend;')
+        lines = editor_lines(t2)
+        i = lines.index('  begin') if '  begin' in lines else -1
+        check(i >= 0 and lines[i + 1] == '      x := 1;' and lines[i + 2].strip() == 'end;' and lines[i + 2].startswith(' '),
+              'a bracketed paste is inserted as it is (no auto indent): %r' % lines[:8], t2)
+        menu(t2, 'M-e', 'Undo', exact=True)
+        lines = editor_lines(t2)
+        check('  begin' not in lines and not any('x := 1' in l or 'end;' in l for l in lines[5:]),
+              'Undo takes the whole paste back in one step: %r' % lines[:8], t2)
+    finally:
+        t2.close()
 
 
 def section_debug(t):
@@ -843,7 +889,7 @@ def section_mouse(t):
     check(t.wait_until(lambda: t.indicator() == (1, 8)), 'a click puts the cursor on that character: %r' % (t.indicator(),), t)
     # a drag selects: "some words" is columns 8..17 of the first line
     t.drag(1 + 7, 2, 1 + 17, 2)
-    menu(t, 'M-e', 'Copy to System')
+    menu(t, 'M-e', 'Copy', exact=True)
     t.pump(0.5)
     buf = subprocess.run(['tmux', 'show-buffer'], capture_output=True, text=True).stdout
     check(buf == 'some words', 'a drag selects text: %r' % buf, t)
@@ -892,7 +938,7 @@ def section_mouse(t):
 
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile),
-            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse)]
+            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('syscb', section_syscb), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])

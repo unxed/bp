@@ -25,7 +25,6 @@
     {$define SUPPORTVESA}
   {$endif ndef NOVESA}
   {$define SUPPORTREDIR}
-  {$define WinClipSupported}
   {$define HasSignal}
   {$define SignalIsFunction}
   {$define SignalIsCdecl}
@@ -39,7 +38,6 @@
 {$ifdef Linux}
   {$undef SUPPORTVESA}
   {$define SUPPORTREDIR}
-  {$undef WinClipSupported}
   {$define HasSignal}
   {$define SignalIsCdecl}
   {$define HasSysMsgUnit}
@@ -49,7 +47,6 @@
 {$ifdef FreeBSD}
   {$undef SUPPORTVESA}
   {$define SUPPORTREDIR}
-  {$undef WinClipSupported}
   {$define HasSignal}
   {$define SignalIsCdecl}
   {$define HasSysMsgUnit}
@@ -58,7 +55,6 @@
 {$ifdef NetBSD}
   {$undef SUPPORTVESA}
   {$define SUPPORTREDIR}
-  {$undef WinClipSupported}
   {$define HasSignal}
   {$define SignalIsCdecl}
   {$define HasSysMsgUnit}
@@ -67,7 +63,6 @@
 {$ifdef OpenBSD}
   {$undef SUPPORTVESA}
   {$define SUPPORTREDIR}
-  {$undef WinClipSupported}
   {$define HasSignal}
   {$define SignalIsCdecl}
   {$define HasSysMsgUnit}
@@ -76,7 +71,6 @@
 {$ifdef Windows}
   {$undef SUPPORTVESA}
   {$define SUPPORTREDIR}
-  {$define WinClipSupported}
   {$ifdef win32}
     {$define HasSignal}
     {$define SignalIsFunction}
@@ -93,24 +87,20 @@
 
 {$ifdef OS2}
   {define SUPPORTREDIR}
-  {define WinClipSupported}
   {define HasSignal}
   {$define FSCaseInsensitive}
 {$endif}
 
 {$ifdef Amiga}
   {$define FSCaseInsensitive}
-  {$define WinClipSupported}
 {$endif}
 
 {$ifdef MorphOS}
   {$define FSCaseInsensitive}
-  {$define WinClipSupported}
 {$endif}
 
 {$ifdef AROS}
   {$define FSCaseInsensitive}
-  {$define WinClipSupported}
 {$endif}
 
 { --- Exclude debugger support --- }
@@ -222,7 +212,3 @@
   {$endif Windows}
 {$endif GDBMI}
 
-{ the system clipboard (OSC 52 or far2l, through tv3): Edit > Copy to / Paste from System; Copy and Cut also set it }
-{$ifdef Unix}
-  {$define WinClipSupported}
-{$endif Unix}
