@@ -622,6 +622,7 @@ resourcestring  menu_local_gotosource = '~G~oto source';
                 label_editor_keeptrailingspaces = '~K~eep trailing spaces';
                 label_editor_codecomplete = 'Co~d~eComplete enabled';
                 label_editor_folds = 'E~n~able folds';
+                label_editor_softwrap = 'Soft ~w~rap';
                 label_editor_editoroptions = '~E~ditor options';
                 label_editor_tabsize = '~T~ab size';
                 label_editor_indentsize = 'Indent si~z~e';

@@ -1167,6 +1167,7 @@ begin
   if (EFlags and efKeepTrailingSpaces)<>0 then EFValue:=EFValue or (1 shl 12);
   if (EFlags and efCodeComplete      )<>0 then EFValue:=EFValue or (1 shl 13);
   if (EFlags and efFolds             )<>0 then EFValue:=EFValue or (1 shl 14);
+  if (EFlags and efSoftWrap          )<>0 then EFValue:=EFValue or (1 shl 15);
 
   R.Assign(0,0,66,20);
   D := TCenterDialog.Create(R, Title);
@@ -1191,7 +1192,8 @@ begin
       NewSItem(label_editor_keeptrailingspaces,
       NewSItem(label_editor_codecomplete,
       NewSItem(label_editor_folds,
-      nil))))))))))))))));
+      NewSItem(label_editor_softwrap,
+      nil)))))))))))))))));
     CB.Value:=EFValue;
     Insert(CB);
     R2.Move(0,-1); R2.B.Y:=R2.A.Y+1;
@@ -1248,6 +1250,7 @@ begin
     if (CB.Value and (1 shl 12))<>0 then EFlags:=EFlags or efKeepTrailingSpaces;
     if (CB.Value and (1 shl 13))<>0 then EFlags:=EFlags or efCodeComplete;
     if (CB.Value and (1 shl 14))<>0 then EFlags:=EFlags or efFolds;
+    if (CB.Value and (1 shl 15))<>0 then EFlags:=EFlags or efSoftWrap;
     TabSize:=StrToInt(ILTab.Data^);
     IndentSize:=StrToInt(ILIdent.Data^);
     if Editor=nil then

@@ -94,6 +94,7 @@ const
       efFolds               = $00008000;
       efNoIndent            = $00010000;
       efKeepLineAttr        = $00020000;
+      efSoftWrap            = $00040000;
       efStoreContent        = $80000000;
 
       attrAsm       = 1;
@@ -1554,7 +1555,9 @@ begin
       IndentSize:=GetIndentSize;
       FreeCursor:=true;
       OverwriteBlocks:=false;
+      ColumnBlocks:=(FFlags and efVerticalBlocks)<>0;
     end;
+  Wrap:=(FFlags and efSoftWrap)<>0;
   HighlightColumn:=(FFlags and efHighlightColumn)<>0;
   ShowCurrentLine:=(FFlags and efHighlightRow)<>0;
   if (FFlags and efSyntaxHighlight)=0 then
