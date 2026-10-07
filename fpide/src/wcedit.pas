@@ -65,7 +65,6 @@ type
 
     TCodeEditor = class(TCustomCodeEditor)
       Core       : PCodeEditorCore;
-      Flags      : longint;
       Indicator  : PIndicator;
       HighlightRow: sw_integer;
       DebuggerRow: sw_integer;
@@ -78,6 +77,7 @@ type
           PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore);
       destructor Destroy; override;
       property    ReadOnly: boolean read FReadOnly write SetReadOnly;
+      property    Flags: longint read GetFlags write SetFlags;
       procedure   DrawIndicator; override;
       function    IsReadOnly: boolean; override;
       procedure   UpdateIndicator; virtual;
@@ -361,8 +361,12 @@ end;
 
 function TFileEditor.IsChangedOnDisk : boolean;
 begin
-  IsChangedOnDisk:=(Core.OnDiskLoadTime<>Cardinal(GetFileTime(FileName))) and
-    (Core.OnDiskLoadTime<>0);
+  if (FileName<>'') and Doc.Info.Known then
+    { size and time of the file, as of the last read or write }
+    IsChangedOnDisk:=TveDiskChanged(FileName,Doc.Info)
+  else
+    IsChangedOnDisk:=(Core.OnDiskLoadTime<>Cardinal(GetFileTime(FileName))) and
+      (Core.OnDiskLoadTime<>0);
 end;
 
 function TFileEditor.SaveFile: boolean;
@@ -469,6 +473,7 @@ function TFileEditor.SaveAs: Boolean;
 var
   SavedName : String;
   SavedDiskLoadTime : cardinal;
+  Inf : TTveFileInfo;
 begin
   SaveAs := False;
   SavedName:=FileName;
@@ -477,7 +482,9 @@ begin
   begin
     FileName:=FExpand(FileName);
     Message(Owner, evBroadcast, cmUpdateTitle, Self);
+    { the new name has no known state on disk }
     Core.OnDiskLoadTime:=0;
+    Inf:=Doc.Info; Inf.Known:=false; Doc.Info:=Inf;
     if SaveFile then
       begin
         SaveAs := true;

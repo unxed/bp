@@ -715,29 +715,21 @@ def section_browser(t):
 
 
 def section_longlines(t):
-    """a line longer than 255 bytes (a line is a short string here) is split when the file is loaded, as the original does,
-    and it is split between characters: the saved file is still valid UTF-8 with all the text"""
+    """a line longer than 255 bytes is kept whole (the editor, tve, has no limit on the length of a line; only the parts of the IDE that
+    take a line as a short string see its first 255 bytes): the file opens without a warning and is saved back byte for byte"""
     path = os.path.join(t.work, 'long.txt')
-    text = 'x' * 300 + '\nsecond\n' + 'ж' * 200 + '\n'
-    with open(path, 'w') as f:
+    text = 'x' * 300 + '\nsecond\n' + '\u0436' * 200 + '\n'
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(text)
     t.key('F3'); t.wait_for('Open a file'); t.type('long.txt'); t.key('Enter')
-    check(t.wait_for('had too long lines', 5), 'the IDE tells that the file had too long lines', t)
-    for _ in range(3):                      # the message is shown more than once; Enter closes each
-        t.key('Enter')
-        t.pump(0.5)
-    check(t.wait_for('long.txt') and t.wait_gone('had too long lines', 3), 'the file is opened after the messages', t)
+    check(t.wait_for('long.txt', 5), 'the file is opened', t)
+    check(not t.wait_for('had too long lines', 1), 'and there is no warning about long lines', t)
+    t.key('C-PPage')
+    t.type('Q')
     t.key('F2')
     t.pump(1)
     data = open(path, 'rb').read()
-    try:
-        out = data.decode('utf-8')
-        valid = True
-    except UnicodeDecodeError:
-        out, valid = '', False
-    check(valid, 'the saved file is valid UTF-8 (no character was cut in two)', t)
-    check(out.replace('\n', '') == text.replace('\n', ''), 'and all the text is there (only line breaks were added)', t)
-    check(max(len(l.encode('utf-8')) for l in out.split('\n')) <= 255, 'every line is at most 255 bytes', t)
+    check(data == ('Q' + text).encode('utf-8'), 'the saved file has all the text, nothing was split or cut: %d bytes' % len(data), t)
 
 
 def section_misc(t):

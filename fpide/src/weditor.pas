@@ -343,10 +343,13 @@ type
       FLastSel: boolean;
       FLastModified: boolean;
       procedure   UpdateCommandStates;
+      procedure   PasteSelecting(const S: AnsiString);
       procedure   SyncFromEditor;
       procedure   ApplyFlags;
       procedure   RememberPos;
       function    OffsetOf(P: TPoint): int64;
+      function    ColToCell(L: int64; Col: integer): integer;
+      function    CellToCol(L: int64; Cell: integer): integer;
       function    PointOf(Offset: int64): TPoint;
     protected
       LastLocalCmd: word;
@@ -1306,12 +1309,14 @@ end;
 { --- TCustomCodeEditor: the editor, on tve --- }
 
 
+
 constructor TCustomCodeEditor.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar; ACore: PCustomCodeEditorCore);
 begin
   inherited Create(Bounds,AHScrollBar,AVScrollBar,ACore.Doc,false);
   FCore:=ACore;
   Options:=Options or ofFirstClick;
   KeysEnabled:=false;
+  MultiClick:=false;
   OnLineAttr:=@LineAttrHook;
   Gutter:=false;
   FFlags:=0;
@@ -1376,14 +1381,15 @@ begin
   F:=FCore.GetLineFlags(Line);
   if F=0 then
     Exit;
-  if (F and lfBreakpoint)<>0 then
+  if (F and (lfHighlightRow or lfDebuggerRow))<>0 then
     begin
-      Attr:=GetColor(16).Lo;
+      { the row where the debugger stopped / a highlighted row; on a breakpoint it still differs from the breakpoint colour }
+      Attr:=GetColor(12).Lo;
       Result:=true;
     end
-  else if (F and (lfHighlightRow or lfDebuggerRow))<>0 then
+  else if (F and lfBreakpoint)<>0 then
     begin
-      Attr:=GetColor(12).Lo;
+      Attr:=GetColor(16).Lo;
       Result:=true;
     end
   else if (F and lfSpecialRow)<>0 then
@@ -1400,9 +1406,38 @@ end;
 
 { --- state kept in the fields the IDE reads --- }
 
+{ The IDE counts columns in characters of the text with its tabs expanded (a wide character is one column); tve counts cells. }
+function TCustomCodeEditor.ColToCell(L: int64; Col: integer): integer;
+var DT: AnsiString;
+    N: integer;
+begin
+  if (L<0) or (L>=Doc.Buffer.LineCount) then
+    Exit(Col);
+  DT:=ExtractTabs(Doc.Buffer.LineText(L),Editor.Opt.TabSize);
+  N:=U8Len(DT);
+  if Col<=N then
+    ColToCell:=U8Cells(DT,0,Col)
+  else
+    ColToCell:=U8Cells(DT,0,N)+(Col-N);
+end;
+
+function TCustomCodeEditor.CellToCol(L: int64; Cell: integer): integer;
+var DT: AnsiString;
+    Cells: integer;
+begin
+  if (L<0) or (L>=Doc.Buffer.LineCount) then
+    Exit(Cell);
+  DT:=ExtractTabs(Doc.Buffer.LineText(L),Editor.Opt.TabSize);
+  Cells:=U8Cells(DT,0,U8Len(DT));
+  if Cell<=Cells then
+    CellToCol:=U8ColAtCell(DT,Cell)
+  else
+    CellToCol:=U8Len(DT)+(Cell-Cells);
+end;
+
 function TCustomCodeEditor.OffsetOf(P: TPoint): int64;
 begin
-  OffsetOf:=Editor.LineCellToOffset(P.Y,P.X);
+  OffsetOf:=Editor.LineCellToOffset(P.Y,ColToCell(P.Y,P.X));
 end;
 
 function TCustomCodeEditor.PointOf(Offset: int64): TPoint;
@@ -1414,7 +1449,7 @@ begin
   L:=Doc.Buffer.LineOfOffset(Offset);
   S:=Doc.Buffer.LineText(L);
   Result.Y:=L;
-  Result.X:=LayoutIndexToCell(S,Offset-Doc.Buffer.LineStart(L)+1,Editor.Opt.TabSize);
+  Result.X:=CellToCol(L,LayoutIndexToCell(S,Offset-Doc.Buffer.LineStart(L)+1,Editor.Opt.TabSize));
 end;
 
 procedure TCustomCodeEditor.SyncFromEditor;
@@ -1422,14 +1457,14 @@ var A,B: int64;
     L1,L2: int64;
     C1,C2: integer;
 begin
-  CurPos.X:=Editor.Cell;
+  CurPos.X:=CellToCol(Editor.Line,Editor.Cell);
   CurPos.Y:=Editor.Line;
   if Editor.HasSelection then
     begin
       if (Editor.SelKind=skColumn) and Editor.ColumnRect(L1,L2,C1,C2) then
         begin
-          SelStart.X:=C1; SelStart.Y:=L1;
-          SelEnd.X:=C2-1; SelEnd.Y:=L2;
+          SelStart.X:=CellToCol(L1,C1); SelStart.Y:=L1;
+          SelEnd.X:=CellToCol(L2,C2)-1; SelEnd.Y:=L2;
         end
       else if Editor.SelectionRange(A,B) then
         begin
@@ -1735,19 +1770,42 @@ function TCustomCodeEditor.CharIdxToLinePos(Line,CharIdx: sw_integer): sw_intege
 var S: string;
 begin
   S:=GetLineText(Line);
-  CharIdxToLinePos:=LayoutIndexToCell(S,CharIdx,Editor.Opt.TabSize);
+  if CharIdx<=Length(S)+1 then
+    CharIdxToLinePos:=U8Len(ExtractTabs(Copy(S,1,CharIdx-1),Editor.Opt.TabSize))
+  else
+    CharIdxToLinePos:=U8Len(ExtractTabs(S,Editor.Opt.TabSize))+(CharIdx-Length(S)-1);
 end;
 
+{ the byte index in the line of the column X (columns of the text with tabs expanded) }
 function TCustomCodeEditor.LinePosToCharIdx(Line,X: sw_integer): sw_integer;
 var S: string;
+    I,Col,W,L: sw_integer;
 begin
   S:=GetLineText(Line);
-  LinePosToCharIdx:=LayoutCellToIndex(S,X,Editor.Opt.TabSize);
+  I:=1; Col:=0;
+  while (I<=Length(S)) and (Col<X) do
+    begin
+      if S[I]=TAB then
+        begin
+          W:=Editor.Opt.TabSize-(Col mod Editor.Opt.TabSize);
+          Inc(Col,W);
+          Inc(I);
+        end
+      else
+        begin
+          L:=U8CharBytes(S,I);
+          Inc(I,L);
+          Inc(Col);
+        end;
+    end;
+  if Col<X then
+    I:=Length(S)+1+(X-Col);
+  LinePosToCharIdx:=I;
 end;
 
 function TCustomCodeEditor.CursorCells(Line,Col: sw_integer): sw_integer;
 begin
-  CursorCells:=Col;
+  CursorCells:=ColToCell(Line,Col);
 end;
 
 function TCustomCodeEditor.GetLineText(I: sw_integer): string;
@@ -2311,13 +2369,13 @@ begin
     begin
       if not Editor.HasSelection then
         Editor.SetSelection(skStream,Editor.Offset);
-      Editor.GotoLineCell(Y,X);
+      Editor.GotoLineCell(Y,ColToCell(Y,X));
     end
   else
     begin
       if not Editor.Opt.PersistentBlocks then
         Editor.ClearSelection;
-      Editor.GotoLineCell(Y,X);
+      Editor.GotoLineCell(Y,ColToCell(Y,X));
     end;
   Refresh;
 end;
@@ -2735,11 +2793,20 @@ begin
   Result:=Editor.SelectionText(Col);
 end;
 
-procedure TCustomCodeEditor.InsertBlockText(const S: AnsiString);
+{ The text is inserted and, as the blocks of this editor persist, it is the selected block afterwards. }
+procedure TCustomCodeEditor.PasteSelecting(const S: AnsiString);
+var Start: int64;
 begin
   if IsReadOnly then Exit;
-  Editor.PasteText(S,false);
+  Start:=Editor.Offset;
+  if Editor.PasteText(S,false) and Editor.Opt.PersistentBlocks and (Editor.Offset>Start) then
+    Editor.SetBlockMarks(Start,Editor.Offset);
   Refresh;
+end;
+
+procedure TCustomCodeEditor.InsertBlockText(const S: AnsiString);
+begin
+  PasteSelecting(S);
 end;
 
 function TCustomCodeEditor.GetCurrentWordArea(var StartP,EndP: TPoint): boolean;
@@ -2837,10 +2904,9 @@ begin
   if T='' then Exit;
   DontConsiderShiftState:=true;
   Doc.BeginGroup;
-  Editor.PasteText(T,false);
+  PasteSelecting(T);
   Doc.EndGroup;
   DontConsiderShiftState:=false;
-  Refresh;
 end;
 
 { --- folds --- }
