@@ -1,0 +1,12 @@
+fpcompil.pas 1
+fpdebug.pas 12
+fpide.pas 5
+fpmfile.inc 1
+fpredir.pas 5
+fputils.pas 5
+gdbmicon.pas 3
+gdbmiwrap.pas 5
+weditor.pas 2
+whtml.pas 1
+whtmlscn.pas 1
+wutils.pas 2

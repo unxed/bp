@@ -151,14 +151,21 @@ end;
 
 
 Function FixPath(s:string;allowdot:boolean):string;
+{$ifndef Unix}
 var
   i : longint;
+{$endif}
 begin
+{$ifndef Unix}
   for i:=1 to length(s) do
    if s[i] in ['/','\'] then
     s[i]:=DirSep;
-  if (length(s)>0) and (s[length(s)]<>DirSep) and
-     (s[length(s)]<>':') then
+{$endif}
+  if (length(s)>0) and (s[length(s)]<>DirSep)
+{$ifndef Unix}
+     and (s[length(s)]<>':')   { a bare drive ("c:") is a directory only where there are drives }
+{$endif}
+  then
    s:=s+DirSep;
   if (not allowdot) and (s='.'+DirSep) then
    s:='';
@@ -167,32 +174,23 @@ end;
 
 
 function FixFileName(const s:string):string;
+{$ifdef Unix}
+begin
+  { A Unix name is kept as it is: the file system tells Foo from foo and a backslash is a letter of a name. }
+  FixFileName:=s;
+end;
+{$else}
 var
   i      : longint;
-{$ifdef Unix}
-  NoPath : boolean;
-{$endif}
 begin
-  {$ifdef Unix}NoPath:=true;{$endif}
   for i:=length(s) downto 1 do
    begin
      case s[i] of
- {$ifdef Unix}
-  '/','\' : begin
-              FixFileName[i]:='/';
-              NoPath:=false; {Skip lowercasing path: 'X11'<>'x11' }
-            end;
- 'A'..'Z' : if NoPath then
-             FixFileName[i]:=char(byte(s[i])+ord('a')-ord('A'))
-            else
-             FixFileName[i]:=s[i];
- {$else}
  {$ifndef hasamiga}
       '/' : FixFileName[i]:='\';
  'A'..'Z' : FixFileName[i]:=char(byte(s[i])+32);
  {$else}
       '\' : FixFileName[i]:='/';
- {$endif}
  {$endif}
      else
       FixFileName[i]:=s[i];
@@ -200,6 +198,7 @@ begin
    end;
   FixFileName[0]:=s[0];
 end;
+{$endif}
 
 
 function MakeExeName(const fn:string):string;

@@ -125,6 +125,12 @@ var
 *****************************************************************************}
 
 function FixPath(const s:string):string;
+{$ifdef Unix}
+begin
+  { Unix: the separator is '/' already and a backslash is a letter of a name (escapes are the shell's) }
+  FixPath:=s;
+end;
+{$else}
 var
   i : longint;
 begin
@@ -136,6 +142,7 @@ begin
     fixpath[i]:=s[i];
   fixpath[0]:=s[0];
 end;
+{$endif}
 
 
     function maybequoted(const s:string):string;

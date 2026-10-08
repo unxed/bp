@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile golang debuggo unicode templates clipboard syscb debug browser longlines misc mouse ux exit
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile golang debuggo unicode templates clipboard syscb debug browser longlines misc mouse ux paths exit
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -1098,6 +1098,68 @@ def section_ux(t):
     t._tmux('send-keys', '-t', t.session, '-H', *['%02x' % b for b in b'\x1b[9;6u'])
     t.pump(0.4)
     check(editor_lines(t)[:1] == ['bbb'], 'Ctrl+Shift+Tab goes back: %r' % editor_lines(t)[:1], t)
+    # F1 in a modal dialog opens the help above it (rule D.3); Esc closes the help and the dialog is still there
+    check(menu(t, 'M-s', 'Find'), 'Search > Find... for F1')
+    check(t.wait_for('Case sensitive'), 'the Find dialog is open for F1', t)
+    t.key('F1')
+    check(t.wait_for('Esc Close help', 4), 'F1 in a modal dialog opens the help window above it', t)
+    t.key('Escape')
+    check(t.wait_gone('Esc Close help', 3) and 'Case sensitive' in t.text(), 'Esc closes the help and the dialog is still there', t)
+    t.key('Escape')
+    check(t.wait_gone('Case sensitive', 2), 'and Esc closes the dialog', t)
+    # R.1: the actions are declared once; no key is on two actions
+    out = subprocess.run([t.binary, '--list-actions'], capture_output=True, text=True, timeout=20).stdout
+    rows = [l.split('\t') for l in out.split('conflicts:')[0].split('\n') if l]
+    byname = dict((r[0], r) for r in rows if len(r) == 3)
+    check(len(rows) > 80, 'the action table has the menu items of the IDE (%d)' % len(rows))
+    check(byname.get('file.open', ['', '', ''])[1] == 'F3' and byname.get('compile.make', ['', '', ''])[1] == 'F9', 'file.open is F3, compile.make is F9')
+    check(out.split('conflicts:')[1].strip() == '', 'no key is on two actions: %r' % out.split('conflicts:')[1][:80])
+
+
+def section_paths(t):
+    """no DOS / Windows paths on Unix: the screens carry no drive letter, UNC name or backslash, the source has no new
+    hand-spelled separator (tools/check-paths.py), names keep their case"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    r = subprocess.run([sys.executable, os.path.join(here, '..', '..', 'tools', 'check-paths.py')], capture_output=True, text=True)
+    check(r.returncode == 0, 'tools/check-paths.py: %s' % r.stdout.strip().split('\n')[-1])
+    bad = re.compile(r'(?<![A-Za-z0-9])[A-Za-z]:\\|\\\\|\\')
+
+    def scan(label):
+        txt = t.text()
+        hits = [l.strip() for l in txt.split('\n') if bad.search(l)]
+        check(not hits, 'no drive letter, UNC name or backslash on the screen %s: %r' % (label, hits[:2]), t)
+
+    with open(os.path.join(t.work, 'bad.pas'), 'w') as f:
+        f.write("program bad;\nbegin\n  a := b;\nend.\n")
+    open(os.path.join(t.work, 'Foo.pas'), 'w').write("program foo1;\nbegin end.\n")
+    open(os.path.join(t.work, 'foo.pas'), 'w').write("program foo2;\nbegin end.\n")
+    menu(t, 'M-o', 'Directories'); t.wait_for('Unit directories'); scan('Options > Directories'); close_dialogs(t, 2)
+    t.key('F3'); t.wait_for('Open a file'); scan('Open a file')
+    check(t.work + '/' in t.text() or t.work in t.text(), 'the Open dialog shows the directory with slashes', t)
+    close_dialogs(t, 2)
+    menu(t, 'M-f', 'Change dir'); t.wait_for('Change Directory'); scan('Change Directory'); close_dialogs(t, 2)
+    menu(t, 'M-o', 'Tools'); t.wait_for('Program titles'); scan('Options > Tools'); close_dialogs(t, 2)
+    menu(t, 'M-r', 'Parameters'); t.pump(0.6); scan('Run > Parameters'); close_dialogs(t, 2)
+    # the case of a name is kept: Foo.pas and foo.pas are two files and two windows
+    for n in ('Foo.pas', 'foo.pas'):
+        t.key('F3'); t.wait_for('Open a file'); t.type(n); t.key('Enter'); t.pump(0.6)
+    menu(t, 'M-w', 'List'); t.wait_for('Windows'); txt = t.text()
+    check('Foo.pas' in txt and 'foo.pas' in txt, 'Foo.pas and foo.pas are two windows in the Window list', t)
+    scan('Window list'); close_dialogs(t, 2)
+    # the compiler messages
+    t.key('F3'); t.wait_for('Open a file'); t.type('bad.pas'); t.key('Enter'); t.pump(0.5)
+    t.key('M-F9')
+    check(t.wait_for('Compile failed', 30), 'a failed compile for the messages', t)
+    t.key('Enter'); t.wait_for('Compiler Messages', 5); scan('Compiler Messages')
+    menu(t, 'M-t', 'Messages'); t.pump(0.6); scan('Tools > Messages')
+    # a mixed-case program name is built and the executable keeps the case
+    open(os.path.join(t.work, 'MixedCase.pas'), 'w').write("program MixedCase;\nbegin writeln('hi') end.\n")
+    t.key('F3'); t.wait_for('Open a file'); t.type('MixedCase.pas'); t.key('Enter'); t.pump(0.5)
+    t.key('F9')
+    check(t.wait_for('Compile successful', 30), 'MixedCase.pas is built', t)
+    t.key('Enter')
+    check(os.path.exists(os.path.join(t.work, 'MixedCase')) and not os.path.exists(os.path.join(t.work, 'mixedcase')),
+          'the executable is MixedCase, not mixedcase: %r' % [n for n in os.listdir(t.work) if n.lower().startswith('mixedcase')])
 
 
 # Delve is installed in ~/go/bin by go install; the IDE runs with another HOME, so the directory goes on the PATH it inherits
@@ -1107,7 +1169,7 @@ if os.path.exists(os.path.join(_gobin, 'dlv')):
 
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile), ('golang', section_golang),
-            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('syscb', section_syscb), ('debug', section_debug), ('debuggo', section_debuggo), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse), ('ux', section_ux)]
+            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('syscb', section_syscb), ('debug', section_debug), ('debuggo', section_debuggo), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse), ('ux', section_ux), ('paths', section_paths)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])

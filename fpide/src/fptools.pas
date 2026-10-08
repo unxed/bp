@@ -1153,7 +1153,9 @@ begin
               begin
                 Consume(')');
                 FSplit(S,D,N,E);
-                L:=Pos(':',D);if L>0 then Delete(D,1,L);
+{$ifndef Unix}
+                L:=Pos(':',D);if L>0 then Delete(D,1,L);   { the drive part; Unix has no drives }
+{$endif}
                 I:=I+ReplacePart(LastWordStart,I-1,D)-1;
               end;
           end else
@@ -1165,8 +1167,12 @@ begin
               begin
                 Consume(')');
                 FSplit(S,D,N,E);
+{$ifdef Unix}
+                D:='';   { no drives }
+{$else}
                 L:=Pos(':',D);
                 D:=copy(D,1,L);
+{$endif}
                 I:=I+ReplacePart(LastWordStart,I-1,D)-1;
               end;
           end else
@@ -1242,8 +1248,12 @@ begin
               begin
                 Consume(')');
                 FSplit(S,D,N,E);
+{$ifdef Unix}
+                D:='';   { no drives }
+{$else}
                 L:=Pos(':',D); if L=0 then L:=-1;
                 D:=copy(D,1,L+1);
+{$endif}
                 I:=I+ReplacePart(LastWordStart,I-1,D)-1;
               end;
           end else

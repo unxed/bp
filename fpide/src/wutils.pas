@@ -48,6 +48,8 @@ const
   { Get DirSep and EOL from System unit, instead of redefining 
     here with tons of $ifdefs (KB) }
   DirSep : char = System.DirectorySeparator;
+  { the mask that matches every file: "*.*" only matches names with a dot on Unix }
+  AllFilesMask = {$ifdef Unix}'*'{$else}'*.*'{$endif};
   EOL : String[2] = System.LineEnding;
 
 
@@ -1311,6 +1313,10 @@ begin
   if Dir='' then Dir:=GetEnv('TMP');
 {$ifdef HASAMIGA}
   if Dir='' then Dir:='T:';
+{$endif}
+{$ifdef Unix}
+  if Dir='' then Dir:=GetEnv('TMPDIR');
+  if Dir='' then Dir:='/tmp';
 {$endif}
   if (Dir<>'') then if not ExistsDir(Dir) then Dir:='';
   if Dir='' then Dir:=GetCurDir;

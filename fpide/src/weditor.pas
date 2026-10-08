@@ -3867,6 +3867,7 @@ begin
         Name:=PString(Info)^;
         GetDir(0,StoreDir);
         DriveNumber:=0;
+{$ifndef Unix}   { drive letters exist on DOS / Windows only; "a:b" is a directory name on Unix }
         if (Length(FileDir)>1) and (FileDir[2]=':') then
           begin
             { does not assume that lowercase are greater then uppercase ! }
@@ -3880,6 +3881,7 @@ begin
             EatIO;
             {$I+}
           end;
+{$endif}
         if FileDir<>'' then
           begin
             {$I-}
@@ -3896,12 +3898,12 @@ begin
           edWriteBlock :
             begin
               Title:=dialog_writeblocktofile;
-              DefExt:='*.*';
+              DefExt:=AllFilesMask;
             end;
           edReadBlock  :
             begin
               Title:=dialog_readblockfromfile;
-              DefExt:='*.*';
+              DefExt:=AllFilesMask;
             end;
         else begin Title:='???'; DefExt:=''; end;
         end;
