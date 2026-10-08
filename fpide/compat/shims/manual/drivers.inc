@@ -31,7 +31,7 @@ procedure SetCellBios(var Cell: TScreenCell; Attr: Byte);
 { ~18.2 Hz tick counter (DOS BIOS style), for idle/timing loops in the IDE. }
 function GetDosTicks: LongInt;
 
-{ FV printf-style formatter: Params is an array of PtrInt (c/d/s/x). }
+{ Result := Format with its % items filled from Params, an array of PtrInt slots (TvFormat.FormatSlots). }
 procedure FormatStr(var Result: String; const Format: String; var Params);
 
 { FV non-blocking keyboard poll: evNothing when no key is pending (the IDE polls for Esc while compiling). }
