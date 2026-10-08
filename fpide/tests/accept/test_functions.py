@@ -367,6 +367,38 @@ def section_compile(t):
     check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE comes back after the key', t)
 
 
+def section_golang(t):
+    """Go through the go tool: a bad file shows the position of the error, a good one is built and run"""
+    import shutil
+    if shutil.which('go') is None:
+        print('SKIP go is not installed')
+        return
+    with open(os.path.join(t.work, 'bad.go'), 'w') as f:
+        f.write('package main\n\nfunc main() {\n\tx := undefinedName\n}\n')
+    t.key('F3'); t.wait_for('Open a file'); t.type('bad.go'); t.key('Enter')
+    check(t.wait_for('bad.go'), 'bad.go is opened', t)
+    t.key('M-F9')
+    check(t.wait_for('Compile failed', 60), 'Alt+F9 (go vet) reports a failed compile', t)
+    t.key('Enter')
+    check(t.wait_for('Compiler Messages', 5), 'the Compiler Messages window shows up', t)
+    check('undefined: undefinedName' in t.text(), 'the error of go is listed with its text', t)
+    t.key('Enter')
+    t.pump(0.8)
+    check(t.wait_until(lambda: t.cursor()[0] == 5), 'Enter on the message puts the cursor on line 4 (cursor row %r)' % (t.cursor(),), t)
+    with open(os.path.join(t.work, 'hello.go'), 'w') as f:
+        f.write('package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hi from go")\n}\n')
+    t.key('F3'); t.wait_for('Open a file'); t.type('hello.go'); t.key('Enter')
+    check(t.wait_for('hello.go'), 'hello.go is opened', t)
+    t.key('F9')
+    check(t.wait_for('Compile successful', 90), 'F9 builds a good Go program: Compile successful', t)
+    check(os.path.exists(os.path.join(t.work, 'hello')), 'the executable exists', t)
+    t.key('Enter')
+    t.key('C-F9')
+    check(t.wait_for('hi from go', 15), 'Ctrl+F9 runs it', t)
+    t.key('Enter')
+    check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE comes back after the key', t)
+
+
 def section_unicode(t):
     new_file(t)
     t.type('Привет, мир! ünï 日本語 ─│┌')
@@ -929,7 +961,7 @@ def section_mouse(t):
 
 
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
-            ('options', section_options), ('files', section_files), ('compile', section_compile),
+            ('options', section_options), ('files', section_files), ('compile', section_compile), ('golang', section_golang),
             ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('syscb', section_syscb), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse)]
 
 if __name__ == '__main__':

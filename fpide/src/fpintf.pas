@@ -341,6 +341,14 @@ begin
           if M.Severity=lsError then
             Inc(status.errorCount);
           CompilerMessageWindow.AddMessage(Lv or V_LineInfo,M.Text,Module,M.Line,M.Col);
+          if M.Severity=lsError then
+            begin
+              { AddMessage shows the window for plain errors only: a message with a place is shown here }
+              if not CompilerMessageWindow.GetState(sfVisible) then
+                CompilerMessageWindow.Show;
+              if Desktop.First<>PView(CompilerMessageWindow) then
+                CompilerMessageWindow.MakeFirst;
+            end;
         end
       else
         CompilerMessageWindow.AddMessage(Lv,M.Text,'',0,0);
