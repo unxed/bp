@@ -2196,9 +2196,10 @@ end;
 
 procedure TCustomCodeEditor.ClearCodeCompleteWord;
 begin
-  FCompleteState:=csInactive;
-  FCompleteWord:='';
-  FCompleteFrag:='';
+  { through the virtual setters: the tip of the source editor is freed by SetCodeCompleteWord('') }
+  SetCompleteState(csInactive);
+  SetCodeCompleteWord('');
+  SetCodeCompleteFrag('');
 end;
 
 procedure TCustomCodeEditor.CodeCompleteCheck;

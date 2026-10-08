@@ -148,6 +148,7 @@ type
     TSourceEditor = class(TFileEditor)
       CompileStamp : longint;
       CodeCompleteTip: PFPToolTip;
+      destructor Destroy; override;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator;const AFileName: string);
 {$ifndef NODEBUG}
@@ -1483,6 +1484,15 @@ begin
         TrackCursor(do_centre);
       end;
     end;
+end;
+
+destructor TSourceEditor.Destroy;
+begin
+  { the tip lives in the application: it must not outlive the editor }
+  if Assigned(CodeCompleteTip) then
+    CodeCompleteTip.Free;
+  CodeCompleteTip:=nil;
+  inherited Destroy;
 end;
 
 procedure TSourceEditor.SetCodeCompleteWord(const S: string);
