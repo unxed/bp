@@ -720,11 +720,11 @@ def section_clipboard(t):
     t.key('Escape', 'Escape')
 
     # the terminal's own clipboard (OSC 52) gets what Copy copies
-    subprocess.call(['tmux', 'set-option', '-g', 'set-clipboard', 'on'])
+    t._tmux('set-option', '-g', 'set-clipboard', 'on')
     t.key('Home', 'S-End')
     menu(t, 'M-e', 'Copy', exact=True)
     t.pump(0.5)
-    buf = subprocess.run(['tmux', 'show-buffer'], capture_output=True, text=True).stdout
+    buf = t._tmux('show-buffer')
     check(buf == 'Привет мирвет мир', 'Edit > Copy sets the system clipboard (OSC 52): %r' % buf, t)
 
 
@@ -1072,7 +1072,7 @@ def test_exit(fp):
 def section_mouse(t):
     """the mouse (SGR reports, as a terminal sends them): the menu bar, the cursor, a selection by dragging, the wheel,
     the status line, the close box, activating a window"""
-    subprocess.call(['tmux', 'set-option', '-g', 'set-clipboard', 'on'])
+    t._tmux('set-option', '-g', 'set-clipboard', 'on')
     # menu bar: click File, click New
     t.click(3, 0)
     check(t.wait_for('New from template', 3), 'a click on File opens the menu', t)
@@ -1090,7 +1090,7 @@ def section_mouse(t):
     t.drag(1 + 7, 2, 1 + 17, 2)
     menu(t, 'M-e', 'Copy', exact=True)
     t.pump(0.5)
-    buf = subprocess.run(['tmux', 'show-buffer'], capture_output=True, text=True).stdout
+    buf = t._tmux('show-buffer')
     check(buf == 'some words', 'a drag selects text: %r' % buf, t)
     # the wheel scrolls the view
     first = editor_lines(t)[0]

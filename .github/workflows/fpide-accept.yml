@@ -14,9 +14,12 @@ on:
       - fpide/tools/fpide-*.sh
       - fpide/tools/fpide-*.py
       - fpide/tools/build-fpide.sh
+      - tools/ci-par.sh
       - .github/workflows/fpide-accept.yml
 
-# The click-through takes minutes because it waits for the program; the groups run side by side (the wall time is the slowest group).
+# The click-through takes minutes because it waits for the program, not for the CPU: the groups are jobs that run side by side,
+# and the commands of a group run side by side too (tools/ci-par.sh, each with a HOME of its own; every section of
+# test_functions.py is a command of its own, the sweep runs 8 copies of the IDE): the wall time is the slowest command.
 jobs:
   accept:
     runs-on: ubuntu-24.04
@@ -24,26 +27,47 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: main functions and the sweep of the menus
+          - name: main functions, configuration, exit
             cmds: |
               python3 fpide/tests/accept/test_accept.py fpide/out/linux64/fp
-              python3 fpide/tests/accept/test_menu_sweep.py fpide/out/linux64/fp
               python3 fpide/tests/accept/test_config.py fpide/out/linux64/fp
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp exit
+          - name: sweep of the menus, part 1 of 2
+            cmds: |
+              python3 fpide/tests/accept/test_menu_sweep.py fpide/out/linux64/fp -j 8 --part 1/2
+          - name: sweep of the menus, part 2 of 2
+            cmds: |
+              python3 fpide/tests/accept/test_menu_sweep.py fpide/out/linux64/fp -j 8 --part 2/2
           - name: editor, search, windows, tools
             cmds: |
-              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp edit search window tools
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp edit
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp search
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp window
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp tools
           - name: options, files, compile
             cmds: |
-              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp options files compile
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp options
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp files
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp compile
           - name: Go (build, vet, test, Delve)
             cmds: |
-              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp golang debuggo
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp golang
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp debuggo
           - name: UTF-8, templates, clipboard, debugger, browser
             cmds: |
-              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp unicode templates clipboard syscb debug browser
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp unicode
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp templates
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp clipboard
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp syscb
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp debug
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp browser
           - name: long lines, misc, mouse, UX guidelines, paths
             cmds: |
-              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp longlines misc mouse ux paths
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp longlines
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp misc
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp mouse
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp ux
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp paths
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,11 +84,4 @@ jobs:
           CMDS: ${{ matrix.cmds }}
         run: |
           export PATH="$PATH:$HOME/go/bin"
-          rc=0
-          while IFS= read -r c; do
-            [ -z "$c" ] && continue
-            echo "::group::$c"
-            bash -c "$c" || { echo "::error::failed: $c"; rc=1; }
-            echo "::endgroup::"
-          done <<< "$CMDS"
-          exit $rc
+          tools/ci-par.sh

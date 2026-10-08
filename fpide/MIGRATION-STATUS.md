@@ -19,7 +19,7 @@ Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external 
 - **Debuggee terminal:** the program run by gdb gets a pty of its own (`gdbpty.pas`) that the IDE relays (output to the screen, keys to the program) — gdb's "Failed to set controlling terminal" is gone.
 - **User screen** (Ctrl+F9 and the debuggee): `UnixSuspend/UnixResume` of tv3 give the real terminal and take it back.
 - **Tests:** `test_accept.py` (35), `test_functions.py` (147: edit, search, window, tools, options, files, compile, unicode, debug),
-  `test_menu_sweep.py` (every menu item); `tools/fpide-accept.sh` runs all three; CI `.github/workflows/fpide-accept.yml`.
+  `test_menu_sweep.py` (every menu item); `tools/fpide-accept.sh` runs them side by side; CI `.github/workflows/fpide-accept.yml`.
 
 ## Open
 

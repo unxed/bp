@@ -2,6 +2,7 @@
 looked at with `tmux capture-pane`. Keys go in with `send-keys` (names or raw bytes), so no
 terminal emulator has to be written. Needs: tmux, python3.  Used by test_accept.py."""
 import collections
+import itertools
 import os
 import re
 import unicodedata
@@ -12,13 +13,14 @@ import time
 
 
 class TmuxTerm:
-    count = 0
+    ids = itertools.count(1)
 
     def __init__(self, binary, cols=100, rows=30, args=(), env=None):
         binary = os.path.abspath(binary)
         self.binary = binary
-        TmuxTerm.count += 1
-        self.session = 'fpideacc%d_%d' % (os.getpid(), TmuxTerm.count)
+        # a tmux server of its own (-L) and a session name of its own: the tests (and the threads of a test) run side by side
+        self.session = 'fpideacc%d_%d' % (os.getpid(), next(TmuxTerm.ids))
+        self.socket = self.session
         self.work = tempfile.mkdtemp(prefix='fpide-acc-')
         self.err = os.path.join(self.work, 'stderr.log')
         # the XDG directories are set so that a value of the tmux server does not lead the IDE out of the temp dir
@@ -29,10 +31,12 @@ class TmuxTerm:
         envs = ' '.join('%s=%s' % kv for kv in e.items())
         cmd = 'cd %s && %s %s %s 2>%s; echo EXIT=$? >> %s; sleep 600' % (
             self.work, envs, binary, ' '.join(args), self.err, self.err)
-        subprocess.check_call(['tmux', 'new-session', '-d', '-s', self.session, '-x', str(cols), '-y', str(rows), cmd])
+        subprocess.check_call(['tmux', '-L', self.socket, '-f', '/dev/null', 'new-session', '-d', '-s', self.session, '-x', str(cols), '-y', str(rows), cmd])
+        self.socket_path = self._tmux('display-message', '-p', '#{socket_path}').strip()
 
     def _tmux(self, *a):
-        return subprocess.run(['tmux'] + list(a), capture_output=True, text=True).stdout
+        """a tmux command on the server of this terminal; its output"""
+        return subprocess.run(['tmux', '-L', self.socket] + list(a), capture_output=True, text=True).stdout
 
     def text(self):
         """the screen as text; the desktop shade is blanked so the tests need not know it"""
@@ -71,7 +75,7 @@ class TmuxTerm:
 
     def paste(self, s):
         """text pasted by the terminal (bracketed paste, as Ctrl+Shift+V does): through a tmux buffer"""
-        subprocess.run(['tmux', 'set-buffer', '-b', 'fpideacc', s[:-1] + '\\;' if s.endswith(';') else s], check=True)   # a trailing ';' is tmux syntax
+        subprocess.run(['tmux', '-L', self.socket, 'set-buffer', '-b', 'fpideacc', s[:-1] + '\\;' if s.endswith(';') else s], check=True)   # a trailing ';' is tmux syntax
         self._tmux('paste-buffer', '-p', '-d', '-b', 'fpideacc', '-t', self.session)
         time.sleep(0.4)
 
@@ -227,5 +231,10 @@ class TmuxTerm:
             return ''
 
     def close(self):
-        self._tmux('kill-session', '-t', self.session)
+        self._tmux('kill-server')
+        if self.socket_path:
+            try:
+                os.unlink(self.socket_path)        # tmux leaves the socket file
+            except OSError:
+                pass
         shutil.rmtree(self.work, ignore_errors=True)

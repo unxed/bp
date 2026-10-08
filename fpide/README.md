@@ -18,7 +18,7 @@ Plan and milestones: [`PLAN.md`](PLAN.md). Current status: [`MIGRATION-STATUS.md
 
 ## Local preflight (before a push)
 
-Before a push: `fpide/tools/fpide-setup-build.sh test` (build ~15 s, tests ~5 min: `test_accept.py`, `test_functions.py` (clicks through the main functions, the debugger included), `test_menu_sweep.py`).
+Before a push: `fpide/tools/fpide-setup-build.sh test` (build ~15 s, tests ~2 min side by side, each section of `test_functions.py` and 8 copies of the IDE for the sweep: `test_accept.py`, `test_config.py`, `test_functions.py` (clicks through the main functions, the debugger included), `test_menu_sweep.py` (`-j N`, `--part K/N`)).
 The build log must have no `An inherited method is hidden by ...` warnings (a lost `override`).
 
 ## Build
