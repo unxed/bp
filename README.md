@@ -1,34 +1,34 @@
 # Better Pascal (bp)
 
-Free Pascal, каким его хотелось бы получить по умолчанию: безопасная память, UTF-8 везде, горутины.
-Без форка FPC и без опций компилятора: один юнит `BP`.
+Free Pascal as one would want it by default: safe memory, UTF-8 everywhere, goroutines.
+No FPC fork and no compiler options: a single unit `BP`.
 
 ```pascal
 program Hello;
-uses BP, SysUtils;   // BP — ПЕРВЫМ в основной программе (он ставит менеджер потоков до SysUtils)
+uses BP, SysUtils;   // BP goes FIRST in the main program (it installs the thread manager before SysUtils)
 begin
-  WriteLn('Привет, мир 😀', CPLength('aё😀'));
+  WriteLn('Hello, world 😀', CPLength('aё😀'));
 end.
 ```
 
-В остальных юнитах `BP` пишется **последним** в `uses`: так он затеняет опасные примитивы (`GetMem(...)` не скомпилируется,
-`System.GetMem` — явный unsafe). Компилятору нужен путь к каталогу с `bp.pas`: `fpc -Fu<путь> -Fu<путь>/safe -Fu<путь>/ext`.
+In all other units `BP` is listed **last** in `uses`: this way it shadows the dangerous primitives (`GetMem(...)` will not compile,
+`System.GetMem` is explicitly unsafe). The compiler needs the path to the directory containing `bp.pas`: `fpc -Fu<path> -Fu<path>/safe -Fu<path>/ext`.
 
-## Три части репозитория
+## Three parts of the repository
 
-| Каталог | Часть | Зависит от |
+| Directory | Part | Depends on |
 |---|---|---|
-| [`safe/`](safe/README.md) | **Safe Pascal**: memory safety (владение, срезы, арена, defer, FFI, отравление опасного) | ничего |
-| [`ext/`](ext/README.md) | **Надстройки над FPC**: UTF-8 по умолчанию, горутины и каналы, менеджер потоков | `safe/` (ядро) |
-| [`fpide/`](fpide/README.md) | **fpide**: Free Pascal IDE на [tv3](https://github.com/unxed/tv3) | только `tv/` и внешний `fpc` |
+| [`safe/`](safe/README.md) | **Safe Pascal**: memory safety (ownership, slices, arena, defer, FFI, poisoning of the unsafe) | nothing |
+| [`ext/`](ext/README.md) | **FPC extensions**: UTF-8 by default, goroutines and channels, thread manager | `safe/` (core) |
+| [`fpide/`](fpide/README.md) | **fpide**: Free Pascal IDE on [tv3](https://github.com/unxed/tv3) | only `tv/` and an external `fpc` |
 
-| Файл | Что это |
+| File | What it is |
 |---|---|
-| `bp.pas` | `unit BP`: собирает `safe/*.inc` и `ext/*.inc` в один юнит (safe + UTF-8 + горутины) |
-| `safe/safe.pas` | `unit Safe`: только слой safe, если остальное не нужно |
-| `tests/` | `tests/safe/` и `tests/ext/`; `tests/run.sh [safe\|ext\|all]` |
-| `.github/workflows/` | `ci` (safe + ext, кросс-сборки), `fpide`, `fpide-accept` |
+| `bp.pas` | `unit BP`: combines `safe/*.inc` and `ext/*.inc` into one unit (safe + UTF-8 + goroutines) |
+| `safe/safe.pas` | `unit Safe`: the safe layer only, if you need nothing else |
+| `tests/` | `tests/safe/` and `tests/ext/`; `tests/run.sh [safe\|ext\|all]` |
+| `.github/workflows/` | `ci` (safe + ext, cross builds), `fpide`, `fpide-accept` |
 
-Лицензия: MIT (`LICENSE`). Код `fpide/` — производный от FPC IDE (GPL, см. `fpide/README.md`), в `safe/` и `ext/` его нет.
+License: MIT (`LICENSE`). The `fpide/` code is derived from the FPC IDE (GPL, see `fpide/README.md`); it is not present in `safe/` or `ext/`.
 
-Репозиторий пока называется `sp`; переименование в `bp` — за владельцем.
+The repository is still called `sp`; renaming it to `bp` is up to the owner.

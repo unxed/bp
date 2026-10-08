@@ -1,7 +1,7 @@
 { SPDX-License-Identifier: MIT }
-{ Safe Pascal, хелпер Free (реализация). }
+{ Safe Pascal, Free helper (implementation). }
 
-{ ---------- хелпер Free ---------- }
+{ ---------- Free helper ---------- }
 
 procedure TSafeObjectHelper.Free(const Forbidden: SAFE_S3_NoFree_UseTOwnedReset_or_UnsafeDestroy);
 begin

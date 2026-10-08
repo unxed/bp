@@ -1,26 +1,26 @@
 { SPDX-License-Identifier: MIT }
-{ Safe Pascal, ядро (интерфейс): владение, срезы, арена, defer, FFI. Включается в unit Safe и unit BP. }
+{ Safe Pascal, core (interface): ownership, slices, arena, defer, FFI. Included in unit Safe and unit BP. }
 
 type
   ESafety = class(Exception);
 
-  { ---------- Внутреннее устройство. Прикладной код это не использует. ---------- }
+  { ---------- Internals. Application code does not use this. ---------- }
 
-  { Ячейка для слабых ссылок. Живёт, пока жив объект или хоть один TWeak. }
+  { Cell for weak references. Lives while the object or at least one TWeak is alive. }
   TSafeCell = class(TInterfacedObject)
   public
-    Life: TObject; // TSafeLife, пока объект жив; nil после смерти
+    Life: TObject; // TSafeLife while the object is alive; nil after it dies
   end;
 
-  { Время жизни объекта. Счётчик ведёт компилятор: на TSafeLife ссылаются
-    поля-интерфейсы в записях TOwned/TShared. Последняя ссылка ушла — объект уничтожен. }
+  { Object lifetime. The compiler maintains the count: the interface fields in the TOwned/TShared records
+    reference TSafeLife. When the last reference is gone, the object is destroyed. }
   TSafeLife = class(TInterfacedObject)
   public
     Obj: TObject;
     CellObj: TSafeCell;
     CellRef: IInterface;
     destructor Destroy; override;
-    function Cell: TSafeCell; // создаётся при первом TShared.Weak
+    function Cell: TSafeCell; // created on the first TShared.Weak
   end;
 
   TSafeArenaImpl = class(TInterfacedObject)
@@ -31,16 +31,16 @@ type
     destructor Destroy; override;
   end;
 
-{ Для обобщений: их тела компилируются в модуле пользователя и могут
-  ссылаться только на символы интерфейса. }
+{ For generics: their bodies are compiled in the user's module and can
+  reference interface symbols only. }
 function SafeNewLife(AObj: TObject; const Who: string): TSafeLife;
 procedure SafeFail(const Msg: string);
 
-{ Счётчик живых объектов под владением (аналог testing.allocator из Zig): растёт при Own/Share/Adopt,
-  убывает при уничтожении. Тест, который «всё освободил», проверяет SafeCheckNoLeaks (R5). }
+{ Counter of live owned objects (like testing.allocator in Zig): grows on Own/Share/Adopt,
+  decreases on destruction. A test that "freed everything" checks SafeCheckNoLeaks (R5). }
 function SafeLiveCount: LongInt;
 procedure SafeCheckNoLeaks;
-{ Исключения, подавленные в отложенных вызовах TDefer (см. ниже). }
+{ Exceptions suppressed in deferred TDefer calls (see below). }
 function SafeDeferFailures: LongInt;
 
 type
@@ -64,8 +64,8 @@ type
     FCellObj: TSafeCell;
     FCell: IInterface;
   public
-    procedure SetCell(ACell: TSafeCell); // внутреннее
-    function CellObj: TSafeCell;         // внутреннее
+    procedure SetCell(ACell: TSafeCell); // internal
+    function CellObj: TSafeCell;         // internal
     function IsAlive: Boolean;
     procedure Reset;
   end;
@@ -111,12 +111,12 @@ type
     function Count: SizeInt;
   end;
 
-  { ---------- defer (идея из Zig) ----------
-    Запись-сторож: вызывает процедуру при выходе переменной из области видимости, в том числе при исключении.
-    D := TDefer.Call(@Self.CloseHandle);  // ... дальше любой код ...   // CloseHandle вызовется сама
-    Cancel — «errdefer наоборот»: успех, вызывать не нужно.
-    Исключение внутри отложенной процедуры нельзя бросить из деструктора во время раскрутки стека: оно
-    подавляется и учитывается (SafeDeferFailures; SafeCheckNoLeaks тоже падает), а не теряется молча. }
+  { ---------- defer (an idea from Zig) ----------
+    A guard record: calls a procedure when the variable leaves scope, including on an exception.
+    D := TDefer.Call(@Self.CloseHandle);  // ... any code follows ...   // CloseHandle will be called by itself
+    Cancel is "errdefer in reverse": success, no call needed.
+    An exception inside the deferred procedure cannot be thrown from a destructor during stack unwinding: it is
+    suppressed and counted (SafeDeferFailures; SafeCheckNoLeaks fails too) rather than silently lost. }
   TSafeDeferProc = procedure of object;
 
   TSafeDeferImpl = class(TInterfacedObject)
@@ -136,9 +136,9 @@ type
   end;
 
   { ---------- FFI (SPEC §13) ----------
-    Указатель, выделенный C-кодом, под владением: освобождается его же функцией.
+    A pointer allocated by C code, under ownership: released by its own function.
       Buf := TCBox.Own(TCResource.Create(c_malloc(N), @c_free));
-    Ptr нужен только unsafe-обвязке; в безопасный код наружу не отдаётся. }
+    Ptr is needed only by the unsafe wrapper; it is not exposed to safe code. }
   TCFreeProc = procedure(P: System.Pointer); cdecl;
 
   TCResource = class
@@ -151,5 +151,5 @@ type
     function Ptr: System.Pointer;
   end;
 
-{ Задачи, упавшие без Wait: счётчик ядра, его увеличивает ext/go (R5). }
+{ Tasks that failed without Wait: a core counter, incremented by ext/go (R5). }
 function SafeGoFailures: LongInt;

@@ -1,53 +1,53 @@
-# safe/ — Safe Pascal: безопасность памяти
+# safe/ — Safe Pascal: memory safety
 
-Слой 1 из трёх в Better Pascal. Только то, что делает код memory-safe, и ничего больше:
-`TOwned/TShared/TWeak/TSlice/TArena`, `TDefer`, FFI (`TCResource`), счётчик утечек и «отравление»
-опасных примитивов (`GetMem`, `New`, `Move`, `FillChar`, `FreeAndNil`, `Obj.Free`...) затенением имён.
+Layer 1 of 3 in Better Pascal. Only what makes code memory-safe, and nothing more:
+`TOwned/TShared/TWeak/TSlice/TArena`, `TDefer`, FFI (`TCResource`), a leak counter and "poisoning"
+of dangerous primitives (`GetMem`, `New`, `Move`, `FillChar`, `FreeAndNil`, `Obj.Free`...) by name shadowing.
 
-| Файл | Что это |
+| File | What it is |
 |---|---|
-| `safe.pas` | `unit Safe`: подключает только этот слой; `uses ..., Safe;` последним в модуле |
-| `core.intf.inc`, `core.impl.inc` | владение, срезы, арена, defer, FFI; те же файлы включает `unit BP` |
-| `poison.intf.inc`, `poison.impl.inc` | отравленные примитивы и хелпер `Free`; включаются последними |
-| `SPEC.md` | спецификация; §0 — карточка правил, §13 FFI, §14 горутины, §15–16 план |
-| `DN-ADOPTION.md` | план перевода DOS Navigator (`unxed/dn`) на Safe Pascal: этапы S0–S10 |
+| `safe.pas` | `unit Safe`: pulls in this layer only; `uses ..., Safe;` goes last in the module |
+| `core.intf.inc`, `core.impl.inc` | ownership, slices, arena, defer, FFI; the same files are included by `unit BP` |
+| `poison.intf.inc`, `poison.impl.inc` | poisoned primitives and the `Free` helper; included last |
+| `SPEC.md` | specification; §0 is the rules card, §13 FFI, §14 goroutines, §15–16 plan |
+| `DN-ADOPTION.md` | plan for migrating DOS Navigator (`unxed/dn`) to Safe Pascal: stages S0–S10 |
 
-Слой не зависит от `ext/` и от `fpide/`. Если нужны ещё и UTF-8 по умолчанию, и горутины — не подключайте `Safe`,
-подключайте `BP` (см. [корневой README](../README.md)): он содержит этот же код.
+The layer does not depend on `ext/` or `fpide/`. If you also need UTF-8 by default and goroutines, do not use `Safe`;
+use `BP` instead (see the [root README](../README.md)): it contains the same code.
 
-Тесты слоя — `tests/safe/` (рантайм и `compile/mf_*.pas`: опасное не собирается, `System.X` собирается).
-Раннер гоняет их дважды: с `unit Safe` и с `unit BP`.
+The layer's tests are in `tests/safe/` (runtime and `compile/mf_*.pas`: the dangerous does not compile, `System.X` does).
+The runner runs them twice: with `unit Safe` and with `unit BP`.
 
-## Статус
+## Status
 
-Итерация 1: код написан, первый прогон workflow `ci` зелёный (гипотезы затенения подтвердились).
-Итерация 2 (v0.2, идеи из Zig, SPEC §12): `TDefer`, `SafeLiveCount`/`SafeCheckNoLeaks` (R5), раздел «уроки практики» по порту DOS Navigator (`object` против `class`). Проверка — тот же workflow.
-Итерация 3 (v0.3): горутины (SPEC §14) и FFI (SPEC §13). Собрано и прогнано локально (FPC 3.2.2, Linux): все тесты зелёные, `test_go` 30 прогонов подряд без сбоев. Найдено: `cthreads` нельзя спрятать в `Safe` (должен инициализироваться раньше SysUtils), поэтому для горутин одна строка в файле программы (с v0.5 — `SafeThreads`, §18), иначе R8.
-Итерация 4 (v0.3.1): проверка на целях `unxed/dn` (x86_64, i386 и aarch64 Linux статически, DOS go32v2, Windows): таблица в SPEC §2; на DOS `TGroup.Go` бросает R8 вместо зависания.
-Итерация 5 (v0.5): Linux без libc по умолчанию (свои потоки на `clone`/`futex`, `fpwidestring`), `-dSAFE_LIBC` для FFI; `-dSAFE_NO_CWSTRING` больше не нужен для статических сборок. Что реализовано и что только план: SPEC, «Что реально есть, а что пока только план».
+Iteration 1: code written, the first run of the `ci` workflow is green (the shadowing hypotheses were confirmed).
+Iteration 2 (v0.2, ideas from Zig, SPEC §12): `TDefer`, `SafeLiveCount`/`SafeCheckNoLeaks` (R5), a "lessons from practice" section from the DOS Navigator port (`object` versus `class`). Verified by the same workflow.
+Iteration 3 (v0.3): goroutines (SPEC §14) and FFI (SPEC §13). Built and run locally (FPC 3.2.2, Linux): all tests green, `test_go` 30 runs in a row without failures. Finding: `cthreads` cannot be hidden inside `Safe` (it must be initialized before SysUtils), so goroutines need one line in the program file (since v0.5 — `SafeThreads`, §18), otherwise R8.
+Iteration 4 (v0.3.1): verification on the `unxed/dn` targets (x86_64, i386 and aarch64 Linux statically, DOS go32v2, Windows): table in SPEC §2; on DOS `TGroup.Go` raises R8 instead of hanging.
+Iteration 5 (v0.5): Linux without libc by default (own threads on `clone`/`futex`, `fpwidestring`), `-dSAFE_LIBC` for FFI; `-dSAFE_NO_CWSTRING` is no longer needed for static builds. What is implemented and what is only a plan: SPEC, "What actually exists and what is only a plan".
 
-## Гипотезы первого прогона CI (исторический раздел, все подтверждены)
+## Hypotheses of the first CI run (historical section, all confirmed)
 
-1. Тип-заглушка с именем `GetMem/New/Move/...` в модуле, стоящем последним в `uses`, закрывает
-   процедуру/интринсик System, и вызов даёт ошибку компиляции с текстом `deprecated` (`SAFE-S1`).
-   Особенно сомнительны интринсики `New/Dispose`.
-2. `deprecated` допустим на объявлении синонима типа (`Pointer = System.Pointer deprecated '...'`).
-3. Хелпер `TObject` с методом `Free(const X: <тип-заглушка>)` перекрывает `TObject.Free`: `Obj.Free` — ошибка компиляции (подтверждено, `tests/compile/mf_free.pas`).
-4. Внутри обобщённой записи её имя без параметров (`TOwned`) обозначает текущую специализацию.
-5. Тела обобщений, специализируемые в модуле пользователя, видят private-поля и интерфейсные
-   символы `Safe` и не задевают отравленные имена.
-6. `specialize TArray<T>` из System доступен в FPC 3.2.2.
+1. A stub type named `GetMem/New/Move/...` in the module listed last in `uses` hides the
+   System procedure/intrinsic, and a call gives a compile error with the text `deprecated` (`SAFE-S1`).
+   The `New/Dispose` intrinsics are especially doubtful.
+2. `deprecated` is allowed on a type alias declaration (`Pointer = System.Pointer deprecated '...'`).
+3. A `TObject` helper with a method `Free(const X: <stub type>)` overrides `TObject.Free`: `Obj.Free` is a compile error (confirmed, `tests/compile/mf_free.pas`).
+4. Inside a generic record, its name without parameters (`TOwned`) denotes the current specialization.
+5. Generic bodies specialized in the user's module see the private fields and interface
+   symbols of `Safe` and do not trip over the poisoned names.
+6. `specialize TArray<T>` from System is available in FPC 3.2.2.
 
-Если что-то из этого не подтвердится — запасные варианты: (1) обычная процедура с `deprecated` и
-`{$WARN SYMBOL_DEPRECATED ERROR}`; (2,3) только линтер; (4) вложенный синоним типа.
+If any of this is not confirmed, the fallbacks are: (1) an ordinary procedure with `deprecated` and
+`{$WARN SYMBOL_DEPRECATED ERROR}`; (2,3) linter only; (4) a nested type alias.
 
-## Сомнительные решения (зафиксированы, к обсуждению)
+## Doubtful decisions (recorded, for discussion)
 
-- `TOwned` на счётчике ссылок, уникальность — контракт линтера (обоснование: SPEC §4).
-- `Free` отравлен только предупреждением: ошибкой его сделать без опций нельзя.
-- `Safe` меняет глобальные кодировки в `initialization`; выключается `-dSAFE_NO_UTF8`.
-- Лицензия: **MIT** (файл `LICENSE`; решение владельца 2026-10-03). Она совместима с переносом в FPC/Lazarus: код можно взять в RTL под её modified LGPL, ничего не меняя у нас.
+- `TOwned` is reference-counted, uniqueness is a linter contract (rationale: SPEC §4).
+- `Free` is poisoned with a warning only: making it an error is impossible without compiler options.
+- `Safe` changes the global encodings in `initialization`; turned off with `-dSAFE_NO_UTF8`.
+- License: **MIT** (file `LICENSE`; owner's decision 2026-10-03). It is compatible with moving into FPC/Lazarus: the code can be taken into the RTL under its modified LGPL without changing anything on our side.
 
-## Следующие итерации
+## Next iterations
 
-Линтер на `fcl-passrc` (правила S3–S10), пакет Lazarus для OPM, Windows в CI, GC-куча (SPEC §11).
+A linter on `fcl-passrc` (rules S3–S10), a Lazarus package for OPM, Windows in CI, a GC heap (SPEC §11).

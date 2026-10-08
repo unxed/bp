@@ -1,12 +1,12 @@
 { SPDX-License-Identifier: MIT }
-{ Safe Pascal, ядро (реализация). }
+{ Safe Pascal, core (implementation). }
 
-{ ---------- внутреннее ---------- }
+{ ---------- internals ---------- }
 
 var
-  GLive: LongInt = 0;         // объекты под владением (TOwned/TShared/TArena), живые сейчас
-  GDeferFailures: LongInt = 0; // исключения, подавленные в отложенных вызовах
-  GGoFailures: LongInt = 0;    // ошибки задач, которые никто не забрал через TGroup.Wait
+  GLive: LongInt = 0;         // owned objects (TOwned/TShared/TArena) alive right now
+  GDeferFailures: LongInt = 0; // exceptions suppressed in deferred calls
+  GGoFailures: LongInt = 0;    // task errors that nobody collected via TGroup.Wait
 
 function SafeLiveCount: LongInt;
 begin
@@ -50,12 +50,12 @@ var
   O: TObject;
 begin
   if CellObj <> nil then
-    CellObj.Life := nil; // слабые ссылки больше не залочат объект
+    CellObj.Life := nil; // weak references will no longer lock the object
   O := Obj;
   Obj := nil;
   if O <> nil then
   begin
-    O.Destroy; // Free здесь затенён хелпером
+    O.Destroy; // Free is shadowed by a helper here
     InterlockedDecrement(GLive);
   end;
   CellRef := nil;
@@ -78,7 +78,7 @@ var
   I: SizeInt;
   O: TObject;
 begin
-  for I := Count - 1 downto 0 do // обратный порядок: позже созданные могут ссылаться на ранние
+  for I := Count - 1 downto 0 do // reverse order: later-created ones may reference earlier ones
   begin
     O := Items[I];
     Items[I] := nil;
@@ -126,7 +126,7 @@ var
   L: IInterface;
   O: T;
 begin
-  // Через локальные: корректно даже если Result и Self — одна память (A := A.Move).
+  // Via locals: correct even if Result and Self are the same memory (A := A.Move).
   L := FLife;
   O := FObj;
   FLife := nil;
@@ -217,7 +217,7 @@ begin
   if Result then
   begin
     L := TSafeLife(C.Life);
-    FLife := L; // сильная ссылка: объект не умрёт, пока она есть
+    FLife := L; // strong reference: the object will not die while it exists
     FLifeObj := L;
     FObj := T(L.Obj);
   end
@@ -317,7 +317,7 @@ begin
     try
       Proc();
     except
-      InterlockedIncrement(GDeferFailures); // из деструктора бросать нельзя: учитываем, SafeCheckNoLeaks заметит
+      InterlockedIncrement(GDeferFailures); // cannot throw from a destructor: count it, SafeCheckNoLeaks will notice
     end;
   inherited Destroy;
 end;

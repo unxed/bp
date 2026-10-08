@@ -25,8 +25,8 @@ jobs:
           LC_ALL: C.UTF-8
         run: ./test_utf8
 
-  # Переносимый режим (Linux по умолчанию, SPEC §18): все тесты и compile-проверки,
-  # проверка «бинарник статический, без libc» и запуск в разных дистрибутивах.
+  # Portable mode (Linux default, SPEC §18): all tests and compile checks,
+  # the "binary is static, no libc" check, and runs on different distributions.
   portable:
     runs-on: ubuntu-latest
     steps:
@@ -55,7 +55,7 @@ jobs:
               sh -c 'cd /t && ./safe-BP/test_safe >/dev/null && ./ext-BP/test_go >/dev/null && ./ext-BP/test_threads >/dev/null && ./ext-BP/test_utf8 >/dev/null && echo ok' || exit 1
           done
 
-  # Режим с libc (-dSAFE_LIBC, аналог cgo): cwstring + cthreads.
+  # Mode with libc (-dSAFE_LIBC, like cgo): cwstring + cthreads.
   libc:
     runs-on: ubuntu-latest
     steps:
@@ -70,8 +70,8 @@ jobs:
           NO_COMPILE_CHECKS: 1
         run: bash tests/run.sh
 
-  # i386 и aarch64: кросс-компиляторы FPC 3.2.2 из официальных исходников, запуск под qemu-user
-  # (i386 — ещё и нативно). Проверяет ассемблер clone в ext/bpthreads.pas на каждой архитектуре.
+  # i386 and aarch64: FPC 3.2.2 cross-compilers from the official sources, run under qemu-user
+  # (i386 also natively). Checks the clone assembler in ext/bpthreads.pas on each architecture.
   cross:
     runs-on: ubuntu-latest
     steps:

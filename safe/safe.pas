@@ -1,15 +1,15 @@
 { SPDX-License-Identifier: MIT }
-{ Safe Pascal v0.1 — безопасный по умолчанию Free Pascal (только слой «safe»).
-  Спецификация: SPEC.md. Подключение: `uses ..., Safe;` ПОСЛЕДНИМ в каждом модуле.
-  Опции компилятора не нужны.
+{ Safe Pascal v0.1 — safe-by-default Free Pascal (the "safe" layer only).
+  Specification: SPEC.md. Usage: `uses ..., Safe;` LAST in every module.
+  No compiler options needed.
 
-  Что делает модуль (и только это):
-  - TOwned/TShared/TWeak/TSlice/TArena, TDefer, FFI (TCResource), счётчик утечек (SPEC §4–5, §13);
-  - "отравляет" опасные примитивы затенением имён (SPEC §6): GetMem(...) в модуле,
-    где Safe последний в uses, не скомпилируется. Полное имя (System.GetMem) — явный unsafe.
+  What the module does (and only this):
+  - TOwned/TShared/TWeak/TSlice/TArena, TDefer, FFI (TCResource), leak counter (SPEC §4–5, §13);
+  - "poisons" dangerous primitives by name shadowing (SPEC §6): GetMem(...) in a module
+    where Safe is last in uses will not compile. The full name (System.GetMem) is an explicit unsafe.
 
-  UTF-8 по умолчанию и горутины сюда не входят: они в ext/, а всё вместе — unit BP (bp.pas).
-  Исходники слоя — include-файлы safe/*.inc: те же файлы собираются в unit BP. }
+  UTF-8 by default and goroutines are not included here: they live in ext/, and everything together is unit BP (bp.pas).
+  The layer's sources are the include files safe/*.inc: the same files are built into unit BP. }
 unit Safe;
 
 {$mode objfpc}{$H+}

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Тесты Better Pascal. Всё собирается БЕЗ опций компилятора (кроме путей к слоям): репозиторий
-# копируется в рабочую папку, как у пользователя (safe/SPEC.md §2).
-#   tests/safe/test_*.pas   слой safe: гоняется дважды — с unit Safe и с unit BP (имя Safe заменяется на BP)
-#   tests/ext/test_*.pas    слой ext (UTF-8, горутины, потоки): только с unit BP
-#   compile/mf_*.pas        первая строка "// EXPECT: fail|warn SAFE-Sx", "clean", "run" (clean + код 0)
-#                           или "exit N" (собирается, завершается с кодом N)
-# usage: tests/run.sh [safe|ext|all]      (по умолчанию all)
-# Переменные окружения (для CI; по умолчанию — голый fpc на хосте):
-#   FPC          компилятор (кросс: ppcrossa64 ...)        FPCOPTS  его опции (-dSAFE_LIBC, -Tlinux -XP...)
-#   RUN          префикс запуска (qemu-aarch64)            OUT      куда положить бинарники (иначе mktemp)
-#   SKIP         тесты, которые пропустить ("test_ffi")    NO_COMPILE_CHECKS=1 — без compile/*.pas
+# Better Pascal tests. Everything is built WITHOUT compiler options (except the layer paths): the repository
+# is copied to a working folder, as for a user (safe/SPEC.md §2).
+#   tests/safe/test_*.pas   the safe layer: run twice — with unit Safe and with unit BP (the name Safe is replaced with BP)
+#   tests/ext/test_*.pas    the ext layer (UTF-8, goroutines, threads): with unit BP only
+#   compile/mf_*.pas        first line "// EXPECT: fail|warn SAFE-Sx", "clean", "run" (clean + exit code 0)
+#                           or "exit N" (builds, terminates with exit code N)
+# usage: tests/run.sh [safe|ext|all]      (default: all)
+# Environment variables (for CI; by default — bare fpc on the host):
+#   FPC          compiler (cross: ppcrossa64 ...)          FPCOPTS  its options (-dSAFE_LIBC, -Tlinux -XP...)
+#   RUN          run prefix (qemu-aarch64)                 OUT      where to put binaries (otherwise mktemp)
+#   SKIP         tests to skip ("test_ffi")                NO_COMPILE_CHECKS=1 — without compile/*.pas
 set -u
 FPC=${FPC:-fpc}
 FPCOPTS=${FPCOPTS:-}

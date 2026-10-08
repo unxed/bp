@@ -1,6 +1,6 @@
-{ Рантайм-тесты Safe Pascal. Собирается без опций: run.sh кладёт рядом safe.pas
-  и вызывает просто `fpc test_safe.pas` (проверка обещания SPEC §2).
-  Код возврата = число проваленных проверок. }
+{ Runtime tests of Safe Pascal. Built without options: run.sh puts safe.pas next to it
+  and simply calls `fpc test_safe.pas` (checking the promise of SPEC §2).
+  Exit code = number of failed checks. }
 program test_safe;
 
 {$mode objfpc}{$H+}
@@ -25,7 +25,7 @@ type
   TIntSlice = specialize TSlice<Integer>;
 
 var
-  Log: string = ''; // '~имя' на каждое уничтожение, по порядку
+  Log: string = ''; // '~name' for each destruction, in order
   Failed: Integer = 0;
 
 constructor TProbe.Create(const AName: string);
@@ -78,7 +78,7 @@ begin
   B.Reset;
   Check(Log = '~b', 'owned: Reset destroys');
   A := TProbeBox.Own(TProbe.Create('b2'));
-  A := A.Move; // самоперенос не должен уничтожить объект
+  A := A.Move; // self-move must not destroy the object
   Check((Log = '~b') and (A.Get.Name = 'b2'), 'owned: A := A.Move keeps object');
 end;
 
@@ -87,7 +87,7 @@ var
   A, C: TProbeBox;
 begin
   A := TProbeBox.Own(TProbe.Create('c'));
-  C := A; // нарушение контракта (линтер), но память должна остаться целой
+  C := A; // contract violation (linter), but memory must remain intact
   A.Reset;
   Check(Log = '', 'owned: copy keeps object alive');
   C.Reset;
