@@ -828,6 +828,7 @@ def section_misc(t):
         t.pump(0.5)
         t.key('M-F5')
         t.pump(1)
+    t.wait_until(lambda: 'arg=hello' in t.text(), 8)      # the user screen is drawn a moment after the key
     txt = t.text()
     check('arg=hello' in txt, 'it got the parameter', t)
     check('dir=/tmp' in txt, 'and ran in the chosen directory', t)
