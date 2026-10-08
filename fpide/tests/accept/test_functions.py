@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile golang debuggo unicode templates clipboard syscb debug browser longlines misc mouse exit
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile golang debuggo unicode templates clipboard syscb debug browser longlines misc mouse ux exit
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -1058,6 +1058,48 @@ def section_mouse(t):
           'a click in the other window activates it: %r -> %r' % (before, after), t)
 
 
+def section_ux(t):
+    """the navigation guidelines of vtui (tv3/docs/UX-CONFORMANCE.md): Esc in menus, radio groups, Ctrl+Tab"""
+    # a menu: Esc closes the drop-down and keeps the bar, the second Esc leaves the bar
+    t.key('M-f')
+    check(t.wait_for('Open...'), 'Alt+F opens the File menu', t)
+    t.key('Escape')
+    check(t.wait_gone('Open...', 2), 'Esc closes the drop-down', t)
+    t.key('Down')
+    check(t.wait_for('Open...'), '... the menu bar stays active: Down opens the menu again', t)
+    t.key('Right')
+    check(t.wait_for('Undo') and t.wait_gone('Open...', 2), 'Right in the active menu bar opens the next drop-down (Edit)', t)
+    t.key('Escape', 'Escape')
+    t.key('Down')
+    check(t.wait_gone('Undo', 2), 'the second Esc leaves the menu bar (Down does not open a menu any more)', t)
+    # a radio group: the arrow keys move the cursor, Space selects
+    new_file(t)
+    check(menu(t, 'M-s', 'Find'), 'Search > Find...')
+    check(t.wait_for('Case sensitive'), 'the Find dialog is open', t)
+    t.key('Tab', 'Tab', 'Tab', 'Down')
+    txt = t.text()
+    check('(\u2022) Global' in txt and '( ) Selected text' in txt, 'Down moves the cursor of the Scope group, the selection stays on Global', t)
+    t.key('Space')
+    txt = t.text()
+    check('(\u2022) Selected text' in txt and '( ) Global' in txt, 'Space selects the radio button under the cursor', t)
+    close_dialogs(t)
+    # Esc closes a dialog
+    check(menu(t, 'M-s', 'Find'), 'Search > Find... again')
+    check(t.wait_for('Case sensitive'), 'the Find dialog is open again', t)
+    t.key('Escape')
+    check(t.wait_gone('Case sensitive', 2), 'Esc closes the dialog', t)
+    # Ctrl+Tab and Ctrl+Shift+Tab walk through the windows
+    new_file(t); t.type('aaa')
+    new_file(t); t.type('bbb')
+    check(editor_lines(t)[:1] == ['bbb'], 'two windows: the second is active', t)
+    t.key('C-Tab')
+    t.pump(0.4)
+    check(editor_lines(t)[:1] != ['bbb'], 'Ctrl+Tab goes to another window: %r' % editor_lines(t)[:1], t)
+    t._tmux('send-keys', '-t', t.session, '-H', *['%02x' % b for b in b'\x1b[9;6u'])
+    t.pump(0.4)
+    check(editor_lines(t)[:1] == ['bbb'], 'Ctrl+Shift+Tab goes back: %r' % editor_lines(t)[:1], t)
+
+
 # Delve is installed in ~/go/bin by go install; the IDE runs with another HOME, so the directory goes on the PATH it inherits
 _gobin = os.path.expanduser('~/go/bin')
 if os.path.exists(os.path.join(_gobin, 'dlv')):
@@ -1065,7 +1107,7 @@ if os.path.exists(os.path.join(_gobin, 'dlv')):
 
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile), ('golang', section_golang),
-            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('syscb', section_syscb), ('debug', section_debug), ('debuggo', section_debuggo), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse)]
+            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('syscb', section_syscb), ('debug', section_debug), ('debuggo', section_debuggo), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse), ('ux', section_ux)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])

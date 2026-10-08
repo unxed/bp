@@ -521,7 +521,12 @@ begin
               if E.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbRight) else
+              begin
+                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+{$IF DECLARED(UxMenuAutoOpen)}
+                if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
+{$ENDIF}
+              end else
               Action := DoReturn;
           kbHome, kbEnd:
             if Size.Y <> 1 then
@@ -537,8 +542,16 @@ begin
           kbEsc:
             begin
               Action := DoReturn;
+              { UX guidelines: Esc closes the drop-down, the menu bar stays; the next Esc leaves it }
+{$IF DECLARED(UxMenuEsc)}
+              if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) or UxMenuEsc then
+                ClearEvent(E);
+              if UxMenuEsc and (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
+                ParentMenu.SubClosedByEsc := True;
+{$ELSE}
               if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) then
                 ClearEvent(E);
+{$ENDIF}
             end;
         else
           Target := Self;
@@ -588,6 +601,13 @@ begin
           Target := TopMenu.NewSubView(R, SubMenu, Self);
           Res := Owner.ExecView(Target);
           Target.Free;
+{$IF DECLARED(UxMenuEsc)}
+          if SubClosedByEsc then
+          begin
+            SubClosedByEsc := False;
+            AutoSelect := False;
+          end;
+{$ENDIF}
         end else if Action = DoSelect then Res := Command;
     if (Res <> 0) and CommandEnabled(Res) then
     begin
@@ -771,7 +791,12 @@ begin
               if E.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbRight) else
+              begin
+                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+{$IF DECLARED(UxMenuAutoOpen)}
+                if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
+{$ENDIF}
+              end else
               Action := DoReturn;
           kbHome, kbEnd:
             if Size.Y <> 1 then
@@ -787,8 +812,16 @@ begin
           kbEsc:
             begin
               Action := DoReturn;
+              { UX guidelines: Esc closes the drop-down, the menu bar stays; the next Esc leaves it }
+{$IF DECLARED(UxMenuEsc)}
+              if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) or UxMenuEsc then
+                ClearEvent(E);
+              if UxMenuEsc and (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
+                ParentMenu.SubClosedByEsc := True;
+{$ELSE}
               if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) then
                 ClearEvent(E);
+{$ENDIF}
             end;
         else
           Target := Self;
@@ -838,6 +871,13 @@ begin
           Target := TopMenu.NewSubView(R, SubMenu, Self);
           Res := Owner.ExecView(Target);
           Target.Free;
+{$IF DECLARED(UxMenuEsc)}
+          if SubClosedByEsc then
+          begin
+            SubClosedByEsc := False;
+            AutoSelect := False;
+          end;
+{$ENDIF}
         end else if Action = DoSelect then Res := Command;
     if (Res <> 0) and CommandEnabled(Res) then
     begin
@@ -1100,7 +1140,12 @@ begin
               if E.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbRight) else
+              begin
+                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+{$IF DECLARED(UxMenuAutoOpen)}
+                if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
+{$ENDIF}
+              end else
               Action := DoReturn;
           kbHome, kbEnd:
             if Size.Y <> 1 then
@@ -1116,8 +1161,16 @@ begin
           kbEsc:
             begin
               Action := DoReturn;
+              { UX guidelines: Esc closes the drop-down, the menu bar stays; the next Esc leaves it }
+{$IF DECLARED(UxMenuEsc)}
+              if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) or UxMenuEsc then
+                ClearEvent(E);
+              if UxMenuEsc and (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
+                ParentMenu.SubClosedByEsc := True;
+{$ELSE}
               if (ParentMenu = nil) or (ParentMenu.Size.Y <> 1) then
                 ClearEvent(E);
+{$ENDIF}
             end;
         else
           Target := Self;
@@ -1167,6 +1220,13 @@ begin
           Target := TopMenu.NewSubView(R, SubMenu, Self);
           Res := Owner.ExecView(Target);
           Target.Free;
+{$IF DECLARED(UxMenuEsc)}
+          if SubClosedByEsc then
+          begin
+            SubClosedByEsc := False;
+            AutoSelect := False;
+          end;
+{$ENDIF}
         end else if Action = DoSelect then Res := Command;
     if (Res <> 0) and CommandEnabled(Res) then
     begin

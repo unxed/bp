@@ -71,3 +71,12 @@ FPC's "An inherited method is hidden by ..." warnings are real bugs here: the ol
 (`Destroy`, `Store`, `Update`, `Draw`, `DoSelectSourceLine`, ...). `DoSelectSourceLine` was never called (the base stub returned garbage,
 the debugger kept resuming); many destructors were skipped. All restored; the only remaining warning is the deliberate
 `Update(AMaxWidth)` overload in `fpdebug.pas`. Keep the build free of this warning.
+
+## 2026-10-08: navigation guidelines of vtui
+
+`wviews.pas` (the three copies of `Execute` of the menu views): `Esc` closes the drop-down and keeps the menu bar, the second `Esc` leaves it; `Left`/`Right` in the bar
+open the next drop-down (`UxMenuEsc`, `UxMenuAutoOpen` of tv3, guarded by `{$IF DECLARED}` so that it builds with an older tv3). The rest of the rules is in the dialogs and
+views of tv3 (radio buttons keep the cursor and the selection apart, `Ctrl+Tab` walks the windows, arrows leave buttons and fields, far2l word rules in input fields).
+The table with every rule, the open gaps and the conflicts with the Borland / Free Pascal IDE habits (`F9` is Make, `Home`/`End` in lists, `Enter` on a check box) is
+`tv/docs/UX-CONFORMANCE.md`. Tests: the section `ux` of `tests/accept/test_functions.py` and `tests/accept/test_esc_sweep.py` (every dialog of the menu bar closes with one `Esc`).
+These need tv3 62900cc or later: the pin of `tv` in sp has to be moved to it.
