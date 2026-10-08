@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        run: sudo apt-get update && sudo apt-get install -y fp-compiler
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler fp-units-fcl
       - name: Build test (module injected by -Fa)
         run: |
           fpc -iV
@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        run: sudo apt-get update && sudo apt-get install -y fp-compiler
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler fp-units-fcl
       - name: Tests (no compiler options, layers safe and ext, units Safe and BP)
         env:
           LANG: C.UTF-8
@@ -61,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        run: sudo apt-get update && sudo apt-get install -y fp-compiler
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler fp-units-fcl
       - name: Tests with -dSAFE_LIBC
         env:
           LANG: C.UTF-8
