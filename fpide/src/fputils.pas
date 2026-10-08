@@ -54,7 +54,6 @@ function FitStr(const S: string; Len: byte): string;
 procedure SelectDir(var S: string; HistoryID: word);
 { Debug aid: appends a line to the file named by $FP_DEBUG_LOG (tv3 owns stderr and the screen, so writeln is no use). }
 procedure DbgLog(const S: string);
-function KillTilde(S: string): string;
 function LowercaseStr(const S: string): string;
 {function DirOf(const S: string): string;
 function ExtOf(const S: string): string;
@@ -222,17 +221,6 @@ begin
   FitStr:=RExpand(copy(S,1,Len),Len);
 end;
 
-
-function KillTilde(S: string): string;
-var P: longint;
-begin
-  repeat
-    P:=Pos('~',S);
-    if P>0 then
-      Delete(S,P,1);
-  until P=0;
-  KillTilde:=S;
-end;
 
 function LowerCaseStr(const S: string): string;
 var

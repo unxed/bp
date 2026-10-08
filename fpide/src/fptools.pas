@@ -172,7 +172,7 @@ uses Dos,
      FVConsts,
      App,MsgBox,
      WConsts,WUtils,TvIni,
-     FPConst,FPVars,FPUtils;
+     FPConst,FPVars,FPUtils,TvCStr;
 
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
@@ -320,7 +320,7 @@ end;
 
 function TTool.GetTitle: string;
 begin
-  GetTitle:=KillTilde(GetStr(Title));
+  GetTitle:=StripTilde(GetStr(Title));
 end;
 
 procedure TTool.GetParams(var ATitle, AProgramPath, ACommandLine: string; var AHotKey: word);
@@ -381,7 +381,7 @@ var S1,S2: string;
     W: word;
 begin
   GetToolParams(Idx,S1,S2,S2,W);
-  GetToolName:=KillTilde(S1);
+  GetToolName:=StripTilde(S1);
 end;
 
 function AddTool(Title, ProgramPath, Params: string; HotKey: word): sw_integer;

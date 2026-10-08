@@ -62,7 +62,7 @@ begin
     begin
       If assigned(TargetMenu.Param) then
         DisposeStr(TargetMenu.Param);
-      TargetMenu.Param:=NewStr(KillTilde(TargetSwitches.ItemName(TargetSwitches.GetCurrSel)));
+      TargetMenu.Param:=NewStr(StripTilde(TargetSwitches.ItemName(TargetSwitches.GetCurrSel)));
     end;
 end;
 
@@ -74,7 +74,7 @@ begin
     begin
       If assigned(ModeMenu.Param) then
         DisposeStr(ModeMenu.Param);
-      ModeMenu.Param:=NewStr(KillTilde(SwitchesModeName[SwitchesMode]));
+      ModeMenu.Param:=NewStr(StripTilde(SwitchesModeName[SwitchesMode]));
     end;
 end;
 

@@ -136,7 +136,7 @@ const
 implementation
 
 uses
-  TvSys,
+  TvSys, TvCStr,
 {$ifdef Unix}
   Unix, BaseUnix,
 {$endif}
@@ -474,7 +474,7 @@ begin
      InfoST.SetText(
        RExpand(' Main file : '#1#$7f+Copy(SmartPath(MainFile),1,39),40)+#2+
          'Total lines  : '#1#$7e+IntToStr(Status.CompiledLines)+#2#13+
-       RExpand(' Target    : '#1#$7f+KillTilde(TargetSwitches.ItemName(TargetSwitches.GetCurrSel)),40)+#2+
+       RExpand(' Target    : '#1#$7f+StripTilde(TargetSwitches.ItemName(TargetSwitches.GetCurrSel)),40)+#2+
          'Total errors : '#1#$7e+IntToStr(Status.ErrorCount)
      );
      if status.currentline>0 then
@@ -584,7 +584,7 @@ constructor TCompilerStatusDialog.Create;
 var R: TRect;
 begin
   R.Assign(0,0,56,11);
-  ClearFormatParams; AddFormatParamStr(KillTilde(SwitchesModeName[SwitchesMode]));
+  ClearFormatParams; AddFormatParamStr(StripTilde(SwitchesModeName[SwitchesMode]));
   inherited Create(R, FormatStrF(dialog_compilingwithmode, FormatParams));
   starttime:=getrealtime;
   GetExtent(R); R.B.Y:=11;
@@ -671,7 +671,7 @@ begin
   AddFormatParamStr(ShrinkPath(SmartPath(MainFile),
     MaxFileNameSize-Length('Main file: %s')));
   AddFormatParamStr(StatusS);
-  AddFormatParamStr(KillTilde(TargetSwitches.ItemName(TargetSwitches.GetCurrSel)));
+  AddFormatParamStr(StripTilde(TargetSwitches.ItemName(TargetSwitches.GetCurrSel)));
   AddFormatParamInt(Status.CurrentLine);
   AddFormatParamInt(Status.CompiledLines);
   hstatus:=GetFPCHeapStatus;

@@ -42,7 +42,7 @@ uses
   Version,
   WConsts,WUtils,TvIni,WViews,WEditor,WCEdit,
   {$ifndef NODEBUG}FPDebug,{$endif}FPConst,FPVars,
-  FPIntf,FPTools,FPSwitch,fpccrc;
+  FPIntf,FPTools,FPSwitch,TvCrc;
 
 const
   PrinterDevice : string = 'prn';
@@ -491,7 +491,7 @@ begin
   CtrlMouseAction:=INIFile.GetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
   {Keyboard}
   S:=upcase(INIFile.GetEntry(secKeyboard,ieEditKeys,''));
-  crcv := UpdateCrc32(0,s[1],Length(s)) ;
+  crcv := Crc32Str(0,S);
   case crcv of
     $795B3767  : {crc32 for 'MICROSOFT'}
       EditKeys:=ekm_microsoft;

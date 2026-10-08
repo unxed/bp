@@ -187,7 +187,7 @@ uses
   fpKeys,TvUnix,
 {$endif Unix}
   FpDpAnsi,WConsts,
-  Video,Mouse,Keyboard,TvActions,TvMenus,
+  Video,Mouse,Keyboard,TvActions,TvMenus,TvCStr,
 {$ifdef EMBED_COMPILER}
   Compiler,
 {$endif}
@@ -1025,7 +1025,7 @@ begin
   R:='';
   for I:=0 to ActionCount-1 do
     with ActionAt(I) do
-      R:=R+Name+#9+ActionKeyText(I)+#9+KillTilde(Caption)+#10;
+      R:=R+Name+#9+ActionKeyText(I)+#9+StripTilde(Caption)+#10;
   R:=R+'conflicts:'#10+ActionKeyConflicts;
   IDEActionReport:=R;
 end;
@@ -1985,7 +1985,7 @@ begin
   for I:=1 to GetToolCount do
   begin
     GetToolParams(I-1,S1,S2,S3,W);
-    P:=NewItem(S1,KillTilde(GetHotKeyName(W)),W,cmToolsBase+I,hcToolsBase+I,nil);
+    P:=NewItem(S1,StripTilde(GetHotKeyName(W)),W,cmToolsBase+I,hcToolsBase+I,nil);
     AppendMenuItem(ToolsMenu.SubMenu,P);
   end;
 end;
