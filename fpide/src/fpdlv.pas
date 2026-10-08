@@ -396,6 +396,8 @@ begin
           if Obj(R, 'body') <> nil then
             Body := TJSONObject(Obj(R, 'body').Clone);
         end
+        else if Str(Obj(Obj(R, 'body'), 'error'), 'format') <> '' then
+          Fail(Command + ': ' + Str(Obj(Obj(R, 'body'), 'error'), 'format'))     { the build output is in it }
         else
           Fail(Command + ': ' + Str(R, 'message'));
         Exit;

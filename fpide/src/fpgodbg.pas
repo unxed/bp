@@ -45,6 +45,7 @@ end;
 
 var
   Session: TDlvSession = nil;
+  LastGoFile: string = '';
   { the files whose breakpoints dlv has (a file that lost its last breakpoint must be cleared) }
   SyncedFiles: TStringList = nil;
 
@@ -262,7 +263,14 @@ begin
       begin
         Err := Session.Error;
         GoDebugEnd;
-        ErrorBox(#3'The debugger of Go failed:'#13#3 + Copy(Err, 1, 70), nil);
+        { the output of a failed build has positions: the window of messages lists them }
+        if (LastGoFile <> '') and (Pos('.go:', Err) > 0) then
+        begin
+          ShowBackendMessages(LastGoFile, Err);
+          ErrorBox(#3'The program does not build'#13#3'(see the messages)', nil);
+        end
+        else
+          ErrorBox(#3'The debugger of Go failed:'#13#3 + Copy(Err, 1, 70), nil);
       end;
   end;
 end;
@@ -281,6 +289,7 @@ begin
   end;
   SaveModifiedSources;
   GoDebugEnd;
+  LastGoFile := GoFile;
   Session := TDlvSession.Create;
   Session.OnIdle := @EscPressed;
   PushStatus('Starting Delve...');

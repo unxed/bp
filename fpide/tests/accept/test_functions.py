@@ -445,6 +445,9 @@ def section_debuggo(t):
         return
     src = ['package main  // dbgo', '', 'import "fmt"', '', 'func add(a, b int) int {', '\treturn a + b', '}', '',
            'func main() {', '\tx := 20', '\ty := add(x, 22)', '\tfmt.Println("sum", y)', '\tfmt.Println("done")', '}']
+    # the golang section leaves a go.mod: with it the whole package would be built (hello.go has a main of its own)
+    if os.path.exists(os.path.join(t.work, 'go.mod')):
+        os.remove(os.path.join(t.work, 'go.mod'))
     with open(os.path.join(t.work, 'dbgo.go'), 'w') as f:
         f.write('\n'.join(src) + '\n')
     t.key('F3'); t.wait_for('Open a file'); t.type('dbgo.go'); t.key('Enter')
@@ -490,6 +493,7 @@ def section_debuggo(t):
     names = [r[1] for r in t._menu_rows()]
     t.key('Escape')
     check(names and names[0].startswith('Run'), 'the first Run item is Run again after the end: %r' % (names[:1],), t)
+    close_all(t)
 
 
 def section_unicode(t):

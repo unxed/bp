@@ -33,6 +33,8 @@ procedure Compile(const FileName, ConfigFile: string);
 procedure SetCompileMode(Mode: LongInt);
 { writes the modified sources that have a name (an external tool reads files, not editors) }
 procedure SaveModifiedSources;
+{ the lines that the tool of a language wrote (a build error from the debugger) go to the window of messages }
+procedure ShowBackendMessages(const MainFileName, Text: string);
 procedure SetPrimaryFile(const fn:string);
 function LinkAfter : boolean;
 { the compiler to use: CompilerSetting is 'auto', 'builtin' or the path of an external compiler (env FP_COMPILER wins) }
@@ -504,6 +506,26 @@ begin
       end;
   finally
     P.Free;
+  end;
+end;
+
+procedure ShowBackendMessages(const MainFileName, Text: string);
+var
+  B: TLangBackend;
+  L: Classes.TStringList;
+  I: LongInt;
+begin
+  B:=BackendFor(MainFileName);
+  if (B=nil) or (CompilerMessageWindow=nil) then
+    Exit;
+  MainFile:=MainFileName;
+  L:=Classes.TStringList.Create;
+  try
+    L.Text:=Text;
+    for I:=0 to L.Count-1 do
+      BackendLine(B,L[I]);
+  finally
+    L.Free;
   end;
 end;
 
