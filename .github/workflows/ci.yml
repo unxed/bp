@@ -6,6 +6,14 @@ on:
   pull_request:
 
 jobs:
+  # English in comments, documents and messages; every text file UTF-8.
+  text-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Text policy
+        run: python3 tools/text-policy.py
+
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
   # the "binary is static, no libc" check, and runs on different distributions.
   portable:
