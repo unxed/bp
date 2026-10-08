@@ -398,13 +398,14 @@ def section_golang(t):
     t.key('Enter')
     check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE comes back after the key', t)
     # go test through Compile > Test
+    os.remove(os.path.join(t.work, 'bad.go'))          # it would break the package
     with open(os.path.join(t.work, 'go.mod'), 'w') as f:
         f.write('module example.com/acc\n\ngo 1.20\n')
     with open(os.path.join(t.work, 'hello_test.go'), 'w') as f:
         f.write('package main\n\nimport "testing"\n\nfunc TestOne(t *testing.T) {\n\tt.Errorf("deliberate failure")\n}\n')
-    t.key('F10', 'Right', 'Right', 'Right', 'Right')      # the Compile menu
+    t.key('M-c')                                          # the Compile menu
     t.pump(0.4)
-    t.key('Down', 'Down', 'Down', 'Down', 'Enter')        # Compile, Make, Build, Test
+    t.key('Down', 'Down', 'Down', 'Enter')                # Compile, Make, Build, Test
     check(t.wait_for('Compile failed', 120), 'Compile > Test runs go test and the failing test fails', t)
     t.key('Enter')
     check(t.wait_for('deliberate failure', 5), 'the message of the failed test is listed', t)
