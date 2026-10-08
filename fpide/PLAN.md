@@ -55,4 +55,5 @@ Make/Build (`go build`, в модуле собирается пакет файл
 попадают в окно Compiler Messages, Enter переходит на строку. Юнит-тест `tests/unit/t_fplang.pas`, приёмка `test_functions.py <fp> golang`.
 Подсветка `.go` — грамматика `lang-go.hl` из tve.
 
-Открыто: отладчик Delve (`dlv`, DAP) вместо gdb для Go; шаблоны файлов Go (`main.go`); `gofmt`; следующие языки (Python, Rust, C) через тот же класс.
+Готово: шаблон нового файла Go (File > Open несуществующего `.go` — `NewFileText`), Tools > Format Go file (`gofmt -w`, тихая перезагрузка `ReloadSilently`).
+Открыто: отладчик Delve (`dlv`, DAP) вместо gdb для Go; следующие языки (Python, Rust, C) через тот же класс.

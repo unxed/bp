@@ -115,6 +115,7 @@ type
       procedure Messages;
       procedure Calculator;
       procedure DoAsciiTable;
+      procedure DoFormatGo;
       procedure ExecuteTool(Idx: integer);
       procedure SetSwitchesMode;
       procedure DoCompilerSwitch;
@@ -194,7 +195,7 @@ uses
   Systems,
   WUtils,WHlpView,WViews,WHTMLHlp,WHelp,WConsole,
   FPConst,FPVars,FPUtils,FPSwitch,FPIni,FPIntf,FPCompil,FPHelp,FPVideo,
-  FPTemplt,FPCalc,FPUsrScr,FPTools,
+  FPTemplt,FPCalc,FPUsrScr,FPTools,FpLang,
 {$ifndef NODEBUG}
   FPDebug,FPRegs,
 {$endif}
@@ -322,6 +323,7 @@ resourcestring  menu_local_gotosource = '~G~oto source';
                 menu_tools_grep        = '~G~rep';
                 menu_tools_calculator  = '~C~alculator';
                 menu_tools_asciitable  = 'Ascii ~t~able';
+                menu_tools_formatgo    = 'Format ~G~o file';
 
                 menu_options           = '~O~ptions';
                 menu_options_mode      = 'Mode~.~..';
@@ -974,7 +976,8 @@ begin
       NewItem(menu_tools_grep,menu_key_tools_grep, kbShiftF2, cmGrep, hcGrep,
       NewItem(menu_tools_calculator, '', kbNoKey, cmCalculator, hcCalculator,
       NewItem(menu_tools_asciitable, '', kbNoKey, cmAsciiTable, hcAsciiTable,
-      nil)))))))),
+      NewItem(menu_tools_formatgo, '', kbNoKey, cmFormatGo, hcFormatGo,
+      nil))))))))),
     NewSubMenu(menu_options, hcOptionsMenu, NewMenu(
       NewItem(menu_options_mode,'', kbNoKey, cmSwitchesMode, hcSwitchesMode,
       NewItem(menu_options_compiler,'', kbNoKey, cmCompiler, hcCompiler,
@@ -1376,6 +1379,7 @@ begin
              cmToolsMessages : Messages;
              cmCalculator    : Calculator;
              cmAsciiTable    : DoAsciiTable;
+             cmFormatGo      : DoFormatGo;
              cmGrep          : DoGrep;
              cmToolsBase+1..
              cmToolsBase+MaxToolCount

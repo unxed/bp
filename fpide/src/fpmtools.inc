@@ -202,6 +202,35 @@ begin
 end;
 
 
+procedure TIDEApp.DoFormatGo;
+var
+  W: PSourceWindow;
+  B: TLangBackend;
+  Output: AnsiString;
+begin
+  if (DeskTop.Current=nil) or (DeskTop.Current.HelpCtx<>hcSourceWindow) then
+    Exit;
+  W:=PSourceWindow(DeskTop.Current);
+  B:=BackendFor(W.Editor.FileName);
+  if (B=nil) or (B.FormatTool='') then
+    begin
+      ErrorBox('There is no formatter for this file',nil);
+      Exit;
+    end;
+  if not W.Editor.Save then
+    Exit;
+  if not FormatFile(B,W.Editor.FileName,Output) then
+    begin
+      if Output='' then
+        Output:=B.FormatTool+' failed';
+      while Pos('%',Output)>0 do
+        System.Delete(Output,Pos('%',Output),1);
+      ErrorBox(Copy(Output,1,400),nil);
+      Exit;
+    end;
+  W.Editor.ReloadSilently;
+end;
+
 procedure TIDEApp.DoGrep;
 Const
   GrepExeName = 'grep'+ExeExt;

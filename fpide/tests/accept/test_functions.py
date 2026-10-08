@@ -409,6 +409,22 @@ def section_golang(t):
     check(t.wait_for('Compile failed', 120), 'Compile > Test runs go test and the failing test fails', t)
     t.key('Enter')
     check(t.wait_for('deliberate failure', 5), 'the message of the failed test is listed', t)
+    # a new Go file starts with the template; Tools > Format Go file runs gofmt
+    t.key('Escape'); t.pump(0.4)                         # leave the window of messages
+    t.key('F3')
+    check(t.wait_for('Open a file', 5), 'the Open dialog is shown after the messages', t)
+    t.type('fresh.go'); t.key('Enter')
+    check(t.wait_for('fresh.go', 10), 'fresh.go is opened', t)
+    check(t.wait_for('fmt.Println("hello")', 5), 'a Go file that does not exist yet starts with the template', t)
+    check('package main' in t.text() and 'fmt.Println' in t.text(), 'the template has the package and a call', t)
+    with open(os.path.join(t.work, 'ugly.go'), 'w') as f:
+        f.write('package main\nfunc  ugly( ){ }\n')
+    t.key('F3'); t.wait_for('Open a file'); t.type('ugly.go'); t.key('Enter')
+    check(t.wait_for('ugly.go', 5), 'ugly.go is opened', t)
+    menu(t, 'M-t', 'Format Go file')
+    check(t.wait_for('func ugly() {', 15), 'Tools > Format Go file runs gofmt and the editor shows the result', t)
+    with open(os.path.join(t.work, 'ugly.go')) as f:
+        check('func ugly() {' in f.read(), 'the file on disk is formatted', t)
 
 
 def section_unicode(t):

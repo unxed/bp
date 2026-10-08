@@ -234,6 +234,7 @@ const
      cmEvaluate          = 1652;
      cmCalculator        = 1653;
      cmASCIITable        = 1654;
+     cmFormatGo          = 1655;
 
      cmToolsMessages     = 1700;
      cmToolsBase         = 1800;
@@ -350,6 +351,7 @@ const
      hcSaveAsINI         = hcShift+cmSaveAsINI;
      hcCalculator        = hcShift+cmCalculator;
      hcAsciiTable        = hcShift+cmAsciiTable;
+     hcFormatGo          = hcShift+cmFormatGo;
 {     hcGrep              = hcShift+cmGrep;}
      hcSwitchesMode      = hcShift+cmSwitchesMode;
      hcBrowser           = hcShift+cmBrowser;

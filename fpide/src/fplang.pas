@@ -11,7 +11,7 @@ unit FpLang;
 interface
 
 uses
-  SysUtils, Classes;
+  SysUtils, Classes, Process;
 
 type
   { what the user asked: the same four of the Compile menu and the tests }
@@ -43,6 +43,11 @@ type
     function IsProgram(const FileName: string): Boolean; virtual;
     { the debugger that the language uses ('gdb' is the default) }
     function DebuggerTool: string; virtual;
+    { the text of a new file of the language (what a file that does not exist yet starts with), '' for none }
+    function NewFileText: string; virtual;
+    { the formatter of the language: the program (''  when there is none) and its arguments for a file }
+    function FormatTool: string; virtual;
+    procedure FormatArguments(const FileName: string; Args: TStrings); virtual;
   end;
 
   TGoBackend = class(TLangBackend)
@@ -55,6 +60,9 @@ type
     function ParseLine(const Line: string; out Msg: TLangMessage): Boolean; override;
     function IsProgram(const FileName: string): Boolean; override;
     function DebuggerTool: string; override;
+    function NewFileText: string; override;
+    function FormatTool: string; override;
+    procedure FormatArguments(const FileName: string; Args: TStrings); override;
     { the directory that holds go.mod above the file (the module), '' when there is none }
     function ModuleDir(const FileName: string): string;
   end;
@@ -62,6 +70,9 @@ type
 procedure RegisterBackend(B: TLangBackend);
 { the backend of a file, nil for a file of Pascal (and of any language without a backend) }
 function BackendFor(const FileName: string): TLangBackend;
+{ runs the formatter of the backend on the file (the file is rewritten); Output has what the formatter wrote.
+  False when the language has no formatter, the tool is not found or it failed }
+function FormatFile(B: TLangBackend; const FileName: string; out Output: string): Boolean;
 
 implementation
 
@@ -81,6 +92,20 @@ end;
 function TLangBackend.DebuggerTool: string;
 begin
   Result := 'gdb';
+end;
+
+function TLangBackend.NewFileText: string;
+begin
+  Result := '';
+end;
+
+function TLangBackend.FormatTool: string;
+begin
+  Result := '';
+end;
+
+procedure TLangBackend.FormatArguments(const FileName: string; Args: TStrings);
+begin
 end;
 
 { --- Go ------------------------------------------------------------------------------------------------------------------ }
@@ -106,6 +131,23 @@ end;
 function TGoBackend.DebuggerTool: string;
 begin
   Result := 'dlv';
+end;
+
+function TGoBackend.NewFileText: string;
+begin
+  Result := 'package main' + LineEnding + LineEnding + 'import "fmt"' + LineEnding + LineEnding +
+    'func main() {' + LineEnding + #9 + 'fmt.Println("hello")' + LineEnding + '}' + LineEnding;
+end;
+
+function TGoBackend.FormatTool: string;
+begin
+  Result := 'gofmt';
+end;
+
+procedure TGoBackend.FormatArguments(const FileName: string; Args: TStrings);
+begin
+  Args.Add('-w');
+  Args.Add(FileName);
 end;
 
 function TGoBackend.ModuleDir(const FileName: string): string;
@@ -287,6 +329,52 @@ begin
   for I := 0 to Backends.Count - 1 do
     if TLangBackend(Backends[I]).Handles(FileName) then
       Exit(TLangBackend(Backends[I]));
+end;
+
+function FormatFile(B: TLangBackend; const FileName: string; out Output: string): Boolean;
+var
+  P: TProcess;
+  Args: TStringList;
+  S: TStringStream;
+  Buf: array[0..4095] of Byte;
+  N, I: Integer;
+begin
+  Output := '';
+  Result := False;
+  if (B = nil) or (B.FormatTool = '') then
+    Exit;
+  P := TProcess.Create(nil);
+  Args := TStringList.Create;
+  S := TStringStream.Create('');
+  try
+    P.Executable := B.FormatTool;
+    B.FormatArguments(FileName, Args);
+    for I := 0 to Args.Count - 1 do
+      P.Parameters.Add(Args[I]);
+    P.CurrentDirectory := B.WorkDir(FileName);
+    P.Options := [poUsePipes, poStderrToOutput];
+    try
+      P.Execute;
+    except
+      on E: Exception do
+      begin
+        Output := E.Message;
+        Exit;
+      end;
+    end;
+    repeat
+      N := P.Output.Read(Buf, SizeOf(Buf));
+      if N > 0 then
+        S.Write(Buf, N);
+    until N <= 0;
+    P.WaitOnExit;
+    Output := Trim(S.DataString);
+    Result := P.ExitStatus = 0;
+  finally
+    S.Free;
+    Args.Free;
+    P.Free;
+  end;
 end;
 
 var

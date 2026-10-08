@@ -150,6 +150,23 @@ begin
     WriteLn('(go is not installed: the checks of the real tool are skipped)');
   A.Free;
 
+  { the template of a new file and the formatter }
+  Check(Pos('func main()', B.NewFileText) > 0, 'a new Go file has a template with main');
+  Check(B.FormatTool = 'gofmt', 'the formatter of Go is gofmt');
+  if FileExists('/usr/local/go/bin/gofmt') or FileExists('/usr/bin/gofmt') then
+  begin
+    Src := Write(Dir + 'lone/ugly.go', 'package main' + LineEnding + 'func  f( ){ }' + LineEnding);
+    Check(FormatFile(B, Src, Out_), 'gofmt formats a file: ' + Out_);
+    Lines := TStringList.Create;
+    Lines.LoadFromFile(Src);
+    Check(Pos('func f() {', Lines.Text) > 0, 'the file is formatted');
+    Lines.Free;
+    Src := Write(Dir + 'lone/broken.go', 'package main' + LineEnding + 'func (' + LineEnding);
+    Check(not FormatFile(B, Src, Out_), 'gofmt fails on a file that does not parse');
+    Check(Out_ <> '', 'the message of gofmt is returned');
+    DeleteFile(Dir + 'lone/ugly.go'); DeleteFile(Dir + 'lone/broken.go');
+  end;
+
   DeleteFile(Dir + 'lone/main'); DeleteFile(Dir + 'lone/main.go');
   DeleteFile(Dir + 'mod/go.mod'); DeleteFile(Dir + 'mod/sub/main.go'); DeleteFile(Dir + 'mod/sub/lib.go');
   RemoveDir(Dir + 'lone'); RemoveDir(Dir + 'mod/sub'); RemoveDir(Dir + 'mod'); RemoveDir(Dir);

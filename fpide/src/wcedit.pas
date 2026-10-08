@@ -100,6 +100,8 @@ type
       function    SaveAsk(Force: boolean): Boolean; virtual;
       function    LoadFile: boolean; virtual;
       function    ReloadFile: boolean; virtual;
+      { the same without a question: for a file that the IDE itself rewrote (a formatter) }
+      function    ReloadSilently: boolean; virtual;
       function    SaveFile: boolean; virtual;
       function    Valid(Command: Word): Boolean; override;
       procedure   HandleEvent(var Event: TEvent); override;
@@ -456,6 +458,22 @@ begin
       EditorDialog(edReadError,@FileName);
     end;
   ReloadFile:=OK;
+end;
+
+function TFileEditor.ReloadSilently: boolean;
+var OK: boolean;
+begin
+  OK:=LoadFile;
+  if OK then
+    begin
+      SetModified(false);
+      Core.OnDiskLoadTime:=Cardinal(GetFileTime(FileName));
+      Core.SystemLoadTime:=Core.OnDiskLoadTime;
+      DrawView;
+    end
+  else
+    EditorDialog(edReadError,@FileName);
+  ReloadSilently:=OK;
 end;
 
 function TFileEditor.ShouldSave: boolean;

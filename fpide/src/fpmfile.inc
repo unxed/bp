@@ -135,6 +135,9 @@ begin
          NewPSW:=OpenEditorWindow(nil,'',0,0);
          NewPSW.Editor.FileName:=FileName;
          NewPSW.SetTitle(FileName);
+         { a file of another language that does not exist yet starts with the text that the language gives }
+         if (BackendFor(FileName)<>nil) and (BackendFor(FileName).NewFileText<>'') then
+           NewPSW.Editor.InsertText(BackendFor(FileName).NewFileText);
          Message(Application,evBroadcast,cmFileNameChanged,NewPSW.Editor);
        end;
    end;
