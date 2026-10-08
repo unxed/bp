@@ -95,7 +95,7 @@ begin
   else
     ToFocus:=-1;
   if CaptureToolTo<>capNone then
-    ShowMessage(FormatStrStr(msg_executingtool,KillTilde(Title)));
+    ShowMessage(FormatStrStr(msg_executingtool,StripTilde(Title)));
 
   Executed:=DoExecute(ProgramPath,Params,'',CaptureFile,ToolCaptureErr,ExecMode);
 
@@ -122,7 +122,7 @@ begin
             begin
               if ToolFilter<>'' then
                 begin
-                  ShowMessage(FormatStrStr(msg_executingfilterfor,KillTilde(Title)));
+                  ShowMessage(FormatStrStr(msg_executingfilterfor,StripTilde(Title)));
                   DoExecute(ToolFilter,'',CaptureFile,FilterCaptureName,'',exNoSwap);
                   HideMessage;
                   if (DosError=0) and (DosExitCode=0) then
@@ -134,7 +134,7 @@ begin
                           ErrorBox(msg_errorprocessingfilteredoutput,nil);
                     end;
                   if (DosError<>0) then
-                    ErrorBox(FormatStrStr(msg_errorexecutingfilter,KillTilde(GetToolName(Idx-1))),nil) else
+                    ErrorBox(FormatStrStr(msg_errorexecutingfilter,StripTilde(GetToolName(Idx-1))),nil) else
                   if DosExitCode<>0 then
                     ErrorBox(FormatStrInt(msg_filterexecutionsuccessfulexitcodeis,DosExitCode),nil);
                 end
@@ -167,7 +167,7 @@ begin
   if (DosError<>0) or (DosExitCode<>0) or (SizeOfFile(ToolCaptureErr)>0) then
     begin
       if (DosError<>0) then
-        ErrorBox(FormatStrStr(msg_errorexecutingtool,KillTilde(GetToolName(Idx-1))),nil) else
+        ErrorBox(FormatStrStr(msg_errorexecutingtool,StripTilde(GetToolName(Idx-1))),nil) else
       if DosExitCode<>0 then
         ErrorBox(FormatStrInt(msg_toolexecutionsuccessfulexitcodeis,DosExitCode),nil);
 {$i-}
