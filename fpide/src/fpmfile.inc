@@ -85,8 +85,8 @@ begin
   if not OpenIt then
    begin
      GetDir(0,StoreDir);
-{$ifndef Unix}   { drive letters exist on DOS / Windows only }
-     if (Length(FileDir)>1) and (FileDir[2]=':') then
+     { a drive letter (there are none on Unix) }
+     if Length(PathDrive(FileDir))=2 then
        begin
          { does not assume that lowercase are greater then uppercase ! }
          if (FileDir[1]>='a') and (FileDir[1]<='z') then
@@ -95,7 +95,6 @@ begin
            DriveNumber:=Ord(FileDir[1])-ord('A')+1;
          GetDir(DriveNumber,StoreDir2);
        end;
-{$endif}
      if (FileDir<>'') and ExistsDir(FileDir) then
        ChDir(TrimEndSlash(FileDir));
      D := TFileDialog.Create(OpenExts,dialog_openafile,label_filetoopen,fdOpenButton,hidOpenSourceFile);
@@ -109,8 +108,8 @@ begin
        Begin
          FileName := D.GetFileName;
          OpenExts:=D.WildCard;
-         if ExistsDir(DirOf(FExpand(FileName))) then
-           FileDir:=DirOf(FExpand(FileName));
+         if ExistsDir(DirOf(ExpandPath(FileName))) then
+           FileDir:=DirOf(ExpandPath(FileName));
        End;
      D.Free;
      if DriveNumber<>0 then
@@ -119,7 +118,7 @@ begin
    end;
   if OpenIt then
    begin
-     FileName:=FExpand(LocatePasFile(FileName));
+     FileName:=ExpandPath(LocatePasFile(FileName));
      if ExistsFile(FileName) then
        begin
      { like for BP unexistant files should  be created PM }
@@ -167,7 +166,7 @@ begin
    end;
   if OpenIt then
    begin
-     FileName:=FExpand(LocatePasFile(FileName));
+     FileName:=ExpandPath(LocatePasFile(FileName));
      Dir:=DirOf(FileName);
      P:=@Dir;
      If Pos(Dir+';',GetSourceDirectories)=0 then

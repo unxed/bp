@@ -187,7 +187,7 @@ uses
   fpKeys,TvUnix,
 {$endif Unix}
   FpDpAnsi,WConsts,
-  Video,Mouse,Keyboard,TvActions,TvMenus,TvCStr,
+  Video,Mouse,Keyboard,TvActions,TvMenus,TvCStr,TvPath,
 {$ifdef EMBED_COMPILER}
   Compiler,
 {$endif}
@@ -1482,7 +1482,7 @@ begin
                                    begin
                                      W:=LastSourceEditor;
                                      if assigned(W) then
-                                       FSplit(W.Editor.FileName,DS,NS,ES)
+                                       SplitPath(W.Editor.FileName,DS,NS,ES)
                                      else
                                        DS:='';
                                      Open(OpenFileName,DS);

@@ -639,7 +639,7 @@ uses
   Strings,Video,MsgBox,App,StdDlg,Validate,
   TvClip,TvColors,TvKeys,TvEvents,TvDrawBuf,
   TveLayout,TveBlocks,TveCmds,TveLang,
-  WConsts,WCEdit,TvUStr,TvUtf8;
+  WConsts,WCEdit,TvUStr,TvUtf8,TvPath;
 
 
 type
@@ -3867,8 +3867,8 @@ begin
         Name:=PString(Info)^;
         GetDir(0,StoreDir);
         DriveNumber:=0;
-{$ifndef Unix}   { drive letters exist on DOS / Windows only; "a:b" is a directory name on Unix }
-        if (Length(FileDir)>1) and (FileDir[2]=':') then
+        { a drive letter (there are none on Unix) }
+        if Length(PathDrive(FileDir))=2 then
           begin
             { does not assume that lowercase are greater then uppercase ! }
             if (FileDir[1]>='a') and (FileDir[1]<='z') then
@@ -3881,7 +3881,6 @@ begin
             EatIO;
             {$I+}
           end;
-{$endif}
         if FileDir<>'' then
           begin
             {$I-}
@@ -3927,7 +3926,7 @@ begin
         end;
         if (Re<>cmCancel) and AskOW then
           begin
-            FileDir:=DirOf(FExpand(Name));
+            FileDir:=DirOf(ExpandPath(Name));
             if ExistsFile(Name) then
               if EditorDialog(edReplaceFile,@Name)<>cmYes then
                 Re:=cmCancel;
