@@ -50,7 +50,7 @@ uses
   FPViews;
 
 type
-  TCompileMode = (cBuild,cMake,cCompile,cRun);
+  TCompileMode = (cBuild,cMake,cCompile,cRun,cTest);
 
 type
     TCompilerMessage = class;
@@ -170,7 +170,7 @@ uses
   FPUsrScr,FPHelp,
 {$ifndef NODEBUG}FPDebug,{$endif}
   FPConst,FPVars,FPUtils,
-  FPCodCmp,FPIntf,FPSwitch;
+  FPCodCmp,FPIntf,FPSwitch,FpLang;
 
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
@@ -915,6 +915,11 @@ begin
       ErrorBox(msg_cantcompileunsavedfile,nil);
       Exit;
     end; }
+  if (Mode=cTest) and (BackendFor(FileName)=nil) then
+    begin
+      ErrorBox('Tests are run for Go programs only',nil);
+      Exit;
+    end;
   PushStatus('Beginning compilation...');
 { Show Compiler Messages Window }
 {  if not CompilerMessageWindow.GetState(sfVisible) then

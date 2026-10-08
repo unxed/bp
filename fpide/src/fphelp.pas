@@ -159,6 +159,7 @@ const
       hint_compile           = 'Compile the current source file';
       hint_make              = 'Rebuild source file and all other files that have been modified';
       hint_build             = 'Rebuild program and all available source files';
+      hint_testlang          = 'Run the tests of the program (Go: go test)';
       hint_target            = 'Select target platform to compile for';
       hint_primaryfile       = 'Define the file that is the focus of Make and Build';
       hint_clearprimaryfile  = 'Clear the file previously set to Primary';
@@ -327,6 +328,7 @@ begin
     hcCompile       : S:=hint_compile;
     hcMake          : S:=hint_make;
     hcBuild         : S:=hint_build;
+    hcTestLang      : S:=hint_testlang;
     hcTarget        : S:=hint_target;
     hcPrimaryFile   : S:=hint_primaryfile;
     hcClearPrimary  : S:=hint_clearprimaryfile;

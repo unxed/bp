@@ -526,7 +526,7 @@ const
       EditorCmds  : TCommandSet =
         ([cmPrint,cmFind,cmReplace,cmSearchAgain,cmJumpLine,cmHelpTopicSearch,cmSelectAll,cmUnselect]);
       CompileCmds : TCommandSet =
-        ([cmMake,cmBuild,cmRun]);
+        ([cmMake,cmBuild,cmRun,cmTestLang]);
 
       CalcClipboard   : extended = 0;
 

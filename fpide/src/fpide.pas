@@ -293,6 +293,7 @@ resourcestring  menu_local_gotosource = '~G~oto source';
                 menu_compile_compile   = '~C~ompile';
                 menu_compile_make      = '~M~ake';
                 menu_compile_build     = '~B~uild';
+                menu_compile_test      = '~T~est';
                 menu_compile_target    = '~T~arget...';
                 menu_compile_primaryfile = '~P~rimary file...';
                 menu_compile_clearprimaryfile = 'C~l~ear primary file';
@@ -932,13 +933,14 @@ begin
       NewItem(menu_compile_compile,menu_key_compile_compile, kbAltF9, cmCompile, hcCompile,
       NewItem(menu_compile_make,menu_key_compile_make, kbF9, cmMake, hcMake,
       NewItem(menu_compile_build,'', kbNoKey, cmBuild, hcBuild,
+      NewItem(menu_compile_test,'', kbNoKey, cmTestLang, hcTestLang,
       NewLine(
       NewItem(menu_compile_target,'', kbNoKey, cmTarget, hcTarget,
       NewItem(menu_compile_primaryfile,'', kbNoKey, cmPrimaryFile, hcPrimaryFile,
       NewItem(menu_compile_clearprimaryfile,'', kbNoKey, cmClearPrimary, hcClearPrimary,
       NewLine(
       NewItem(menu_compile_compilermessages,menu_key_compile_compilermessages, kbF12, cmCompilerMessages, hcCompilerMessages,
-      nil)))))))))),
+      nil))))))))))),
     NewSubMenu(menu_debug, hcDebugMenu, NewMenu(
       NewItem(menu_debug_output,'', kbNoKey, cmUserScreenWindow, hcUserScreenWindow,
       NewItem(menu_debug_userscreen,menu_key_debug_userscreen, kbAltF5, cmUserScreen, hcUserScreen,
@@ -1322,6 +1324,7 @@ begin
            { -- Compile menu -- }
              cmCompile       : DoCompile(cCompile);
              cmBuild         : DoCompile(cBuild);
+             cmTestLang      : DoCompile(cTest);
              cmMake          : DoCompile(cMake);
              cmTarget        : Target;
              cmPrimaryFile   : DoPrimaryFile;

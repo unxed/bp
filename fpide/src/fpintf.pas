@@ -354,7 +354,11 @@ begin
         CompilerMessageWindow.AddMessage(Lv,M.Text,'',0,0);
     end
   else if (CompileModeNow=Ord(lmTest)) and (Trim(L)<>'') then
-    CompilerMessageWindow.AddMessage(V_Info,L,'',0,0);
+    begin
+      CompilerMessageWindow.AddMessage(V_Info,L,'',0,0);
+      if not CompilerMessageWindow.GetState(sfVisible) then
+        CompilerMessageWindow.Show;
+    end;
 end;
 
 function BackendOutFile(B: TLangBackend): string;

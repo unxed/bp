@@ -166,6 +166,7 @@ const
      cmCompile           = 212;
      cmMake              = 213;
      cmBuild             = 214;
+     cmTestLang          = 3071;     { the tests of the program of a language that has them (Go: go test) }
      cmTarget            = 215;
      cmPrimaryFile       = 216;
      cmClearPrimary      = 217;
@@ -399,6 +400,7 @@ const
      hcCompile           = hcShift+cmCompile;
      hcMake              = hcShift+cmMake;
      hcBuild             = hcShift+cmBuild;
+     hcTestLang          = hcShift+cmTestLang;
      hcTarget            = hcShift+cmTarget;
      hcPrimaryFile       = hcShift+cmPrimaryFile;
      hcClearPrimary      = hcShift+cmClearPrimary;
