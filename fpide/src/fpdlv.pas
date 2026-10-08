@@ -24,6 +24,21 @@ type
   { called while the program runs; True asks to interrupt it (the key Esc) }
   TDlvIdleFunc = function: Boolean;
 
+  { a breakpoint of a file: the line (1 based), an expression that must be true for the stop, a hit condition of dlv ("> 2" stops from the third hit on) }
+  TDlvBreakpoint = record
+    Line: LongInt;
+    Condition: string;
+    HitCondition: string;
+  end;
+
+  { one frame of the call stack }
+  TDlvFrame = record
+    Id: Int64;
+    Name: string;
+    FileName: string;
+    Line: LongInt;
+  end;
+
   TDlvSession = class
   private
     FProc: TProcess;
@@ -39,6 +54,8 @@ type
     FOutput: AnsiString;
     FError: string;
     FLog: TStringList;
+    FFrames: array of TDlvFrame;
+    FSelected: LongInt;
     procedure DrainProcess;
     function ReadMessage(TimeoutMs: LongInt): TJSONObject;
     procedure Handle(Msg: TJSONObject);
@@ -48,6 +65,7 @@ type
     function Resume(const Command: string): TDlvResult;
     procedure ReadStop;
     procedure Fail(const Msg: string);
+    function SelectedFrameId: Int64;
   public
     { called while the program runs }
     OnIdle: TDlvIdleFunc;
@@ -58,6 +76,8 @@ type
     function Start(const Tool, Mode, Prog, Cwd, Args: string): Boolean;
     { the breakpoints of one file (the lines are 1 based; none clears the file); the call may be made at any time }
     function SetBreakpoints(const FileName: string; const Lines: array of LongInt): Boolean;
+    { the same with a condition and a hit condition for each }
+    function SetBreakpointsEx(const FileName: string; const Bps: array of TDlvBreakpoint): Boolean;
     { a breakpoint on a function, for example main.main (the program held back stops in it) }
     function SetFunctionBreakpoint(const Name: string): Boolean;
     { lets the program run to the first stop }
@@ -66,8 +86,16 @@ type
     function StepOver: TDlvResult;
     function StepInto: TDlvResult;
     function StepOut: TDlvResult;
-    { the value of an expression in the frame where the program stopped; False when it has none }
+    { the value of an expression in the selected frame (the top one after a stop); False when it has none (Value is the reason then) }
     function Evaluate(const Expr: string; out Value: string): Boolean;
+    { the arguments and local variables of the selected frame as "name = value" lines }
+    function Locals(out Text: string): Boolean;
+    { the call stack of the stop (the frames are read at each stop) and the frame that expressions are evaluated in }
+    function FrameCount: LongInt;
+    function FrameAt(Index: LongInt): TDlvFrame;
+    property SelectedFrame: LongInt read FSelected write FSelected;
+    { text for the keyboard of the program (its standard input); a line needs its end of line }
+    procedure SendInput(const S: AnsiString);
     { ends the session and the program }
     procedure Stop;
     function Alive: Boolean;
@@ -91,6 +119,7 @@ const
   StartTimeout = 120000;      { building a program takes its time }
   ReplyTimeout = 30000;
   RunTimeout = 24 * 3600 * 1000;
+  MaxFrames = 20;
 
 function FileInPath(const Name: string): string;
 var
@@ -442,7 +471,7 @@ begin
       Exit;
     end;
   end;
-  FProc.CloseInput;               { the program reads nothing from the keyboard of the IDE }
+  { the input of dlv stays open: it is the standard input of the program (SendInput) }
   { the first line says where dlv listens: "DAP server listening at: 127.0.0.1:41207" }
   Deadline := GetTickCount64 + 20000;
   Line := '';
@@ -510,7 +539,7 @@ begin
   A1.Add('program', Prog);
   A1.Add('cwd', Cwd);
   A1.Add('stopOnEntry', False);
-  A1.Add('stackTraceDepth', 8);
+  A1.Add('stackTraceDepth', MaxFrames);
   ArgList := TJSONArray.Create;
   L := TStringList.Create;
   try
@@ -547,8 +576,23 @@ end;
 
 function TDlvSession.SetBreakpoints(const FileName: string; const Lines: array of LongInt): Boolean;
 var
+  B: array of TDlvBreakpoint;
+  I: Integer;
+begin
+  SetLength(B, Length(Lines));
+  for I := 0 to High(Lines) do
+  begin
+    B[I].Line := Lines[I];
+    B[I].Condition := '';
+    B[I].HitCondition := '';
+  end;
+  Result := SetBreakpointsEx(FileName, B);
+end;
+
+function TDlvSession.SetBreakpointsEx(const FileName: string; const Bps: array of TDlvBreakpoint): Boolean;
+var
   A, Src: TJSONObject;
-  Arr, Bps: TJSONArray;
+  Arr, List: TJSONArray;
   B, Resp: TJSONObject;
   I: Integer;
 begin
@@ -557,15 +601,19 @@ begin
   Src.Add('path', FileName);
   A.Add('source', Src);
   Arr := TJSONArray.Create;
-  Bps := TJSONArray.Create;
-  for I := Low(Lines) to High(Lines) do
+  List := TJSONArray.Create;
+  for I := Low(Bps) to High(Bps) do
   begin
     B := TJSONObject.Create;
-    B.Add('line', Lines[I]);
-    Bps.Add(B);
-    Arr.Add(Lines[I]);
+    B.Add('line', Bps[I].Line);
+    if Bps[I].Condition <> '' then
+      B.Add('condition', Bps[I].Condition);
+    if Bps[I].HitCondition <> '' then
+      B.Add('hitCondition', Bps[I].HitCondition);
+    List.Add(B);
+    Arr.Add(Bps[I].Line);
   end;
-  A.Add('breakpoints', Bps);
+  A.Add('breakpoints', List);
   A.Add('lines', Arr);
   Result := Request('setBreakpoints', A, Resp, ReplyTimeout);
   Resp.Free;
@@ -590,13 +638,16 @@ procedure TDlvSession.ReadStop;
 var
   A, Resp, F, S: TJSONObject;
   Frames: TJSONArray;
+  I: Integer;
 begin
   FStopFile := '';
   FStopLine := 0;
+  SetLength(FFrames, 0);
+  FSelected := 0;
   A := TJSONObject.Create;
   A.Add('threadId', FThread);
   A.Add('startFrame', 0);
-  A.Add('levels', 1);
+  A.Add('levels', MaxFrames);
   if not Request('stackTrace', A, Resp, ReplyTimeout) then
   begin
     FError := '';                 { a program that cannot tell where it is stays stopped }
@@ -605,15 +656,39 @@ begin
   if (Resp <> nil) and (Resp.Find('stackFrames') <> nil) and (Resp.Find('stackFrames').JSONType = jtArray) then
   begin
     Frames := TJSONArray(Resp.Find('stackFrames'));
-    if (Frames.Count > 0) and (Frames[0].JSONType = jtObject) then
+    for I := 0 to Frames.Count - 1 do
+      if Frames[I].JSONType = jtObject then
+      begin
+        F := TJSONObject(Frames[I]);
+        S := Obj(F, 'source');
+        SetLength(FFrames, Length(FFrames) + 1);
+        with FFrames[High(FFrames)] do
+        begin
+          Id := Num(F, 'id', 0);
+          Name := Str(F, 'name');
+          FileName := Str(S, 'path');
+          Line := Num(F, 'line', 0);
+        end;
+      end;
+    if Length(FFrames) > 0 then
     begin
-      F := TJSONObject(Frames[0]);
-      S := Obj(F, 'source');
-      FStopFile := Str(S, 'path');
-      FStopLine := Num(F, 'line', 0);
+      FStopFile := FFrames[0].FileName;
+      FStopLine := FFrames[0].Line;
     end;
   end;
   Resp.Free;
+end;
+
+function TDlvSession.FrameCount: LongInt;
+begin
+  Result := Length(FFrames);
+end;
+
+function TDlvSession.FrameAt(Index: LongInt): TDlvFrame;
+begin
+  FillChar(Result, SizeOf(Result), 0);
+  if (Index >= 0) and (Index < Length(FFrames)) then
+    Result := FFrames[Index];
 end;
 
 function TDlvSession.Wait(TimeoutMs: LongInt): TDlvResult;
@@ -695,44 +770,105 @@ begin
   Result := Resume('stepOut');
 end;
 
+function TDlvSession.SelectedFrameId: Int64;
+begin
+  Result := 0;
+  if (FSelected >= 0) and (FSelected < Length(FFrames)) then
+    Result := FFrames[FSelected].Id
+  else if Length(FFrames) > 0 then
+    Result := FFrames[0].Id;
+end;
+
 function TDlvSession.Evaluate(const Expr: string; out Value: string): Boolean;
 var
   A, Resp: TJSONObject;
-  St, Body: TJSONObject;
-  Frames: TJSONArray;
-  FrameId: Int64;
 begin
   Result := False;
   Value := '';
   if (FSock < 0) or FTerminated then
     Exit;
-  FrameId := 0;
-  A := TJSONObject.Create;
-  A.Add('threadId', FThread);
-  A.Add('startFrame', 0);
-  A.Add('levels', 1);
-  if not Request('stackTrace', A, St, ReplyTimeout) then
-    Exit;
-  if (St <> nil) and (St.Find('stackFrames') <> nil) and (St.Find('stackFrames').JSONType = jtArray) then
-  begin
-    Frames := TJSONArray(St.Find('stackFrames'));
-    if (Frames.Count > 0) and (Frames[0].JSONType = jtObject) then
-      FrameId := Num(TJSONObject(Frames[0]), 'id', 0);
-  end;
-  St.Free;
   A := TJSONObject.Create;
   A.Add('expression', Expr);
-  A.Add('frameId', FrameId);
+  A.Add('frameId', SelectedFrameId);
   A.Add('context', 'watch');
-  Body := nil;
   Resp := nil;
   Result := Request('evaluate', A, Resp, ReplyTimeout);
   if Result then
     Value := Str(Resp, 'result')
   else
+  begin
+    Value := FError;              { "evaluate: could not find symbol value for x": the reason is the value of a watch that has none }
+    if Pos('evaluate: ', Value) = 1 then
+      Delete(Value, 1, 10);
     FError := '';
+  end;
   Resp.Free;
-  Body.Free;
+end;
+
+function TDlvSession.Locals(out Text: string): Boolean;
+var
+  A, Resp, Sc, V, R2: TJSONObject;
+  Scopes, Vars: TJSONArray;
+  I, J: Integer;
+  Ref: Int64;
+begin
+  Result := False;
+  Text := '';
+  if (FSock < 0) or FTerminated then
+    Exit;
+  A := TJSONObject.Create;
+  A.Add('frameId', SelectedFrameId);
+  if not Request('scopes', A, Resp, ReplyTimeout) then
+  begin
+    FError := '';
+    Exit;
+  end;
+  Result := True;
+  if (Resp <> nil) and (Resp.Find('scopes') <> nil) and (Resp.Find('scopes').JSONType = jtArray) then
+  begin
+    Scopes := TJSONArray(Resp.Find('scopes'));
+    for I := 0 to Scopes.Count - 1 do
+    begin
+      if Scopes[I].JSONType <> jtObject then
+        Continue;
+      Sc := TJSONObject(Scopes[I]);
+      if Pos('Local', Str(Sc, 'name')) = 0 then      { "Locals" holds the arguments too; the globals are not listed }
+        Continue;
+      Ref := Num(Sc, 'variablesReference', 0);
+      if Ref = 0 then
+        Continue;
+      A := TJSONObject.Create;
+      A.Add('variablesReference', Ref);
+      if not Request('variables', A, R2, ReplyTimeout) then
+      begin
+        FError := '';
+        Continue;
+      end;
+      if (R2 <> nil) and (R2.Find('variables') <> nil) and (R2.Find('variables').JSONType = jtArray) then
+      begin
+        Vars := TJSONArray(R2.Find('variables'));
+        for J := 0 to Vars.Count - 1 do
+          if Vars[J].JSONType = jtObject then
+          begin
+            V := TJSONObject(Vars[J]);
+            if Text <> '' then
+              Text := Text + #10;
+            Text := Text + Str(V, 'name') + ' = ' + Str(V, 'value');
+          end;
+      end;
+      R2.Free;
+    end;
+  end;
+  Resp.Free;
+end;
+
+procedure TDlvSession.SendInput(const S: AnsiString);
+begin
+  if (FProc <> nil) and (FProc.Input <> nil) and (S <> '') then
+    try
+      FProc.Input.Write(S[1], Length(S));
+    except
+    end;
 end;
 
 procedure TDlvSession.Stop;

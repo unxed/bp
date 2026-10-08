@@ -462,6 +462,21 @@ def section_debuggo(t):
     check(t.wait_until(lambda: go_line_colors(t, '// dbgo')[10] != plain[10], 90),
           'Run starts Delve and stops at the breakpoint: line 11 is painted as the debugger row', t)
     check(t.alive(), 'the IDE is alive while the program is stopped', t)
+    # Evaluate, Watches and Call stack are served by Delve while the program is stopped
+    t.key('C-F4')
+    check(t.wait_for('Evaluate expression', 4), 'Debug > Evaluate opens', t)
+    t.type('x + 1'); t.key('Enter')
+    check(t.wait_for('= 21', 8), 'Evaluate asks Delve: x + 1 is 21', t)
+    t.key('Escape')
+    t.key('C-F7')
+    check(t.wait_for('Edit Watch', 4), 'Ctrl+F7 adds a watch', t)
+    t.type('x'); t.key('Enter')
+    check(t.wait_for('x = 20', 8), 'the watch x shows the value from Delve: x = 20', t)
+    menu(t, 'M-w', 'Close', exact=True)
+    menu(t, 'M-d', 'Call stack')
+    check(t.wait_for('main.main', 8) and 'dbgo.go(11)' in t.text(), 'the Call stack window lists main.main with its line', t)
+    menu(t, 'M-w', 'Close', exact=True)
+    t.pump(0.4)
     t.key('F8')
     check(t.wait_until(lambda: go_line_colors(t, '// dbgo')[11] not in (plain[11], None) and go_line_colors(t, '// dbgo')[10] == plain[10]
                        or t.indicator()[0] == 12, 30), 'F8 steps over the call: the cursor moves to line 12: %r' % (t.indicator(),), t)
@@ -493,6 +508,68 @@ def section_debuggo(t):
     names = [r[1] for r in t._menu_rows()]
     t.key('Escape')
     check(names and names[0].startswith('Run'), 'the first Run item is Run again after the end: %r' % (names[:1],), t)
+    close_all(t)
+    # the condition of a breakpoint goes to Delve
+    src = ['package main  // dbgcond', '', 'import "fmt"', '', 'func main() {', '\tfor i := 0; i < 6; i++ {', '\t\tfmt.Println("i", i)', '\t}', '}']
+    with open(os.path.join(t.work, 'dbgcond.go'), 'w') as f:
+        f.write('\n'.join(src) + '\n')
+    t.key('F3'); t.wait_for('Open a file'); t.type('dbgcond.go'); t.key('Enter')
+    check(t.wait_for('dbgcond.go'), 'dbgcond.go is opened', t)
+    t.key('C-Home', *(['Down'] * 6), 'Home')
+    menu(t, 'M-d', 'Breakpoint', exact=True)
+    menu(t, 'M-d', 'Breakpoint List')
+    pos = None
+    for i, l in enumerate(t.lines()):
+        if 'Close' in l and 'Edit' in l and 'New' in l:
+            pos = (l.index('Edit') + 1, i)
+    check(pos is not None, 'the list of breakpoints has the Edit button', t)
+    if pos:
+        t.key('End')             # the new breakpoint is the last one; the one of the run before is still in the list
+        t.click(*pos)
+        check(t.wait_for('Modify/New Breakpoint', 4), 'Edit opens the breakpoint dialog', t)
+        t.key('Tab'); t.type('i == 3'); t.key('Enter')
+        t.pump(0.5)
+        pos = None
+        for i, l in enumerate(t.lines()):
+            if 'Close' in l and 'Edit' in l and 'New' in l:
+                pos = (l.index('Close') + 1, i)
+        if pos:
+            t.click(*pos)
+        t.pump(0.5)
+    t.menu('M-r', 'Run', exact=True)
+    check(t.wait_until(lambda: t.indicator() == (7, 1), 90), 'the condition stops the program on line 7: %r' % (t.indicator(),), t)
+    t.pump(1)
+    t.key('C-F4')
+    t.wait_for('Evaluate expression', 4)
+    t.type('i'); t.key('Enter')
+    check(t.wait_for('= 3', 8), 'and only when i is 3 (the first three hits did not stop)', t)
+    t.key('Escape')
+    menu(t, 'M-r', 'Program reset')
+    t.pump(1)
+    close_all(t)
+    # the output of the program is listed while it runs and the keyboard goes to its standard input
+    src = ['package main  // dbgin', '', 'import (', '\t"bufio"', '\t"fmt"', '\t"os"', ')', '', 'func main() {',
+           '\tfmt.Println("hello out")', '\tsc := bufio.NewScanner(os.Stdin)', '\tsc.Scan()', '\ttxt := sc.Text()', '\tfmt.Println("got", txt)', '}']
+    with open(os.path.join(t.work, 'dbgin.go'), 'w') as f:
+        f.write('\n'.join(src) + '\n')
+    t.key('F3'); t.wait_for('Open a file'); t.type('dbgin.go'); t.key('Enter')
+    check(t.wait_for('dbgin.go'), 'dbgin.go is opened', t)
+    t.key('C-Home', *(['Down'] * 13), 'Home')
+    menu(t, 'M-d', 'Breakpoint', exact=True)
+    t.menu('M-r', 'Run', exact=True)
+    check(t.wait_for('hello out', 90), 'the output of the running program is listed at once (Messages window)', t)
+    t.type('abc')
+    check(t.wait_for('Program input', 5) and 'abc' in t.lines()[-1], 'typing shows the line for the standard input in the status line', t)
+    t.key('Enter')
+    check(t.wait_until(lambda: t.indicator() == (14, 1), 30), 'the program read the line and stopped at the breakpoint (14): %r' % (t.indicator(),), t)
+    t.pump(1)
+    t.key('C-F4')
+    t.wait_for('Evaluate expression', 4)
+    t.type('txt'); t.key('Enter')
+    check(t.wait_for('abc', 8) and '"abc"' in t.text(), 'txt is "abc": the input reached the program', t)
+    t.key('Escape')
+    menu(t, 'M-r', 'Program reset')
+    t.pump(1)
     close_all(t)
 
 

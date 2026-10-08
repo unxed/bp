@@ -61,6 +61,10 @@ Make/Build (`go build`, в модуле собирается пакет файл
 Alt+F4 step out, F4 run to cursor, Continue, Program reset; точки останова из списка IDE (Ctrl+F8) передаются dlv перед каждым запуском; строка остановки
 подсвечивается как debugger row; в конце — окно с кодом выхода и последними строками вывода программы. Юнит-тест `tests/unit/t_fpdlv.pas`
 (настоящий dlv, пропускается без dlv/go), приёмка `test_functions.py <fp> debuggo`.
-Не сделано для Go: окна Watches/Call stack/Registers/Evaluate (только gdb), условия и ignore-счётчики точек останова, ввод с клавиатуры в отлаживаемую
-программу (stdin закрыт), вывод программы показывается по завершении, а не вживую; Delve проверен версией 1.25.2 с Go 1.24 (dlv 1.27 требует более новый Go); ошибки сборки программы попадают в окно Compiler Messages.
+Done for Go since: the Watches, Evaluate (Ctrl+F4) and Call stack windows are served by Delve while a session is open (hooks `ForeignEval`,
+`ForeignFrame*` in `fpdebug.pas`; the expression `$locals` lists the arguments and local variables; choosing a frame in the Call stack window evaluates in it);
+the condition and the ignore count of a breakpoint go to dlv (`condition` and `hitCondition` "> N" of `setBreakpoints`); the output of the running program is
+listed live in the Messages window and the keyboard goes to its standard input (the status line shows the line, Enter sends it, Esc interrupts the program).
+Not done for Go: the Registers, FPU, vector and Disassembly windows (dlv has no DAP request for them), expressions with function calls (Delve refuses them),
+breakpoints on a function name or a watchpoint from the IDE list. Delve was checked with 1.25.2 and Go 1.24 (dlv 1.27 needs a newer Go); build errors of the program go to the Compiler Messages window.
 Другие языки в задание не входили: класс `TLangBackend` готов, но новых языков не добавляем без отдельного запроса.

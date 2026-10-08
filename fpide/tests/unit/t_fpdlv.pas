@@ -45,8 +45,27 @@ const
     #9 + 'fmt.Println("sum", y)' + LineEnding +               { 12 }
     '}' + LineEnding;
 
+const
+  Prog2 = 'package main' + LineEnding +                      { 1 }
+    LineEnding +                                              { 2 }
+    'import (' + LineEnding +                                 { 3 }
+    #9 + '"bufio"' + LineEnding +                             { 4 }
+    #9 + '"fmt"' + LineEnding +                               { 5 }
+    #9 + '"os"' + LineEnding +                                { 6 }
+    ')' + LineEnding +                                        { 7 }
+    LineEnding +                                              { 8 }
+    'func main() {' + LineEnding +                            { 9 }
+    #9 + 'for i := 0; i < 5; i++ {' + LineEnding +            { 10 }
+    #9#9 + 'fmt.Println("i", i)' + LineEnding +               { 11 }
+    #9 + '}' + LineEnding +                                   { 12 }
+    #9 + 'sc := bufio.NewScanner(os.Stdin)' + LineEnding +     { 13 }
+    #9 + 'sc.Scan()' + LineEnding +                            { 14 }
+    #9 + 'fmt.Println("read", sc.Text())' + LineEnding +       { 15 }
+    '}' + LineEnding;
+
 var
   Dir, Src, Dlv, V: string;
+  Bp: array[0..0] of TDlvBreakpoint;
   S: TDlvSession;
   R: Boolean;
 begin
@@ -100,6 +119,39 @@ begin
     S.Stop;
     Check(not S.Alive, 'Stop ends the session');
     S.Free;
+
+    { condition, hit condition, call stack, locals, standard input }
+    Src := Write(Dir + 'q.go', Prog2);
+    S := TDlvSession.Create;
+    R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'start of the loop program: ' + S.Error);
+    Bp[0].Line := 11; Bp[0].Condition := 'i == 3'; Bp[0].HitCondition := '';
+    Check(S.SetBreakpointsEx(Src, Bp), 'a conditional breakpoint is set: ' + S.Error);
+    Check((S.Go = drStopped) and (S.StopLine = 11), 'it stops on line 11: ' + S.Error);
+    R := S.Evaluate('i', V); Check(R and (V = '3'), 'the condition held: i is 3: ' + V);
+    Check(S.FrameCount >= 1, 'the call stack has frames: ' + IntToStr(S.FrameCount));
+    Check(Pos('main.main', S.FrameAt(0).Name) > 0, 'the top frame is main.main: ' + S.FrameAt(0).Name);
+    Check(S.FrameAt(0).Line = 11, 'the top frame has the line: ' + IntToStr(S.FrameAt(0).Line));
+    R := S.Locals(V); Check(R and (Pos('i = 3', V) > 0), 'the locals have i = 3: ' + V);
+    R := S.Evaluate('nope + 1', V); Check(not R and (V <> ''), 'an expression with no value says why: ' + V);
+    Bp[0].Condition := ''; Bp[0].HitCondition := '';
+    Bp[0].Line := 14; Bp[0].HitCondition := '';
+    Check(S.SetBreakpointsEx(Src, Bp), 'a breakpoint before the read');
+    Check((S.Proceed = drStopped) and (S.StopLine = 14), 'stopped before sc.Scan(): ' + S.Error);
+    S.SendInput('hello'#10);
+    Check(S.SetBreakpointsEx(Src, []), 'cleared');
+    Check(S.Proceed = drExited, 'the program ends');
+    V := S.TakeOutput;
+    Check(Pos('read hello', V) > 0, 'the program got its standard input: ' + V);
+    S.Free;
+    { an ignore count: the first two hits do not stop }
+    S := TDlvSession.Create;
+    R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'start for the ignore count: ' + S.Error);
+    Bp[0].Line := 11; Bp[0].Condition := ''; Bp[0].HitCondition := '> 2';
+    Check(S.SetBreakpointsEx(Src, Bp), 'a breakpoint with an ignore count is set');
+    Check((S.Go = drStopped) and (S.StopLine = 11), 'it stops on line 11: ' + S.Error);
+    R := S.Evaluate('i', V); Check(R and (V = '2'), 'two hits were ignored: the stop is at i = 2 (' + V + ')');
+    S.Free;
+    DeleteFile(Dir + 'q.go');
 
     { a program that does not build }
     Src := Write(Dir + 'bad.go', 'package main' + LineEnding + 'func main() { x := nope }' + LineEnding);

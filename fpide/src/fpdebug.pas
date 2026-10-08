@@ -339,6 +339,24 @@ var
   BreakpointsCollection : PBreakpointCollection;
   WatchesCollection    : PwatchesCollection;
 
+type
+  { The debugger of another language (Delve for Go, unit fpgodbg) serves the windows of watches, evaluation and call stack through
+    these procedures while its session is open; with none set the windows talk to gdb. }
+  TForeignEvalFunc = function(const Expr: string; out Value: string): boolean;
+  TForeignFrameCountFunc = function: longint;
+  TForeignFrameProc = procedure(Index: longint; out Name, FileName: string; out Line: longint);
+  TForeignSelectFrameProc = procedure(Index: longint);
+
+var
+  ForeignEval: TForeignEvalFunc = nil;
+  ForeignFrameCount: TForeignFrameCountFunc = nil;
+  ForeignFrame: TForeignFrameProc = nil;
+  ForeignSelectFrame: TForeignSelectFrameProc = nil;
+  { changes at each stop of the foreign debugger: the values of the watches are read again }
+  ForeignRunCount: longint = 1;
+
+{ the stop of a foreign debugger or another frame: the watches (and the open windows of watches) are read again }
+procedure ForeignRereadWatches;
 procedure InitDebugger;
 procedure DoneDebugger;
 procedure InitGDBWindow;
@@ -595,6 +613,24 @@ end;
 {****************************************************************************
                             TDebugController
 ****************************************************************************}
+
+procedure ForeignRereadWatches;
+
+  procedure DoRead(PB : PWatch);
+  begin
+    PB.Get_new_value;
+  end;
+
+begin
+  inc(ForeignRunCount);
+  if Assigned(WatchesCollection) then
+    begin
+      WatchesCollection.ForEach(TNestedActionProc(@DoRead));
+      WatchesCollection.Update;
+    end;
+  If Assigned(WatchesWindow) then
+    WatchesWindow.Update;
+end;
 
 procedure UpdateDebugViews;
 
@@ -2841,6 +2877,7 @@ procedure TWatch.Get_new_value;
   var i, curframe, startframe : longint;
       s,s2,orig_s_result : AnsiString;
       loop_higher, found : boolean;
+      fv : ShortString;
 
     function GetValue(var s : AnsiString) : boolean;
       begin
@@ -2851,6 +2888,21 @@ procedure TWatch.Get_new_value;
       end;
 
   begin
+    if Assigned(ForeignEval) then
+      begin
+        { a session of the debugger of Go is open: Delve evaluates }
+        if GDBRunCount=ForeignRunCount then
+          exit;
+        GDBRunCount:=ForeignRunCount;
+        if assigned(last_value) then
+          strdispose(last_value);
+        last_value:=current_value;
+        if ForeignEval(GetStr(expr),fv) then
+          current_value:=StrNew(PChar(AnsiString('= ' + fv)))
+        else
+          current_value:=StrNew(PChar(AnsiString(fv)));
+        exit;
+      end;
     If not assigned(Debugger) or Not Debugger.HasExe or
        (GDBRunCount=Debugger.RunCount) then
       exit;
@@ -3465,9 +3517,25 @@ end;
 
     var i : longint;
         W : PSourceWindow;
+        fname,fsrc : string;
+        fline : longint;
 
     begin
 {$ifndef NODEBUG}
+      if Assigned(ForeignFrameCount) then
+        begin
+          DeskTop.Lock;
+          Clear;
+          for i:=0 to ForeignFrameCount()-1 do
+            begin
+              ForeignFrame(i,fname,fsrc,fline);
+              AddItem(TMessageItem.Create(0,fname,AddModuleName(fsrc),fline,1));
+            end;
+          if Assigned(list) and (List.Count > 0) then
+            FocusItem(0);
+          DeskTop.Unlock;
+          exit;
+        end;
       { call backtrace command }
       If not assigned(Debugger) then
         exit;
@@ -3525,6 +3593,14 @@ end;
 
   procedure TFramesListBox.GotoSource;
     begin
+      if Assigned(ForeignSelectFrame) then
+        begin
+          { the frame that expressions are evaluated in; the watches are read again }
+          ForeignSelectFrame(Focused);
+          ForeignRereadWatches;
+          inherited GotoSource;
+          exit;
+        end;
 {$ifndef NODEBUG}
       { select frame for watches }
       If not assigned(Debugger) then

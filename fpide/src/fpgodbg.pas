@@ -2,7 +2,10 @@
 
   MIT. A session starts with Run when a breakpoint is set in the Go file (or with F7/F8, which stop in
   main.main); the breakpoints of the list in the files of Go are handed to dlv before each run of the program; the line where it stops is
-  painted as the debugger row. The commands of gdb (call stack, watches, registers) are not served for Go. }
+  painted as the debugger row. The windows of watches, of Evaluate and of the call stack are served by Delve while a session is open
+  (fpdebug.ForeignEval and the like); the registers and the disassembly are not. Breakpoint conditions and ignore counts go to dlv.
+  While the program runs its output is listed live in the Messages window and what is typed goes to its standard input
+  (the status line shows the line; Enter sends it, Esc interrupts the program). }
 {$mode objfpc}{$H+}{$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 unit FpGoDbg;
@@ -21,7 +24,7 @@ implementation
 
 uses
   SysUtils, Classes, Objects, Drivers, Views, App, MsgBox, WViews, WEditor,
-  FpLang, FpDlv, FPConst, FPViews, FPVars, FPUtils, FPCompil, FPIde, FPHelp,
+  FpLang, FpDlv, FPConst, FPViews, FPVars, FPUtils, FPCompil, FPIde, FPHelp, FPTools,
 {$ifndef NODEBUG}
   FPDebug,
 {$endif}
@@ -54,12 +57,155 @@ begin
   Result := (Session <> nil) and Session.Alive;
 end;
 
-function EscPressed: Boolean;
+var
+  StdinLine: string = '';
+  OutputPending: string = '';
+
+{ the lines the program wrote so far are added to the Messages window }
+procedure PumpOutput;
+var
+  L: TStringList;
+  I: Integer;
+  Text: string;
+begin
+  if Session = nil then
+    Exit;
+  Text := OutputPending + Session.TakeOutput;
+  OutputPending := '';
+  if Text = '' then
+    Exit;
+  { an unfinished line waits for its end }
+  I := Length(Text);
+  while (I > 0) and (Text[I] <> #10) do
+    Dec(I);
+  OutputPending := Copy(Text, I + 1, MaxInt);
+  Text := Copy(Text, 1, I);
+  if Text = '' then
+    Exit;
+  if MessagesWindow = nil then
+    Message(Application, evCommand, cmToolsMessages, nil);
+  L := TStringList.Create;
+  try
+    L.Text := Text;
+    for I := 0 to L.Count - 1 do
+      AddToolMessage('', L[I], 0, 0);
+  finally
+    L.Free;
+  end;
+  UpdateToolMessages;
+end;
+
+{ while the program runs: the output is shown, keys go to its standard input, Esc interrupts it }
+function GoIdle: Boolean;
 var
   Event: TEvent;
+  S: string;
+  I: Integer;
 begin
-  GetKeyEvent(Event);
-  Result := (Event.What = evKeyDown) and (Event.KeyCode = kbEsc);
+  Result := False;
+  PumpOutput;
+  repeat
+    GetKeyEvent(Event);
+    if Event.What <> evKeyDown then
+      Break;
+    if Event.KeyCode = kbEsc then
+    begin
+      Result := True;
+      Break;
+    end
+    else if Event.KeyCode = kbEnter then
+    begin
+      Session.SendInput(StdinLine + #10);
+      AddToolMessage('', '> ' + StdinLine, 0, 0);
+      UpdateToolMessages;
+      StdinLine := '';
+    end
+    else if Event.KeyCode = kbBack then
+    begin
+      if StdinLine <> '' then
+      begin
+        I := Length(StdinLine);
+        while (I > 1) and ((Ord(StdinLine[I]) and $C0) = $80) do
+          Dec(I);
+        SetLength(StdinLine, I - 1);
+      end;
+    end
+    else if (Event.TextLength > 0) and (Ord(Event.Text[0]) >= 32) then
+    begin
+      SetString(S, PChar(@Event.Text[0]), Event.TextLength);
+      StdinLine := StdinLine + S;
+    end
+    else
+      Continue;
+    SetStatus('Program input (Enter sends, Esc interrupts): ' + StdinLine);
+  until False;
+end;
+
+{ the windows of watches, of Evaluate and of the call stack read Delve while a session is open }
+function HookEval(const Expr: ShortString; out Value: ShortString): Boolean;
+var
+  V: string;
+begin
+  Value := '';
+  if (Session = nil) or not Session.Alive then
+  begin
+    Value := 'no program is running';
+    Exit(False);
+  end;
+  if Trim(Expr) = '$locals' then
+  begin
+    Result := Session.Locals(V);
+    V := StringReplace(V, #10, ', ', [rfReplaceAll]);
+    if Result and (V = '') then
+      V := '(no variables)';
+  end
+  else
+    Result := Session.Evaluate(Expr, V);
+  Value := Copy(V, 1, 255);
+end;
+
+function HookFrameCount: LongInt;
+begin
+  if Session = nil then
+    Result := 0
+  else
+    Result := Session.FrameCount;
+end;
+
+procedure HookFrame(Index: LongInt; out Name, FileName: ShortString; out Line: LongInt);
+var
+  F: TDlvFrame;
+begin
+  F := Session.FrameAt(Index);
+  Name := F.Name;
+  FileName := F.FileName;
+  Line := F.Line;
+end;
+
+procedure HookSelect(Index: LongInt);
+begin
+  if Session <> nil then
+    Session.SelectedFrame := Index;
+end;
+
+procedure InstallHooks;
+begin
+  ForeignEval := @HookEval;
+  ForeignFrameCount := @HookFrameCount;
+  ForeignFrame := @HookFrame;
+  ForeignSelectFrame := @HookSelect;
+end;
+
+procedure RemoveHooks;
+begin
+  ForeignEval := nil;
+  ForeignFrameCount := nil;
+  ForeignFrame := nil;
+  ForeignSelectFrame := nil;
+  if StackWindow <> nil then
+    StackWindow.Update;
+  if WatchesCollection <> nil then
+    ForeignRereadWatches;        { back to gdb }
 end;
 
 procedure ClearDebuggerRows;
@@ -81,6 +227,9 @@ end;
 
 procedure GoDebugEnd;
 begin
+  RemoveHooks;
+  StdinLine := '';
+  OutputPending := '';
   if Session <> nil then
   begin
     Session.Free;
@@ -131,15 +280,22 @@ begin
   end;
 end;
 
-{ the breakpoints of the list (and one more line, the target of "go to cursor") are given to dlv, file by file }
+{ the breakpoints of the list (and one more line, the target of "go to cursor") are given to dlv, file by file; the condition of a
+  breakpoint and its ignore count (the first N hits do not stop: dlv's hit condition "> N") go with it }
 procedure SyncBreakpoints(const ExtraFile: string; ExtraLine: LongInt);
 var
   Files: TStringList;
-  Lines: array of LongInt;
-  I, J, N: Integer;
+  Bps: array of TDlvBreakpoint;
+  I, J, K: Integer;
   PB: PBreakpoint;
   F: string;
-  Tmp: TStringList;
+  Dup: Boolean;
+
+  function Wanted(P: PBreakpoint): Boolean;
+  begin
+    Result := (P.typ = bt_file_line) and (P.state = bs_enabled) and (P.FileName <> nil);
+  end;
+
 begin
   Files := TStringList.Create;
   try
@@ -149,8 +305,7 @@ begin
       for I := 0 to BreakpointsCollection.Count - 1 do
       begin
         PB := BreakpointsCollection.At(I);
-        if (PB.typ = bt_file_line) and (PB.state = bs_enabled) and (PB.FileName <> nil) and
-           (LowerCase(ExtractFileExt(PB.FileName^)) = '.go') then
+        if Wanted(PB) and (LowerCase(ExtractFileExt(PB.FileName^)) = '.go') then
           Files.Add(ExpandFileName(PB.FileName^));
       end;
     if ExtraFile <> '' then
@@ -163,29 +318,52 @@ begin
     for I := 0 to Files.Count - 1 do
     begin
       F := Files[I];
-      Tmp := TStringList.Create;
-      try
-        Tmp.Sorted := True;
-        Tmp.Duplicates := dupIgnore;
-        if BreakpointsCollection <> nil then
-          for J := 0 to BreakpointsCollection.Count - 1 do
+      SetLength(Bps, 0);
+      if BreakpointsCollection <> nil then
+        for J := 0 to BreakpointsCollection.Count - 1 do
+        begin
+          PB := BreakpointsCollection.At(J);
+          if not (Wanted(PB) and (ExpandFileName(PB.FileName^) = F)) then
+            Continue;
+          Dup := False;
+          for K := 0 to High(Bps) do
+            if Bps[K].Line = PB.Line then
+              Dup := True;
+          if Dup then
+            Continue;                     { one breakpoint per line: the first one counts }
+          SetLength(Bps, Length(Bps) + 1);
+          with Bps[High(Bps)] do
           begin
-            PB := BreakpointsCollection.At(J);
-            if (PB.typ = bt_file_line) and (PB.state = bs_enabled) and (PB.FileName <> nil) and
-               (ExpandFileName(PB.FileName^) = F) then
-              Tmp.Add(Format('%.8d', [PB.Line]));
+            Line := PB.Line;
+            Condition := Trim(GetStr(PB.Conditions));
+            if PB.IgnoreCount > 0 then
+              HitCondition := '> ' + IntToStr(PB.IgnoreCount)
+            else
+              HitCondition := '';
           end;
-        if (F = ExtraFile) and (ExtraLine > 0) then
-          Tmp.Add(Format('%.8d', [ExtraLine]));
-        SetLength(Lines, Tmp.Count);
-        for N := 0 to Tmp.Count - 1 do
-          Lines[N] := StrToInt(Tmp[N]);
-        Session.SetBreakpoints(F, Lines);
-        if Tmp.Count > 0 then
-          SyncedFiles.Add(F);
-      finally
-        Tmp.Free;
+        end;
+      if (F = ExtraFile) and (ExtraLine > 0) then
+      begin
+        Dup := False;
+        for K := 0 to High(Bps) do
+          if Bps[K].Line = ExtraLine then
+          begin
+            { the target of the run to the cursor stops at once: no condition }
+            Bps[K].Condition := '';
+            Bps[K].HitCondition := '';
+            Dup := True;
+          end;
+        if not Dup then
+        begin
+          SetLength(Bps, Length(Bps) + 1);
+          Bps[High(Bps)].Line := ExtraLine;
+          Bps[High(Bps)].Condition := '';
+          Bps[High(Bps)].HitCondition := '';
+        end;
       end;
+      Session.SetBreakpointsEx(F, Bps);
+      if Length(Bps) > 0 then
+        SyncedFiles.Add(F);
     end;
   finally
     Files.Free;
@@ -248,9 +426,17 @@ var
   Code: LongInt;
   Err: string;
 begin
+  StdinLine := '';
+  SetStatus('');
+  PumpOutput;
   case R of
     drStopped:
-      ShowStop;
+      begin
+        ShowStop;
+        ForeignRereadWatches;
+        if StackWindow <> nil then
+          StackWindow.Update;
+      end;
     drExited:
       begin
         Code := Session.ExitCode;
@@ -291,7 +477,8 @@ begin
   GoDebugEnd;
   LastGoFile := GoFile;
   Session := TDlvSession.Create;
-  Session.OnIdle := @EscPressed;
+  Session.OnIdle := @GoIdle;
+  ClearToolMessages;
   PushStatus('Starting Delve...');
   try
     if not Session.Start(Tool, 'debug', ProgramOf(GoFile), ExtractFilePath(GoFile), GetRunParameters) then
@@ -304,6 +491,7 @@ begin
   end;
   PopStatus;
   UpdateMenus(True);
+  InstallHooks;
   SyncBreakpoints(ExtraFile, ExtraLine);
   if StopAtMain then
     Session.SetFunctionBreakpoint('main.main');
