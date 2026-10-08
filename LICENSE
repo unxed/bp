@@ -1,6 +1,12 @@
+Scope
+
+This license covers the files of this repository except those of fpide/. The files of fpide/ are the Free Pascal IDE and
+its changes: they are under the GNU General Public License, version 2 or (at your option) any later version, as the head
+of each file says; the text of that license is fpide/COPYING.
+
 MIT License
 
-Copyright (c) 2026 the authors of the Safe Pascal project
+Copyright (c) 2026 the authors of Better Pascal (see the history of the repository)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
