@@ -1,6 +1,6 @@
 #!/bin/sh
 # Acceptance tests of fpide on tv3 (fpide/tests/accept): build fp, then drive it in tmux. The tests wait for the program, not for
-# the CPU, so they all run side by side: test_accept.py, test_config.py, every section of test_functions.py and the menu sweep
+# the CPU, so they all run side by side: test_accept.py, test_config.py, every section of test_functions.py, the Esc sweep and the menu sweep
 # (with -j $FPIDE_SWEEP_J copies of the IDE, default 8), each with a HOME and XDG directories of its own.
 # usage: fpide/tools/fpide-accept.sh [PATH/TO/fp]     (default: build with tools/build-fpide.sh linux64)
 # The logs go to $FPIDE_ACCEPT_LOGS (default: a new temp dir); the summary lists each test, its time and its last line.
@@ -20,7 +20,7 @@ mkdir -p "$logs"
 [ -d "$HOME/go/bin" ] && PATH="$HOME/go/bin:$PATH" && export PATH
 
 sections=$(python3 -c "import sys; sys.path.insert(0, sys.argv[1]); import test_functions as t; print(' '.join(n for n, _ in t.SECTIONS))" "$acc")
-jobs="accept:test_accept.py config:test_config.py sweep:test_menu_sweep.py"
+jobs="accept:test_accept.py config:test_config.py esc:test_esc_sweep.py sweep:test_menu_sweep.py"
 for s in $sections exit; do jobs="$jobs functions-$s:test_functions.py"; done
 
 start=$(date +%s)

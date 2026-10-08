@@ -4,6 +4,7 @@ name: fpide-accept
 # test_accept.py: the main functions (start, menus, editor, save, directories, make, run);
 # test_functions.py: the click-through of the functions (editor, search, windows, tools, options, files, compiler, UTF-8 text);
 # test_menu_sweep.py: every menu item is activated and the IDE must stay alive;
+# test_esc_sweep.py: every dialog of the menu bar closes with one Esc;
 # test_config.py: the files of the user in the XDG directories, the files of ~/.fp taken over.
 on:
   workflow_dispatch:
@@ -27,10 +28,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: main functions, configuration, exit
+          - name: main functions, configuration, Esc sweep, exit
             cmds: |
               python3 fpide/tests/accept/test_accept.py fpide/out/linux64/fp
               python3 fpide/tests/accept/test_config.py fpide/out/linux64/fp
+              python3 fpide/tests/accept/test_esc_sweep.py fpide/out/linux64/fp
               python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp exit
           - name: sweep of the menus, part 1 of 2
             cmds: |
