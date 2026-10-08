@@ -29,7 +29,7 @@ interface
 {$i globdir.inc}
 
 uses
-  Objects,Drivers,Views,App,Gadgets,MsgBox,Tabs,
+  Objects,Drivers,Views,App,TvGadgets,MsgBox,Tabs,
   WEditor,WCEdit,
   Comphook,Browcol,
   WHTMLScn,

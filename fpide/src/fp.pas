@@ -82,7 +82,7 @@ uses
 {$ifdef COLORSEL}
   ColorSel,
 {$endif COLORSEL}
-  ASCIITab,
+  TvAscii,
   WUtils,WViews,WHTMLScn,WHelp,
   FPIDE,FPCalc,FPCompil,FPIntf,
   FPIni,FPViews,FPConst,FPVars,FPUtils,FPHelp,FPSwitch,FPUsrScr,
@@ -294,7 +294,8 @@ begin
 {$ifdef COLORSEL}
   RegisterColorSel;
 {$endif COLORSEL}
-  RegisterAsciiTab;
+  RegisterType(RAsciiTable);
+  RegisterType(RAsciiReport);
   RegisterWEditor;
   RegisterWCEdit;
   RegisterFPCalc;

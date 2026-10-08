@@ -56,7 +56,7 @@ uses Dos,
      FPKeys,
 {$endif Unix}
      FPConst,FPVars,FPTools,FPUtils,FPViews,FPHelp,
-     FPCompil,FPCodCmp,FPCodTmp,FPRegs,AsciiTab,FPVideo,TvAppDir;
+     FPCompil,FPCodCmp,FPCodTmp,FPRegs,TvAscii,FPVideo,TvAppDir;
 
 type
      TWindowInfo =
@@ -522,10 +522,7 @@ begin
          if DV>=$A then
            begin
              GetData(ch,sizeof(char));
-             AsciiChart.Report.AsciiChar:=ord(ch);
-             AsciiChart.Table.SetCursor(
-               ord(ch) mod AsciiChart.Table.Size.X,
-               ord(ch) div AsciiChart.Table.Size.X);
+             AsciiChart.Table.SetCode(ord(ch));
            end;
       end;
   end;
@@ -703,7 +700,7 @@ begin
       end;
     hcAsciiTableWindow :
       begin
-        ch:=chr(PFPAsciiChart(P).Report.AsciiChar);
+        ch:=chr(byte(PFPAsciiChart(P).Table.Code));
         AddData(ch,sizeof(char));
       end;
   end;
