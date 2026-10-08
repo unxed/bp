@@ -15,14 +15,54 @@ on:
       - fpide/tools/build-fpide.sh
       - .github/workflows/fpide-accept.yml
 
+# The click-through takes minutes because it waits for the program; the groups run side by side (the wall time is the slowest group).
 jobs:
   accept:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: main functions and the sweep of the menus
+            cmds: |
+              python3 fpide/tests/accept/test_accept.py fpide/out/linux64/fp
+              python3 fpide/tests/accept/test_menu_sweep.py fpide/out/linux64/fp
+          - name: editor, search, windows, tools
+            cmds: |
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp edit search window tools
+          - name: options, files, compile
+            cmds: |
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp options files compile
+          - name: Go (build, vet, test, Delve)
+            cmds: |
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp golang debuggo
+          - name: UTF-8, templates, clipboard, debugger, browser
+            cmds: |
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp unicode templates clipboard syscb debug browser
+          - name: long lines, misc, mouse, UX guidelines
+            cmds: |
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp longlines misc mouse ux
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Packages
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-fcl fp-units-base fp-units-misc fp-units-gfx python3 tmux gdb git
-      - name: Build and run the acceptance tests
-        run: fpide/tools/fpide-accept.sh
+      - name: Delve (the Go debugger)
+        run: |
+          GOBIN=$HOME/go/bin go install github.com/go-delve/delve/cmd/dlv@v1.25.2 || echo "no dlv - the Delve checks skip themselves"
+      - name: Build the IDE
+        run: fpide/tools/build-fpide.sh
+      - name: ${{ matrix.name }}
+        env:
+          CMDS: ${{ matrix.cmds }}
+        run: |
+          export PATH="$PATH:$HOME/go/bin"
+          rc=0
+          while IFS= read -r c; do
+            [ -z "$c" ] && continue
+            echo "::group::$c"
+            bash -c "$c" || { echo "::error::failed: $c"; rc=1; }
+            echo "::endgroup::"
+          done <<< "$CMDS"
+          exit $rc
