@@ -1,70 +1,69 @@
-# fpide: Text Mode IDE на Free Pascal + tv3
+# fpide: Text Mode IDE on Free Pascal + tv3
 
-Цель: **Text Mode IDE** из дистрибутива FPC (`packages/ide`), собранный на **[unxed/tv3](https://github.com/unxed/tv3)** вместо **Free Vision**, с **UTF-8** и переходом **`object` → `class`**, с поведением, неотличимым от ванильной IDE на экране (после учёта кодировок).
+Goal: the **Text Mode IDE** of the FPC distribution (`packages/ide`) built on **[unxed/tv3](https://github.com/unxed/tv3)** instead of **Free Vision**, with **UTF-8** and the move **`object` → `class`**, with behaviour on screen that cannot be told from the vanilla IDE (once the encodings are accounted for).
 
-**Приоритет:** полностью перенести, **не сломав никакой функционал**. Нельзя ради линковки заглушать компилятор, отладчик, редактор, справку или сужать продукт до «только UI». **Решение владельца (2026-10-06):** компилятор и отладчик — **внешние программы** системы (`fpc`, `gdb`), IDE запускает их сама; встроенный компилятор FPC остаётся опцией (`FPIDE_EMBED=1`). Сборка — одной командой на Ubuntu (`tools/fpide-setup-build.sh`), без скачивания исходников FPC.
+**Priority:** move everything over **without breaking any function**. Stubbing out the compiler, the debugger, the editor or the help just to link, or narrowing the product to "UI only", is not allowed. **Decision of the owner (2026-10-06):** the compiler and the debugger are **external programs** of the system (`fpc`, `gdb`) that the IDE runs itself; the built-in FPC compiler stays an option (`FPIDE_EMBED=1`). The build is one command on Ubuntu (`tools/fpide-setup-build.sh`), without downloading the FPC sources.
 
-Как работаем (как в `unxed/dn`): коммиты в **`main`**, тяжёлая сборка и тесты — **GitHub Actions**, submodule `tv/` указывает на tv3. Перед push — локальный `tools/fpide-preflight.sh`.
+How we work (as in `unxed/dn`): commits to **`main`**, the heavy build and the tests run in **GitHub Actions**, the submodule `tv/` points to tv3. Before a push: the local `tools/fpide-preflight.sh`.
 
-## Источники
+## Sources
 
-| Что | Где |
+| What | Where |
 |---|---|
-| IDE | FPC `packages/ide`, тег `release_3_2_2` — [`fpide/bootstrap/upstream.env`](bootstrap/upstream.env) |
-| Компилятор | системный `fpc` (внешний); несколько модулей компилятора, которые нужны самой IDE, лежат в [`compat/fpc`](compat/fpc). Встроенный вариант (`FPIDE_EMBED=1`): дерево `compiler/` того же тега FPC |
-| UI (замена FV) | [unxed/tv3](https://github.com/unxed/tv3), submodule `tv/` |
-| Эталон поведения | бинарник IDE из того же FPC 3.2.x (`fp` / `fpide`) на Linux, сравнение дампов экрана |
-| Образец переноса | [unxed/dn](https://github.com/unxed/dn): shims, `tools/build.sh`, `dn-accept`, class migration |
+| IDE | FPC `packages/ide`, tag `release_3_2_2`: [`fpide/bootstrap/upstream.env`](bootstrap/upstream.env) |
+| Compiler | the system `fpc` (external); the few compiler units that the IDE itself needs are in [`compat/fpc`](compat/fpc). The built-in variant (`FPIDE_EMBED=1`): the `compiler/` tree of the same FPC tag |
+| UI (in place of FV) | [unxed/tv3](https://github.com/unxed/tv3), submodule `tv/` |
+| Reference of behaviour | the IDE binary of the same FPC 3.2.x (`fp` / `fpide`) on Linux, compared by screen dumps |
 
-Free Vision в репозиторий **не** копируем: имена юнитов FV (`Views`, `App`, …) закрываются **shim-юнитами**, генерируемыми из tv3 (`tools/gen-shim.py`, карта `fpide/compat/shims/shims.map`).
+Free Vision is **not** copied into the repository: the FV unit names (`Views`, `App`, …) are provided by **shim units** generated from tv3 (`tools/gen-shim.py`, map `fpide/compat/shims/shims.map`).
 
-Компиляция из IDE идёт через внешний `fpc` (разбор вывода, переход к ошибкам, сообщения); отладка — через `gdb` (GDB/MI), у отлаживаемой программы свой pty. Браузер символов строится по исходникам парсером FCL (`fpsrcbrw.pas`).
+Compiling from the IDE goes through the external `fpc` (the output is parsed, errors can be jumped to, messages are listed); debugging goes through `gdb` (GDB/MI), and the debugged program has its own pty. The symbol browser is built from the sources by the FCL parser (`fpsrcbrw.pas`).
 
-## Решения
+## Decisions
 
-1. **Два независимых дерева:** `tv/` не знает о `fpide/`; `fpide/` использует tv3 только как пакет. Проверяет `tools/check-fpide-layout.sh`.
-2. **База IDE — публичный FPC 3.2.2**, воспроизводимая через `fpide/bootstrap/run.sh`; дальше — обычные коммиты в `fpide/src`.
-3. **Компилятор — внешний `fpc`** (автоопределение; `FP_COMPILER`/`fp.ini` для другого). Встроенный `compiler/` FPC — только для `FPIDE_EMBED=1`; в git не кладём (pin в `upstream.env`, `fpide/bootstrap/ensure-compiler.sh`).
-4. **UTF-8** — как в tv3/DN: исходники, строки и ресурсы IDE в UTF-8; редактор открывает, правит и сохраняет UTF-8 (столбец = символ, широкие символы в две ячейки); однобайтовый режим только для DOS.
-5. **Классы** — по тому же плану, что DN (`CLASS-MIGRATION.md` в dn): alias-ы, поля, `New`/`Done`, затем ресурсы и редакторские юниты.
-6. **Отладчик** — как у апстрима FPC IDE на Linux: по умолчанию **GDB/MI** (`-dGDBMI`). `FPIDE_NOGDB=1` только как явный override, не цель порта.
-7. **CI** — `ubuntu-24.04`: сборка и приёмка (`fpide-accept.yml`: `test_accept.py`, `test_functions.py`, `test_menu_sweep.py`); локально — `tools/fpide-setup-build.sh test`.
+1. **Two independent trees:** `tv/` knows nothing of `fpide/`; `fpide/` uses tv3 only as a package. Checked by `tools/check-fpide-layout.sh`.
+2. **The IDE base is the public FPC 3.2.2**, reproducible with `fpide/bootstrap/run.sh`; after that, ordinary commits to `fpide/src`.
+3. **The compiler is the external `fpc`** (found automatically; `FP_COMPILER`/`fp.ini` for another one). The built-in FPC `compiler/` is only for `FPIDE_EMBED=1`; it is not committed (pin in `upstream.env`, `fpide/bootstrap/ensure-compiler.sh`).
+4. **UTF-8** as in tv3/DN: the sources, strings and resources of the IDE are UTF-8; the editor opens, edits and saves UTF-8 (a column is a character, wide characters take two cells); the single-byte mode is only for DOS.
+5. **Classes** follow the same plan as DN (`CLASS-MIGRATION.md` in dn): aliases, fields, `New`/`Done`, then the resources and the editor units.
+6. **Debugger** as in the upstream FPC IDE on Linux: **GDB/MI** by default (`-dGDBMI`). `FPIDE_NOGDB=1` only as an explicit override, not a goal of the port.
+7. **CI** on `ubuntu-24.04`: build and acceptance (`fpide-accept.yml`: `test_accept.py`, `test_functions.py`, `test_menu_sweep.py`); locally `tools/fpide-setup-build.sh test`.
 
-## Вехи
+## Milestones
 
-| # | Содержание | Критерий готовности |
+| # | Content | Done when |
 |---|---|---|
-| 0 | Каркас репо, submodule tv3, CI | сделано |
-| 1 | Shims FV→tv3; `fp.pas` линкуется (linux64, GDB/MI, внешний fpc/gdb) | сделано |
-| 2 | Запуск: меню, статусная строка, выход | сделано (`test_accept.py`, `test_functions.py`) |
-| 3 | Редактор (UTF-8), диалоги открытия/сохранения, буфер обмена, мышь | сделано |
-| 4 | Компиляция из IDE (внешний fpc), сообщения, запуск, отладчик (gdb), браузер символов | сделано; справка — файлы CHM не поставляются (как в оригинале) |
-| 5 | Class migration | сделано для fpide |
-| 6 | Полная приёмка (все пункты меню, горячие клавиши) | пункты меню проходят `test_menu_sweep.py`, функции — `test_functions.py`; сравнение с ванильной IDE побитово — открыто |
+| 0 | Repository skeleton, submodule tv3, CI | done |
+| 1 | Shims FV→tv3; `fp.pas` links (linux64, GDB/MI, external fpc/gdb) | done |
+| 2 | Start-up: menu, status line, exit | done (`test_accept.py`, `test_functions.py`) |
+| 3 | Editor (UTF-8), open/save dialogs, clipboard, mouse | done |
+| 4 | Compiling from the IDE (external fpc), messages, running, debugger (gdb), symbol browser | done; help: the CHM files are not shipped (as upstream) |
+| 5 | Class migration | done for fpide |
+| 6 | Full acceptance (all menu items, hot keys) | the menu items pass `test_menu_sweep.py`, the functions `test_functions.py`; the bit-for-bit comparison with the vanilla IDE is open |
 
-## Открыто
+## Open
 
-- Точная карта shim для юнитов IDE (`WEditor`, `Tabs`, …) — часть FV, часть только IDE.
-- Справка IDE (CHM) и просмотр справки (`whlpview`, счёт по байтам).
-- Параллель с Better Pascal (`bp.pas`, `safe/`, `ext/` в корне репозитория) — **не** блокирует fpide; возможная интеграция позже.
+- The exact shim map for the IDE units (`WEditor`, `Tabs`, …): partly FV, partly IDE only.
+- The IDE help (CHM) and the help viewer (`whlpview`, counting in bytes).
+- Better Pascal alongside (`bp.pas`, `safe/`, `ext/` at the root of the repository) does **not** block fpide; integration may come later.
 
-## Другие языки (этап 7)
+## Other languages (stage 7)
 
-Сделано: `src/fplang.pas` — класс-бэкенд языка (инструмент, аргументы, разбор вывода, отладчик); первым идёт **Go**: Compile (go vet),
-Make/Build (`go build`, в модуле собирается пакет файла), Run (запуск собранного), Compile > Test (`go test`); ошибки с позицией
-попадают в окно Compiler Messages, Enter переходит на строку. Юнит-тест `tests/unit/t_fplang.pas`, приёмка `test_functions.py <fp> golang`.
-Подсветка `.go` — грамматика `lang-go.hl` из tve.
+Done: `src/fplang.pas`, a class that is the backend of a language (tool, arguments, output parsing, debugger); **Go** comes first: Compile (go vet),
+Make/Build (`go build`, in a module the package of the file is built), Run (runs what was built), Compile > Test (`go test`); errors with a position
+go to the Compiler Messages window, Enter jumps to the line. Unit test `tests/unit/t_fplang.pas`, acceptance `test_functions.py <fp> golang`.
+Highlighting of `.go`: the grammar `lang-go.hl` of tve.
 
-Готово: шаблон нового файла Go (File > Open несуществующего `.go` — `NewFileText`), Tools > Format Go file (`gofmt -w`, тихая перезагрузка `ReloadSilently`).
-Готово (первый срез): отладчик Go — Delve. `src/fpdlv.pas` — клиент DAP к `dlv dap` (TCP на localhost, mode `debug`: dlv сам собирает программу с `-N -l`),
-`src/fpgodbg.pas` — связка с меню Run: Run при точке останова в `.go` (или F7/F8 без сессии — остановка в `main.main`), F8 step over, F7 trace into,
-Alt+F4 step out, F4 run to cursor, Continue, Program reset; точки останова из списка IDE (Ctrl+F8) передаются dlv перед каждым запуском; строка остановки
-подсвечивается как debugger row; в конце — окно с кодом выхода и последними строками вывода программы. Юнит-тест `tests/unit/t_fpdlv.pas`
-(настоящий dlv, пропускается без dlv/go), приёмка `test_functions.py <fp> debuggo`.
+Done: the template of a new Go file (File > Open of a `.go` that does not exist: `NewFileText`), Tools > Format Go file (`gofmt -w`, silent reload `ReloadSilently`).
+Done (first slice): the Go debugger is Delve. `src/fpdlv.pas` is a DAP client for `dlv dap` (TCP on localhost, mode `debug`: dlv builds the program itself with `-N -l`),
+`src/fpgodbg.pas` ties it to the Run menu: Run with a breakpoint in a `.go` file (or F7/F8 without a session: stop in `main.main`), F8 step over, F7 trace into,
+Alt+F4 step out, F4 run to cursor, Continue, Program reset; the breakpoints of the IDE list (Ctrl+F8) are passed to dlv before each run; the line where the program stopped
+is highlighted as the debugger row; at the end a window shows the exit code and the last lines of the program output. Unit test `tests/unit/t_fpdlv.pas`
+(the real dlv; skipped without dlv/go), acceptance `test_functions.py <fp> debuggo`.
 Done for Go since: the Watches, Evaluate (Ctrl+F4) and Call stack windows are served by Delve while a session is open (hooks `ForeignEval`,
 `ForeignFrame*` in `fpdebug.pas`; the expression `$locals` lists the arguments and local variables; choosing a frame in the Call stack window evaluates in it);
 the condition and the ignore count of a breakpoint go to dlv (`condition` and `hitCondition` "> N" of `setBreakpoints`); the output of the running program is
 listed live in the Messages window and the keyboard goes to its standard input (the status line shows the line, Enter sends it, Esc interrupts the program).
 Not done for Go: the Registers, FPU, vector and Disassembly windows (dlv has no DAP request for them), expressions with function calls (Delve refuses them),
 breakpoints on a function name or a watchpoint from the IDE list. Delve was checked with 1.25.2 and Go 1.24 (dlv 1.27 needs a newer Go); build errors of the program go to the Compiler Messages window.
-Другие языки в задание не входили: класс `TLangBackend` готов, но новых языков не добавляем без отдельного запроса.
+Other languages were not part of the task: the class `TLangBackend` is ready, but no new languages are added without a separate request.

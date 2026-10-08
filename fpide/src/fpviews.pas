@@ -3667,7 +3667,7 @@ begin
   HeaderLen:=0; for i:=0 to DefCount-1 do HeaderLen:=HeaderLen+CStrLen(AtTab(i).Name^)+3; Dec(HeaderLen);
   if HeaderLen>Size.X-2 then HeaderLen:=Size.X-2;
 
-  { --- 1. sor --- }
+  { --- line 1 --- }
   ClearBuf; MoveFill(B[0], '│',C1,1); MoveFill(B[HeaderLen+1], '│',C1,1);
   X:=1;
   for i:=0 to DefCount-1 do
@@ -3685,7 +3685,7 @@ begin
       end;
   SWriteBuf(0,1,Size.X,1,B);
 
-  { --- 0. sor --- }
+  { --- line 0 --- }
   ClearBuf; MoveFill(B[0], '┌',C1,1);
   X:=1;
   for i:=0 to DefCount-1 do
@@ -3703,7 +3703,7 @@ begin
   MoveFill(B[ActiveKPos], '┌',C1,1); MoveFill(B[ActiveVPos], '┐',C1,1);
   SWriteBuf(0,0,Size.X,1,B);
 
-  { --- 2. sor --- }
+  { --- line 2 --- }
   MoveFill(B[1], '─',C1,Max(HeaderLen,0)); MoveFill(B[HeaderLen+2], '─',C1,Max(Size.X-HeaderLen-3,0));
   MoveFill(B[Size.X-1], '┐',C1,1);
   MoveFill(B[ActiveKPos], '┘',C1,1);
@@ -3713,14 +3713,14 @@ begin
   MoveChar(B[ActiveKPos+1],' ',C1,Max(ActiveVPos-ActiveKPos-1,0));
   SWriteBuf(0,2,Size.X,1,B);
 
-  { --- maradék sor --- }
+  { --- the remaining lines --- }
   ClearBuf; MoveFill(B[0], '│',C1,1); MoveFill(B[Size.X-1], '│',C1,1);
   for i:=3 to Size.Y-1 do
     SWriteBuf(0,i,Size.X,1,B);
   { SWriteBuf(0,3,Size.X,Size.Y-4,B); this was wrong
     because WriteBuf then expect a buffer of size size.x*(size.y-4)*2 PM }
 
-  { --- Size.X . sor --- }
+  { --- the last line --- }
   MoveFill(B[0], '└',C1,1); MoveFill(B[1], '─',C1,Max(Size.X-2,0)); MoveFill(B[Size.X-1], '┘',C1,1);
   SWriteBuf(0,Size.Y-1,Size.X,1,B);
 
