@@ -88,8 +88,6 @@ const
 {$endif}
       dialog_help = 'Help';
 
-      msg_modalhelpnotimplemented = 'Sorry, modal help not yet implemented.';
-
       { Help messages }
       msg_indexingfile = 'Indexing file %s';
       msg_loadinghelpfiles = 'Loading help files...';
@@ -526,10 +524,33 @@ begin
   end;
 end;
 
+{ The help window above a modal dialog (UX guidelines, rule D.3): a window of its own that is run modally on the
+  desktop and freed on return, so the dialog below is still there afterwards. The topic is that of the context
+  asked for, else the table of contents, else the index. }
+procedure HelpModal(FileID, Context: THelpCtx);
+var R: TRect;
+    W: PFPHelpWindow;
+    Id: word;
+    Ctx: THelpCtx;
+begin
+  CheckHelpSystem;
+  Desktop.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
+  W:=TFPHelpWindow.Create(R, dialog_help, 0, 0, 0);
+  W.HideOnClose:=false;
+  if (Context<>0) and (HelpFacility.GetTopicInfo(FileID,Context)<>'Not found') then
+    W.ShowTopic(FileID,Context)
+  else if HelpFacility.TopicSearch('Table of contents',Id,Ctx) then
+    W.ShowTopic(Id,Ctx)
+  else
+    W.ShowIndex;
+  Desktop.ExecView(W);
+  W.Free;
+end;
+
 procedure Help(FileID, Context: THelpCtx; Modal: boolean);
 begin
   if Modal then
-     begin MessageBox(msg_modalhelpnotimplemented,mfInformation+mfInsertInApp+mfOKButton); Exit; end;
+     begin HelpModal(FileID,Context); Exit; end;
   HelpCreateWindow;
   with HelpWindow do
   begin

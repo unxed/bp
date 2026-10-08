@@ -39,9 +39,9 @@ jobs:
           - name: UTF-8, templates, clipboard, debugger, browser
             cmds: |
               python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp unicode templates clipboard syscb debug browser
-          - name: long lines, misc, mouse, UX guidelines
+          - name: long lines, misc, mouse, UX guidelines, paths
             cmds: |
-              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp longlines misc mouse ux
+              python3 fpide/tests/accept/test_functions.py fpide/out/linux64/fp longlines misc mouse ux paths
     steps:
       - uses: actions/checkout@v4
         with:

@@ -2160,6 +2160,13 @@ end;
 
 procedure TFPHelpWindow.HandleEvent(var Event: TEvent);
 begin
+  { run modally above a dialog (HelpModal): a window, unlike a dialog, does not end its own modal state }
+  if (Event.What=evCommand) and ((Event.Command=cmCancel) or (Event.Command=cmClose)) and GetState(sfModal) then
+    begin
+      EndModal(cmCancel);
+      ClearEvent(Event);
+      Exit;
+    end;
   case Event.What of
     evBroadcast :
       case Event.Command of

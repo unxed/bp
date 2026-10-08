@@ -378,6 +378,12 @@ BEGIN
 {$endif}
   HistorySize:=16384;
 
+  if (ParamCount=1) and (System.ParamStr(1)='--list-actions') then
+    begin
+      write(IDEActionReport);
+      Halt(0);
+    end;
+
   { Startup info }
   writeln(bullet+' Free Pascal IDE Version '+VersionStr+' ['+{$i %date%}+']');
   writeln(bullet+' Compiler Version '+Full_Version_String);

@@ -169,6 +169,8 @@ type
       procedure UpdateTools;
     end;
 
+{ The table of the actions as text (name, key, caption; then the keys that are on two actions): fp --list-actions }
+function IDEActionReport: AnsiString;
 procedure PutEvent(TargetView: PView; E: TEvent);
 procedure PutCommand(TargetView: PView; What, Command: Word; InfoPtr: Pointer);
 
@@ -185,7 +187,7 @@ uses
   fpKeys,TvUnix,
 {$endif Unix}
   FpDpAnsi,WConsts,
-  Video,Mouse,Keyboard,
+  Video,Mouse,Keyboard,TvActions,TvMenus,
 {$ifdef EMBED_COMPILER}
   Compiler,
 {$endif}
@@ -863,146 +865,324 @@ begin
   Desktop := TFPDesktop.Create(R);
 end;
 
+{ The actions of the IDE (rule R.1 of the navigation guidelines): the name, the caption, the key and the command are declared here once;
+  the menu items (IdeItem) and the keys of the status line (NewActionStatusKey) are made from this table. The text of the key in the
+  menu is the one declared (menu_key_*) while the key is the declared one, the name of the key otherwise. }
+var
+  ActionKeyTexts: array[0..511] of string[24];
+
+procedure A(const AName, ACaption, AKeyText: string; AKey, ACommand, AHelpCtx: word);
+var I: integer;
+begin
+  I:=RegisterAction(AName,ACaption,ACommand,AKey,AHelpCtx);
+  if (I>=0) and (I<=High(ActionKeyTexts)) then ActionKeyTexts[I]:=AKeyText;
+end;
+
+function IdeStdStatusKeys(Next: PStatusItem): PStatusItem;
+begin
+  IdeStdStatusKeys:=
+    NewActionStatusKey('','file.exit',
+    NewActionStatusKey('','app.menu',
+    NewActionStatusKey('','window.close',
+    NewActionStatusKey('','window.zoom',
+    NewActionStatusKey('','window.resize',
+    NewActionStatusKey('','window.next',
+    NewActionStatusKey('','window.previous',Next)))))));
+end;
+
+procedure RegisterIDEActions;
+begin
+  A('file.new', menu_file_new, '', kbNoKey, cmNew, hcNew);
+  A('file.template', menu_file_template, '', kbNoKey, cmNewFromTemplate, hcNewFromTemplate);
+  A('file.open', menu_file_open, menu_key_file_open, kbF3, cmOpen, hcOpen);
+  A('file.reload', menu_file_reload, '', kbNoKey, cmDoReload, hcDoReload);
+  A('file.save', menu_file_save, menu_key_file_save, kbF2, cmSave, hcSave);
+  A('file.saveas', menu_file_saveas, '', kbNoKey, cmSaveAs, hcSaveAs);
+  A('file.saveall', menu_file_saveall, '', kbNoKey, cmSaveAll, hcSaveAll);
+  A('file.print', menu_file_print, '', kbNoKey, cmPrint, hcPrint);
+  A('file.printsetup', menu_file_printsetup, '', kbNoKey, cmPrinterSetup, hcPrinterSetup);
+  A('file.changedir', menu_file_changedir, '', kbNoKey, cmChangeDir, hcChangeDir);
+  A('file.dosshell', menu_file_dosshell, '', kbNoKey, cmDOSShell, hcDOSShell);
+  A('file.exit', menu_file_exit, menu_key_file_exit, kbAltX, cmQuit, hcQuit);
+  A('edit.undo', menu_edit_undo, menu_key_edit_undo, kbAltBack, cmUndo, hcUndo);
+  A('edit.redo', menu_edit_redo, '', kbNoKey, cmRedo, hcRedo);
+{$ifdef DebugUndo}
+  A('edit.dumpundo', '~D~ump Undo', '', kbNoKey, cmDumpUndo, hcUndo);
+{$endif DebugUndo}
+{$ifdef DebugUndo}
+  A('edit.undoall', 'U~n~do All', '', kbNoKey, cmUndoAll, hcUndo);
+{$endif DebugUndo}
+{$ifdef DebugUndo}
+  A('edit.redoall', 'R~e~do All', '', kbNoKey, cmRedoAll, hcRedo);
+{$endif DebugUndo}
+  A('edit.cut', menu_edit_cut, menu_key_edit_cut, cut_key, cmCut, hcCut);
+  A('edit.copy', menu_edit_copy, menu_key_edit_copy, copy_key, cmCopy, hcCopy);
+  A('edit.paste', menu_edit_paste, menu_key_edit_paste, paste_key, cmPaste, hcPaste);
+  A('edit.clear', menu_edit_clear, menu_key_edit_clear, kbCtrlDel, cmClear, hcClear);
+  A('edit.selectall', menu_edit_selectall, menu_key_edit_all, all_Key, cmSelectAll, hcSelectAll);
+  A('edit.unselect', menu_edit_unselect, '', kbNoKey, cmUnselect, hcUnselect);
+  A('edit.showclipboard', menu_edit_showclipboard, '', kbNoKey, cmShowClipboard, hcShowClipboard);
+  A('search.find', menu_search_find, '', kbNoKey, cmFind, hcFind);
+  A('search.replace', menu_search_replace, '', kbNoKey, cmReplace, hcReplace);
+  A('search.searchagain', menu_search_searchagain, '', kbNoKey, cmSearchAgain, hcSearchAgain);
+  A('search.jumpline', menu_search_jumpline, '', kbNoKey, cmJumpLine, hcGotoLine);
+  A('search.findproc', menu_search_findproc, '', kbNoKey, cmFindProcedure, hcFindProcedure);
+  A('search.objects', menu_search_objects, '', kbNoKey, cmObjects, hcObjects);
+  A('search.modules', menu_search_modules, '', kbNoKey, cmModules, hcModules);
+  A('search.globals', menu_search_globals, '', kbNoKey, cmGlobals, hcGlobals);
+  A('search.symbol', menu_search_symbol, '', kbNoKey, cmSymbol, hcSymbol);
+  A('run.run', menu_run_run, menu_key_run_run, kbCtrlF9, cmRun, hcRun);
+  A('run.stepover', menu_run_stepover, menu_key_run_stepover, kbF8, cmStepOver, hcRun);
+  A('run.traceinto', menu_run_traceinto, menu_key_run_traceinto, kbF7, cmTraceInto, hcRun);
+  A('run.conttocursor', menu_run_conttocursor, menu_key_run_conttocursor, kbF4, cmContToCursor, hcContToCursor);
+  A('run.untilreturn', menu_run_untilreturn, menu_key_run_untilreturn, kbAltF4, cmUntilReturn, hcUntilReturn);
+  A('run.rundir', menu_run_rundir, '', kbNoKey, cmRunDir, hcRunDir);
+  A('run.parameters', menu_run_parameters, '', kbNoKey, cmParameters, hcParameters);
+  A('run.resetdebugger', menu_run_resetdebugger, menu_key_run_resetdebugger, kbCtrlF2, cmResetDebugger, hcResetDebugger);
+  A('compile.compile', menu_compile_compile, menu_key_compile_compile, kbAltF9, cmCompile, hcCompile);
+  A('compile.make', menu_compile_make, menu_key_compile_make, kbF9, cmMake, hcMake);
+  A('compile.build', menu_compile_build, '', kbNoKey, cmBuild, hcBuild);
+  A('compile.test', menu_compile_test, '', kbNoKey, cmTestLang, hcTestLang);
+  A('compile.target', menu_compile_target, '', kbNoKey, cmTarget, hcTarget);
+  A('compile.primaryfile', menu_compile_primaryfile, '', kbNoKey, cmPrimaryFile, hcPrimaryFile);
+  A('compile.clearprimaryfile', menu_compile_clearprimaryfile, '', kbNoKey, cmClearPrimary, hcClearPrimary);
+  A('compile.compilermessages', menu_compile_compilermessages, menu_key_compile_compilermessages, kbF12, cmCompilerMessages, hcCompilerMessages);
+  A('debug.output', menu_debug_output, '', kbNoKey, cmUserScreenWindow, hcUserScreenWindow);
+  A('debug.userscreen', menu_debug_userscreen, menu_key_debug_userscreen, kbAltF5, cmUserScreen, hcUserScreen);
+{$ifdef SUPPORT_REMOTE}
+  A('debug.remote', menu_debug_remote, '', kbNoKey, cmTransferRemote, hcTransferRemote);
+{$endif SUPPORT_REMOTE}
+  A('debug.addwatch', menu_debug_addwatch, menu_key_debug_addwatch, kbCtrlF7, cmAddWatch, hcAddWatch);
+  A('debug.watches', menu_debug_watches, '', kbNoKey, cmWatches, hcWatchesWindow);
+  A('debug.breakpoint', menu_debug_breakpoint, menu_key_debug_breakpoint, kbCtrlF8, cmToggleBreakpoint, hcToggleBreakpoint);
+  A('debug.breakpointlist', menu_debug_breakpointlist, '', kbNoKey, cmBreakpointList, hcBreakpointList);
+  A('debug.evaluate', '~E~valuate...', 'Ctrl+F4', kbCtrlF4, cmEvaluate, hcEvaluate);
+  A('debug.callstack', menu_debug_callstack, menu_key_debug_callstack, kbCtrlF3, cmStack, hcStackWindow);
+  A('debug.disassemble', menu_debug_disassemble, '', kbNoKey, cmDisassemble, hcDisassemblyWindow);
+  A('debug.registers', menu_debug_registers, '', kbNoKey, cmRegisters, hcRegistersWindow);
+  A('debug.fpu_registers', menu_debug_fpu_registers, '', kbNoKey, cmFPURegisters, hcFPURegisters);
+  A('debug.vector_registers', menu_debug_vector_registers, '', kbNoKey, cmVectorRegisters, hcVectorRegisters);
+  A('debug.gdbwindow', menu_debug_gdbwindow, '', kbNoKey, cmOpenGDBWindow, hcOpenGDBWindow);
+  A('tools.messages', menu_tools_messages, menu_key_tools_messages, kbF11, cmToolsMessages, hcToolsMessages);
+  A('tools.msgnext', menu_tools_msgnext, menu_key_tools_msgnext, kbAltF8, cmToolsMsgNext, hcToolsMsgNext);
+  A('tools.msgprev', menu_tools_msgprev, menu_key_tools_msgprev, kbAltF7, cmToolsMsgPrev, hcToolsMsgPrev);
+  A('tools.grep', menu_tools_grep, menu_key_tools_grep, kbShiftF2, cmGrep, hcGrep);
+  A('tools.calculator', menu_tools_calculator, '', kbNoKey, cmCalculator, hcCalculator);
+  A('tools.asciitable', menu_tools_asciitable, '', kbNoKey, cmAsciiTable, hcAsciiTable);
+  A('tools.formatgo', menu_tools_formatgo, '', kbNoKey, cmFormatGo, hcFormatGo);
+  A('options.mode', menu_options_mode, '', kbNoKey, cmSwitchesMode, hcSwitchesMode);
+  A('options.compiler', menu_options_compiler, '', kbNoKey, cmCompiler, hcCompiler);
+  A('options.memory', menu_options_memory, '', kbNoKey, cmMemorySizes, hcMemorySizes);
+  A('options.linker', menu_options_linker, '', kbNoKey, cmLinker, hcLinker);
+  A('options.debugger', menu_options_debugger, '', kbNoKey, cmDebugger, hcDebugger);
+{$ifdef SUPPORT_REMOTE}
+  A('options.remote', menu_options_remote, '', kbNoKey, cmRemoteDialog, hcRemoteDialog);
+{$endif SUPPORT_REMOTE}
+  A('options.directories', menu_options_directories, '', kbNoKey, cmDirectories, hcDirectories);
+  A('options.browser', menu_options_browser, '', kbNoKey, cmBrowser, hcBrowser);
+  A('options.tools', menu_options_tools, '', kbNoKey, cmTools, hcTools);
+  A('options.env_preferences', menu_options_env_preferences, '', kbNoKey, cmPreferences, hcPreferences);
+  A('options.env_editor', menu_options_env_editor, '', kbNoKey, cmEditor, hcEditor);
+  A('options.env_codecomplete', menu_options_env_codecomplete, '', kbNoKey, cmCodeCompleteOptions, hcCodeCompleteOptions);
+  A('options.env_codetemplates', menu_options_env_codetemplates, '', kbNoKey, cmCodeTemplateOptions, hcCodeTemplateOptions);
+  A('options.env_desktop', menu_options_env_desktop, '', kbNoKey, cmDesktopOptions, hcDesktopOptions);
+  A('options.env_keybmouse', menu_options_env_keybmouse, '', kbNoKey, cmMouse, hcMouse);
+{$ifdef Unix}
+  A('options.learn_keys', menu_options_learn_keys, '', kbNoKey, cmKeys, hcKeys);
+{$endif Unix}
+  A('options.open', menu_options_open, '', kbNoKey, cmOpenINI, hcOpenINI);
+  A('options.save', menu_options_save, '', kbNoKey, cmSaveINI, hcSaveINI);
+  A('options.saveas', menu_options_saveas, '', kbNoKey, cmSaveAsINI, hcSaveAsINI);
+  A('window.tile', menu_window_tile, '', kbNoKey, cmTile, hcTile);
+  A('window.cascade', menu_window_cascade, '', kbNoKey, cmCascade, hcCascade);
+  A('window.closeall', menu_window_closeall, '', kbNoKey, cmCloseAll, hcCloseAll);
+  A('window.resize', menu_window_resize, menu_key_window_resize, kbCtrlF5, cmResize, hcResize);
+  A('window.zoom', menu_window_zoom, menu_key_window_zoom, kbF5, cmZoom, hcZoom);
+  A('window.next', menu_window_next, menu_key_window_next, kbF6, cmNext, hcNext);
+  A('window.previous', menu_window_previous, menu_key_window_previous, kbShiftF6, cmPrev, hcPrev);
+  A('window.hide', menu_window_hide, menu_key_window_hide, kbCtrlF6, cmHide, hcHide);
+  A('window.close', menu_window_close, menu_key_window_close, kbAltF3, cmClose, hcClose);
+  A('window.list', menu_window_list, menu_key_window_list, kbAlt0, cmWindowList, hcWindowList);
+  A('window.update', menu_window_update, '', kbNoKey, cmUpdate, hcUpdate);
+  A('help.contents', menu_help_contents, '', kbNoKey, cmHelpContents, hcHelpContents);
+  A('help.index', menu_help_index, menu_key_help_helpindex, kbShiftF1, cmHelpIndex, hcHelpIndex);
+  A('help.topicsearch', menu_help_topicsearch, menu_key_help_topicsearch, kbCtrlF1, cmHelpTopicSearch, hcHelpTopicSearch);
+  A('help.prevtopic', menu_help_prevtopic, menu_key_help_prevtopic, kbAltF1, cmHelpPrevTopic, hcHelpPrevTopic);
+  A('help.using', menu_help_using, '', kbNoKey, cmHelpUsingHelp, hcHelpUsingHelp);
+  A('help.files', menu_help_files, '', kbNoKey, cmHelpFiles, hcHelpFiles);
+  A('help.about', menu_help_about, '', kbNoKey, cmAbout, hcAbout);
+  { keys of the status line that have no menu item }
+  A('help.help', 'Help', 'F1', kbF1, cmHelp, hcNoContext);
+  A('edit.localmenu', 'Local menu', 'Alt+F10', kbAltF10, cmLocalMenu, hcNoContext);
+  A('app.menu', 'Menu', 'F10', kbF10, cmMenu, hcNoContext);
+end;
+
+function IDEActionReport: AnsiString;
+var I: integer;
+    R: AnsiString;
+begin
+  RegisterIDEActions;
+  R:='';
+  for I:=0 to ActionCount-1 do
+    with ActionAt(I) do
+      R:=R+Name+#9+ActionKeyText(I)+#9+KillTilde(Caption)+#10;
+  R:=R+'conflicts:'#10+ActionKeyConflicts;
+  IDEActionReport:=R;
+end;
+
+function IdeItem(const AName: string; Next: PMenuItem): PMenuItem;
+var I: integer;
+    A: TAction;
+    KT: string;
+begin
+  I:=FindAction(AName);
+  if I<0 then begin IdeItem:=Next; Exit; end;
+  A:=ActionAt(I);
+  if A.Key=A.DefaultKey then KT:=ActionKeyTexts[I] else KT:=ActionKeyText(I);
+  IdeItem:=NewItem(A.Caption,KT,A.Key,A.Command,A.HelpCtx,Next);
+end;
+
 procedure TIDEApp.LoadMenuBar;
 
 var R: TRect;
     WinPMI : PMenuItem;
 
 begin
+  RegisterIDEActions;
   GetExtent(R); R.B.Y:=R.A.Y+1;
   WinPMI:=nil;
   MenuBar := TAdvancedMenuBar.Create(R, NewMenu(
     NewSubMenu(menu_file,hcFileMenu, NewMenu(
-      NewItem(menu_file_new,'',kbNoKey,cmNew,hcNew,
-      NewItem(menu_file_template,'',kbNoKey,cmNewFromTemplate,hcNewFromTemplate,
-      NewItem(menu_file_open,menu_key_file_open,kbF3,cmOpen,hcOpen,
-      NewItem(menu_file_reload,'',kbNoKey,cmDoReload,hcDoReload,
-      NewItem(menu_file_save,menu_key_file_save,kbF2,cmSave,hcSave,
-      NewItem(menu_file_saveas,'',kbNoKey,cmSaveAs,hcSaveAs,
-      NewItem(menu_file_saveall,'',kbNoKey,cmSaveAll,hcSaveAll,
+      IdeItem('file.new',
+      IdeItem('file.template',
+      IdeItem('file.open',
+      IdeItem('file.reload',
+      IdeItem('file.save',
+      IdeItem('file.saveas',
+      IdeItem('file.saveall',
       NewLine(
-      NewItem(menu_file_print,'',kbNoKey,cmPrint,hcPrint,
-      NewItem(menu_file_printsetup,'',kbNoKey,cmPrinterSetup,hcPrinterSetup,
+      IdeItem('file.print',
+      IdeItem('file.printsetup',
       NewLine(
-      NewItem(menu_file_changedir,'',kbNoKey,cmChangeDir,hcChangeDir,
-      NewItem(menu_file_dosshell,'',kbNoKey,cmDOSShell,hcDOSShell,
-      NewItem(menu_file_exit,menu_key_file_exit,kbNoKey,cmQuit,hcQuit,
+      IdeItem('file.changedir',
+      IdeItem('file.dosshell',
+      IdeItem('file.exit',
       nil))))))))))))))),
     NewSubMenu(menu_edit,hcEditMenu, NewMenu(
-      NewItem(menu_edit_undo,menu_key_edit_undo, kbAltBack, cmUndo, hcUndo,
-      NewItem(menu_edit_redo,'', kbNoKey, cmRedo, hcRedo,
+      IdeItem('edit.undo',
+      IdeItem('edit.redo',
 {$ifdef DebugUndo}
-      NewItem('~D~ump Undo','', kbNoKey, cmDumpUndo, hcUndo,
-      NewItem('U~n~do All','', kbNoKey, cmUndoAll, hcUndo,
-      NewItem('R~e~do All','', kbNoKey, cmRedoAll, hcRedo,
+      IdeItem('edit.dumpundo',
+      IdeItem('edit.undoall',
+      IdeItem('edit.redoall',
 {$endif DebugUndo}
       NewLine(
-      NewItem(menu_edit_cut,menu_key_edit_cut, cut_key, cmCut, hcCut,
-      NewItem(menu_edit_copy,menu_key_edit_copy, copy_key, cmCopy, hcCopy,
-      NewItem(menu_edit_paste,menu_key_edit_paste, paste_key, cmPaste, hcPaste,
-      NewItem(menu_edit_clear,menu_key_edit_clear, kbCtrlDel, cmClear, hcClear,
-      NewItem(menu_edit_selectall,menu_key_edit_all, all_Key, cmSelectAll, hcSelectAll,
-      NewItem(menu_edit_unselect,'', kbNoKey, cmUnselect, hcUnselect,
+      IdeItem('edit.cut',
+      IdeItem('edit.copy',
+      IdeItem('edit.paste',
+      IdeItem('edit.clear',
+      IdeItem('edit.selectall',
+      IdeItem('edit.unselect',
       NewLine(
-      NewItem(menu_edit_showclipboard,'', kbNoKey, cmShowClipboard, hcShowClipboard,
+      IdeItem('edit.showclipboard',
       WinPMI))))))))
 {$ifdef DebugUndo}))){$endif DebugUndo}
       )))),
     NewSubMenu(menu_search,hcSearchMenu, NewMenu(
-      NewItem(menu_search_find,'', kbNoKey, cmFind, hcFind,
-      NewItem(menu_search_replace,'', kbNoKey, cmReplace, hcReplace,
-      NewItem(menu_search_searchagain,'', kbNoKey, cmSearchAgain, hcSearchAgain,
+      IdeItem('search.find',
+      IdeItem('search.replace',
+      IdeItem('search.searchagain',
       NewLine(
-      NewItem(menu_search_jumpline,'', kbNoKey, cmJumpLine, hcGotoLine,
-      NewItem(menu_search_findproc,'', kbNoKey, cmFindProcedure, hcFindProcedure,
+      IdeItem('search.jumpline',
+      IdeItem('search.findproc',
       NewLine(
-      NewItem(menu_search_objects,'', kbNoKey, cmObjects, hcObjects,
-      NewItem(menu_search_modules,'', kbNoKey, cmModules, hcModules,
-      NewItem(menu_search_globals,'', kbNoKey, cmGlobals, hcGlobals,
+      IdeItem('search.objects',
+      IdeItem('search.modules',
+      IdeItem('search.globals',
       NewLine(
-      NewItem(menu_search_symbol,'', kbNoKey, cmSymbol, hcSymbol,
+      IdeItem('search.symbol',
       nil))))))))))))),
     NewSubMenu(menu_run,hcRunMenu, NewMenu(
-      NewItem(menu_run_run,menu_key_run_run, kbCtrlF9, cmRun, hcRun,
-      NewItem(menu_run_stepover,menu_key_run_stepover, kbF8, cmStepOver, hcRun,
-      NewItem(menu_run_traceinto,menu_key_run_traceinto, kbF7, cmTraceInto, hcRun,
-      NewItem(menu_run_conttocursor,menu_key_run_conttocursor, kbF4, cmContToCursor, hcContToCursor,
-      NewItem(menu_run_untilreturn,menu_key_run_untilreturn, kbAltF4,cmUntilReturn,hcUntilReturn,
-      NewItem(menu_run_rundir,'', kbNoKey, cmRunDir, hcRunDir,
-      NewItem(menu_run_parameters,'', kbNoKey, cmParameters, hcParameters,
-      NewItem(menu_run_resetdebugger,menu_key_run_resetdebugger, kbCtrlF2, cmResetDebugger, hcResetDebugger,
+      IdeItem('run.run',
+      IdeItem('run.stepover',
+      IdeItem('run.traceinto',
+      IdeItem('run.conttocursor',
+      IdeItem('run.untilreturn',
+      IdeItem('run.rundir',
+      IdeItem('run.parameters',
+      IdeItem('run.resetdebugger',
       nil))))))))),
     NewSubMenu(menu_compile,hcCompileMenu, NewMenu(
-      NewItem(menu_compile_compile,menu_key_compile_compile, kbAltF9, cmCompile, hcCompile,
-      NewItem(menu_compile_make,menu_key_compile_make, kbF9, cmMake, hcMake,
-      NewItem(menu_compile_build,'', kbNoKey, cmBuild, hcBuild,
-      NewItem(menu_compile_test,'', kbNoKey, cmTestLang, hcTestLang,
+      IdeItem('compile.compile',
+      IdeItem('compile.make',
+      IdeItem('compile.build',
+      IdeItem('compile.test',
       NewLine(
-      NewItem(menu_compile_target,'', kbNoKey, cmTarget, hcTarget,
-      NewItem(menu_compile_primaryfile,'', kbNoKey, cmPrimaryFile, hcPrimaryFile,
-      NewItem(menu_compile_clearprimaryfile,'', kbNoKey, cmClearPrimary, hcClearPrimary,
+      IdeItem('compile.target',
+      IdeItem('compile.primaryfile',
+      IdeItem('compile.clearprimaryfile',
       NewLine(
-      NewItem(menu_compile_compilermessages,menu_key_compile_compilermessages, kbF12, cmCompilerMessages, hcCompilerMessages,
+      IdeItem('compile.compilermessages',
       nil))))))))))),
     NewSubMenu(menu_debug, hcDebugMenu, NewMenu(
-      NewItem(menu_debug_output,'', kbNoKey, cmUserScreenWindow, hcUserScreenWindow,
-      NewItem(menu_debug_userscreen,menu_key_debug_userscreen, kbAltF5, cmUserScreen, hcUserScreen,
+      IdeItem('debug.output',
+      IdeItem('debug.userscreen',
       NewLine(
 {$ifdef SUPPORT_REMOTE}
-      NewItem(menu_debug_remote,'', kbNoKey, cmTransferRemote, hcTransferRemote,
+      IdeItem('debug.remote',
 {$endif SUPPORT_REMOTE}
-      NewItem(menu_debug_addwatch,menu_key_debug_addwatch, kbCtrlF7, cmAddWatch, hcAddWatch,
-      NewItem(menu_debug_watches,'', kbNoKey, cmWatches, hcWatchesWindow,
-      NewItem(menu_debug_breakpoint,menu_key_debug_breakpoint, kbCtrlF8, cmToggleBreakpoint, hcToggleBreakpoint,
-      NewItem(menu_debug_breakpointlist,'', kbNoKey, cmBreakpointList, hcBreakpointList,
-      NewItem('~E~valuate...','Ctrl+F4', kbCtrlF4, cmEvaluate, hcEvaluate,
-      NewItem(menu_debug_callstack,menu_key_debug_callstack, kbCtrlF3, cmStack, hcStackWindow,
+      IdeItem('debug.addwatch',
+      IdeItem('debug.watches',
+      IdeItem('debug.breakpoint',
+      IdeItem('debug.breakpointlist',
+      IdeItem('debug.evaluate',
+      IdeItem('debug.callstack',
       NewLine(
-      NewItem(menu_debug_disassemble,'', kbNoKey, cmDisassemble, hcDisassemblyWindow,
-      NewItem(menu_debug_registers,'', kbNoKey, cmRegisters, hcRegistersWindow,
-      NewItem(menu_debug_fpu_registers,'', kbNoKey, cmFPURegisters, hcFPURegisters,
-      NewItem(menu_debug_vector_registers,'', kbNoKey, cmVectorRegisters, hcVectorRegisters,
+      IdeItem('debug.disassemble',
+      IdeItem('debug.registers',
+      IdeItem('debug.fpu_registers',
+      IdeItem('debug.vector_registers',
       NewLine(
-      NewItem(menu_debug_gdbwindow,'', kbNoKey, cmOpenGDBWindow, hcOpenGDBWindow,
+      IdeItem('debug.gdbwindow',
       nil
 {$ifdef SUPPORT_REMOTE}
       )
 {$endif SUPPORT_REMOTE}
       ))))))))))))))))),
     NewSubMenu(menu_tools, hcToolsMenu, NewMenu(
-      NewItem(menu_tools_messages,menu_key_tools_messages, kbF11, cmToolsMessages, hcToolsMessages,
-      NewItem(menu_tools_msgnext,menu_key_tools_msgnext, kbAltF8, cmToolsMsgNext, hcToolsMsgNext,
-      NewItem(menu_tools_msgprev,menu_key_tools_msgprev, kbAltF7, cmToolsMsgPrev, hcToolsMsgPrev,
+      IdeItem('tools.messages',
+      IdeItem('tools.msgnext',
+      IdeItem('tools.msgprev',
       NewLine(
-      NewItem(menu_tools_grep,menu_key_tools_grep, kbShiftF2, cmGrep, hcGrep,
-      NewItem(menu_tools_calculator, '', kbNoKey, cmCalculator, hcCalculator,
-      NewItem(menu_tools_asciitable, '', kbNoKey, cmAsciiTable, hcAsciiTable,
-      NewItem(menu_tools_formatgo, '', kbNoKey, cmFormatGo, hcFormatGo,
+      IdeItem('tools.grep',
+      IdeItem('tools.calculator',
+      IdeItem('tools.asciitable',
+      IdeItem('tools.formatgo',
       nil))))))))),
     NewSubMenu(menu_options, hcOptionsMenu, NewMenu(
-      NewItem(menu_options_mode,'', kbNoKey, cmSwitchesMode, hcSwitchesMode,
-      NewItem(menu_options_compiler,'', kbNoKey, cmCompiler, hcCompiler,
-      NewItem(menu_options_memory,'', kbNoKey, cmMemorySizes, hcMemorySizes,
-      NewItem(menu_options_linker,'', kbNoKey, cmLinker, hcLinker,
-      NewItem(menu_options_debugger,'', kbNoKey, cmDebugger, hcDebugger,
+      IdeItem('options.mode',
+      IdeItem('options.compiler',
+      IdeItem('options.memory',
+      IdeItem('options.linker',
+      IdeItem('options.debugger',
 {$ifdef SUPPORT_REMOTE}
-      NewItem(menu_options_remote,'', kbNoKey, cmRemoteDialog, hcRemoteDialog,
+      IdeItem('options.remote',
 {$endif SUPPORT_REMOTE}
-      NewItem(menu_options_directories,'', kbNoKey, cmDirectories, hcDirectories,
-      NewItem(menu_options_browser,'',kbNoKey, cmBrowser, hcBrowser,
-      NewItem(menu_options_tools,'', kbNoKey, cmTools, hcTools,
+      IdeItem('options.directories',
+      IdeItem('options.browser',
+      IdeItem('options.tools',
       NewLine(
       NewSubMenu(menu_options_env, hcEnvironmentMenu, NewMenu(
-        NewItem(menu_options_env_preferences,'', kbNoKey, cmPreferences, hcPreferences,
-        NewItem(menu_options_env_editor,'', kbNoKey, cmEditor, hcEditor,
-        NewItem(menu_options_env_codecomplete,'', kbNoKey, cmCodeCompleteOptions, hcCodeCompleteOptions,
-        NewItem(menu_options_env_codetemplates,'', kbNoKey, cmCodeTemplateOptions, hcCodeTemplateOptions,
-        NewItem(menu_options_env_desktop,'', kbNoKey, cmDesktopOptions, hcDesktopOptions,
-        NewItem(menu_options_env_keybmouse,'', kbNoKey, cmMouse, hcMouse,
-{        NewItem(menu_options_env_startup,'', kbNoKey, cmStartup, hcStartup,
-        NewItem(menu_options_env_colors,'', kbNoKey, cmColors, hcColors,}
+        IdeItem('options.env_preferences',
+        IdeItem('options.env_editor',
+        IdeItem('options.env_codecomplete',
+        IdeItem('options.env_codetemplates',
+        IdeItem('options.env_desktop',
+        IdeItem('options.env_keybmouse',
+{        IdeItem('options.env_startup',
+        IdeItem('options.env_colors',}
 {$ifdef Unix}
-        NewItem(menu_options_learn_keys,'', kbNoKey, cmKeys, hcKeys,
+        IdeItem('options.learn_keys',
 {$endif Unix}
         nil
 {$ifdef Unix}
@@ -1010,38 +1190,38 @@ begin
 {$endif Unix}
         {))}))))))),
       NewLine(
-      NewItem(menu_options_open,'', kbNoKey, cmOpenINI, hcOpenINI,
-      NewItem(menu_options_save,'', kbNoKey, cmSaveINI, hcSaveINI,
-      NewItem(menu_options_saveas,'', kbNoKey, cmSaveAsINI, hcSaveAsINI,
+      IdeItem('options.open',
+      IdeItem('options.save',
+      IdeItem('options.saveas',
       nil
 {$ifdef SUPPORT_REMOTE}
       )
 {$endif SUPPORT_REMOTE}
       ))))))))))))))),
     NewSubMenu(menu_window, hcWindowMenu, NewMenu(
-      NewItem(menu_window_tile,'', kbNoKey, cmTile, hcTile,
-      NewItem(menu_window_cascade,'', kbNoKey, cmCascade, hcCascade,
-      NewItem(menu_window_closeall,'', kbNoKey, cmCloseAll, hcCloseAll,
+      IdeItem('window.tile',
+      IdeItem('window.cascade',
+      IdeItem('window.closeall',
       NewLine(
-      NewItem(menu_window_resize,menu_key_window_resize, kbCtrlF5, cmResize, hcResize,
-      NewItem(menu_window_zoom,menu_key_window_zoom, kbF5, cmZoom, hcZoom,
-      NewItem(menu_window_next,menu_key_window_next, kbF6, cmNext, hcNext,
-      NewItem(menu_window_previous,menu_key_window_previous, kbShiftF6, cmPrev, hcPrev,
-      NewItem(menu_window_hide,menu_key_window_hide, kbCtrlF6, cmHide, hcHide,
-      NewItem(menu_window_close,menu_key_window_close, kbAltF3, cmClose, hcClose,
+      IdeItem('window.resize',
+      IdeItem('window.zoom',
+      IdeItem('window.next',
+      IdeItem('window.previous',
+      IdeItem('window.hide',
+      IdeItem('window.close',
       NewLine(
-      NewItem(menu_window_list,menu_key_window_list, kbAlt0, cmWindowList, hcWindowList,
-      NewItem(menu_window_update,'', kbNoKey, cmUpdate, hcUpdate,
+      IdeItem('window.list',
+      IdeItem('window.update',
       nil)))))))))))))),
     NewSubMenu(menu_help, hcHelpMenu, NewMenu(
-      NewItem(menu_help_contents,'', kbNoKey, cmHelpContents, hcHelpContents,
-      NewItem(menu_help_index,menu_key_help_helpindex, kbShiftF1, cmHelpIndex, hcHelpIndex,
-      NewItem(menu_help_topicsearch,menu_key_help_topicsearch, kbCtrlF1, cmHelpTopicSearch, hcHelpTopicSearch,
-      NewItem(menu_help_prevtopic,menu_key_help_prevtopic, kbAltF1, cmHelpPrevTopic, hcHelpPrevTopic,
-      NewItem(menu_help_using,'',kbNoKey, cmHelpUsingHelp, hcHelpUsingHelp,
-      NewItem(menu_help_files,'',kbNoKey, cmHelpFiles, hcHelpFiles,
+      IdeItem('help.contents',
+      IdeItem('help.index',
+      IdeItem('help.topicsearch',
+      IdeItem('help.prevtopic',
+      IdeItem('help.using',
+      IdeItem('help.files',
       NewLine(
-      NewItem(menu_help_about,'',kbNoKey, cmAbout, hcAbout,
+      IdeItem('help.about',
       nil))))))))),
     nil))))))))))));
    SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,false);
@@ -1094,28 +1274,29 @@ procedure TIDEApp.InitStatusLine;
 var
   R: TRect;
 begin
+  RegisterIDEActions;
   GetExtent(R);
   R.A.Y := R.B.Y - 1;
   StatusLine := TIDEStatusLine.Create(R,
     NewStatusDef(hcDragging, hcDragging,
-      NewStatusKey(status_help, kbF1, cmHelp,
-      StdStatusKeys(
+      NewActionStatusKey(status_help,'help.help',
+      IdeStdStatusKeys(
       NewStatusKey('~Cursor~ Move', kbNoKey, 65535,
       NewStatusKey('~Shift+Cursor~ Size', kbNoKey, 65535,
       NewStatusKey('~◄─┘~ Done', kbNoKey, 65535, {#17 = left arrow}
       NewStatusKey('~Esc~ Cancel', kbNoKey, 65535,
       nil)))))),
     NewStatusDef(hcStackWindow, hcStackWindow,
-      NewStatusKey(status_help, kbF1, cmHelp,
+      NewActionStatusKey(status_help,'help.help',
       NewStatusKey(status_disassemble, kbAltI, cmDisassemble,
-      StdStatusKeys(
+      IdeStdStatusKeys(
       nil))),
     NewStatusDef(hcFirstCommand, hcLastNormalCommand,
-      NewStatusKey(status_help, kbF1, cmHelp,
-      StdStatusKeys(
+      NewActionStatusKey(status_help,'help.help',
+      IdeStdStatusKeys(
       nil)),
     NewStatusDef(hcFirstNoAltXCommand, hcLastCommand,
-      NewStatusKey(status_help, kbF1, cmHelp,
+      NewActionStatusKey(status_help,'help.help',
       NewStatusKey('', kbF10, cmMenu,
       NewStatusKey('', kbAltF3, cmClose,
       NewStatusKey('', kbF5, cmZoom,
@@ -1128,44 +1309,44 @@ begin
       NewStatusKey(status_help_previoustopic, kbAltF1, cmHelpPrevTopic,
       NewStatusKey(status_help_index, kbShiftF1, cmHelpIndex,
       NewStatusKey(status_help_close, kbEsc, cmClose,
-      StdStatusKeys(
+      IdeStdStatusKeys(
       nil))))),
     NewStatusDef(hcSourceWindow, hcSourceWindow,
-      NewStatusKey(status_help, kbF1, cmHelp,
-      NewStatusKey(status_save, kbF2, cmSave,
-      NewStatusKey(status_open, kbF3, cmOpen,
-      NewStatusKey(status_compile, kbAltF9, cmCompile,
-      NewStatusKey(status_make, kbF9, cmMake,
-      NewStatusKey(status_localmenu, kbAltF10, cmLocalMenu,
-      StdStatusKeys
+      NewActionStatusKey(status_help,'help.help',
+      NewActionStatusKey(status_save,'file.save',
+      NewActionStatusKey(status_open,'file.open',
+      NewActionStatusKey(status_compile,'compile.compile',
+      NewActionStatusKey(status_make,'compile.make',
+      NewActionStatusKey(status_localmenu,'edit.localmenu',
+      IdeStdStatusKeys
       (
       nil))))))),
     NewStatusDef(hcASCIITableWindow, hcASCIITableWindow,
-      NewStatusKey(status_help, kbF1, cmHelp,
+      NewActionStatusKey(status_help,'help.help',
       NewStatusKey(status_transferchar, kbCtrlEnter, cmTransfer,
-      StdStatusKeys(
+      IdeStdStatusKeys(
       nil))),
     NewStatusDef(hcMessagesWindow, hcMessagesWindow,
-      NewStatusKey(status_help, kbF1, cmHelp,
+      NewActionStatusKey(status_help,'help.help',
       NewStatusKey(status_msggotosource, kbEnter, cmMsgGotoSource,
       NewStatusKey(status_msgtracksource, kbNoKey, cmMsgTrackSource,
-      NewStatusKey(status_localmenu, kbAltF10, cmLocalMenu,
+      NewActionStatusKey(status_localmenu,'edit.localmenu',
       NewStatusKey('', kbEsc, cmClose,
-      StdStatusKeys(
+      IdeStdStatusKeys(
       nil)))))),
     NewStatusDef(hcCalcWindow, hcCalcWindow,
-      NewStatusKey(status_help, kbF1, cmHelp,
+      NewActionStatusKey(status_help,'help.help',
       NewStatusKey(status_close, kbEsc, cmClose,
       NewStatusKey(status_calculatorpaste, kbCtrlEnter, cmCalculatorPaste,
-      StdStatusKeys(
+      IdeStdStatusKeys(
       nil)))),
     NewStatusDef(0, $FFFF,
-      NewStatusKey(status_help, kbF1, cmHelp,
-      NewStatusKey(status_open, kbF3, cmOpen,
-      NewStatusKey(status_compile, kbAltF9, cmCompile,
-      NewStatusKey(status_make, kbF9, cmMake,
-      NewStatusKey(status_localmenu, kbAltF10, cmLocalMenu,
-      StdStatusKeys(
+      NewActionStatusKey(status_help,'help.help',
+      NewActionStatusKey(status_open,'file.open',
+      NewActionStatusKey(status_compile,'compile.compile',
+      NewActionStatusKey(status_make,'compile.make',
+      NewActionStatusKey(status_localmenu,'edit.localmenu',
+      IdeStdStatusKeys(
       nil)))))),
     nil)))))))))));
 end;
@@ -1209,6 +1390,15 @@ begin
     HandleEvent(Event);
 
   inherited GetEvent(Event);
+  { F1 in a modal dialog (UX guidelines, D.3): the command would reach the dialog, which ignores it; the help
+    window runs modally above the dialog instead, on the topic of the focused element }
+  if ((Event.What=evCommand) and (Event.Command=cmHelp)) or
+     ((Event.What=evKeyDown) and (Event.KeyCode=kbF1)) then
+    if (TopView<>nil) and (TopView<>Self) and (TopView.HelpCtx<>hcHelpWindow) then
+      begin
+        ClearEvent(Event);
+        Help(0,TopView.GetHelpCtx,true);
+      end;
 {$ifdef DEBUG}
   if (Event.What=evKeyDown) and (Event.KeyCode=kbAltF11) then
     begin
