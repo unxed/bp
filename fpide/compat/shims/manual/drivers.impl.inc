@@ -284,9 +284,7 @@ end;
 
 procedure GetKeyEvent(var Event: TEvent);
 begin
-  TvSys.PollEvent(0, Event);
-  if Event.What <> evKeyDown then
-    ClearEvent(Event);
+  TvSys.PollKeyEvent(Event);
 end;
 
 function ShrinkPath(Path: string; MaxLen: Integer): string;
