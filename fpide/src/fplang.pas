@@ -11,7 +11,7 @@ unit FpLang;
 interface
 
 uses
-  SysUtils, Classes, Process;
+  SysUtils, Classes, Process, TvPath;
 
 type
   { what the user asked: the same four of the Compile menu and the tests }
@@ -81,7 +81,7 @@ var
 
 function TLangBackend.WorkDir(const FileName: string): string;
 begin
-  Result := ExtractFilePath(ExpandFileName(FileName));
+  Result := PathDir(PathExpand(FileName));
 end;
 
 function TLangBackend.IsProgram(const FileName: string): Boolean;
@@ -119,8 +119,8 @@ function TGoBackend.Handles(const FileName: string): Boolean;
 var
   E: string;
 begin
-  E := LowerCase(ExtractFileExt(FileName));
-  Result := (E = '.go') or (LowerCase(ExtractFileName(FileName)) = 'go.mod');
+  E := LowerCase(PathExt(FileName));
+  Result := (E = '.go') or (LowerCase(PathName(FileName)) = 'go.mod');
 end;
 
 function TGoBackend.ToolName: string;
@@ -155,12 +155,12 @@ var
   D, Up: string;
 begin
   Result := '';
-  D := ExcludeTrailingPathDelimiter(ExtractFilePath(ExpandFileName(FileName)));
+  D := PathDelSep(PathDir(PathExpand(FileName)));
   while D <> '' do
   begin
-    if FileExists(IncludeTrailingPathDelimiter(D) + 'go.mod') then
+    if FileExists(PathAddSep(D) + 'go.mod') then
       Exit(D);
-    Up := ExcludeTrailingPathDelimiter(ExtractFilePath(D));
+    Up := PathDelSep(PathDir(D));
     if Up = D then
       Break;
     D := Up;
@@ -169,7 +169,7 @@ end;
 
 function TGoBackend.WorkDir(const FileName: string): string;
 begin
-  Result := ExtractFilePath(ExpandFileName(FileName));
+  Result := PathDir(PathExpand(FileName));
 end;
 
 procedure TGoBackend.Arguments(Mode: TLangMode; const FileName, OutFile: string; Args: TStrings);
@@ -180,7 +180,7 @@ begin
   if ModuleDir(FileName) <> '' then
     Target := '.'
   else
-    Target := ExtractFileName(FileName);
+    Target := PathName(FileName);
   case Mode of
     lmBuild:
       begin
@@ -290,7 +290,7 @@ var
   N: Integer;
 begin
   Result := True;
-  if LowerCase(ExtractFileExt(FileName)) <> '.go' then
+  if LowerCase(PathExt(FileName)) <> '.go' then
     Exit;
   AssignFile(T, FileName);
   {$I-}

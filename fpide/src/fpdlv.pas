@@ -15,7 +15,7 @@ unit FpDlv;
 interface
 
 uses
-  SysUtils, Classes, Process, Sockets, BaseUnix, fpjson, jsonparser;
+  SysUtils, Classes, Process, Sockets, BaseUnix, fpjson, jsonparser, TvPath;
 
 type
   { what a command that lets the program run came back with }
@@ -133,8 +133,8 @@ begin
     Paths.StrictDelimiter := True;
     Paths.DelimitedText := GetEnvironmentVariable('PATH');
     for I := 0 to Paths.Count - 1 do
-      if (Paths[I] <> '') and FileExists(IncludeTrailingPathDelimiter(Paths[I]) + Name) then
-        Exit(IncludeTrailingPathDelimiter(Paths[I]) + Name);
+      if (Paths[I] <> '') and FileExists(PathJoin(Paths[I], Name)) then
+        Exit(PathJoin(Paths[I], Name));
   finally
     Paths.Free;
   end;
@@ -148,12 +148,12 @@ begin
   if Result <> '' then
     Exit;
   D := GetEnvironmentVariable('GOBIN');
-  if (D <> '') and FileExists(IncludeTrailingPathDelimiter(D) + 'dlv') then
-    Exit(IncludeTrailingPathDelimiter(D) + 'dlv');
+  if (D <> '') and FileExists(PathJoin(D, 'dlv')) then
+    Exit(PathJoin(D, 'dlv'));
   D := GetEnvironmentVariable('GOPATH');
   if D = '' then
-    D := IncludeTrailingPathDelimiter(GetEnvironmentVariable('HOME')) + 'go';
-  D := IncludeTrailingPathDelimiter(D) + 'bin' + PathDelim + 'dlv';
+    D := PathJoin(GetEnvironmentVariable('HOME'), 'go');
+  D := PathJoin(PathJoin(D, 'bin'), 'dlv');
   if FileExists(D) then
     Exit(D);
 end;

@@ -23,7 +23,7 @@ procedure GoDebugEnd;
 implementation
 
 uses
-  SysUtils, Classes, Objects, Drivers, Views, App, MsgBox, WViews, WEditor,
+  SysUtils, TvPath, Classes, Objects, Drivers, Views, App, MsgBox, WViews, WEditor,
   FpLang, FpDlv, FPConst, FPViews, FPVars, FPUtils, FPCompil, FPIde, FPHelp, FPTools,
 {$ifndef NODEBUG}
   FPDebug,
@@ -258,7 +258,7 @@ begin
   end;
   if Result = '' then
     Exit;
-  Result := ExpandFileName(Result);
+  Result := PathExpand(Result);
   B := BackendFor(Result);
   if (B = nil) or (B.DebuggerTool <> 'dlv') then
     Result := '';
@@ -272,7 +272,7 @@ begin
   G := TGoBackend.Create;
   try
     if G.ModuleDir(GoFile) <> '' then
-      Result := ExcludeTrailingPathDelimiter(ExtractFilePath(GoFile))
+      Result := PathDelSep(PathDir(GoFile))
     else
       Result := GoFile;
   finally
@@ -305,8 +305,8 @@ begin
       for I := 0 to BreakpointsCollection.Count - 1 do
       begin
         PB := BreakpointsCollection.At(I);
-        if Wanted(PB) and (LowerCase(ExtractFileExt(PB.FileName^)) = '.go') then
-          Files.Add(ExpandFileName(PB.FileName^));
+        if Wanted(PB) and (LowerCase(PathExt(PB.FileName^)) = '.go') then
+          Files.Add(PathExpand(PB.FileName^));
       end;
     if ExtraFile <> '' then
       Files.Add(ExtraFile);
@@ -323,7 +323,7 @@ begin
         for J := 0 to BreakpointsCollection.Count - 1 do
         begin
           PB := BreakpointsCollection.At(J);
-          if not (Wanted(PB) and (ExpandFileName(PB.FileName^) = F)) then
+          if not (Wanted(PB) and (PathExpand(PB.FileName^) = F)) then
             Continue;
           Dup := False;
           for K := 0 to High(Bps) do
@@ -481,7 +481,7 @@ begin
   ClearToolMessages;
   PushStatus('Starting Delve...');
   try
-    if not Session.Start(Tool, 'debug', ProgramOf(GoFile), ExtractFilePath(GoFile), GetRunParameters) then
+    if not Session.Start(Tool, 'debug', ProgramOf(GoFile), PathDir(GoFile), GetRunParameters) then
     begin
       PopStatus;
       Finished(drFailed);
@@ -537,7 +537,7 @@ begin
           W := PFPWindow(Desktop.Current);
           if (W <> nil) and (W.ClassType = TSourceWindow) then
           begin
-            F := ExpandFileName(PSourceWindow(W).Editor.FileName);
+            F := PathExpand(PSourceWindow(W).Editor.FileName);
             Line := PSourceWindow(W).Editor.CurPos.Y + 1;
             Result := Resume(cmContinue, F, Line);
           end;
@@ -567,7 +567,7 @@ begin
         W := PFPWindow(Desktop.Current);
         if (W <> nil) and (W.ClassType = TSourceWindow) then
         begin
-          F := ExpandFileName(PSourceWindow(W).Editor.FileName);
+          F := PathExpand(PSourceWindow(W).Editor.FileName);
           Line := PSourceWindow(W).Editor.CurPos.Y + 1;
           StartSession(GoFile, False, F, Line);
           Result := True;

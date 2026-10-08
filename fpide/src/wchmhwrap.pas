@@ -21,7 +21,7 @@ unit wchmhwrap;
 {$modeswitch autoderef}
 interface
 
-Uses  wutils,whelp,whtml,SysUtils,ChmReader,ChmSiteMap,Classes;
+Uses  wutils,whelp,whtml,SysUtils,ChmReader,ChmSiteMap,Classes,TvPath;
 
 Type
 //      TopicLinks: PTopicLinkCollection;IndexEntries : PUnsortedIndexEntryCollection;
@@ -52,6 +52,17 @@ implementation
 
 var CHMIndex : TStringList; // list to register open CHMs.
 
+{ The names inside a CHM file are written with '/' on every system. }
+
+function chmdir(const s:String):String;
+begin
+  chmdir:=PathDelSep(PathDir(s,UnixPathRules),UnixPathRules);
+end;
+
+function chmrooted(const s:String):String;
+begin
+  chmrooted:=PathJoin(UnixPathRules.Sep,s,UnixPathRules);
+end;
 
 function combinepaths(relpath,basepath:String):String;
 
@@ -61,11 +72,11 @@ begin
   {$endif}
 
   if relpath='' then exit;
-  if relpath[length(relpath)]<>'/' Then
-    basepath:=extractfiledir(basepath);
+  if not EndsWithSep(relpath,UnixPathRules) Then
+    basepath:=chmdir(basepath);
   while (length(relpath)>0) and (copy(relpath,1,3)='../') do
      begin
-       basepath:=extractfiledir(basepath);
+       basepath:=chmdir(basepath);
        delete(relpath,1,3);
      end;
 
@@ -74,8 +85,8 @@ begin
   {$endif}
   if (length(basepath)>0) and (length(relpath)>0) then
     begin
-      if (relpath[1]<>'/') and (basepath[length(basepath)]<>'/') then
-        basepath:=basepath+'/';
+      if not PathIsRooted(relpath,UnixPathRules) then
+        basepath:=PathAddSep(basepath,UnixPathRules);
        {$ifdef combinedebug}
         debugmessageS({$i %file%},'combine out2 "'+relpath+'" and "'+basepath+'"',{$i %line%},'1',0,0);
        {$endif}
@@ -173,8 +184,8 @@ begin
            s2:=item.SubItem[1].local;
           if s2='' then
             s2:=searchlocal(item);
-          if (length(s2)>0) and (s2[1]<>'/') then
-            tli:=TopicLinks.AddItem('/'+s2)
+          if length(s2)>0 then
+            tli:=TopicLinks.AddItem(chmrooted(s2))
           else
             tli:=TopicLinks.AddItem(s2);
           TLI:=EncodeHTMLCtx(ID,TLI+1);
@@ -236,8 +247,8 @@ begin
   result:=nil;
   if not assigned(fchmr) or (name='') then exit;
 
-  If (name[1]<>'/') and (copy(name,1,7)<>'ms-its:') Then
-    name:='/'+name;
+  If copy(name,1,7)<>'ms-its:' Then
+    name:=chmrooted(name);
   linedata:=Classes.TStringList.create;
   try
     {$ifdef wdebug}

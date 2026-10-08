@@ -54,7 +54,7 @@ uses
   FPDebug,
 {$endif NODEBUG}
   FPRedir,FPVars,FpCompil,
-  FPUtils,FPSwitch,WUtils,FpLang;
+  FPUtils,FPSwitch,WUtils,FpLang,TvPath;
 
 {****************************************************************************
                                    Run
@@ -339,9 +339,9 @@ begin
       if Module<>'' then
         begin
           if not FileExists(Module) then
-            Module:=ExpandFileName(IncludeTrailingPathDelimiter(B.WorkDir(MainFile))+Module)
+            Module:=PathExpand(PathAddSep(B.WorkDir(MainFile))+Module)
           else
-            Module:=ExpandFileName(Module);
+            Module:=PathExpand(Module);
           if M.Severity=lsError then
             Inc(status.errorCount);
           CompilerMessageWindow.AddMessage(Lv or V_LineInfo,M.Text,Module,M.Line,M.Col);
@@ -369,14 +369,14 @@ function BackendOutFile(B: TLangBackend): string;
 var
   Name: string;
 begin
-  Name:=ChangeFileExt(ExtractFileName(MainFile),'');
+  Name:=PathChangeExt(PathName(MainFile),'');
   {$ifdef Windows}
   Name:=Name+'.exe';
   {$endif}
   if GetExePath<>'' then
     Result:=FixFileName(GetExePath+Name)
   else
-    Result:=ExtractFilePath(MainFile)+Name;
+    Result:=PathDir(MainFile)+Name;
 end;
 
 procedure CompileExternal(const FileName, ConfigFile: string);

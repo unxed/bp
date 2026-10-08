@@ -18,7 +18,7 @@ function BuildSourceBrowser(const MainFile: string): boolean;
 implementation
 
 uses
-  Classes, SysUtils, Objects, PasTree, PScanner, PParser, SymConst, BrowCol;
+  Classes, SysUtils, TvPath, Objects, PasTree, PScanner, PParser, SymConst, BrowCol;
 
 type
   TBrowseContainer = class(TPasTreeContainer)
@@ -62,7 +62,7 @@ begin
   parser := TPasParser.Create(scanner, resolver, container);
   try
     try
-      dir := ExtractFilePath(ExpandFileName(FileName));
+      dir := PathDir(PathExpand(FileName));
       resolver.BaseDirectory := dir;
       resolver.AddIncludePath(dir);
       scanner.AddDefine('FPC');
@@ -148,7 +148,7 @@ end;
 procedure AddReference(S: PSymbol; E: TPasElement);
 begin
   if (E.SourceFilename <> '') and (E.SourceLinenumber > 0) then
-    S.References.Insert(TReference.Create(ModuleNames.Add(ExpandFileName(E.SourceFilename)),
+    S.References.Insert(TReference.Create(ModuleNames.Add(PathExpand(E.SourceFilename)),
       E.SourceLinenumber, 1));
 end;
 
@@ -364,8 +364,8 @@ begin
   modules_ := TList.Create;
   try
     done.CaseSensitive := False;
-    dir := ExtractFilePath(ExpandFileName(MainFile));
-    queue.Add(ExpandFileName(MainFile));
+    dir := PathDir(PathExpand(MainFile));
+    queue.Add(PathExpand(MainFile));
     { the units of a program come first as they are used: dependencies are read before their users so that the
       ancestors of classes are known; so the queue is read first and the modules are added in reverse }
     n := 0;
@@ -393,8 +393,8 @@ begin
     for i := 0 to modules_.Count - 1 do
     begin
       M := TPasModule(modules_[i]);
-      U := TModuleSymbol.Create(M.Name, ExpandFileName(M.SourceFilename));
-      U.AddSourceFile(ExpandFileName(M.SourceFilename));
+      U := TModuleSymbol.Create(M.Name, PathExpand(M.SourceFilename));
+      U.AddSourceFile(PathExpand(M.SourceFilename));
       AddReference(U, M);
       Modules.Insert(U);
       Sec := M.InterfaceSection;

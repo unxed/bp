@@ -35,7 +35,7 @@ unit browcol;
 interface
 
 uses
-  SysUtils,
+  SysUtils,TvPath,
 {$ifdef EMBED_COMPILER}
   CUtils,
   cclasses,
@@ -2026,19 +2026,19 @@ begin
     m:=tmodule(loaded_units.first);
     while assigned(m) do
     begin
-      obj:=ExpandFileName(m.objfilename);
+      obj:=PathExpand(m.objfilename);
       ppu:=''; source:='';
       if m.is_unit then
-        ppu:=ExpandFileName(m.ppufilename);
+        ppu:=PathExpand(m.ppufilename);
       if (m.is_unit=false) and (m.islibrary=false) then
-        ppu:=ExpandFileName(m.exefilename);
+        ppu:=PathExpand(m.exefilename);
       if assigned(m.sourcefiles) then
         begin
           s:=m.sourcefiles.files;
           while assigned(s) do
           begin
             source:=s.path+s.name;
-            source:=ExpandFileName(source);
+            source:=PathExpand(source);
 
             sourcefiles.Insert(TSourceFile.Create(source,obj,ppu));
             s:=s.ref_next;
