@@ -35,6 +35,8 @@ jobs:
         with:
           submodules: true
       - run: fpide/tools/check-fpide-layout.sh
+      - name: paths spelled by hand (a ratchet)
+        run: python3 fpide/tools/check-paths.py
 
   tv:
     runs-on: ubuntu-24.04
