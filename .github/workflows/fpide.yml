@@ -1,6 +1,6 @@
 name: fpide
 
-# Text Mode IDE port: tv3 tests, layout, shims smoke, manual full build (linux64). The full build and the
+# Text Mode IDE port: tv3 tests (unit and pty, side by side), layout, shims smoke, manual full build (linux64). The full build and the
 # click-through tests of the IDE itself run in fpide-accept.yml. (The old job that diffed fpide/src with FPC
 # upstream is gone: the port diverged on purpose.)
 on:
@@ -10,6 +10,7 @@ on:
       - fpide/**
       - fpide/tv/**
       - fpide/tools/build-fpide.sh
+      - fpide/tools/tv-test.sh
       - fpide/tools/tv-pty-test.sh
       - fpide/tools/fpide-env.sh
       - fpide/tools/need-tv.sh
@@ -46,15 +47,23 @@ jobs:
           submodules: true
       - name: Packages
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-fcl python3
-      - name: tv3 unit tests (memory backend)
+      - name: tv3 unit tests
         run: fpide/tools/tv-test.sh
-      - name: tv3 far2l extensions through a pty (client and server)
+
+  tv-pty:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-fcl python3
+      - name: tv3 tests through a pty (side by side)
         run: fpide/tools/tv-pty-test.sh
 
-  # Smoke link of the shims on tv3; the full IDE build is in fpide-accept.yml.
+  # Smoke link of the shims on tv3 (beside the tests); the full IDE build is in fpide-accept.yml.
   preflight:
     runs-on: ubuntu-24.04
-    needs: [layout, tv]
     steps:
       - uses: actions/checkout@v4
         with:
