@@ -1,31 +1,34 @@
-# Safe Pascal — specification v0.5
+# Better Pascal — specification v0.6
 
-> **Better Pascal (v0.6):** the library is split into layers. Read mentions of `safe.pas` and `SafeThreads` below as `safe/*.inc` (the safe layer), `ext/*.inc` and `ext/bpthreads.pas` (the ext layer); you include `unit BP` (everything at once, first in the program, last in the other units) or `unit Safe` (the safe layer only). See the root README.
+Safe-by-default Free Pascal. Not a fork, not a new syntax: **one unit `BP` and one line in every module**:
+`uses BP, ...;` first in the program file, `uses ..., BP;` last in every other unit.
+Works on stock FPC 3.2+ with no compiler options.
 
-
-Safe-by-default Free Pascal. Not a fork, not a new syntax: **one file `safe.pas` and one line
-`uses Safe` in every module**. Works on stock FPC 3.2+ with no compiler options.
+`BP` (`bp.pas`) is made of two layers: the safe layer (`safe/*.inc`: ownership, slices, arena, defer, FFI, the poisoned
+primitives) and the ext layer (`ext/*.inc` and `ext/bpthreads.pas`: UTF-8 by default, goroutines, the thread manager).
+`unit Safe` (`safe/safe.pas`) is the safe layer alone. Below, "Safe Pascal" and `uses Safe` name the safe layer and its
+rules; everything said about them holds for `BP`, which includes the same code.
 
 The document is written so that it can be attached to a prompt in full: a model that writes code
 strictly by §0 writes Safe Pascal code. The remaining sections explain §0 and define the API.
 
 Porting all of this (or ideas from it) into FPC/Lazarus in any form is **welcome**: nothing is required
 from us for that, and Safe Pascal needs nothing from FPC to work either.
-License: MIT (`LICENSE`, the header of `safe.pas`).
+License: MIT (`LICENSE`, the SPDX header of each file).
 
 Versions and what was verified on which targets: §2 (table) and §17 (history).
 
-### What actually exists and what is only a plan so far (v0.5)
+### What actually exists and what is only a plan so far (v0.6)
 
 | Part | Status | Where |
 |---|---|---|
-| UTF-8 by default, `CodePoints`/`CPLength` | **implemented, tests** | §3, `test_safe` |
+| UTF-8 by default, `CodePoints`/`CPLength` (ext layer, unit `BP`) | **implemented, tests** | §3, `test_utf8` |
 | `TOwned/TShared/TWeak/TSlice/TArena`, R1–R4 | **implemented, tests, CI** | §4–5, `test_safe` |
 | Shadowing of `GetMem/New/Dispose/Move/FillChar/FreeAndNil`, `.Free`, `Pointer` (S1–S4) | **implemented (compiler), compile tests `mf_*.pas`** | §6 |
 | `TDefer`, `SafeLiveCount`/`SafeCheckNoLeaks` (R5) | **implemented, tests** | §5, §12 |
 | FFI: `TCResource`, the `ffi_libc` binding | **implemented, test** (needs libc, `-dSAFE_LIBC`) | §13 |
-| Goroutines: `TGroup/TTask/TChan/Select`, R6–R8 | **implemented, tests** | §14 |
-| Own threads without libc (`safethreads.pas`: `clone`+`futex`+`mmap`), Linux without libc by default | **implemented, tests** (`test_threads`; x86_64, i386, aarch64, Alpine) | §18 |
+| Goroutines: `TGroup/TTask/TChan/Select`, R6–R8 (ext layer, unit `BP`) | **implemented, tests** | §14, `test_go` |
+| Threads without libc (`ext/bpthreads.pas`: `clone`+`futex`+`mmap`), Linux without libc by default | **implemented, tests** (`test_threads`; x86_64, i386, aarch64, Alpine) | §18 |
 | Sum types: example and test; **S13 checks (`case` exhaustiveness, tag)** | example and test exist; **checks (linter) — plan** | §16, `test_sumtype` |
 | Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | **specification only (plan), no code** | §15 |
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
@@ -33,7 +36,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
 | Lazarus package (OPM), Windows in CI | **plan** | §11 |
-| CI: "no INTERP/NEEDED" check, Alpine/Debian in containers | **plan** (currently CI runs `tests/run.sh` on Ubuntu) | §18 |
+| CI: "no INTERP/NEEDED" check, Alpine/Debian/Ubuntu 16.04/CentOS 7 in containers, i386 and aarch64 under qemu | **implemented** (`.github/workflows/ci.yml`) | §18 |
 | Support for `object` (Turbo Pascal) | **plan** | §19 |
 | GC heap | **deliberately not adopted** | §18 |
 
@@ -94,7 +97,7 @@ OLD STYLE                              (§12)
 
 TARGETS                                (§2, table of what was verified)
   Linux (x86_64, i386, aarch64): by default a static binary without libc, works on any distribution;
-  threads — SafeThreads. FFI to C libraries and libc — only with -dSAFE_LIBC (§18).
+  threads — BPThreads (inside BP). FFI to C libraries and libc — only with -dSAFE_LIBC (§18).
   DOS: no threads, TGroup.Go raises R8. Windows: builds, run not verified.
 
 UNSAFE
@@ -110,8 +113,8 @@ GOROUTINES                             (§14; "do not communicate by sharing mem
   Channels: Ch := specialize TChan<T>.Create(Cap); Send / Recv(out V): Boolean / TryRecv / Close; for V in Ch.
   select: case Select([A.Sel, B.Sel, Done], TimeoutMs) of ... — then TryRecv; -1 = timeout.
   Cancellation: G.Cancel → Done is closed; in a task — Cancelled or Done in Select. A task error → G.Wait raises R7.
-  IN THE PROGRAM FILE, as the first unit  uses SafeThreads, ...  (on Linux — own threads without libc, §18;
-  with -dSAFE_LIBC and on other Unixes — cthreads). Without it Go → R8.
+  IN THE PROGRAM FILE, as the first unit  uses BP, ...  (it installs the thread manager: on Linux threads without libc, §18;
+  with -dSAFE_LIBC and on other Unixes — cthreads). BP not first → the first Go stops the program (code 211).
 
 FFI                                    (§13; like cgo)
   external declarations — only in a binding module (// UNSAFE-UNIT:), a safe facade outward.
@@ -128,8 +131,8 @@ FPC already has almost everything: reference-counted strings with an encoding, d
 with automatic finalization, interfaces with an atomic counter, range checks,
 exceptions with guaranteed finalization. Three things are missing: **(1)** the right defaults
 (UTF-8), **(2)** a couple of thin wrappers for objects and **(3)** a way to make the dangerous visible.
-Safe Pascal provides all three in one module, and it "poisons" the dangerous primitives by name shadowing:
-the `Safe` module, placed last in `uses`, declares same-named symbols, and the compiler itself
+Better Pascal provides all three in one unit, and it "poisons" the dangerous primitives by name shadowing:
+the `BP` unit (or `Safe`), placed last in `uses`, declares same-named symbols, and the compiler itself
 rejects `GetMem(...)` with a message saying what to do instead. The full name
 (`System.GetMem`) bypasses the shadowing — this is the explicit opt-in to unsafe, visible to grep.
 
@@ -137,15 +140,14 @@ rejects `GetMem(...)` with a message saying what to do instead. The full name
 
 | Method | What to do | Industry analogue |
 |---|---|---|
-| **File alongside** (main) | put `safe.pas` in the folder with the sources | SQLite amalgamation, stb, vendoring in Go |
-| Shared copy | one line `-Fu/path/to/safe-pascal` in `~/.fpc.cfg` | `GOPATH` |
+| **Copy alongside** (main) | put `bp.pas`, `safe/` and `ext/` next to the sources; `-Fu` for `safe/` and `ext/` | SQLite amalgamation, stb, vendoring in Go |
+| Shared copy | `-Fu<path> -Fu<path>/safe -Fu<path>/ext` in `~/.fpc.cfg` | `GOPATH` |
 | Lazarus | a package in OPM (plan, §11) | npm / cargo |
 | Upstream | a module shipped with FPC — do nothing | `std` |
 
-FPC looks for modules in the folder of the compiled source, so "file alongside" needs no options.
-The switches `-Fa`, `-Mobjfpc`, `-Sh`, `-FcUTF8` are not needed:
+Apart from the unit paths, no switches are needed: `-Fa`, `-Mobjfpc`, `-Sh`, `-FcUTF8` are not needed:
 
-- UTF-8 is enabled in the `initialization` of the `Safe` module, and it is in the `uses` of every module → it is guaranteed
+- UTF-8 is enabled in the `initialization` of the `BP` unit, and it is in the `uses` of every module → it is guaranteed
   to run before the main program. `-Fa` (which also only applies to programs) is not needed.
 - `{$mode objfpc}{$H+}` is inserted by Lazarus into every new module anyway.
 - `-FcUTF8` is not needed and is **harmful**: literals without `{$codepage}` are stored as is (UTF-8 bytes) with the encoding `CP_ACP`,
@@ -155,7 +157,7 @@ The switches `-Fa`, `-Mobjfpc`, `-Sh`, `-FcUTF8` are not needed:
 `uses Safe` is both an import and a declaration "this module is safe" (cf. `#![forbid(unsafe_code)]`
 in Rust). A module without `uses Safe` is considered unsafe and must be marked (§7).
 
-To disable the UTF-8 initialization (if the application manages encodings itself): `-dSAFE_NO_UTF8`.
+To disable the UTF-8 initialization of `BP` (if the application manages encodings itself): `-dSAFE_NO_UTF8`.
 
 Linux is built without libc by default (§18): `cwstring` and `cthreads` are not needed, `-dSAFE_NO_CWSTRING` remains only for the case of `-dSAFE_LIBC` on a static build without libc.
 
@@ -172,12 +174,12 @@ Tests: `test_safe` (core), `test_go` (goroutines, §14), `test_threads` (thread 
 | Windows x86_64 (cross-compiler) | builds | builds | builds | builds | builds; run not verified (no wine) |
 
 Conclusion: after v0.5 (Linux without libc by default) the core, goroutines, threads and sum types work on all verified Linux targets, including static i386 and aarch64 without libc, without any switches;
-FFI depends on libc/the OS. To check your own set: `fpc test_safe.pas` with a cross-compiler and run it (qemu-user, DOSBox-X); the repository CI runs only Linux x86_64.
+FFI depends on libc/the OS. To check your own set: `tests/run.sh` with `FPC`/`FPCOPTS`/`RUN` of a cross-compiler (qemu-user); the repository CI runs Linux x86_64, i386 and aarch64.
 
 ## §3. Strings: UTF-8 everywhere
 
 - `String` = `AnsiString` with `DefaultSystemCodePage = CP_UTF8`. File names, the console, `Input/Output` — UTF-8.
-  On Unix `cwstring` is included inside `Safe`, on Windows UTF-8 is enabled in the console.
+  `BP` does it: on Linux with `fpwidestring` (no libc), on other Unix with `cwstring`, on Windows UTF-8 is enabled in the console.
 - Indices and lengths are in bytes (like Go and Rust). UTF-8 is self-synchronizing: a substring search
   by bytes cannot find "half a character", so `Pos/Copy/Delete/StringReplace` are correct.
 - A character (code point) is also a `String`: `for Ch in CodePoints(S) do if Ch = '<one non-ASCII character>' then ...`.
@@ -229,7 +231,7 @@ The price is one atomic increment on creation and on `Move`. That is cheap.
 
 Inside an arena objects refer to each other with raw references marked `// borrow: arena`.
 
-## §5. API (`safe.pas`)
+## §5. API (`safe/core.intf.inc`)
 
 In objfpc mode generics require `specialize`; it is customary to declare synonyms:
 `type TFooBox = specialize TOwned<TFoo>;`.
@@ -298,7 +300,7 @@ Runtime checks (always enabled, cost one comparison):
 | R5 | `SafeCheckNoLeaks` at the end of a test: live owned objects remain, suppressed exceptions in `TDefer`, or task errors not collected by `TGroup.Wait` |
 | R6 | `Send` to a closed channel, a repeated `Close` (like panic in Go) |
 | R7 | a group task failed: `TGroup.Wait` raises with the original class and exception text |
-| R8 | `TGroup.Go` without threads: the program has no `SafeThreads` (or `cthreads`), or the target has no threads (DOS) |
+| R8 | `TGroup.Go` without threads: no thread manager is installed, or the target has no threads (DOS) |
 
 Thread safety in v0.1: the counters are atomic, so `TShared` can be copied between threads;
 `TWeak.TryLock` from different threads concurrently with the last `Reset` is a race (§11).
@@ -403,18 +405,15 @@ end;                                    // the list is destroyed here, also on a
 - **Modules and dependencies as in Go** (§15) and the **`sp` tool** — one command for building, testing,
   checking, formatting and dependencies (§16).
 - Windows in CI; `ParamStr` in UTF-8 on Windows.
-- **Full translation of the repository into English** (owner, 2026-10-03): `SPEC.md` (starting with the §0 card and §2), `README.md`,
-  `DN-ADOPTION.md`, `fpc-utf8/README.md`, comments in `safe.pas`, `safethreads.pas`, the tests and CI. Done at the end, in separate
-  commits; the code does not change (check: `tests/run.sh` and CI are green). The plan is kept in `unxed/dn`, `PLAN.md`, "Tail of the plan".
 
-## §12. What was taken from Zig and what was not (v0.2) and lessons from practice
+## §12. Ideas from Zig: what was adopted and what was not (v0.2), and lessons from practice
 
 Rationale: for safety Zig uses not a borrow checker but **explicitness and verification tools**: the allocator is passed as a parameter, the test allocator catches leaks, `defer` keeps cleanup next to
 acquisition, errors are in the result type. This fits the Safe Pascal philosophy ("no fork, no new syntax, a violation is visible").
 
 | Zig idea | What was done | Where |
 |---|---|---|
-| a test allocator that catches leaks | `SafeLiveCount` + `SafeCheckNoLeaks` (R5): a counter of live owned objects, one atomic increment/decrement | §5, R5, `tests/test_safe.pas` |
+| a test allocator that catches leaks | `SafeLiveCount` + `SafeCheckNoLeaks` (R5): a counter of live owned objects, one atomic increment/decrement | §5, R5, `tests/safe/test_safe.pas` |
 | `defer` / `errdefer` | `TDefer.Call` / `Cancel`: a guard record, fires on leaving the scope and on an exception; an exception inside a deferred call is not lost but counted (`SafeDeferFailures`) | §5 |
 | the allocator as an explicit parameter | a rule, no code: a function that creates objects takes a `TArena` or returns a `TOwned` (it is visible who is responsible for the memory) | §4 |
 | errors as values | for now `TryX(out V): Boolean`; for functions with several failure causes an enumeration of causes (`TFileError`) is recommended instead of Boolean | §0 (idea, no API) |
@@ -442,7 +441,7 @@ headers are translated by `h2pas`), so there is almost nothing to add — only t
 | `//export` + panic does not cross C | **F4**: a `cdecl` callback; do not let an exception escape into C frames (`try..except` inside) |
 | `runtime.LockOSThread` | **F5**: call thread-bound C libraries from a single task; threads created by C do not call Pascal without RTL initialization |
 
-API (`safe.pas`): `TCFreeProc = procedure(P: Pointer); cdecl` and `TCResource` (holds a pointer and a function,
+API (`safe/core.intf.inc`): `TCFreeProc = procedure(P: Pointer); cdecl` and `TCResource` (holds a pointer and a function,
 releases in the destructor). A sample binding is `tests/ffi_libc.pas` (`strlen`, `strdup/free`, `qsort`
 with a callback in Pascal), the test is `tests/test_ffi.pas`.
 
@@ -474,10 +473,10 @@ while holding its lock, and whoever changed the state wakes everyone on the list
 (the same idea as `sudog` in the Go runtime), and `Select` is the same registration in several channels at once.
 FPC strings and dynamic arrays count references atomically, so values are passed between threads as is.
 
-The thread manager must be initialized before SysUtils, so `SafeThreads` goes first in the `uses`
-**of the program file** (one place per project). `Safe` cannot include it itself: a module placed last
-in `uses` is initialized too late. Without the manager `Go` raises R8 with a ready-made line to paste.
-On Linux `SafeThreads` is own threads on `clone`/`futex`/`mmap` without libc (§18), with `-dSAFE_LIBC` and on other
+The thread manager must be initialized before SysUtils, so `BP` (which uses `BPThreads` first) goes first in the `uses`
+**of the program file** (one place per project); in the other units `BP` goes last. If `BP` comes too late, the first
+`Go` stops the program with an explanation (code 211, `tests/ext/compile/mf_threads_order.pas`).
+On Linux `BPThreads` is threads on `clone`/`futex`/`mmap` without libc (§18), with `-dSAFE_LIBC` and on other
 Unixes — `cthreads`. On DOS (go32v2) there are no threads: `TGroup.Go` raises R8 immediately.
 
 Limitations of v0.3: `Select` is receive-only; no timers (`time.After`) — there is a `Select` timeout;
@@ -540,7 +539,7 @@ mirror  github.com/acme/json https://codeberg.org/acme-mirror/json    // optiona
 
 The main convenience of Go is not the language but one command for everything. Each `sp` subcommand is a thin wrapper over
 what is already shipped with FPC (verified: `ptop`, `fpdoc`, `data2inc`, `bin2obj`, `h2pas` are installed together with
-`fp-compiler`), so there is almost no code of our own:
+`fp-compiler`), so each subcommand is small:
 
 | `sp` | Analogue | Built on |
 |---|---|---|
@@ -624,19 +623,20 @@ constants are `const`, not variables that nobody changes. The compiler already f
 | v0.3 | FFI (§13, S12, `TCResource`), goroutines (§14: `TGroup/TTask/TChan/Select`, R6–R8, S11) |
 | v0.3.1 | table of verified targets (§2): x86_64/i386/aarch64 Linux, DOS, Windows; R8 on targets without threads (DOS) instead of hanging; the §0 card extended (defer, tests, old style, targets) |
 | v0.5.1 | `.Free` is a compile error (a helper with a stub parameter); CI: static audit, Alpine/Debian/Ubuntu 16.04/CentOS 7, `SAFE_LIBC` mode, i386 and aarch64 under qemu |
-| v0.5 | §18: Linux without libc by default (fpwidestring, SafeThreads on clone/futex), `-dSAFE_LIBC`, verification on x86_64/i386/aarch64 and Alpine; the decision on GC |
+| v0.5 | §18: Linux without libc by default (fpwidestring, a thread manager on clone/futex), `-dSAFE_LIBC`, verification on x86_64/i386/aarch64 and Alpine; the decision on GC |
 | v0.5.1 | §2 aligned with v0.5: a matrix of verified targets on v0.5 code (i386 and aarch64 without libc pass all tests without switches); `test_threads` is skipped on DOS |
 | v0.5.2 | §0 "What actually exists and what is only a plan so far"; §19 (Turbo Pascal style code) |
+| v0.6 | Better Pascal: the safe layer (`safe/`, `unit Safe`) and the ext layer (`ext/`: UTF-8, goroutines, `BPThreads`); `unit BP` gives both |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
 
-- **The default on Linux is a static binary without libc**: strings — `fpwidestring` + `unicodeducet` (Unicode in Pascal, case and sorting work even with `LANG=C`), threads — `safethreads.pas` (our own FPC thread manager: `clone` + `futex` + `mmap`, like the Go runtime). One file works on any distribution: verified on an Ubuntu host (glibc) and in an Alpine 3.20 chroot (musl); a libc build does not run on Alpine at all.
-- **A program with goroutines**: `uses SafeThreads, ...` — FIRST in the program file (instead of `cthreads`) on all targets.
-- **`-dSAFE_LIBC`** (an analogue of cgo): `cwstring` + `cthreads`; needed only for FFI with C libraries. If libc is loaded and the switch is absent, the first `BeginThread` stops the program with an explanation (code 232) rather than giving a silent race (`tests/compile/mf_libc_guard.pas`).
+- **The default on Linux is a static binary without libc**: strings — `fpwidestring` + `unicodeducet` (Unicode in Pascal, case and sorting work even with `LANG=C`), threads — `ext/bpthreads.pas` (an FPC thread manager on `clone` + `futex` + `mmap`, like the Go runtime). One file works on any distribution: verified on an Ubuntu host (glibc) and in an Alpine 3.20 chroot (musl); a libc build does not run on Alpine at all.
+- **A program with goroutines**: `uses BP, ...` — FIRST in the program file (instead of `cthreads`) on all targets.
+- **`-dSAFE_LIBC`** (an analogue of cgo): `cwstring` + `cthreads`; needed only for FFI with C libraries. If libc is loaded and the switch is absent, the first `BeginThread` stops the program with an explanation (code 232) rather than giving a silent race (`tests/ext/compile/mf_libc_guard.pas`).
 - Verified (FPC 3.2.2, cross-compilers built from the official sources): x86_64 natively and in Alpine; i386 natively and under qemu-i386; aarch64 under qemu-aarch64 — `test_safe`, `test_go`, `test_threads` (1500 tasks: heap, strings, exceptions, recursive locks, `TThread`, events) — 0 failures, 10 repeats without crashes.
 - Design: the current thread is found by the stack pointer (the stack region is aligned to its own size, at its start is the thread record with the threadvar block; the main thread is the range `[stack limit, argv)`), without assembler TLS; assembler only for `clone` (≈20 lines per architecture).
-- Inspired by `unxed/static-everywhere`: Safe Pascal by default is its "Profile S"; `SAFE_LIBC` is "Profile H" (the baseline glibc version = the version on the build machine). Plan: in CI — a "no INTERP/NEEDED" check (`readelf`) and running the tests in Alpine/Debian containers; host data (CA certificates, time zones) to be read from the host rather than embedded.
+- In the terms of `unxed/static-everywhere` the default is "Profile S"; `SAFE_LIBC` is "Profile H" (the baseline glibc version = the version on the build machine). CI checks that the binaries have no INTERP/NEEDED (`readelf`) and runs them in Alpine, Debian, Ubuntu 16.04 and CentOS 7 containers. Plan: host data (CA certificates, time zones) to be read from the host rather than embedded.
 
 **GC — weighed, not adopted.** For an LLM the difference from Go is choosing the owner of an object and two "holes": `TShared` cycles and a borrow that outlives its owner. Values (strings, arrays, records) are managed automatically anyway. Cycles are caught by `SafeCheckNoLeaks` in tests (R5), a dangling borrow by the debug build `-gh -CR` + `HEAPTRC=keepreleased` (memory is not reused, a method call on a dead object is caught). The ARC + weak + arenas model is the Swift model, and a great deal of application code is written on it without a GC. A tracing GC without compiler support would be a conservative scanner of stacks and heap (Boehm) — a large unsafe component with non-deterministic destructors: overengineering. The default rule for an LLM: "if you do not know what to choose — TShared; back references — TWeak; trees and graphs — TArena".
 
@@ -651,4 +651,4 @@ Rationale: a measurement on real code (DOS Navigator, `unxed/dn`): `New(` 843+10
 | (a) extend Safe Pascal to `object` | an owner over an `object` type: a pointer + a "lifetime lock" with a release procedure (`Done` + `Dispose`); for `object`, `New/Dispose` are not shadowed | **second**: a narrow prototype on a small slice, a checkpoint by the numbers |
 | (b) move the code to `class` | `Init/Done` → `Create/Destroy`, ~1400 call sites | **fallback**: only for a slice where (a) did not give guarantees |
 
-The order (the RUP method: from simple to complex, atomic steps with tests, something to try at every step) and steps S0–S10 are kept in `unxed/dn`, `PLAN.md`, the section "Safe Pascal as the DN code style". The license of `safe.pas` is MIT.
+The order (the RUP method: from simple to complex, atomic steps with tests, something to try at every step) and steps S0–S10 are kept in `unxed/dn`, `PLAN.md`, the section "Safe Pascal as the DN code style". The license is MIT.

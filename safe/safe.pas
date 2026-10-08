@@ -1,5 +1,5 @@
 { SPDX-License-Identifier: MIT }
-{ Safe Pascal v0.1 — safe-by-default Free Pascal (the "safe" layer only).
+{ Safe Pascal: safe-by-default Free Pascal (the "safe" layer only).
   Specification: SPEC.md. Usage: `uses ..., Safe;` LAST in every module.
   No compiler options needed.
 

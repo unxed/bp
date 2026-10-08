@@ -5,7 +5,7 @@
 
 Moved from `PLAN.md` of the [`unxed/dn`](https://github.com/unxed/dn) repository (2026-10-03); continue from here. The status of S1–S10 is kept here; `dn/PLAN.md` only has a link.
 
-Concept: this repository (`SPEC.md`, `safe.pas`, tests, CI; formerly `safe-pascal/` in `unxed/sandbox`, PR #4, history carried over; "ground truth", refined by experience).
+Concept: this repository (`SPEC.md`, `bp.pas`, `safe/`, `ext/`, tests, CI; "ground truth", refined by experience).
 A single file `safe.pas` and `uses Safe` last in a module, no compiler options: UTF-8 everywhere, `TOwned/TShared/TWeak/TSlice/TArena`, dangerous primitives
 (`GetMem/FreeMem/New/Dispose/Move/FillChar/FreeAndNil`, `.Free`, raw pointers) are shadowed and give an error or warning with code `SAFE-S1..S4`; unsafe code is written with the full
 name (`System.GetMem`) with a `// UNSAFE:` comment. The author's first CI run (2026-10-03, 12:13) is green: the shadowing hypotheses were confirmed; there is no linter for rules S5–S10 yet.
@@ -53,10 +53,10 @@ Rules for all steps: DN behavior does not change (the `tv/`, `dn/` tests and `to
 everything doubtful is recorded in `dn/TODO-later.md`, `dist/` is updated on noticeable steps. Decision points are marked **[owner's decision]**.
 
 *Phase "Start" (removing risks, changing nothing in DN code):*
-- **S0 [done 2026-10-03].** The concept in this repository (formerly `unxed/sandbox`, PR #4), the result of verification on our targets (SPEC §2). *To try:* `tests/run.sh`, the table of targets.
+- **S0 [done 2026-10-03].** The concept in this repository, the result of verification on our targets (SPEC §2). *To try:* `tests/run.sh`, the table of targets.
 - **S1. Violation census `tools/safe-census.py`.** Reads `dn/src` and `tv/src`, counts S1–S4, S9 (and the `object`/`class` share) per unit, prints a table and a total, saves JSON. *Tests:* python tests on small samples and a check of the totals against the measurement from this section (843/421/230...).
   *To try:* `python3 tools/safe-census.py` shows which units are closest to "safe" and how many places each option affects. CI prints the total (not a gate).
-- **S2. License and wiring up `safe.pas`.** **Decided (owner, 2026-10-03): MIT** (no reasons against: the license of `dn` and `tv/` is also MIT for our files, and the `safe.pas` code borrows nothing from others; MIT is compatible with moving into FPC/Lazarus). Recorded in `LICENSE` and the `safe.pas` header (`SPDX-License-Identifier: MIT`).
+- **S2. License and wiring up `safe.pas`.** **Decided (owner, 2026-10-03): MIT** (MIT is compatible with moving into FPC/Lazarus). Recorded in `LICENSE` and the `safe.pas` header (`SPDX-License-Identifier: MIT`).
   Next: `safe.pas` is placed in `dn/third_party/` (or `tv/`) together with a provenance note (`dn/PROVENANCE.md`, `check-layout.sh`). *To try:* `tools/build.sh linux64` with `DN_SAFE=1` builds DN where only the units from the list (empty for now) are compiled in Safe mode.
 
 *Phase "Development" (variant (c): safe new code next to the old):*
@@ -64,7 +64,7 @@ everything doubtful is recorded in `dn/TODO-later.md`, `dist/` is updated on not
   *To try:* DN under DN_SAFE=1 behaves the same (`dn-linux-ops.py`), `safe-census` shows the first "clean" unit.
 - **S4. The "no worse" gate.** CI compares the `safe-census` output with `tools/safe-baseline.json`: the number of violations in units from the "safe" list does not grow. *To try:* deliberately add `GetMem` to a "safe" unit, and CI will show what and where.
 - **S5. Batches of leaf units** of 3–5 (file formats with a "format layer" boundary, settings, names, key parsing), each batch in a separate commit; units that do not pass without `object` stay on the "waiting" list. *To try:* the `safe-census` progress table grows, DN stays the same.
-- **S6. A new feature written from scratch per the SPEC** (showcase): for example, gluing the built-in terminal (`dnrun.pas`, `dnutil`) or the user screen after an external program (the DOS remainder), with `TOwned`, `TDefer` and `SafeCheckNoLeaks` in tests.
+- **S6. A new feature written per the SPEC** (showcase): for example, gluing the built-in terminal (`dnrun.pas`, `dnutil`) or the user screen after an external program (the DOS remainder), with `TOwned`, `TDefer` and `SafeCheckNoLeaks` in tests.
   *To try:* the feature itself in DN + a "what it looks like in Safe Pascal" section in the documentation.
 
 *Decision point:* **[owner's decision]** after S6, by the `safe-census` numbers and the experience of S3–S6: is (c) enough, or do we move to (a)?
