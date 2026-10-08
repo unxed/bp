@@ -49,12 +49,14 @@ type
 
 implementation
 
+uses
+  TvPath;
 
 procedure UnixDir(var s : string);
 var i : longint;
 begin
   for i:=1 to length(s) do
-    if s[i]='\' then s[i]:='/';
+    if s[i]=PathSep then s[i]:='/';
 end;
 
 

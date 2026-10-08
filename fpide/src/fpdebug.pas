@@ -379,7 +379,7 @@ function TransformRemoteString(st : string) : string;
 implementation
 
 uses
-  Dos,
+  Dos,TvPath,
   Video,
 {$ifdef DOS}
   fpusrscr,
@@ -534,6 +534,12 @@ const
 {$define FrameNameKnown}
 {$endif powerpc}
 
+{$ifndef Unix}
+const
+  { gdb escapes a space in a name with it }
+  GdbEscape = '\';
+{$endif Unix}
+
 function  GDBFileName(st : string) : string;
 {$ifndef Unix}
 var i : longint;
@@ -545,33 +551,33 @@ begin
 {$ifdef Unix}
   GDBFileName:=st;
 {$else}
-{ should we also use / chars ? }
+{ gdb reads '/' as the separator }
   for i:=1 to Length(st) do
-    if st[i]='\' then
+    if st[i]=PathSep then
 {$ifdef Windows}
-  { Don't touch at '\ ' used to escapes spaces in windows file names PM }
+  { Don't touch the escape of a space in windows file names PM }
      if (i=length(st)) or (st[i+1]<>' ') then
 {$endif Windows}
       st[i]:='/';
 {$ifdef Windows}
   {$ifndef USE_MINGW_GDB} // see mantis 11968 because of mingw build. MvdV
-{ for Windows we should convert e:\ into //e/ PM }
+{ for Windows we should convert e:/ into /cygdrive/e/ PM }
   if
     {$ifdef GDBMI}
      using_cygwin_gdb and
     {$endif}
-     (length(st)>2) and (st[2]=':') and (st[3]='/') then
-    st:=CygDrivePrefix+'/'+st[1]+copy(st,3,length(st));
+     (Length(PathDrive(st))=2) and (PathRootLen(st)=3) then
+    st:=PathJoin(CygDrivePrefix,st[1]+copy(st,3,length(st)),UnixPathRules);
   {$endif}
-{ support spaces in the name by escaping them but without changing '\ ' into '\\ ' }
+{ support spaces in the name by escaping them, but not those that are escaped already }
   for i:=Length(st) downto 1 do
-    if (st[i]=' ') and ((i=1) or (st[i-1]<>'\')) then
-      st:=copy(st,1,i-1)+'\'+copy(st,i,length(st));
+    if (st[i]=' ') and ((i=1) or (st[i-1]<>GdbEscape)) then
+      st:=copy(st,1,i-1)+GdbEscape+copy(st,i,length(st));
 {$endif Windows}
 {$ifdef go32v2}
 { for go32v2 we should convert //e/ back into e:/  PM }
-  if (length(st)>3) and (st[1]='/') and (st[2]='/') and (st[4]='/') then
-    st:=st[3]+':/'+copy(st,5,length(st));
+  if (length(st)>3) and IsPathSep(st[1]) and IsPathSep(st[2]) and IsPathSep(st[4]) then
+    st:=st[3]+':'+copy(st,4,length(st));
 {$endif go32v2}
   GDBFileName:=LowerCaseStr(st);
 {$endif}
@@ -589,24 +595,20 @@ begin
 {$ifdef Windows}
  {$ifndef NODEBUG}
 { for Windows we should convert /cygdrive/e/ into e:\ PM }
-  if pos(CygDrivePrefix+'/',st)=1 then
-    st:=st[Length(CygdrivePrefix)+2]+':\'+copy(st,length(CygdrivePrefix)+4,length(st));
+  if pos(PathAddSep(CygDrivePrefix,UnixPathRules),st)=1 then
+    st:=st[Length(CygdrivePrefix)+2]+':'+copy(st,length(CygdrivePrefix)+3,length(st));
  {$endif NODEBUG}
 {$endif Windows}
-{ support spaces in the name by escaping them but without changing '\ ' into '\\ ' }
+{ remove the escapes of spaces }
   for i:=Length(st) downto 2 do
-    if (st[i]=' ') and (st[i-1]='\') then
+    if (st[i]=' ') and (st[i-1]=GdbEscape) then
       st:=copy(st,1,i-2)+copy(st,i,length(st));
 {$ifdef go32v2}
 { for go32v2 we should convert //e/ back into e:/  PM }
-  if (length(st)>3) and (st[1]='/') and (st[2]='/') and (st[4]='/') then
-    st:=st[3]+':\'+copy(st,5,length(st));
+  if (length(st)>3) and IsPathSep(st[1]) and IsPathSep(st[2]) and IsPathSep(st[4]) then
+    st:=st[3]+':'+copy(st,4,length(st));
 {$endif go32v2}
-{ should we also use / chars ? }
-  for i:=1 to Length(st) do
-    if st[i]='/' then
-      st[i]:='\';
-  OSFileName:=LowerCaseStr(st);
+  OSFileName:=LowerCaseStr(PathNative(st));
 {$endif}
 end;
 
@@ -1700,7 +1702,7 @@ begin
   typ:=bt_file_line;
   state:=bs_enabled;
   GDBState:=bs_deleted;
-  AFile:=FEXpand(AFile);
+  AFile:=ExpandPath(AFile);
 (*
   { d:test.pas:12 does not work !! }
   { I do not know how to solve this if
@@ -1985,7 +1987,7 @@ procedure TBreakpointCollection.ShowBreakpoints(W : PFPWindow);
   procedure SetInSource(P : PBreakpoint);
   begin
     If assigned(P.FileName) and
-      (OSFileName(P.FileName^)=OSFileName(FExpand(PSourceWindow(W).Editor.FileName))) then
+      (OSFileName(P.FileName^)=OSFileName(ExpandPath(PSourceWindow(W).Editor.FileName))) then
       PSourceWindow(W).Editor.SetLineFlagState(P.Line-1,lfBreakpoint,P.state=bs_enabled);
   end;
 
@@ -2007,7 +2009,7 @@ procedure TBreakpointCollection.ShowBreakpoints(W : PFPWindow);
                 S:=PDisassemblyWindow(W).Editor.GetDisplayText(i);
                 ps:=pos(':',S);
                 qs:=pos(' ',copy(S,ps+1,High(S)));
-                if (GDBFileName(P.FileName^)=GDBFileName(FExpand(Copy(S,1,ps-1)))) and
+                if (GDBFileName(P.FileName^)=GDBFileName(ExpandPath(Copy(S,1,ps-1)))) and
                    (StrToInt(copy(S,ps+1,qs-1))=P.line) then
                   PDisassemblyWindow(W).Editor.SetLineFlagState(i,lfBreakpoint,P.state=bs_enabled);
               end;
@@ -2037,7 +2039,7 @@ procedure TBreakpointCollection.AdaptBreakpoints(Editor : PSourceEditor; Pos, Ch
   procedure AdaptInSource(P : PBreakpoint);
   begin
     If assigned(P.FileName) and
-       (P.FileName^=OSFileName(FExpand(Editor.FileName))) then
+       (P.FileName^=OSFileName(ExpandPath(Editor.FileName))) then
         begin
           if P.state=bs_enabled then
             Editor.SetLineFlagState(P.Line-1,lfBreakpoint,false);
@@ -2075,7 +2077,7 @@ function TBreakpointCollection.FindBreakpointAt(Editor : PSourceEditor; Line : l
   function IsAtLine(P : PBreakpoint) : boolean;
   begin
     If assigned(P.FileName) and
-       (P.FileName^=OSFileName(FExpand(Editor.FileName))) and
+       (P.FileName^=OSFileName(ExpandPath(Editor.FileName))) and
        (Line=P.Line) then
       IsAtLine:=true
     else
@@ -2128,7 +2130,7 @@ var
   PB : PBreakpoint;
 begin
     ToggleFileLine:=false;
-    FileName:=OSFileName(FExpand(FileName));
+    FileName:=OSFileName(ExpandPath(FileName));
     PB:=TBreakpoint(FirstThat(TNestedTestProc(@IsThere)));
     If Assigned(PB) then
       begin

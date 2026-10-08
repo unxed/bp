@@ -99,22 +99,23 @@ uses
 {$ifdef Windows}
   Windebug,
 {$endif Windows}
-  strings;
+  strings, TvPath;
 
+{ gdb reads '/' as the separator (nothing changes on Unix) }
 procedure UnixDir(var s : string);
 var i : longint;
 begin
   for i:=1 to length(s) do
-    if s[i]='\' then
+    if s[i]=PathSep then
 {$ifdef windows}
-  { Don't touch at '\ ' used to escapes spaces in windows file names PM }
+  { Don't touch the escape of a space in windows file names PM }
      if (i=length(s)) or (s[i+1]<>' ') then
 {$endif windows}
       s[i]:='/';
 {$ifdef windows}
-  { if we are using cygwin, we need to convert e:\ into /cygdriveprefix/e/ PM }
-  if using_cygwin_gdb and (length(s)>2) and (s[2]=':') and (s[3]='/') then
-    s:=CygDrivePrefix+'/'+s[1]+copy(s,3,length(s));
+  { if we are using cygwin, we need to convert e:/ into /cygdriveprefix/e/ PM }
+  if using_cygwin_gdb and (Length(PathDrive(s))=2) and (PathRootLen(s)=3) then
+    s:=PathJoin(CygDrivePrefix,s[1]+copy(s,3,length(s)),UnixPathRules);
 {$endif windows}
 end;
 
