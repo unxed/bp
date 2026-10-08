@@ -29,6 +29,8 @@ procedure SetRunDir(const Params: string);
 
 { Compile }
 procedure Compile(const FileName, ConfigFile: string);
+{ what the user asked (the Ord of TCompileMode): a language other than Pascal builds differently for each }
+procedure SetCompileMode(Mode: LongInt);
 procedure SetPrimaryFile(const fn:string);
 function LinkAfter : boolean;
 { the compiler to use: CompilerSetting is 'auto', 'builtin' or the path of an external compiler (env FP_COMPILER wins) }
@@ -48,7 +50,7 @@ uses
   FPDebug,
 {$endif NODEBUG}
   FPRedir,FPVars,FpCompil,
-  FPUtils,FPSwitch,WUtils;
+  FPUtils,FPSwitch,WUtils,FpLang;
 
 {****************************************************************************
                                    Run
@@ -306,8 +308,64 @@ begin
   CloseFile(F);
 end;
 
+var
+  CompileModeNow: LongInt = 0;
+
+procedure SetCompileMode(Mode: LongInt);
+begin
+  CompileModeNow:=Mode;
+end;
+
+{ a line of the output of the tool of another language: the backend reads it, the window of messages shows it }
+procedure BackendLine(B: TLangBackend; const L: string);
+var
+  M: TLangMessage;
+  Lv: LongInt;
+  Module: string;
+begin
+  if B.ParseLine(L,M) then
+    begin
+      case M.Severity of
+        lsError: Lv:=V_Error;
+        lsWarning: Lv:=V_Warning;
+      else
+        Lv:=V_Note;
+      end;
+      Module:=M.FileName;
+      if Module<>'' then
+        begin
+          if not FileExists(Module) then
+            Module:=ExpandFileName(IncludeTrailingPathDelimiter(B.WorkDir(MainFile))+Module)
+          else
+            Module:=ExpandFileName(Module);
+          if M.Severity=lsError then
+            Inc(status.errorCount);
+          CompilerMessageWindow.AddMessage(Lv or V_LineInfo,M.Text,Module,M.Line,M.Col);
+        end
+      else
+        CompilerMessageWindow.AddMessage(Lv,M.Text,'',0,0);
+    end
+  else if (CompileModeNow=Ord(lmTest)) and (Trim(L)<>'') then
+    CompilerMessageWindow.AddMessage(V_Info,L,'',0,0);
+end;
+
+function BackendOutFile(B: TLangBackend): string;
+var
+  Name: string;
+begin
+  Name:=ChangeFileExt(ExtractFileName(MainFile),'');
+  {$ifdef Windows}
+  Name:=Name+'.exe';
+  {$endif}
+  if GetEXEPath<>'' then
+    Result:=FixFileName(GetEXEPath+Name)
+  else
+    Result:=ExtractFilePath(MainFile)+Name;
+end;
+
 procedure CompileExternal(const FileName, ConfigFile: string);
 var
+  Backend: TLangBackend;
   P: TProcess;
   Exe: string;
   CmdLine: AnsiString;
@@ -316,33 +374,57 @@ var
   N,NL: LongInt;
   Aborted: boolean;
   Kind: string;
+  Args: TStringList;
   procedure Feed(const Data: AnsiString);
   begin
     Pending:=Pending+Data;
     NL:=Pos(#10,Pending);
     while NL>0 do
       begin
-        ExternalCompilerLine(Copy(Pending,1,NL-1));
+        if Backend<>nil then
+          BackendLine(Backend,Copy(Pending,1,NL-1))
+        else
+          ExternalCompilerLine(Copy(Pending,1,NL-1));
         Delete(Pending,1,NL);
         NL:=Pos(#10,Pending);
       end;
   end;
 begin
   SaveModifiedSources;
-  Exe:=ExternalCompilerExe;
+  Backend:=BackendFor(MainFile);
+  if Backend<>nil then
+    Exe:=Backend.ToolName
+  else
+    Exe:=ExternalCompilerExe;
   if not LocateExeFile(Exe) then
     begin
-      CompilerMessageWindow.AddMessage(V_Fatal,'Compiler "'+ExternalCompilerExe+'" not found','',0,0);
+      CompilerMessageWindow.AddMessage(V_Fatal,'Compiler "'+Exe+'" not found','',0,0);
       Inc(status.errorCount);
       Exit;
     end;
-  CmdLine:='';
-  if ConfigFile<>'' then
-    CmdLine:='"@'+ConfigFile+'" ';
-  CmdLine:=CmdLine+'-d'+SwitchesModeStr[SwitchesMode];
-  if PrimaryFileSwitches<>'' then
-    CmdLine:=CmdLine+' '+PrimaryFileSwitches;
-  CmdLine:=CmdLine+' '+FileName;
+  if Backend<>nil then
+    begin
+      Args:=TStringList.Create;
+      try
+        Backend.Arguments(TLangMode(CompileModeNow),MainFile,BackendOutFile(Backend),Args);
+        CmdLine:='';
+        for N:=0 to Args.Count-1 do
+          CmdLine:=CmdLine+' "'+Args[N]+'"';
+        CmdLine:=Trim(CmdLine);
+      finally
+        Args.Free;
+      end;
+    end
+  else
+    begin
+      CmdLine:='';
+      if ConfigFile<>'' then
+        CmdLine:='"@'+ConfigFile+'" ';
+      CmdLine:=CmdLine+'-d'+SwitchesModeStr[SwitchesMode];
+      if PrimaryFileSwitches<>'' then
+        CmdLine:=CmdLine+' '+PrimaryFileSwitches;
+      CmdLine:=CmdLine+' '+FileName;
+    end;
   status.currentsource:=FileName;
   status.compiledlines:=0;
   Aborted:=false;
@@ -351,6 +433,8 @@ begin
   try
     P.Executable:=Exe;
     CommandToList(CmdLine,P.Parameters);
+    if Backend<>nil then
+      P.CurrentDirectory:=Backend.WorkDir(MainFile);
     P.Options:=[poUsePipes,poStderrToOutput,poNoConsole];
     try
       P.Execute;
@@ -392,9 +476,17 @@ begin
     status.IsLibrary:=false;
     if (status.errorCount=0) and not Aborted then
       begin
-        Kind:=SourceKind(MainFile);
-        status.IsExe:=Kind<>'unit';
-        status.IsLibrary:=Kind='library';
+        if Backend<>nil then
+          begin
+            status.IsExe:=Backend.IsProgram(MainFile);
+            status.IsLibrary:=false;
+          end
+        else
+          begin
+            Kind:=SourceKind(MainFile);
+            status.IsExe:=Kind<>'unit';
+            status.IsLibrary:=Kind='library';
+          end;
       end;
   finally
     P.Free;
@@ -408,7 +500,7 @@ var
 {$endif EMBED_COMPILER}
 begin
 {$ifdef EMBED_COMPILER}
-  if not UseExternalCompiler then
+  if (not UseExternalCompiler) and (BackendFor(MainFile)=nil) then
     begin
       cmd:='-d'+SwitchesModeStr[SwitchesMode];
       if ConfigFile<>'' then

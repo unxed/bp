@@ -995,6 +995,7 @@ begin
     end;
   {$endif NODEBUG}
   try
+    FpIntF.SetCompileMode(Ord(Mode));
     FpIntF.Compile(FileName,SwitchesPath);
   except
     on ECompilerAbort do
