@@ -25,8 +25,8 @@ interface
 uses
   Dos,Objects,Drivers,
   FVConsts,
-  Views,Menus,Dialogs,App,Gadgets,Tabs,
-  ASCIITAB,
+  Views,Menus,Dialogs,App,TvGadgets,Tabs,
+  TvAscii,
   WEditor,WCEdit,TvUStr,
   WUtils,WHelp,WHlpView,WViews,WANSI,
   Comphook,
@@ -1974,7 +1974,7 @@ end;
 
 constructor TFPHeapView.InitKb(var Bounds: TRect);
 begin
-  inherited InitKb(Bounds);
+  inherited CreateKb(Bounds);
   Options:=Options or gfGrowHiX or gfGrowHiY;
   EventMask:=EventMask or evIdle;
   GrowMode:=gfGrowAll;
@@ -4394,7 +4394,8 @@ end;
 
 constructor TFPASCIIChart.Create;
 begin
-  inherited Create;
+  { the editor is UTF-8: the table shows Unicode code points and picks them }
+  inherited Create('ASCII Table', True);
   HelpCtx:=hcASCIITableWindow;
   Number:=SearchFreeWindowNo;
   ASCIIChart:=Self;
@@ -4426,7 +4427,7 @@ begin
     evCommand :
       begin
       {writeln(stderr,'fpascii what=',event.what, ' cmd=', event.command, ' ',cmtransfer,' ',cmsearchwindow);}
-      if Event.Command=(AsciiTableCommandBase+1) then // variable
+      if Event.Command=AsciiCommandBase+acPicked then
           begin
             W:=FirstEditorWindow;
             if Assigned(W) and Assigned(Report) then
@@ -4439,7 +4440,7 @@ begin
           begin
             W:=FirstEditorWindow;
             if Assigned(W) and Assigned(Report) then
-              Message(W,evCommand,cmAddChar,pointer(ptrint(ord(Report.AsciiChar))));
+              Message(W,evCommand,cmAddChar,pointer(ptrint(Table.Code)));
             ClearEvent(Event);
           end;
 

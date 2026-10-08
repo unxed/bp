@@ -283,10 +283,19 @@ def section_tools(t):
     t.key('Escape', 'Escape')
     check(t.wait_gone('Calculator'), 'Esc closes the calculator', t)
 
+    # the ASCII table picks a character into the edit window
+    check(new_file(t), 'File > New opens an edit window for the ASCII table', t)
     check(menu(t, 'M-t', 'Ascii table'), 'Tools > Ascii table')
-    check(t.wait_for('ASCII Table') and 'Char: #0' in t.text(), 'the ASCII table opens', t)
+    check(t.wait_for('ASCII Table') and 'Dec: 0' in t.text() and 'U+0000' in t.text(),
+          'the ASCII table opens; the report shows the code in decimal and as U+', t)
+    t.key('Down', 'Down', 'Right')
+    check(t.wait_for('Char: A  Dec: 65  U+0041'), 'the arrows move the cursor, the report follows', t)
+    t.key('Enter')
+    t.type('é')
     t.key('Escape')
-    close_dialogs(t, 1)
+    check(t.wait_gone('ASCII Table', 3), 'Esc closes the ASCII table', t)
+    check(t.wait_until(lambda: editor_lines(t)[:1] == ['Aé'], 3),
+          'Enter and a typed character put the characters into the edit window (%r)' % editor_lines(t)[:1], t)
 
 
 def section_options(t):

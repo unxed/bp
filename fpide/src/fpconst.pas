@@ -472,7 +472,7 @@ const
 
      CGDBInputLine   = #9#9#10#11#12;
 
-     CFPClockView = #0#227;
+     CFPClockView = #227;
 
      CFPToolTip     = #228;
 
