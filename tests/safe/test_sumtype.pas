@@ -1,4 +1,4 @@
-{ Образец типа-суммы из SPEC §16 (S13): должен собираться и работать как есть. Код возврата = число провалов. }
+{ The sum type example of SPEC §16 (S13): must build and run as it is. Exit code = number of failures. }
 program test_sumtype;
 {$mode objfpc}{$H+}
 uses SysUtils, Safe;

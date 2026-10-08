@@ -1,6 +1,6 @@
 // EXPECT: exit 232
-{ FFI к libc + горутины без -dSAFE_LIBC: SafeThreads должен остановить программу
-  с объяснением (код 232), а не дать потокам звать libc без её TLS. Только Linux. }
+{ FFI to libc + goroutines without -dSAFE_LIBC: BPThreads must stop the program
+  with an explanation (code 232) instead of letting threads call libc without its TLS. Linux only. }
 program mf_libc_guard;
 {$mode objfpc}{$H+}
 uses BP, SysUtils;
@@ -12,5 +12,5 @@ begin
   G := TGroup.Create;
   G.Go(@Nop);
   G.Wait;
-  Halt(0); // сюда попадать не должны
+  Halt(0); // must not get here
 end.

@@ -1,10 +1,10 @@
 { SPDX-License-Identifier: MIT }
-{ Better Pascal, ext/utf8 (реализация). }
+{ Better Pascal, ext/utf8 (implementation). }
 
 { ---------- UTF-8 ---------- }
 
-{ Длина символа по ведущему байту. Битый байт или "хвост" — отдельный символ:
-  обход никогда не зацикливается и не теряет байты. }
+{ The length of a character from its lead byte. A broken byte or a lone continuation byte is a character of its own:
+  the walk never loops and never loses bytes. }
 function CPByteLen(B: Byte): SizeInt; inline;
 begin
   case B of
@@ -33,7 +33,7 @@ begin
   if Result then
   begin
     FLen := CPByteLen(Byte(FS[FPos]));
-    if FLen > Length(FS) - FPos + 1 then // обрезанный символ в конце строки
+    if FLen > Length(FS) - FPos + 1 then // a truncated character at the end of the string
       FLen := Length(FS) - FPos + 1;
   end;
 end;

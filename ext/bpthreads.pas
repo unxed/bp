@@ -1,30 +1,30 @@
 { SPDX-License-Identifier: MIT }
-// UNSAFE-UNIT: менеджер потоков FPC. На Linux — свой, на системных вызовах без libc (как в Go); с -dSAFE_LIBC и на других Unix — cthreads.
-{ BPThreads: одна строка для потоков на всех целях (SPEC §14).
+// UNSAFE-UNIT: the FPC thread manager. On Linux it works on system calls without libc (like Go); with -dSAFE_LIBC and on other Unix it is cthreads.
+{ BPThreads: one line for threads on all targets (SPEC §14).
 
     program P;
-    uses BP, SysUtils, ...;   // BP (а он тянет BPThreads) — ПЕРВЫМ в uses программы; в остальных юнитах BP — последним
+    uses BP, SysUtils, ...;   // BP (which pulls in BPThreads) goes FIRST in the program uses; in the other units BP goes last
 
-  - Linux (x86_64, i386, aarch64) по умолчанию — собственный менеджер: clone + futex
-    + mmap, libc не нужна; статический бинарник работает на любом дистрибутиве
-    (glibc, musl). Из таких потоков нельзя звать C-код, использующий libc (её TLS
-    для них не настроен): программа с FFI к libc собирается с -dSAFE_LIBC
-    (SPEC §13 F5); если libc всё же загружена, первый BeginThread остановит
-    программу с объяснением, а не даст тихую гонку;
-  - -dSAFE_LIBC и другие Unix — cthreads (потоки libc/pthread);
-  - на остальных целях модуль пуст.
+  - Linux (x86_64, i386, aarch64) by default: a thread manager on clone + futex
+    + mmap, no libc needed; a static binary runs on any distribution
+    (glibc, musl). C code that uses libc must not be called from these threads (the libc TLS
+    is not set up for them): a program with FFI to libc is built with -dSAFE_LIBC
+    (SPEC §13 F5); if libc is loaded anyway, the first BeginThread stops the
+    program with an explanation instead of a silent race;
+  - -dSAFE_LIBC and other Unix: cthreads (libc/pthread threads);
+  - on the other targets the unit is empty.
 
-  Как устроено (режим RAW):
-  - стек потока — отдельный регион mmap размера R (степень двойки), выровненный по R;
-    в его начале лежит управляющая запись потока, за ней сторожевая страница;
-  - текущий поток определяется по указателю стека: Sptr and not (R - 1) — без
-    ассемблера и без регистра TLS; главный поток узнаётся по диапазону своего стека;
-  - threadvar-блок потока — mmap, указатель хранится в управляющей записи;
-  - замок — futex-мьютекс Дреппера (рекурсивный, как требует RTL), события — futex;
-  - завершение: CLONE_CHILD_CLEARTID — ядро обнуляет Tid и будит ожидающих;
-    регион стека освобождает следующий BeginThread/CloseThread («сборщик зомби»);
-  - главный поток узнаётся по диапазону [MainLow, MainHigh): сверху argv, снизу
-    лимит стека; регион, попавший в диапазон, отбрасывается (так бывает под qemu-user). }
+  How it works (RAW mode):
+  - the stack of a thread is a separate mmap region of size R (a power of two), aligned to R;
+    the control record of the thread lies at its start, followed by a guard page;
+  - the current thread is found from the stack pointer: Sptr and not (R - 1), with no
+    assembler and no TLS register; the main thread is recognised by the range of its stack;
+  - the threadvar block of a thread is mmap'ed, its pointer is kept in the control record;
+  - the lock is Drepper's futex mutex (recursive, as the RTL requires), events are futexes;
+  - exit: CLONE_CHILD_CLEARTID, the kernel clears Tid and wakes the waiters;
+    the stack region is freed by the next BeginThread/CloseThread (the "zombie collector");
+  - the main thread is recognised by the range [MainLow, MainHigh): argv above, the stack
+    limit below; a region that falls into the range is dropped (this happens under qemu-user). }
 unit BPThreads;
 
 {$mode objfpc}{$H+}
@@ -45,7 +45,7 @@ interface
 uses
   BaseUnix, UnixType, Linux, Syscall;
 
-{ Сколько потоков сейчас живо (для тестов). }
+{ How many threads are alive now (for tests). }
 function SafeRawThreadCount: LongInt;
 {$else}
   {$ifdef unix}
@@ -60,13 +60,13 @@ implementation
 
 const
   {$ifdef cpu64}
-  RegionLog2 = 23; // 8 МиБ виртуального адреса на поток, как у pthread
+  RegionLog2 = 23; // 8 MiB of virtual address space per thread, as with pthread
   {$else}
-  RegionLog2 = 20; // 1 МиБ: 32-битное адресное пространство тесное
+  RegionLog2 = 20; // 1 MiB: the 32-bit address space is tight
   {$endif}
   RegionSize = PtrUInt(1) shl RegionLog2;
-  CtlSize = 65536;   // запись потока; 64 КиБ — кратно любой странице
-  GuardSize = 65536; // сторожевая область между записью и стеком
+  CtlSize = 65536;   // the thread record; 64 KiB is a multiple of any page size
+  GuardSize = 65536; // the guard area between the record and the stack
   ThreadMagic = PtrUInt($5AFE7EAD);
 
   FUTEX_PRIVATE = 128;
@@ -77,21 +77,21 @@ type
   PRawThread = ^TRawThread;
   TRawThread = record
     Magic: PtrUInt;
-    TVBlock: Pointer;      // threadvar-блок
+    TVBlock: Pointer;      // the threadvar block
     Fn: TThreadFunc;
     Arg: Pointer;
     StackLen: PtrUInt;
-    Tid: LongInt;          // 1, пока поток жив; ядро обнуляет при выходе (CLONE_CHILD_CLEARTID)
-    Closed: LongInt;       // CloseThread вызван: регион можно освободить после выхода
+    Tid: LongInt;          // 1 while the thread is alive; the kernel clears it on exit (CLONE_CHILD_CLEARTID)
+    Closed: LongInt;       // CloseThread was called: the region may be freed after the exit
     ExitCode: PtrInt;
     Region: Pointer;
-    Next: PRawThread;      // список ещё не освобождённых регионов
+    Next: PRawThread;      // the list of regions not freed yet
   end;
 
-  { Рекурсивный futex-мьютекс поверх TRTLCriticalSection. }
+  { A recursive futex mutex laid over TRTLCriticalSection. }
   PRawMutex = ^TRawMutex;
   TRawMutex = record
-    State: LongInt;        // 0 свободен, 1 занят, 2 занят и есть ждущие
+    State: LongInt;        // 0 free, 1 taken, 2 taken with waiters
     Count: LongInt;
     Owner: TThreadID;
   end;
@@ -106,7 +106,7 @@ type
 
 var
   MainThread: TRawThread;
-  MainLow, MainHigh: PtrUInt; // [MainLow, MainHigh) — стек главного потока
+  MainLow, MainHigh: PtrUInt; // [MainLow, MainHigh) is the stack of the main thread
   ThreadVarBlockSize: DWord = 0;
   TVInitialized: LongInt = 0;
   Zombies: PRawThread = nil;
@@ -118,7 +118,7 @@ begin
   Result := LiveThreads;
 end;
 
-{ ---------- текущий поток: по указателю стека ---------- }
+{ ---------- the current thread: from the stack pointer ---------- }
 
 function CurThread: PRawThread; inline;
 var
@@ -157,7 +157,7 @@ begin
   Linux.futex(Addr, FUTEX_WAKE or FUTEX_PRIVATE, N, nil);
 end;
 
-{ Без futex: Tid в записи потока обнуляет ядро, а оно будит без FUTEX_PRIVATE. }
+{ Without FUTEX_PRIVATE: the kernel clears Tid in the thread record and wakes without that flag. }
 procedure FutexWaitShared(var Addr: LongInt; Expected: LongInt);
 begin
   Linux.futex(Addr, FUTEX_WAIT, Expected, nil);
@@ -171,7 +171,7 @@ begin
   Result := Int64(TS.tv_sec) * 1000 + TS.tv_nsec div 1000000;
 end;
 
-{ ---------- мьютекс (Drepper, "Futexes are tricky", вариант 2) + рекурсия ---------- }
+{ ---------- mutex (Drepper, "Futexes are tricky", variant 2) + recursion ---------- }
 
 procedure MutexEnter(var M: TRawMutex);
 var
@@ -265,7 +265,7 @@ end;
 
 function NewTVBlock: Pointer;
 begin
-  // память не из кучи: куча сама живёт на threadvar (как в cthreads)
+  // memory not from the heap: the heap itself lives in threadvars (as in cthreads)
   Result := Fpmmap(nil, ThreadVarBlockSize, PROT_READ or PROT_WRITE, MAP_PRIVATE or MAP_ANONYMOUS, -1, 0);
   if Result = MAP_FAILED then
     RunError(203);
@@ -278,7 +278,7 @@ end;
 
 procedure RawAllocateThreadVars;
 begin
-  CurThread^.TVBlock := NewTVBlock; // вызывается для главного потока из InitThreadVars
+  CurThread^.TVBlock := NewTVBlock; // called for the main thread from InitThreadVars
 end;
 
 procedure RawReleaseThreadVars;
@@ -293,9 +293,9 @@ begin
   end;
 end;
 
-{ ---------- clone: единственное место с ассемблером ----------
-  RawClone(Fn, StackTop, Flags, Arg, ChildTid): в потомке на новом стеке
-  вызывает Fn(Arg) (cdecl) и делает exit (только этого потока). }
+{ ---------- clone: the only place with assembler ----------
+  RawClone(Fn, StackTop, Flags, Arg, ChildTid): in the child, on the new stack,
+  calls Fn(Arg) (cdecl) and exits (this thread only). }
 
 {$ifdef cpux86_64}
 function RawClone(Fn: TRawEntry; Stack: Pointer; Flags: PtrInt; Arg: Pointer; ChildTid: Pointer): PtrInt;
@@ -319,7 +319,7 @@ asm
   popq   %rdi              // Arg
   call   *%rax
   movq   %rax, %rdi
-  movl   $60, %eax         // exit (только поток)
+  movl   $60, %eax         // exit (this thread only)
   syscall
   hlt
 .Lparent:
@@ -349,10 +349,10 @@ asm
   testl  %eax, %eax
   jnz    .Lparent
   xorl   %ebp, %ebp
-  popl   %eax              // Fn; на вершине стека остаётся Arg — аргумент cdecl
+  popl   %eax              // Fn; Arg stays on top of the stack as the cdecl argument
   call   *%eax
   movl   %eax, %ebx
-  movl   $1, %eax          // exit (только поток)
+  movl   $1, %eax          // exit (this thread only)
   int    $0x80
   hlt
 .Lparent:
@@ -384,13 +384,13 @@ asm
   mov    x29, xzr
   mov    x30, xzr
   blr    x9
-  mov    x8, #93           // exit (только поток)
+  mov    x8, #93           // exit (this thread only)
   svc    #0
 .Lparent:
 end;
 {$endif}
 
-{ ---------- потоки ---------- }
+{ ---------- threads ---------- }
 
 function RawThreadMain(Arg: Pointer): PtrInt; cdecl;
 var
@@ -404,7 +404,7 @@ begin
   Result := 0;
 end;
 
-{ Освободить регионы потоков, которые вышли и закрыты. }
+{ Free the regions of the threads that have exited and are closed. }
 procedure ReapZombies;
 var
   P: ^PRawThread;
@@ -448,8 +448,8 @@ begin
       Fpmunmap(Pointer(Base + RegionSize), Raw + 2 * RegionSize - (Base + RegionSize));
     if (Base < MainHigh) and (Base + RegionSize > MainLow) then
     begin
-      // Регион пересёк диапазон, который считается стеком главного потока
-      // (бывает, например, под qemu-user): держим его занятым, просим другой.
+      // The region overlaps the range taken as the stack of the main thread
+      // (this happens under qemu-user, for one): keep it mapped and ask for another one.
       Rejected[NRej] := Base;
       Inc(NRej);
       Continue;
@@ -462,7 +462,7 @@ begin
     Fpmunmap(Pointer(Rejected[I]), RegionSize);
 end;
 
-{ libc в процессе (FFI без -dSAFE_LIBC)? Смотрим /proc/self/maps; нет /proc — не знаем, пропускаем. }
+{ Is libc in the process (FFI without -dSAFE_LIBC)? Read /proc/self/maps; without /proc we cannot tell and skip the check. }
 function LibcLoaded: Boolean;
 var
   Fd: cint;
@@ -506,7 +506,7 @@ begin
       WriteLn(StdErr, 'Build this program with -dSAFE_LIBC (SPEC section 13, F5).');
       Halt(232);
     end;
-    InitThreadVars(@RawRelocateThreadVar); // ещё однопоточно: копирует threadvar главного потока
+    InitThreadVars(@RawRelocateThreadVar); // still single-threaded: copies the threadvars of the main thread
   end;
   IsMultiThread := True;
   ReapZombies;
@@ -547,7 +547,7 @@ procedure RawEndThread(ExitCode: DWord);
 begin
   DoneThread;
   InterlockedDecrement(LiveThreads);
-  do_syscall(syscall_nr_exit, TSysParam(ExitCode)); // только этот поток; регион освободит сборщик
+  do_syscall(syscall_nr_exit, TSysParam(ExitCode)); // this thread only; the collector frees the region
 end;
 
 function RawWaitForThreadTerminate(ThreadHandle: TThreadID; TimeoutMs: LongInt): DWord;
@@ -601,7 +601,7 @@ procedure RawSetNameU(ThreadHandle: TThreadID; const ThreadName: UnicodeString);
 begin
 end;
 
-{ ---------- события ---------- }
+{ ---------- events ---------- }
 
 function NewEvent(Manual, Initial: Boolean): PRawEvent;
 begin
@@ -610,7 +610,7 @@ begin
   Result^.Flag := Ord(Initial);
 end;
 
-{ True — дождались, False — таймаут. TimeoutMs < 0 — без таймаута. }
+{ True: signalled, False: timeout. TimeoutMs < 0: no timeout. }
 function EventWait(E: PRawEvent; TimeoutMs: Int64): Boolean;
 var
   Deadline, Left: Int64;
@@ -708,7 +708,7 @@ begin
   Result := wrSignaled;
 end;
 
-{ ---------- установка ---------- }
+{ ---------- installation ---------- }
 
 function RawInitManager: Boolean;
 begin
@@ -732,11 +732,12 @@ begin
     WriteLn('In the program put BP (or BPThreads) FIRST in the uses clause: uses BP, SysUtils, ...');
     RunError(211);
   end;
-  if SizeOf(TRTLCriticalSection) < SizeOf(TRawMutex) then
-    RunError(211);
-  // Стек главного потока: [MainLow, MainHigh). Сверху — argv: он лежит на стеке
-  // выше любого кадра главного потока. Снизу — лимит стека (RLIMIT_STACK, с запасом).
-  // Регионы потоков в этот диапазон не попадают — AllocRegion это гарантирует.
+  {$if SizeOf(TRTLCriticalSection) < SizeOf(TRawMutex)}
+    {$error BPThreads: TRTLCriticalSection is smaller than the futex mutex}
+  {$endif}
+  // The stack of the main thread: [MainLow, MainHigh). Above: argv, which lies on the stack
+  // above any frame of the main thread. Below: the stack limit (RLIMIT_STACK, with a margin).
+  // Thread regions never fall into this range: AllocRegion makes sure of it.
   {$ifdef cpu64}
   Reserve := PtrUInt(1) shl 30;
   {$else}
@@ -747,7 +748,7 @@ begin
   if Reserve < 8 * 1024 * 1024 then
     Reserve := 8 * 1024 * 1024;
   MainHigh := PtrUInt(argv);
-  if MainHigh < PtrUInt(Sptr) then // на всякий случай: argv обязан быть выше
+  if MainHigh < PtrUInt(Sptr) then // just in case: argv must be higher
     MainHigh := PtrUInt(Sptr) + 65536;
   if PtrUInt(Sptr) > Reserve then
     MainLow := PtrUInt(Sptr) - Reserve

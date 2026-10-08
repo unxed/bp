@@ -1,15 +1,16 @@
-# ext/ — надстройки над Free Pascal
+# ext/ — extensions of Free Pascal
 
-Слой 2 из трёх в Better Pascal. Не про безопасность памяти, а про удобство: то, чего не хватает FPC «из коробки».
+Layer 2 of 3 in Better Pascal. Not about memory safety but about convenience: what FPC lacks out of the box.
 
-| Часть | Файлы | Что даёт |
+| Part | Files | What it gives |
 |---|---|---|
-| UTF-8 по умолчанию | `utf8.intf.inc`, `utf8.impl.inc`, `utf8.init.inc` | `String` = UTF-8, имена файлов и консоль в UTF-8, `CodePoints`, `CPLength`; выключается `-dSAFE_NO_UTF8` |
-| Горутины | `go.intf.inc`, `go.impl.inc` | `TGroup`/`TTask` (структурная конкурентность), `TChan<T>`, `Select` (SPEC §14) |
-| Потоки | `bpthreads.pas` | менеджер потоков без libc для Linux (clone/futex/mmap), `cthreads` на остальных Unix; DOS: пусто |
-| UTF-8 для чужого кода | `fpc-utf8/` | отдельный вариант «только UTF-8» через `-Fa` и конфиг, без `BP` (перенесён из `unxed/sandbox`) |
+| UTF-8 by default | `utf8.intf.inc`, `utf8.impl.inc`, `utf8.init.inc` | `String` = UTF-8, file names and the console in UTF-8, `CodePoints`, `CPLength`; turned off with `-dSAFE_NO_UTF8` |
+| Goroutines | `go.intf.inc`, `go.impl.inc` | `TGroup`/`TTask` (structured concurrency), `TChan<T>`, `Select` (SPEC §14) |
+| Threads | `bpthreads.pas` | unit `BPThreads`: a thread manager without libc on Linux (clone/futex/mmap), `cthreads` on the other Unix; empty on DOS |
+| UTF-8 for existing code | `fpc-utf8/` | a separate UTF-8-only variant through `-Fa` and a config file, without `BP` ([README](fpc-utf8/README.md)) |
 
-Слой использует ядро `safe/` (`ESafety`, счётчики отказов), но `safe/` о нём ничего не знает.
-В код программы он попадает через `unit BP` (`../bp.pas`), который включает эти `.inc` вместе с `safe/*.inc`.
+The layer uses the core of `safe/` (`ESafety`, the failure counters); `safe/` knows nothing about it.
+Programs get it through `unit BP` (`../bp.pas`), which includes these `.inc` files together with `safe/*.inc`.
 
-Тесты — `tests/ext/` (`test_utf8`, `test_go`, `test_threads`, `compile/mf_*`).
+Tests: `tests/ext/` (`test_utf8`, `test_go`, `test_threads`, `compile/mf_*`) and `ext/fpc-utf8/test_utf8.pas`;
+`tests/run.sh ext` and `tests/run.sh fpc-utf8`.

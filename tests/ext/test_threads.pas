@@ -1,5 +1,5 @@
-{ Нагрузочный тест менеджера потоков (BPThreads), годится для обоих режимов:
-  свои потоки без libc (Linux по умолчанию) и cthreads (-dSAFE_LIBC). Код возврата = число провалов. }
+{ A load test of the thread manager (BPThreads) for both modes:
+  threads without libc (the Linux default) and cthreads (-dSAFE_LIBC). Exit code = number of failures. }
 program test_threads;
 
 {$mode objfpc}{$H+}
@@ -10,7 +10,7 @@ uses
 type
   TIntChan = specialize TChan<Integer>;
 
-  { Куча, строки и исключения внутри потока. }
+  { The heap, strings and exceptions inside a thread. }
   TChurn = class(TTask)
   private
     FN: Integer;
@@ -28,7 +28,7 @@ type
 
 var
   Failed: Integer = 0;
-  Ev: PEventState; // ручной сброс: на этом построен SyncObjs.TEvent
+  Ev: PEventState; // manual reset: SyncObjs.TEvent is built on this
   Shared: LongInt = 0;
   CS: TRTLCriticalSection;
 
@@ -59,7 +59,7 @@ begin
     except
       on E: EConvertError do Inc(Caught);
     end;
-    EnterCriticalSection(CS);   // рекурсивный замок RTL
+    EnterCriticalSection(CS);   // the recursive RTL lock
     EnterCriticalSection(CS);
     Inc(Shared);
     LeaveCriticalSection(CS);
@@ -70,7 +70,7 @@ end;
 
 procedure TPlainThread.Execute;
 begin
-  BasicEventWaitFor(Cardinal($FFFFFFFF), Ev); // без таймаута
+  BasicEventWaitFor(Cardinal($FFFFFFFF), Ev); // no timeout
   Value := 42;
 end;
 
@@ -118,7 +118,7 @@ begin
   BasicEventSetEvent(Ev);
   T.WaitFor;
   Check(T.Value = 42, 'TThread + manual-reset BasicEvent');
-  // UNSAFE: классический RTL-код, владельца нет
+  // UNSAFE: classic RTL code, no owner
   T.Destroy;
   BasicEventDestroy(Ev);
 end;

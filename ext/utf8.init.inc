@@ -1,12 +1,12 @@
 { SPDX-License-Identifier: MIT }
-{ Better Pascal, ext/utf8: кодировки по умолчанию (секция initialization). }
+{ Better Pascal, ext/utf8: the default encodings (the initialization section). }
 {$ifndef SAFE_NO_UTF8}
-  // Кодировка String по умолчанию (а с ней и всех неявных конверсий).
+  // The default encoding of String (and with it of all implicit conversions).
   DefaultSystemCodePage := CP_UTF8;
-  // Имена файлов: на входе в RTL и на выходе (FindFirst, GetCurrentDir...).
+  // File names: into the RTL and out of it (FindFirst, GetCurrentDir...).
   DefaultFileSystemCodePage := CP_UTF8;
   DefaultRTLFileSystemCodePage := CP_UTF8;
-  // Консоль и стандартные потоки.
+  // The console and the standard streams.
   SetTextCodePage(Input, CP_UTF8);
   SetTextCodePage(Output, CP_UTF8);
   SetTextCodePage(ErrOutput, CP_UTF8);

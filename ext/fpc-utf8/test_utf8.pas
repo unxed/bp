@@ -1,5 +1,5 @@
-{ Тест UTF8Everywhere. Обратите внимание: в uses модуля нет,
-  его подставляет -FaUTF8Everywhere из utf8.cfg. Код возврата 0 = всё прошло. }
+{ The test of UTF8Everywhere. Note that the unit is not in uses:
+  -FaUTF8Everywhere from utf8.cfg inserts it. Exit code 0 means all checks passed. }
 program test_utf8;
 
 uses
@@ -27,18 +27,18 @@ var
 begin
   S := 'привет';
   Check(DefaultSystemCodePage = CP_UTF8, 'DefaultSystemCodePage = CP_UTF8');
-  Check(StringCodePage(S + IntToStr(1)) = CP_UTF8, 'строка из выражения в UTF-8');
-  Check(Length(S) = 12, 'Length в байтах: 12');
-  Check(CPLength(S) = 6, 'CPLength в символах: 6');
-  Check(Pos('ве', S) = 7, 'Pos по байтам: 7');
-  Check(Copy(S, Pos('ве', S), MaxInt) = 'вет', 'Copy с позиции Pos');
+  Check(StringCodePage(S + IntToStr(1)) = CP_UTF8, 'a string from an expression is UTF-8');
+  Check(Length(S) = 12, 'Length in bytes: 12');
+  Check(CPLength(S) = 6, 'CPLength in characters: 6');
+  Check(Pos('ве', S) = 7, 'Pos in bytes: 7');
+  Check(Copy(S, Pos('ве', S), MaxInt) = 'вет', 'Copy from the Pos position');
 
   U := S;
-  Check(Length(U) = 6, 'string -> UnicodeString без потерь');
-  Check(string(U) = S, 'UnicodeString -> string без потерь');
+  Check(Length(U) = 6, 'string -> UnicodeString without loss');
+  Check(string(U) = S, 'UnicodeString -> string without loss');
 
-  Check(AnsiUpperCase(S) = 'ПРИВЕТ', 'AnsiUpperCase кириллицы');
-  Check(AnsiLowerCase('ЁЖ') = 'ёж', 'AnsiLowerCase кириллицы');
+  Check(AnsiUpperCase(S) = 'ПРИВЕТ', 'AnsiUpperCase of Cyrillic');
+  Check(AnsiLowerCase('ЁЖ') = 'ёж', 'AnsiLowerCase of Cyrillic');
   Check(Format('%s, %s!', [S, 'мир']) = 'привет, мир!', 'Format');
 
   Parts := TStringList.Create;
@@ -47,25 +47,25 @@ begin
   Check((Parts.Count = 3) and (Parts[0] = 'a') and (Parts[1] = 'ё') and
     (Parts[2] = '😀'), 'for Ch in CodePoints: a, ё, 😀');
   Parts.Free;
-  Check(CPLength(#$D0) = 1, 'обрезанный символ: не зависаем');
+  Check(CPLength(#$D0) = 1, 'a truncated character: no hang');
 
   Name := 'тест_файл_😀.txt';
   Assign(F, Name);
   Rewrite(F);
   WriteLn(F, 'строка');
   Close(F);
-  Check(FileExists(Name), 'файл с UTF-8 именем создан');
+  Check(FileExists(Name), 'a file with a UTF-8 name is created');
   Reset(F);
   ReadLn(F, Line);
   Close(F);
-  Check(Line = 'строка', 'чтение UTF-8 текста из файла');
-  Check(DeleteFile(Name), 'удаление файла с UTF-8 именем');
+  Check(Line = 'строка', 'UTF-8 text is read from the file');
+  Check(DeleteFile(Name), 'the file with a UTF-8 name is deleted');
 
-  WriteLn('Вывод в консоль: ', S, ' 😀');
+  WriteLn('Console output: ', S, ' 😀');
   if Failed > 0 then
   begin
-    WriteLn('провалено проверок: ', Failed);
+    WriteLn('failed checks: ', Failed);
     Halt(1);
   end;
-  WriteLn('все проверки прошли');
+  WriteLn('all checks passed');
 end.

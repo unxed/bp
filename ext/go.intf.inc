@@ -1,10 +1,10 @@
 { SPDX-License-Identifier: MIT }
-{ Better Pascal, ext/go: горутины, каналы, группы, Select (интерфейс). }
+{ Better Pascal, ext/go: goroutines, channels, groups, Select (interface). }
 type
-  { ---------- Горутины и каналы (SPEC §14) ---------- }
+  { ---------- Goroutines and channels (SPEC §14) ---------- }
 
-  { Внутреннее: замок + список ждущих потоков. Ждущий кладёт в список своё
-    событие, пока держит замок, поэтому пробуждение не теряется (как sudog в Go). }
+  { Internal: a lock + a list of waiting threads. A waiter puts its event into the list
+    while it holds the lock, so a wakeup is never lost (like sudog in Go). }
   TSafeSync = class(TInterfacedObject)
   private
     FLock: TRTLCriticalSection;
@@ -15,13 +15,13 @@ type
     destructor Destroy; override;
     procedure Lock;
     procedure Unlock;
-    procedure Register;   // под замком
-    procedure Unregister; // под замком
-    procedure Broadcast;  // под замком
-    function WaitLocked(TimeoutMs: Integer): Boolean; // под замком; условие проверять в цикле
+    procedure Register;   // under the lock
+    procedure Unregister; // under the lock
+    procedure Broadcast;  // under the lock
+    function WaitLocked(TimeoutMs: Integer): Boolean; // under the lock; check the condition in a loop
   end;
 
-  { Канал без типа: то, что умеет Select. }
+  { An untyped channel: what Select works with. }
   TSafeChan = class(TSafeSync)
   private
     FCap, FCount: SizeInt;
@@ -29,7 +29,7 @@ type
     FSentSeq, FRecvSeq: Int64;
   public
     procedure Close;
-    function Ready: Boolean; // под замком: есть значение или канал закрыт
+    function Ready: Boolean; // under the lock: a value is there or the channel is closed
   end;
 
   generic TSafeChanOf<T> = class(TSafeChan)
@@ -45,7 +45,7 @@ type
   end;
 
   generic TChanEnumerator<T> = record
-  public // заполняет TChan.GetEnumerator
+  public // filled by TChan.GetEnumerator
     FImpl: specialize TSafeChanOf<T>;
     FRef: IInterface;
     FCur: T;
@@ -54,7 +54,7 @@ type
     property Current: T read FCur;
   end;
 
-  { Канал Go: ссылочный тип (копия записи — тот же канал), Cap = 0 — без буфера (рандеву). }
+  { A Go channel: a reference type (a copy of the record is the same channel); Cap = 0 is unbuffered (rendezvous). }
   generic TChan<T> = record
   private type
     TImpl = specialize TSafeChanOf<T>;
@@ -64,26 +64,26 @@ type
     procedure Check;
   public
     class function Create(ACap: SizeInt = 0): TChan; static;
-    procedure Send(const V: T);               // в закрытый канал → ESafety (R6)
-    function Recv(out V: T): Boolean;          // False: закрыт и пуст (v, ok := <-ch)
-    function TryRecv(out V: T): Boolean;       // без ожидания
-    procedure Close;                           // повторно → ESafety (R6)
-    function Sel: TSafeChan;                   // для Select
+    procedure Send(const V: T);               // into a closed channel → ESafety (R6)
+    function Recv(out V: T): Boolean;          // False: closed and empty (v, ok := <-ch)
+    function TryRecv(out V: T): Boolean;       // without waiting
+    procedure Close;                           // a second time → ESafety (R6)
+    function Sel: TSafeChan;                   // for Select
     function GetEnumerator: specialize TChanEnumerator<T>; // for V in Ch (range ch)
   end;
 
   TSafeGroupImpl = class;
 
-  { Задача-горутина: данные — поля (заполняются в конструкторе), код — Run.
-    Поля задачи: значения, TChan, TShared, перенесённые (Move) TOwned. Не заёмы (S11). }
+  { A goroutine task: the data are fields (filled in the constructor), the code is Run.
+    Task fields: values, TChan, TShared, TOwned passed with Move. No borrows (S11). }
   TTask = class
   private
     FGroup: TSafeGroupImpl;
   public
     procedure Run; virtual; abstract;
     function Cancelled: Boolean;
-    function Done: TSafeChan;    // закрывается при отмене группы: Select([..., Done])
-    procedure Go(ATask: TTask);  // запустить ещё одну задачу в той же группе
+    function Done: TSafeChan;    // closed when the group is cancelled: Select([..., Done])
+    procedure Go(ATask: TTask);  // start one more task in the same group
   end;
 
   TSafeGroupImpl = class(TSafeSync)
@@ -98,13 +98,13 @@ type
     procedure Go(ATask: TTask);
     procedure Cancel;
     function Cancelled: Boolean;
-    function WaitAll: string; // ждёт всех, возвращает и сбрасывает первую ошибку
+    function WaitAll: string; // waits for all, returns and clears the first error
     procedure TaskDone(const Err: string);
   end;
 
-  { Структурная конкурентность: группа ждёт все свои задачи при выходе из области
-    видимости. Ошибка задачи не роняет процесс (как panic в Go), а отменяет группу
-    и бросается из Wait (R7). }
+  { Structured concurrency: a group waits for all its tasks when it goes out of
+    scope. An error of a task does not bring the process down (as a panic in Go does); it cancels the group
+    and is raised from Wait (R7). }
   TGroup = record
   private
     FImpl: TSafeGroupImpl;
@@ -112,15 +112,15 @@ type
     procedure Check;
   public
     class function Create: TGroup; static;
-    procedure Go(ATask: TTask); overload;      // задача переходит во владение группы
+    procedure Go(ATask: TTask); overload;      // the group takes ownership of the task
     procedure Go(AProc: TProcedure); overload;
-    procedure Wait;                            // ошибка задачи → ESafety (R7)
+    procedure Wait;                            // an error of a task → ESafety (R7)
     procedure Cancel;
     function Cancelled: Boolean;
     function Done: TSafeChan;
   end;
 
-{ select: индекс готового канала (есть значение или закрыт) или -1 по таймауту.
-  Готовность — подсказка: значение может забрать другой получатель, поэтому
-  дальше TryRecv и при неудаче — снова Select. }
+{ select: the index of a ready channel (it has a value or is closed), or -1 on timeout.
+  Readiness is a hint: another receiver may take the value, so
+  call TryRecv next and Select again if it fails. }
 function Select(const Chans: array of TSafeChan; TimeoutMs: Integer = -1): Integer;

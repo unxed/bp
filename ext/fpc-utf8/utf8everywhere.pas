@@ -1,16 +1,16 @@
-{ UTF8Everywhere: string = UTF-8, без оговорок.
+{ UTF8Everywhere: string = UTF-8, with no exceptions.
 
-  Подключать руками не нужно: utf8.cfg содержит -FaUTF8Everywhere,
-  и компилятор сам вставляет этот модуль первым в uses каждой программы.
+  No need to add it by hand: utf8.cfg holds -FaUTF8Everywhere,
+  and the compiler inserts this unit first into the uses of every program.
 
-  Что делает:
-  - прячет "менеджер строк" (cwstring на Unix) внутрь себя;
-  - объявляет UTF-8 кодировкой по умолчанию для строк, имён файлов и консоли;
-  - даёт обход строки по символам: for Ch in CodePoints(S), где Ch тоже string.
+  What it does:
+  - hides the string manager (cwstring on Unix) inside itself;
+  - makes UTF-8 the default encoding of strings, file names and the console;
+  - walks a string by characters: for Ch in CodePoints(S), where Ch is a string too.
 
-  Length(S) и S[i] остаются в байтах. Это не баг, а принцип UTF-8 Everywhere:
-  индексы в байтах дешёвые и однозначные, Pos/Copy/Delete на них корректны,
-  потому что UTF-8 самосинхронизируется. Символы нужны редко, для них CodePoints. }
+  Length(S) and S[i] stay in bytes. This is not a bug but the UTF-8 Everywhere principle:
+  byte indexes are cheap and unambiguous, and Pos/Copy/Delete are correct on them
+  because UTF-8 is self-synchronizing. Characters are rarely needed; CodePoints is there for them. }
 unit UTF8Everywhere;
 
 {$mode objfpc}{$H+}
@@ -19,12 +19,12 @@ unit UTF8Everywhere;
 interface
 
 uses
-  {$ifdef unix}cwstring,{$endif} // UTF-8 <-> UTF-16 и регистр букв через libc
+  {$ifdef unix}cwstring,{$endif} // UTF-8 <-> UTF-16 and letter case through libc
   {$ifdef windows}Windows,{$endif}
   SysUtils;
 
 type
-  { Перечислитель символов (code points). Current: один символ как string. }
+  { An enumerator of characters (code points). Current: one character as a string. }
   TCodePointEnumerator = record
   private
     FS: RawByteString;
@@ -38,13 +38,13 @@ type
 
 { for Ch in CodePoints('aё😀') do ...  // 'a', 'ё', '😀' }
 function CodePoints(const S: string): TCodePointEnumerator;
-{ Длина в символах (code points), а не в байтах. }
+{ The length in characters (code points), not in bytes. }
 function CPLength(const S: string): SizeInt;
 
 implementation
 
-{ Длина символа по ведущему байту. Битый байт или "хвост" считаем
-  отдельным символом: обход никогда не зацикливается и не теряет байты. }
+{ The length of a character from its lead byte. A broken byte or a lone continuation byte counts
+  as a character of its own: the walk never loops and never loses bytes. }
 function CPByteLen(B: Byte): SizeInt; inline;
 begin
   case B of
@@ -73,7 +73,7 @@ begin
   if Result then
   begin
     FLen := CPByteLen(Byte(FS[FPos]));
-    if FLen > Length(FS) - FPos + 1 then // обрезанный символ в конце строки
+    if FLen > Length(FS) - FPos + 1 then // a truncated character at the end of the string
       FLen := Length(FS) - FPos + 1;
   end;
 end;
@@ -95,12 +95,12 @@ begin
 end;
 
 initialization
-  // Кодировка string по умолчанию (а с ней и всех неявных конверсий).
+  // The default encoding of string (and with it of all implicit conversions).
   DefaultSystemCodePage := CP_UTF8;
-  // Имена файлов: на входе в RTL и на выходе (FindFirst, GetCurrentDir...).
+  // File names: into the RTL and out of it (FindFirst, GetCurrentDir...).
   DefaultFileSystemCodePage := CP_UTF8;
   DefaultRTLFileSystemCodePage := CP_UTF8;
-  // Консоль и стандартные потоки.
+  // The console and the standard streams.
   SetTextCodePage(Input, CP_UTF8);
   SetTextCodePage(Output, CP_UTF8);
   SetTextCodePage(ErrOutput, CP_UTF8);

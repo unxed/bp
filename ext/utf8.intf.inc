@@ -1,9 +1,9 @@
 { SPDX-License-Identifier: MIT }
-{ Better Pascal, ext/utf8: UTF-8 по умолчанию (интерфейс). }
+{ Better Pascal, ext/utf8: UTF-8 by default (interface). }
 type
   { ---------- UTF-8 ---------- }
 
-  { Перечислитель символов (code points). Current: один символ как String. }
+  { An enumerator of characters (code points). Current: one character as a String. }
   TCodePointEnumerator = record
   private
     FS: RawByteString;
@@ -17,5 +17,5 @@ type
 
 { for Ch in CodePoints('aё😀') do ...  // 'a', 'ё', '😀' }
 function CodePoints(const S: string): TCodePointEnumerator;
-{ Длина в символах (code points), а не в байтах. }
+{ The length in characters (code points), not in bytes. }
 function CPLength(const S: string): SizeInt;

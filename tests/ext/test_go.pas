@@ -1,16 +1,16 @@
-{ Тесты горутин и каналов (SPEC §14). Код возврата = число провалов. }
+{ Tests of goroutines and channels (SPEC §14). Exit code = number of failures. }
 program test_go;
 
 {$mode objfpc}{$H+}
 
 uses
-  BP, // первым в uses программы: он же ставит менеджер потоков (ext/bpthreads.pas)
+  BP, // first in the program uses: it also installs the thread manager (ext/bpthreads.pas)
   SysUtils;
 
 type
   TIntChan = specialize TChan<Integer>;
 
-  { Задача: данные — поля, код — Run. }
+  { A task: the data are fields, the code is Run. }
   TSquare = class(TTask)
   private
     FN: Integer;
@@ -25,7 +25,7 @@ type
     procedure Run; override;
   end;
 
-  { Ждёт отмены группы через Select по Done. }
+  { Waits for the group to be cancelled with Select on Done. }
   TWaiter = class(TTask)
   private
     FIn: TIntChan;
@@ -68,7 +68,7 @@ begin
   repeat
     case Select([FIn.Sel, Done]) of
       0: if FIn.TryRecv(V) then Inc(Counter, V);
-      1: Exit; // группа отменена
+      1: Exit; // the group is cancelled
     end;
   until False;
 end;
@@ -96,7 +96,7 @@ var
   I, V, Sum: Integer;
 begin
   G := TGroup.Create;
-  Ch := TIntChan.Create; // без буфера: рандеву
+  Ch := TIntChan.Create; // unbuffered: rendezvous
   for I := 1 to 10 do
     G.Go(TSquare.Create(I, Ch));
   Sum := 0;
@@ -113,10 +113,10 @@ var
   V, Sum: Integer;
 begin
   Ch := TIntChan.Create(3);
-  Ch.Send(1); Ch.Send(2); Ch.Send(3); // не блокирует: буфер 3
+  Ch.Send(1); Ch.Send(2); Ch.Send(3); // does not block: buffer of 3
   Ch.Close;
   Sum := 0;
-  for V in Ch do // range ch: до закрытия и опустошения
+  for V in Ch do // range ch: until closed and drained
     Inc(Sum, V);
   Check(Sum = 6, 'chan: buffered send without receiver, range until closed');
   Check(not Ch.Recv(V) and (V = 0), 'chan: Recv on closed and drained returns False');
@@ -185,7 +185,7 @@ begin
   G := TGroup.Create;
   for I := 1 to 200 do
     G.Go(@Bump);
-end; // выход из области видимости ждёт все задачи
+end; // leaving the scope waits for all tasks
 
 begin
 {$if defined(go32v2) or defined(msdos)}

@@ -1,10 +1,10 @@
 { SPDX-License-Identifier: MIT }
-{ Better Pascal, ext/go (реализация). }
+{ Better Pascal, ext/go (implementation). }
 
-{ ---------- горутины: синхронизация ---------- }
+{ ---------- goroutines: synchronization ---------- }
 
 threadvar
-  TMyEvent: PRTLEvent; // событие текущего потока для ожиданий; создаётся лениво
+  TMyEvent: PRTLEvent; // the event of the current thread for waits; created lazily
 
 function MyEvent: PRTLEvent;
 begin
@@ -69,8 +69,8 @@ end;
 
 function TSafeSync.WaitLocked(TimeoutMs: Integer): Boolean;
 begin
-  // Событие «залипает» (RTLEvent — двоичный семафор): SetEvent между Unlock и
-  // WaitFor не теряется. Лишние пробуждения безвредны: вызывающий проверяет условие в цикле.
+  // The event is sticky (an RTLEvent is a binary semaphore): a SetEvent between Unlock and
+  // WaitFor is not lost. Spurious wakeups are harmless: the caller checks the condition in a loop.
   Register;
   Unlock;
   if TimeoutMs < 0 then
@@ -78,11 +78,11 @@ begin
   else
     RTLEventWaitFor(MyEvent, TimeoutMs);
   Lock;
-  Unregister; // после таймаута; если нас вычеркнул Broadcast — ничего не найдёт
+  Unregister; // after a timeout; if Broadcast already removed us, finds nothing
   Result := True;
 end;
 
-{ ---------- каналы ---------- }
+{ ---------- channels ---------- }
 
 procedure TSafeChan.Close;
 begin
@@ -129,7 +129,7 @@ begin
     Inc(FSentSeq);
     Ticket := FSentSeq;
     Broadcast;
-    if FCap = 0 then // рандеву: ждём, пока значение заберут
+    if FCap = 0 then // rendezvous: wait until the value is taken
       while FRecvSeq < Ticket do
         WaitLocked(-1);
   finally
@@ -146,7 +146,7 @@ begin
     Exit;
   end;
   V := FBuf[FHead];
-  FBuf[FHead] := Default(T); // не держим ссылку на отданное значение
+  FBuf[FHead] := Default(T); // do not keep a reference to the value handed out
   FHead := (FHead + 1) mod Length(FBuf);
   Dec(FCount);
   Inc(FRecvSeq);
@@ -237,7 +237,7 @@ var
 begin
   Deadline := GetTickCount64 + QWord(TimeoutMs);
   repeat
-    // Проверка и регистрация — под замком каждого канала: пробуждение не теряется.
+    // The check and the registration are under the lock of each channel: no wakeup is lost.
     for I := 0 to High(Chans) do
     begin
       Chans[I].Lock;
@@ -274,7 +274,7 @@ begin
       Chans[J].Unlock;
     end;
   until (TimeoutMs >= 0) and (GetTickCount64 >= Deadline);
-  // последний шанс после таймаута
+  // a last chance after the timeout
   for I := 0 to High(Chans) do
   begin
     Chans[I].Lock;
@@ -288,7 +288,7 @@ begin
   Result := -1;
 end;
 
-{ ---------- группы и задачи ---------- }
+{ ---------- groups and tasks ---------- }
 
 function SafeGoThread(P: System.Pointer): PtrInt;
 var
@@ -319,7 +319,7 @@ begin
     RTLEventDestroy(TMyEvent);
     TMyEvent := nil;
   end;
-  G.TaskDone(Err); // после этого группа может быть уже уничтожена: G больше не трогаем
+  G.TaskDone(Err); // the group may be destroyed after this: G is not touched any more
   Result := 0;
 end;
 
@@ -361,9 +361,9 @@ end;
 
 destructor TSafeGroupImpl.Destroy;
 begin
-  // Структурная конкурентность: группа не умирает раньше своих задач.
+  // Structured concurrency: a group does not die before its tasks.
   if WaitAll <> '' then
-    InterlockedIncrement(GGoFailures); // бросать из деструктора нельзя: учитываем (R5)
+    InterlockedIncrement(GGoFailures); // a destructor must not raise: count it instead (R5)
   inherited Destroy;
 end;
 
@@ -378,16 +378,16 @@ begin
     SafeFail('SAFE-R3: TGroup.Go: task already started');
   ATask.FGroup := Self;
 {$if defined(go32v2) or defined(msdos)}
-  // DOS однозадачна: потоков нет, BeginThread не вернёт управление осмысленно (проверено на go32v2 под DOSBox-X: тест зависал).
+  // DOS is single-tasking: there are no threads, BeginThread does not return in a useful way (on go32v2 under DOSBox-X the test hung).
   ATask.Destroy;
   SafeFail('SAFE-R8: this target (DOS) has no threads; goroutines are not available. Use plain procedures');
 {$endif}
-  // Без менеджера потоков (Unix без cthreads) RTLEventCreate возвращает nil.
+  // Without a thread manager RTLEventCreate returns nil.
   Probe := RTLEventCreate;
   if Probe = nil then
   begin
     ATask.Destroy;
-    SafeFail('SAFE-R8: no thread manager. On Unix put cthreads FIRST in the program uses: uses {$ifdef unix}cthreads,{$endif} ...');
+    SafeFail('SAFE-R8: no thread manager. Put BP FIRST in the program uses: uses BP, SysUtils, ...');
   end;
   RTLEventDestroy(Probe);
   Lock;
@@ -414,7 +414,7 @@ begin
     try
       FDone.Close;
     except
-      on ESafety do ; // закрыли параллельно — то же самое
+      on ESafety do ; // closed concurrently: the same result
     end;
 end;
 
@@ -448,7 +448,7 @@ begin
     FError := Err;
   Unlock;
   if Failed then
-    Cancel; // первая ошибка отменяет остальных (errgroup)
+    Cancel; // the first error cancels the others (errgroup)
   Lock;
   Dec(FRunning);
   Broadcast;

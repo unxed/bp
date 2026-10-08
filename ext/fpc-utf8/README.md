@@ -1,44 +1,41 @@
-# fpc-utf8: UTF-8 Everywhere для Free Pascal
+# fpc-utf8: UTF-8 Everywhere for Free Pascal
 
-Идея: `string` всегда UTF-8, и всё работает из коробки, без правки исходников.
+The idea: `string` is always UTF-8, and everything works out of the box, with no change of the sources.
+This is a separate variant for existing code that does not use `BP`; `BP` gives the same UTF-8 defaults itself.
 
-FPC 3.x уже умеет строки с кодовой страницей (`AnsiString(CP_UTF8)`), мешают только умолчания:
-`string` = `ShortString` в режиме по умолчанию, кодировка строк берётся из локали,
-на Unix нужен `cwstring`, на Windows консоль в OEM. Всё это чинится в одном месте:
+FPC 3.x already has strings with a code page (`AnsiString(CP_UTF8)`); only the defaults are in the way:
+`string` = `ShortString` in the default mode, the string encoding comes from the locale,
+Unix needs `cwstring`, the Windows console is in OEM. All of this is fixed in one place:
 
-- `utf8everywhere.pas`: модуль, который прячет `cwstring` внутрь себя, в `initialization`
-  ставит `DefaultSystemCodePage`, `DefaultFileSystemCodePage`, `DefaultRTLFileSystemCodePage`
-  и кодировку `Input/Output/StdErr` в `CP_UTF8` (на Windows ещё `SetConsoleOutputCP`).
-  Плюс `for Ch in CodePoints(S)` (символ тоже `string`) и `CPLength(S)`.
-- `utf8.cfg`: `-Mobjfpc -Sh -FaUTF8Everywhere`. Главный трюк: ключ `-Fa`
-  заставляет компилятор вставить модуль первым в `uses` каждой программы.
-  Строки из `utf8.cfg` можно дописать в системный `fpc.cfg`, и UTF-8 станет умолчанием вообще.
+- `utf8everywhere.pas`: a unit that hides `cwstring` inside itself and in `initialization`
+  sets `DefaultSystemCodePage`, `DefaultFileSystemCodePage`, `DefaultRTLFileSystemCodePage`
+  and the encoding of `Input/Output/StdErr` to `CP_UTF8` (on Windows also `SetConsoleOutputCP`).
+  Plus `for Ch in CodePoints(S)` (a character is a `string` too) and `CPLength(S)`.
+- `utf8.cfg`: `-Mobjfpc -Sh -FaUTF8Everywhere`. The main trick: the `-Fa` option
+  makes the compiler insert the unit first into the `uses` of every program.
+  The lines of `utf8.cfg` can be appended to the system `fpc.cfg` to make UTF-8 the default everywhere.
 
-Сборка: `fpc @fpc-utf8/utf8.cfg -Fufpc-utf8 program.pas`.
+Build: `fpc @fpc-utf8/utf8.cfg -Fufpc-utf8 program.pas`.
 
-Принцип: `Length(S)` и `S[i]` в байтах (как в Go и Rust). `Pos/Copy/Delete` на байтовых индексах
-корректны, потому что UTF-8 самосинхронизируется. Символы нужны редко, для них `CodePoints`.
+The principle: `Length(S)` and `S[i]` are in bytes (as in Go and Rust). `Pos/Copy/Delete` on byte indexes
+are correct because UTF-8 is self-synchronizing. Characters are rarely needed; `CodePoints` is there for them.
 
-## Тесты
+## Tests
 
-`test_utf8.pas` (модуль в нём не подключён, его вставляет `-Fa`): длины, `Pos/Copy`, конверсия в
-`UnicodeString` и обратно, `AnsiUpperCase/AnsiLowerCase` кириллицы, `Format`, обход по символам
-(включая эмодзи и обрезанный символ), файл с UTF-8 именем и UTF-8 содержимым, вывод в консоль.
-Код возврата 0 = всё прошло. CI: `.github/workflows/ci.yml`, job `fpc-utf8` (Ubuntu, `fp-compiler` из apt).
+`test_utf8.pas` (the unit is not in its `uses`; `-Fa` inserts it): lengths, `Pos/Copy`, conversion to
+`UnicodeString` and back, `AnsiUpperCase/AnsiLowerCase` of Cyrillic, `Format`, the walk by characters
+(including an emoji and a truncated character), a file with a UTF-8 name and UTF-8 contents, console output.
+Exit code 0 means all checks passed. Run: `tests/run.sh fpc-utf8` (part of `tests/run.sh all`); CI job `fpc-utf8`.
 
-## Статус и сомнительные места
+## Limitations
 
-- Итерация 1: код написан, локально не собирался; первая проверка в CI.
-- Регистр букв (`AnsiUpperCase`) на Unix идёт через `towupper` из libc и зависит от локали:
-  при `LANG=C` кириллица не поднимется. Тест гоняется под `C.UTF-8`. Вариант на будущее:
-  настройка (define) для чистого паскалевского менеджера `fpwidestring` из rtl-unicode, без libc.
-- Windows не проверен в CI. Известно, что `ParamStr` на Windows в FPC 3.2 может отдавать строки
-  в ANSI-кодировке (в Lazarus для этого есть `ParamStrUTF8`), это следующая итерация.
-- `-Fa` действует только на программы (не на модули и библиотеки). Для программы этого достаточно:
-  `initialization` модуля отрабатывает до основного кода.
-
-## Почему нет `-FcUTF8` (исправлено 2026-10-03)
-
-Первая версия `utf8.cfg` содержала `-FcUTF8`. С ним строковые литералы становятся `UnicodeString` (кодовая страница 1200),
-и `Pos('ве', S)` возвращает 0, а `Copy(S, Pos(...), MaxInt)` возвращает всю строку: тест падал в CI. Без ключа литералы
-хранятся как байты с кодировкой `CP_ACP`, а она в рантайме равна `DefaultSystemCodePage` = UTF-8, и всё работает (так делает Lazarus).
+- Letter case (`AnsiUpperCase`) on Unix goes through `towupper` of libc and depends on the locale:
+  with `LANG=C` Cyrillic is not upper-cased. The test runs under `C.UTF-8`. `BP` has no such limitation on Linux
+  (it uses `fpwidestring` without libc).
+- Windows is not checked in CI. `ParamStr` on Windows in FPC 3.2 may return strings
+  in the ANSI code page.
+- `-Fa` applies to programs only (not to units and libraries). For a program this is enough:
+  the `initialization` of the unit runs before the main code.
+- No `-FcUTF8` in `utf8.cfg`: with it string literals become `UnicodeString` (code page 1200),
+  and `Pos('ве', S)` returns 0. Without it literals are stored as bytes with the `CP_ACP` encoding, which at run time
+  equals `DefaultSystemCodePage` = UTF-8.

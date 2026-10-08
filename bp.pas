@@ -1,14 +1,14 @@
 { SPDX-License-Identifier: MIT }
-{ Better Pascal — один юнит, который сразу даёт всё:
-    1) safe  (safe/):  владение, срезы, арена, defer, FFI, отравленные опасные примитивы;
-    2) ext   (ext/):   UTF-8 по умолчанию, горутины/каналы/Select, менеджер потоков;
-  Подключение: `uses ..., BP;` ПОСЛЕДНИМ в каждом модуле. Опции компилятора не нужны.
-  Только безопасность без расширений — unit Safe (safe/safe.pas).
+{ Better Pascal: one unit that gives everything.
+    1) safe (safe/): ownership, slices, arena, defer, FFI, poisoned dangerous primitives;
+    2) ext  (ext/):  UTF-8 by default, goroutines/channels/Select, the thread manager.
+  Usage: `uses BP, ...;` FIRST in the program, `uses ..., BP;` LAST in every other unit. No compiler options.
+  The safe layer alone, without the extensions: unit Safe (safe/safe.pas).
 
-  Linux по умолчанию — переносимый режим без libc (как Go): строки — fpwidestring
-  (Unicode на Паскале), потоки — BPThreads на системных вызовах; один бинарник
-  работает и на Debian, и на Alpine. -dSAFE_LIBC — режим с libc (cwstring, cthreads),
-  нужен только для FFI с C-библиотеками (аналог cgo). }
+  Linux by default is the portable mode without libc (like Go): strings use fpwidestring
+  (Unicode in Pascal), threads use BPThreads on system calls; one binary
+  runs on Debian and on Alpine alike. -dSAFE_LIBC is the mode with libc (cwstring, cthreads),
+  needed only for FFI with C libraries (like cgo). }
 unit BP;
 
 {$mode objfpc}{$H+}
@@ -18,11 +18,11 @@ unit BP;
 interface
 
 uses
-  BPThreads, // менеджер потоков (горутины); сам первый в uses, чтобы стать менеджером до остальных
+  BPThreads, // the thread manager (goroutines); first in uses, so it is installed before the other units
   {$ifdef SAFE_PORTABLE}
-  unicodeducet, fpwidestring, // Unicode без libc; unicodeducet раньше: его таблица сортировки нужна fpwidestring при старте
+  unicodeducet, fpwidestring, // Unicode without libc; unicodeducet first: fpwidestring needs its collation table at startup
   {$else}
-  {$if defined(unix) and not defined(SAFE_NO_CWSTRING)}cwstring,{$endif} // UTF-8 <-> UTF-16 и регистр через libc
+  {$if defined(unix) and not defined(SAFE_NO_CWSTRING)}cwstring,{$endif} // UTF-8 <-> UTF-16 and letter case through libc
   {$endif}
   {$ifdef windows}Windows,{$endif}
   SysUtils;

@@ -1,4 +1,4 @@
-{ Тесты FFI (SPEC §13): безопасный фасад над libc. Код возврата = число провалов. }
+{ Tests of FFI (SPEC §13): a safe facade over libc. Exit code = number of failures. }
 program test_ffi;
 
 {$mode objfpc}{$H+}

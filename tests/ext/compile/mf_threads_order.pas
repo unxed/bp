@@ -1,6 +1,6 @@
 // EXPECT: exit 211
-{ BP не первым в uses программы (SysUtils раньше): менеджер потоков опоздал, и первая горутина
-  останавливается с объяснением (код 211), а не даёт тихую гонку. Только Linux в переносимом режиме. }
+{ BP not first in the program uses (SysUtils before it): the thread manager comes too late, and the first goroutine
+  stops with an explanation (code 211) instead of a silent race. Linux in the portable mode only. }
 program mf_threads_order;
 {$mode objfpc}{$H+}
 uses SysUtils, BP;

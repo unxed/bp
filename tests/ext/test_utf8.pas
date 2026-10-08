@@ -1,4 +1,4 @@
-{ Тесты ext/utf8: UTF-8 по умолчанию даёт unit BP. Код возврата = число провалов. }
+{ Tests of ext/utf8: unit BP gives UTF-8 by default. Exit code = number of failures. }
 program test_utf8;
 
 {$mode objfpc}{$H+}
