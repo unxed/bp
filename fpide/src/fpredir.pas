@@ -98,15 +98,13 @@ Uses
   baseunix,
   unix,
 {$endif unix}
-  dos;
+  dos, TvPath;
 
 Const
 {$ifdef UNIX}
-  DirSep='/';
   listsep = [';',':'];
   exeext = '';
 {$else UNIX}
-  DirSep='\';
   listsep = [';'];
   exeext = '.exe';
 {$endif UNIX}
@@ -125,24 +123,10 @@ var
 *****************************************************************************}
 
 function FixPath(const s:string):string;
-{$ifdef Unix}
 begin
-  { Unix: the separator is '/' already and a backslash is a letter of a name (escapes are the shell's) }
-  FixPath:=s;
+  { nothing changes on Unix: a backslash is a letter of a name there (escapes are the shell's) }
+  FixPath:=PathNative(s);
 end;
-{$else}
-var
-  i : longint;
-begin
-  { Fix separator }
-  for i:=1 to length(s) do
-   if s[i] in ['/','\'] then
-    fixpath[i]:=DirSep
-   else
-    fixpath[i]:=s[i];
-  fixpath[0]:=s[0];
-end;
-{$endif}
 
 
     function maybequoted(const s:string):string;
@@ -279,19 +263,15 @@ end;
 
 function CompleteDir(const Path: string): string;
 begin
-  { keep c: untouched PM }
-  if (Path<>'') and (Path[Length(Path)]<>DirSep) and
-     (Path[Length(Path)]<>':') then
-   CompleteDir:=Path+DirSep
-  else
-   CompleteDir:=Path;
+  { a bare drive "c:" stays as it is }
+  CompleteDir:=PathAddSep(Path);
 end;
 
 
 function LocateExeFile(var FileName:string): boolean;
 var
   S : AnsiString;
-  dir,d,n,e : string;
+  dir : string;
   i : longint;
 begin
   LocateExeFile:=False;
@@ -301,9 +281,7 @@ begin
       Exit;
     end;
 
-  Fsplit(Filename,d,n,e);
-
-  if (e='') and FileExist(FileName+exeext) then
+  if (PathExt(FileName)='') and FileExist(FileName+exeext) then
     begin
       FileName:=FileName+exeext;
       LocateExeFile:=true;
@@ -637,19 +615,15 @@ end;
 
 function CompleteDir(const Path: string): string;
 begin
-  { keep c: untouched PM }
-  if (Path<>'') and (Path[Length(Path)]<>DirSep) and
-     (Path[Length(Path)]<>':') then
-   CompleteDir:=Path+DirSep
-  else
-   CompleteDir:=Path;
+  { a bare drive "c:" stays as it is }
+  CompleteDir:=PathAddSep(Path);
 end;
 
 
 function LocateExeFile(var FileName:string): boolean;
 var
   S : AnsiString;
-  dir,d,n,e : string;
+  dir : string;
   i : longint;
 begin
   LocateExeFile:=False;
@@ -659,9 +633,7 @@ begin
       Exit;
     end;
 
-  Fsplit(Filename,d,n,e);
-
-  if (e='') and FileExist(FileName+exeext) then
+  if (PathExt(FileName)='') and FileExist(FileName+exeext) then
     begin
       FileName:=FileName+exeext;
       LocateExeFile:=true;

@@ -34,7 +34,7 @@ uses
   baseunix,
   unix,
 {$endif Unix}
-  Dos,Objects;
+  Dos,Objects,TvPath;
 
 const
       kbCtrlGrayPlus         = $9000;
@@ -47,9 +47,9 @@ const
 
   { Get DirSep and EOL from System unit, instead of redefining 
     here with tons of $ifdefs (KB) }
-  DirSep : char = System.DirectorySeparator;
+  DirSep : char = PathSep;
   { the mask that matches every file: "*.*" only matches names with a dot on Unix }
-  AllFilesMask = {$ifdef Unix}'*'{$else}'*.*'{$endif};
+  AllFilesMask = PathAllFiles;
   EOL : String[2] = System.LineEnding;
 
 
@@ -169,6 +169,10 @@ function GetPChar(P: PChar): string;
 function BoolToStr(B: boolean; const TrueS, FalseS: string): string;
 function LExtendString(S: string; MinLen: byte): string;
 
+{ FSplit and FExpand by the rules of the system (those of the Dos unit read '\' as a separator on Unix too);
+  ExpandPath also reads a leading '~' as the home directory on Unix }
+procedure SplitPath(const S: string; var D: DirStr; var N: NameStr; var E: ExtStr);
+function ExpandPath(const S: string): string;
 function DirOf(const S: string): string;
 function ExtOf(const S: string): string;
 function NameOf(const S: string): string;
@@ -552,48 +556,48 @@ begin
   if P=nil then GetPChar:='' else GetPChar:=StrPas(P);
 end;
 
-function DirOf(const S: string): string;
-var D: DirStr; E: ExtStr; N: NameStr;
+procedure SplitPath(const S: string; var D: DirStr; var N: NameStr; var E: ExtStr);
+var DA, NA, EA: AnsiString;
 begin
-  FSplit(S,D,N,E);
-  if (D<>'') and (D[Length(D)]<>DirSep)
-  {$ifdef HASAMIGA}
-    and (D[Length(D)]<>DriveSeparator)
-  {$endif}
-  then
-   DirOf:=D+DirSep
+  PathSplit(S,DA,NA,EA);
+  D:=DA; N:=NA; E:=EA;
+end;
+
+function ExpandPath(const S: string): string;
+begin
+{$ifdef Unix}
+  if (S='~') or (copy(S,1,2)='~'+PathSep) then
+    ExpandPath:=PathExpand(PathJoin(GetEnv('HOME'),copy(S,3,High(S))))
   else
-   DirOf:=D;
+{$endif}
+    ExpandPath:=PathExpand(S);
+end;
+
+function DirOf(const S: string): string;
+begin
+  DirOf:=PathAddSep(PathDir(S));
 end;
 
 
 function ExtOf(const S: string): string;
-var D: DirStr; E: ExtStr; N: NameStr;
 begin
-  FSplit(S,D,N,E);
-  ExtOf:=E;
+  ExtOf:=PathExt(S);
 end;
 
 
 function NameOf(const S: string): string;
-var D: DirStr; E: ExtStr; N: NameStr;
 begin
-  FSplit(S,D,N,E);
-  NameOf:=N;
+  NameOf:=PathChangeExt(PathName(S),'');
 end;
 
 function NameAndExtOf(const S: string): string;
-var D: DirStr; E: ExtStr; N: NameStr;
 begin
-  FSplit(S,D,N,E);
-  NameAndExtOf:=N+E;
+  NameAndExtOf:=PathName(S);
 end;
 
 function DirAndNameOf(const S: string): string;
-var D: DirStr; E: ExtStr; N: NameStr;
 begin
-  FSplit(S,D,N,E);
-  DirAndNameOf:=D+N;
+  DirAndNameOf:=PathChangeExt(S,'');
 end;
 
 { return Dos GetFTime value or -1 if the file does not exist }
@@ -1038,13 +1042,8 @@ begin
 end;
 
 function TrimEndSlash(const Path: string): string;
-var S: string;
 begin
-  S:=Path;
-  if (length(S)>0) and (S<>DirSep) and (copy(S,length(S),1)=DirSep) and
-    (S[length(S)-1]<>':') then
-   S:=copy(S,1,length(S)-1);
-  TrimEndSlash:=S;
+  TrimEndSlash:=PathDelSep(Path);
 end;
 
 function CompareText(S1, S2: string): integer;
@@ -1058,37 +1057,14 @@ begin
 end;
 
 function FormatPath(Path: string): string;
-var P: sw_integer;
-    SC: char;
 begin
-  if ord(DirSep)=ord('/') then
-    SC:='\'
-  else
-    SC:='/';
-
-  repeat
-    P:=Pos(SC,Path);
-    if P>0 then Path[P]:=DirSep;
-  until P=0;
-  FormatPath:=Path;
+  FormatPath:=PathNative(Path);
 end;
 
+{ InComplete taken from the directory of the file Base }
 function CompletePath(const Base, InComplete: string): string;
-var Drv,BDrv: string[40]; D,BD: DirStr; N,BN: NameStr; E,BE: ExtStr;
-    P: sw_integer;
-    Complete: string;
 begin
-  Complete:=FormatPath(InComplete);
-  FSplit(FormatPath(InComplete),D,N,E);
-  P:=Pos(':',D); if P=0 then Drv:='' else begin Drv:=copy(D,1,P); Delete(D,1,P); end;
-  FSplit(FormatPath(Base),BD,BN,BE);
-  P:=Pos(':',BD); if P=0 then BDrv:='' else begin BDrv:=copy(BD,1,P); Delete(BD,1,P); end;
-  if copy(D,1,1)<>DirSep then
-    Complete:=BD+D+N+E;
-  if Drv='' then
-    Complete:=BDrv+Complete;
-  Complete:=FExpand(Complete);
-  CompletePath:=Complete;
+  CompletePath:=PathExpandFrom(PathNative(InComplete),PathDir(PathNative(Base)));
 end;
 
 function CompleteURL(const Base, URLRef: string): string;
@@ -1282,24 +1258,15 @@ end;
 
 function CompleteDir(const Path: string): string;
 begin
-  { keep c: untouched PM }
-  if (Path<>'') and (Path[Length(Path)]<>DirSep) and
-     (Path[Length(Path)]<>':') then
-   CompleteDir:=Path+DirSep
-  else
-   CompleteDir:=Path;
+  { a bare drive "c:" stays as it is }
+  CompleteDir:=PathAddSep(Path);
 end;
 
 function GetCurDir: string;
 var S: string;
 begin
   GetDir(0,S);
-{$ifdef HASAMIGA}
-  if (copy(S,length(S),1)<>DirSep) and (copy(S,length(S),1)<>DriveSeparator) then S:=S+DirSep;
-{$else}
-  if copy(S,length(S),1)<>DirSep then S:=S+DirSep;
-{$endif}
-  GetCurDir:=S;
+  GetCurDir:=PathAddSep(S);
 end;
 
 function GenTempFileName: string;

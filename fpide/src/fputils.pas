@@ -19,10 +19,10 @@ interface
 
 uses
   Sysutils,
-  Objects;
+  Objects,TvPath;
 
 const
-  dirsep = System.DirectorySeparator;
+  dirsep = PathSep;
 
 {$ifdef Unix}
   listsep = [';',':'];
@@ -133,39 +133,17 @@ end;
 function SmartPath(Path: string): string;
 var S: string;
 begin
-  GetDir(0,S);
-{$ifdef HASAMIGA}
-  if (copy(S,length(S),1)<>DirSep) and (copy(S,length(S),1)<>DriveSeparator) then S:=S+DirSep;
-{$else}
-  if copy(S,length(S),1)<>DirSep then S:=S+DirSep;
-{$endif}
-{$ifdef FSCaseInsensitive}
-  if (LowerCaseStr(copy(Path,1,length(S)))=LowerCaseStr(S)) {and (Pos('\',copy(Path,length(S)+1,High(S)))=0)} then
-{$else}
-  if (copy(Path,1,length(S))=S) {and (Pos('\',copy(Path,length(S)+1,High(S)))=0)} then
-{$endif}
+  S:=GetCurDir;
+  if PathSameName(copy(Path,1,length(S)),S) then
      system.Delete(Path,1,length(S));
   SmartPath:=Path;
 end;
 
 
 Function FixPath(s:string;allowdot:boolean):string;
-{$ifndef Unix}
-var
-  i : longint;
-{$endif}
 begin
-{$ifndef Unix}
-  for i:=1 to length(s) do
-   if s[i] in ['/','\'] then
-    s[i]:=DirSep;
-{$endif}
-  if (length(s)>0) and (s[length(s)]<>DirSep)
-{$ifndef Unix}
-     and (s[length(s)]<>':')   { a bare drive ("c:") is a directory only where there are drives }
-{$endif}
-  then
-   s:=s+DirSep;
+  { a bare drive ("c:") gets no separator }
+  s:=PathAddSep(PathNative(s));
   if (not allowdot) and (s='.'+DirSep) then
    s:='';
   FixPath:=s;
@@ -179,35 +157,15 @@ begin
   FixFileName:=s;
 end;
 {$else}
-var
-  i      : longint;
 begin
-  for i:=length(s) downto 1 do
-   begin
-     case s[i] of
- {$ifndef hasamiga}
-      '/' : FixFileName[i]:='\';
- 'A'..'Z' : FixFileName[i]:=char(byte(s[i])+32);
- {$else}
-      '\' : FixFileName[i]:='/';
- {$endif}
-     else
-      FixFileName[i]:=s[i];
-     end;
-   end;
-  FixFileName[0]:=s[0];
+  FixFileName:=LowerCaseStr(PathNative(s));
 end;
 {$endif}
 
 
 function MakeExeName(const fn:string):string;
-var
-  d : DirStr;
-  n : NameStr;
-  e : ExtStr;
 begin
-  FSplit(fn,d,n,e);
-  MakeExeName:=d+n+ExeExt;
+  MakeExeName:=PathChangeExt(fn,ExeExt);
 end;
 
 
@@ -237,7 +195,7 @@ end;
 {function DirOf(const S: string): string;
 var D: DirStr; E: ExtStr; N: NameStr;
 begin
-  FSplit(S,D,N,E);
+  SplitPath(S,D,N,E);
   if (D<>'') and (D[Length(D)]<>DirSep) then
    DirOf:=D+DirSep
   else
@@ -248,7 +206,7 @@ end;
 function ExtOf(const S: string): string;
 var D: DirStr; E: ExtStr; N: NameStr;
 begin
-  FSplit(S,D,N,E);
+  SplitPath(S,D,N,E);
   ExtOf:=E;
 end;
 
@@ -256,14 +214,14 @@ end;
 function NameOf(const S: string): string;
 var D: DirStr; E: ExtStr; N: NameStr;
 begin
-  FSplit(S,D,N,E);
+  SplitPath(S,D,N,E);
   NameOf:=N;
 end;
 
 function NameAndExtOf(const S: string): string;
 var D: DirStr; E: ExtStr; N: NameStr;
 begin
-  FSplit(S,D,N,E);
+  SplitPath(S,D,N,E);
   NameAndExtOf:=N+E;
 end; }
 
@@ -298,13 +256,13 @@ var P: integer;
     F: string;
 begin
   Match:=false;
-  FSplit(What,WD.D,WD.N,WD.E);
+  SplitPath(What,WD.D,WD.N,WD.E);
   if What<>'' then
   repeat
     P:=Pos(ListSeparator, FileList);
     if P=0 then P:=length(FileList)+1;
     F:=copy(FileList,1,P-1);
-    FSplit(F,FD.D,FD.N,FD.E);
+    SplitPath(F,FD.D,FD.N,FD.E);
     Match:=MatchesMask(WD.D+WD.N,FD.D+FD.N) and
            MatchesMask(WD.E,FD.E);
     Delete(FileList,1,P);
@@ -339,7 +297,7 @@ end;
 function LocateSingleFile(FileName: string): boolean;
 var OK: boolean;
 begin
-  OK:=CheckFile(FExpand('.'),FileName);
+  OK:=CheckFile(ExpandPath('.'),FileName);
   if OK=false then OK:=CheckFile(StartupDir,FileName);
   if OK=false then OK:=CheckFile(IDEDir,FileName);
   LocateSingleFile:=OK;

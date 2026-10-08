@@ -20,7 +20,7 @@ pat = re.compile(
     r"|\+\s*'/'|'/'\s*\+"              # a slash joined to a path
     r"|'\*\.\*'"                       # the DOS mask of every file
     r"|\(\s*'\\'\s*,\s*'/'\s*\)"       # ('\', '/')
-    r"|COMSPEC|cygdrive", re.I)
+    r"|'COMSPEC'|cygdrive", re.I)
 string = re.compile(r"'(?:[^']|'')*'")
 
 
