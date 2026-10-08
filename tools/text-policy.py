@@ -26,7 +26,7 @@ ALLOWED = [
     (r"^ext/utf8\.intf\.inc$", r"CodePoints\('a", "an example of a UTF-8 literal (a comment)"),
     (r"^fpide/src/wconstsh\.inc$", None, "the Hungarian language resource of the IDE"),
     (r"^fpide/src/whtml\.pas$", r"then E:='", "the table of the HTML character entities"),
-    (r"^fpide/src/(fpviews|wconsts)\.pas$", r"Bérczi Gábor|Klämpfl|Michäel", "the names of the authors"),
+    (r"^fpide/src/(fpviews|wconsts)\.pas$", r"B\u00e9rczi G\u00e1bor|Kl\u00e4mpfl|Mich\u00e4el", "the names of the authors"),
 ]
 
 
@@ -59,7 +59,7 @@ def check():
         except UnicodeDecodeError as error:
             problems.append("%s: not UTF-8 (byte %d)" % (name, error.start))
             continue
-        if text.startswith("﻿") or "�" in text:
+        if text.startswith("\ufeff") or "\ufffd" in text:
             problems.append("%s: byte order mark or U+FFFD" % name)
         for number, line in enumerate(text.split("\n"), 1):
             if foreign_letter(line) and not allowed(name, line):
