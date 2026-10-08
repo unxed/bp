@@ -108,16 +108,27 @@ run_fpc_utf8() {
   fi
 }
 
+# the layers build in directories of their own, so they run side by side; their logs are printed in order
+jobs=
+layer() {   # layer NAME COMMAND...: runs the command in the background, its output to $work/NAME.log
+  local name=$1; shift
+  ( fail=0; "$@"; exit $fail ) > "$work/$name.log" 2>&1 &
+  jobs="$jobs $name:$!"
+}
 $FPC -iV
 case "$layers" in all) check_layout ;; esac
 case "$layers" in safe|all)
-  run_layer "$here/safe" safe-Safe safe
-  run_layer "$here/safe" safe-BP bp ;;
+  layer safe-Safe run_layer "$here/safe" safe-Safe safe
+  layer safe-BP run_layer "$here/safe" safe-BP bp ;;
 esac
 case "$layers" in ext|all)
-  run_layer "$here/ext" ext-BP raw ;;
+  layer ext-BP run_layer "$here/ext" ext-BP raw ;;
 esac
 case "$layers" in fpc-utf8|all)
-  run_fpc_utf8 ;;
+  layer fpc-utf8 run_fpc_utf8 ;;
 esac
+for j in $jobs; do
+  wait "${j#*:}" || fail=1
+  cat "$work/${j%%:*}.log"
+done
 exit $fail

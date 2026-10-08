@@ -36,13 +36,14 @@ jobs:
             fi
             echo "ok   $b: static, no libc"
           done
-      - name: Same binaries on other distributions (musl and glibc, old and new)
-        run: |
-          for img in alpine:3.20 debian:12 ubuntu:16.04 centos:7; do
-            echo "== $img"
-            docker run --rm -e LANG=C -v "$PWD/out:/t:ro" "$img" \
-              sh -c 'cd /t && ./safe-BP/test_safe >/dev/null && ./ext-BP/test_go >/dev/null && ./ext-BP/test_threads >/dev/null && ./ext-BP/test_utf8 >/dev/null && echo ok' || exit 1
-          done
+      - name: Same binaries on other distributions (musl and glibc, old and new; side by side)
+        env:
+          CMDS: |
+            docker run --rm -e LANG=C -v "$PWD/out:/t:ro" alpine:3.20 sh -c 'cd /t && ./safe-BP/test_safe >/dev/null && ./ext-BP/test_go >/dev/null && ./ext-BP/test_threads >/dev/null && ./ext-BP/test_utf8 >/dev/null && echo ok'
+            docker run --rm -e LANG=C -v "$PWD/out:/t:ro" debian:12 sh -c 'cd /t && ./safe-BP/test_safe >/dev/null && ./ext-BP/test_go >/dev/null && ./ext-BP/test_threads >/dev/null && ./ext-BP/test_utf8 >/dev/null && echo ok'
+            docker run --rm -e LANG=C -v "$PWD/out:/t:ro" ubuntu:16.04 sh -c 'cd /t && ./safe-BP/test_safe >/dev/null && ./ext-BP/test_go >/dev/null && ./ext-BP/test_threads >/dev/null && ./ext-BP/test_utf8 >/dev/null && echo ok'
+            docker run --rm -e LANG=C -v "$PWD/out:/t:ro" centos:7 sh -c 'cd /t && ./safe-BP/test_safe >/dev/null && ./ext-BP/test_go >/dev/null && ./ext-BP/test_threads >/dev/null && ./ext-BP/test_utf8 >/dev/null && echo ok'
+        run: tools/ci-par.sh
 
   # Mode with libc (-dSAFE_LIBC, like cgo): cwstring + cthreads.
   libc:
@@ -83,18 +84,14 @@ jobs:
           cd /tmp/fpc-3.2.2
           make crossall crossinstall CPU_TARGET=aarch64 OS_TARGET=linux BINUTILSPREFIX=aarch64-linux-gnu- FPC=/usr/bin/fpc INSTALL_PREFIX=$HOME/fpccross > /tmp/a64.log 2>&1 || { tail -50 /tmp/a64.log; exit 1; }
           make crossall crossinstall CPU_TARGET=i386 OS_TARGET=linux BINUTILSPREFIX=i686-linux-gnu- FPC=/usr/bin/fpc INSTALL_PREFIX=$HOME/fpccross > /tmp/i386.log 2>&1 || { tail -50 /tmp/i386.log; exit 1; }
-      - name: aarch64 under qemu
+      - name: aarch64 and i386 under qemu (side by side)
+        env:
+          CMDS: |
+            FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 LANG=C OUT=$PWD/outa64 bash tests/run.sh
+            FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 LANG=C OUT=$PWD/out386 bash tests/run.sh
         run: |
-          I=$HOME/fpccross/lib/fpc/3.2.2
-          FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" \
-          RUN=qemu-aarch64 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 LANG=C \
-            bash tests/run.sh
-      - name: i386 under qemu
-        run: |
-          I=$HOME/fpccross/lib/fpc/3.2.2
-          FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" \
-          RUN=qemu-i386 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 LANG=C OUT=$PWD/out386 \
-            bash tests/run.sh
+          export I=$HOME/fpccross/lib/fpc/3.2.2
+          tools/ci-par.sh
       - name: i386 natively (same binaries)
         run: |
           cd out386
