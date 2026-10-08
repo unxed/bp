@@ -69,6 +69,8 @@ end;
 procedure TIDEApp.DoStepOver;
 begin
 {$ifndef NODEBUG}
+  if GoDebugCommand(cmStepOver) then
+    exit;
   if not assigned(Debugger) or Not Debugger.HasExe then
    begin
      InitDebugger;
@@ -110,6 +112,8 @@ end;
 procedure TIDEApp.DoTraceInto;
 begin
 {$ifndef NODEBUG}
+  if GoDebugCommand(cmTraceInto) then
+    exit;
   if not assigned(Debugger) or Not Debugger.HasExe then
    begin
      InitDebugger;
@@ -153,6 +157,8 @@ end;
 procedure TIDEApp.DoContUntilReturn;
 begin
 {$ifndef NODEBUG}
+  if GoDebugCommand(cmUntilReturn) then
+    exit;
   if not assigned(Debugger) or Not Debugger.HasExe then
    begin
      InitDebugger;
@@ -183,6 +189,8 @@ var
   s : shortstring;
 begin
 {$ifndef NODEBUG}
+  if GoDebugCommand(cmRun) then
+    exit;
   if not assigned(Debugger) or not Debugger.HasExe or not Debugger.IsRunning then
 {$endif}
     begin
@@ -356,6 +364,8 @@ end;
 procedure TIDEApp.DoResetDebugger;
 begin
 {$ifndef NODEBUG}
+  if GoDebugCommand(cmResetDebugger) then
+    exit;
   if assigned(Debugger) then
      DoneDebugger;
   UpdateScreen(true);
@@ -374,6 +384,8 @@ var
 {$endif}
 begin
 {$ifndef NODEBUG}
+  if GoDebugCommand(cmGotoCursor) then
+    exit;
   if (DeskTop.Current=nil) or
      ((DeskTop.Current.ClassType<>TSourceWindow) and
       (DeskTop.Current.ClassType<>TDisassemblyWindow)) then

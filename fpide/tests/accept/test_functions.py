@@ -4,7 +4,7 @@
 clipboard, selection), Search (find, find again, replace, go to line), Window (tile, cascade, next, zoom, close all),
 Tools (calculator, ASCII table), Options dialogs, Help, the file dialogs, the compiler (error messages with
 positions, jump to the error, a good build) and Run.
-usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile unicode templates clipboard syscb debug browser longlines misc mouse exit
+usage: test_functions.py PATH/TO/fp [section ...]     sections: edit search window tools options files compile golang debuggo unicode templates clipboard syscb debug browser longlines misc mouse exit
 Prints PASS/FAIL per check, exit status 1 on any FAIL. Needs tmux, fpc (the IDE runs the compiler of the system)."""
 import datetime
 import os
@@ -425,6 +425,71 @@ def section_golang(t):
     check(t.wait_for('func ugly() {', 15), 'Tools > Format Go file runs gofmt and the editor shows the result', t)
     with open(os.path.join(t.work, 'ugly.go')) as f:
         check('func ugly() {' in f.read(), 'the file on disk is formatted', t)
+
+
+def go_line_colors(t, marker, n=14):
+    """like line_colors, for the window of a Go program found by a text on its first line"""
+    for top, l in enumerate(t.lines()):
+        if marker in l:
+            return t.row_backgrounds(l.index(marker) + 2)[top:top + n]
+    return [None] * n
+
+
+def section_debuggo(t):
+    """the Go debugger (Delve): a breakpoint, Run stops on it, F8 steps over, F7 steps into, F4 runs to the cursor,
+    Continue runs to the end and shows the output; Program reset ends a session"""
+    import shutil
+    dlv = shutil.which('dlv') or os.path.expanduser('~/go/bin/dlv')
+    if shutil.which('go') is None or not os.path.exists(dlv):
+        print('SKIP go or dlv is not installed')
+        return
+    src = ['package main  // dbgo', '', 'import "fmt"', '', 'func add(a, b int) int {', '\treturn a + b', '}', '',
+           'func main() {', '\tx := 20', '\ty := add(x, 22)', '\tfmt.Println("sum", y)', '\tfmt.Println("done")', '}']
+    with open(os.path.join(t.work, 'dbgo.go'), 'w') as f:
+        f.write('\n'.join(src) + '\n')
+    t.key('F3'); t.wait_for('Open a file'); t.type('dbgo.go'); t.key('Enter')
+    check(t.wait_for('dbgo.go'), 'dbgo.go is opened', t)
+    t.key('C-Home', *(['Down'] * 10), 'Home')
+    check(t.wait_until(lambda: t.indicator() == (11, 1)), 'the cursor is on line 11 (y := add): %r' % (t.indicator(),), t)
+    menu(t, 'M-d', 'Breakpoint')
+    t.pump(0.4)
+    plain = go_line_colors(t, '// dbgo')
+    check(plain[10] != plain[9], 'the breakpoint line is painted', t)
+    t.menu('M-r', 'Run', exact=True)
+    check(t.wait_until(lambda: go_line_colors(t, '// dbgo')[10] != plain[10], 90),
+          'Run starts Delve and stops at the breakpoint: line 11 is painted as the debugger row', t)
+    check(t.alive(), 'the IDE is alive while the program is stopped', t)
+    t.key('F8')
+    check(t.wait_until(lambda: go_line_colors(t, '// dbgo')[11] not in (plain[11], None) and go_line_colors(t, '// dbgo')[10] == plain[10]
+                       or t.indicator()[0] == 12, 30), 'F8 steps over the call: the cursor moves to line 12: %r' % (t.indicator(),), t)
+    check(t.indicator()[0] == 12, 'the stop is on line 12: %r' % (t.indicator(),), t)
+    # F7 on line 12 (fmt.Println) goes into library code, so test F7 on the call instead: Program reset and begin again with F7
+    menu(t, 'M-r', 'Program reset')
+    t.pump(1)
+    check(t.alive(), 'Program reset ends the session', t)
+    t.key('F7')
+    check(t.wait_until(lambda: t.indicator()[0] == 9, 90), 'F7 without a session starts it and stops in main (line 9): %r' % (t.indicator(),), t)
+    t.key('F8', 'F8')
+    check(t.wait_until(lambda: t.indicator()[0] == 11, 30), 'two steps over: line 11: %r' % (t.indicator(),), t)
+    t.key('F7')
+    check(t.wait_until(lambda: t.indicator()[0] == 5, 30), 'F7 on the call goes into add (line 5): %r' % (t.indicator(),), t)
+    t.key('F8', 'F8')                 # add's statement, then back in main
+    t.pump(1.5)
+    check(t.wait_until(lambda: t.indicator()[0] in (11, 12), 30), 'stepping over the end of add returns to main: %r' % (t.indicator(),), t)
+    # run to the cursor: line 13
+    t.key('C-Home', *(['Down'] * 12), 'Home')
+    t.key('F4')
+    check(t.wait_until(lambda: go_line_colors(t, '// dbgo')[12] != plain[12], 30), 'F4 runs to the cursor: line 13 is the debugger row: %r' % (t.indicator(),), t)
+    # continue to the end: the output of the program and the exit code
+    t.menu('M-r', 'Continue', exact=True)
+    check(t.wait_for('Program exited with', 30) and 'exitcode = 0' in t.text(), 'Continue runs to the end: "Program exited with exitcode = 0"', t)
+    check('done' in t.text(), 'the output of the program is shown', t)
+    t.key('Enter')
+    check(t.wait_gone('Program exited', 3) and t.alive(), 'the IDE is back in control after the program ends', t)
+    t.key('M-r'); t.pump(0.4)
+    names = [r[1] for r in t._menu_rows()]
+    t.key('Escape')
+    check(names and names[0].startswith('Run'), 'the first Run item is Run again after the end: %r' % (names[:1],), t)
 
 
 def section_unicode(t):
@@ -989,9 +1054,14 @@ def section_mouse(t):
           'a click in the other window activates it: %r -> %r' % (before, after), t)
 
 
+# Delve is installed in ~/go/bin by go install; the IDE runs with another HOME, so the directory goes on the PATH it inherits
+_gobin = os.path.expanduser('~/go/bin')
+if os.path.exists(os.path.join(_gobin, 'dlv')):
+    os.environ['PATH'] = _gobin + os.pathsep + os.environ.get('PATH', '')
+
 SECTIONS = [('edit', section_edit), ('search', section_search), ('window', section_window), ('tools', section_tools),
             ('options', section_options), ('files', section_files), ('compile', section_compile), ('golang', section_golang),
-            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('syscb', section_syscb), ('debug', section_debug), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse)]
+            ('unicode', section_unicode), ('templates', section_templates), ('clipboard', section_clipboard), ('syscb', section_syscb), ('debug', section_debug), ('debuggo', section_debuggo), ('browser', section_browser), ('longlines', section_longlines), ('misc', section_misc), ('mouse', section_mouse)]
 
 if __name__ == '__main__':
     run(sys.argv[1], sys.argv[2:])

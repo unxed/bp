@@ -199,6 +199,7 @@ uses
 {$ifndef NODEBUG}
   FPDebug,FPRegs,
 {$endif}
+  FpGoDbg,
   FPRedir,
   FPDesk,FPCodCmp,FPCodTmp;
 
@@ -1667,7 +1668,7 @@ begin
   SetCmdState([cmTile,cmCascade],IsThereAnyVisibleWindow);
   SetCmdState([cmFindProcedure,cmObjects,cmModules,cmGlobals,cmSymbol],IsSymbolInfoAvailable);
 {$ifndef NODEBUG}
-  SetCmdState([cmResetDebugger,cmUntilReturn],assigned(debugger) and debugger.debuggee_started);
+  SetCmdState([cmResetDebugger,cmUntilReturn],(assigned(debugger) and debugger.debuggee_started) or GoDebugActive);
 {$endif}
   SetCmdState([cmToolsMsgNext,cmToolsMsgPrev],MessagesWindow<>nil);
   UpdateTools;

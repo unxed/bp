@@ -84,6 +84,14 @@ begin
     Check(Pos('sum 42', S.TakeOutput) > 0, 'the output of the program is returned');
     S.Free;
 
+    { a session that starts at main.main }
+    S := TDlvSession.Create;
+    R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'third start: ' + S.Error);
+    Check(S.SetFunctionBreakpoint('main.main'), 'a function breakpoint is set');
+    R := S.Go = drStopped; Check(R, 'the program stops in main.main: ' + S.Error);
+    Check((S.StopFile = Src) and (S.StopLine = 9), 'main.main stops on its line (9): ' + IntToStr(S.StopLine));
+    S.Free;
+
     { a session ended while the program is stopped }
     S := TDlvSession.Create;
     R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'second start: ' + S.Error);

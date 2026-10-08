@@ -56,4 +56,11 @@ Make/Build (`go build`, в модуле собирается пакет файл
 Подсветка `.go` — грамматика `lang-go.hl` из tve.
 
 Готово: шаблон нового файла Go (File > Open несуществующего `.go` — `NewFileText`), Tools > Format Go file (`gofmt -w`, тихая перезагрузка `ReloadSilently`).
-Открыто: отладчик Delve (`dlv`, DAP) вместо gdb для Go; следующие языки (Python, Rust, C) через тот же класс.
+Готово (первый срез): отладчик Go — Delve. `src/fpdlv.pas` — клиент DAP к `dlv dap` (TCP на localhost, mode `debug`: dlv сам собирает программу с `-N -l`),
+`src/fpgodbg.pas` — связка с меню Run: Run при точке останова в `.go` (или F7/F8 без сессии — остановка в `main.main`), F8 step over, F7 trace into,
+Alt+F4 step out, F4 run to cursor, Continue, Program reset; точки останова из списка IDE (Ctrl+F8) передаются dlv перед каждым запуском; строка остановки
+подсвечивается как debugger row; в конце — окно с кодом выхода и последними строками вывода программы. Юнит-тест `tests/unit/t_fpdlv.pas`
+(настоящий dlv, пропускается без dlv/go), приёмка `test_functions.py <fp> debuggo`.
+Не сделано для Go: окна Watches/Call stack/Registers/Evaluate (только gdb), условия и ignore-счётчики точек останова, ввод с клавиатуры в отлаживаемую
+программу (stdin закрыт), вывод программы показывается по завершении, а не вживую; Delve проверен версией 1.25.2 с Go 1.24.
+Открыто: следующие языки (Python, Rust, C) через тот же класс.

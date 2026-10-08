@@ -31,6 +31,8 @@ procedure SetRunDir(const Params: string);
 procedure Compile(const FileName, ConfigFile: string);
 { what the user asked (the Ord of TCompileMode): a language other than Pascal builds differently for each }
 procedure SetCompileMode(Mode: LongInt);
+{ writes the modified sources that have a name (an external tool reads files, not editors) }
+procedure SaveModifiedSources;
 procedure SetPrimaryFile(const fn:string);
 function LinkAfter : boolean;
 { the compiler to use: CompilerSetting is 'auto', 'builtin' or the path of an external compiler (env FP_COMPILER wins) }

@@ -58,6 +58,8 @@ type
     function Start(const Tool, Mode, Prog, Cwd, Args: string): Boolean;
     { the breakpoints of one file (the lines are 1 based; none clears the file); the call may be made at any time }
     function SetBreakpoints(const FileName: string; const Lines: array of LongInt): Boolean;
+    { a breakpoint on a function, for example main.main (the program held back stops in it) }
+    function SetFunctionBreakpoint(const Name: string): Boolean;
     { lets the program run to the first stop }
     function Go: TDlvResult;
     function Proceed: TDlvResult;
@@ -564,6 +566,21 @@ begin
   A.Add('breakpoints', Bps);
   A.Add('lines', Arr);
   Result := Request('setBreakpoints', A, Resp, ReplyTimeout);
+  Resp.Free;
+end;
+
+function TDlvSession.SetFunctionBreakpoint(const Name: string): Boolean;
+var
+  A, B, Resp: TJSONObject;
+  Bps: TJSONArray;
+begin
+  A := TJSONObject.Create;
+  Bps := TJSONArray.Create;
+  B := TJSONObject.Create;
+  B.Add('name', Name);
+  Bps.Add(B);
+  A.Add('breakpoints', Bps);
+  Result := Request('setFunctionBreakpoints', A, Resp, ReplyTimeout);
   Resp.Free;
 end;
 

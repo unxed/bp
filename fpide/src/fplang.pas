@@ -4,7 +4,7 @@
   of the output, it answers with messages that the window of messages shows. Pascal is not here: its compiler keeps its own way (fpintf).
   A language is a class that is registered; the first that takes the file is the backend of the file.
 
-  Go: "go build", "go vet", "go test"; the debugger of Go is Delve (a later step). }
+  Go: "go build", "go vet", "go test"; the debugger of Go is Delve (fpdlv, fpgodbg). }
 {$mode objfpc}{$H+}
 unit FpLang;
 
