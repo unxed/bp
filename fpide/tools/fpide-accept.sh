@@ -13,4 +13,5 @@ status=0
 python3 "$here/tests/accept/test_accept.py" "$fp" || status=1
 python3 "$here/tests/accept/test_functions.py" "$fp" || status=1
 python3 "$here/tests/accept/test_menu_sweep.py" "$fp" || status=1
+python3 "$here/tests/accept/test_config.py" "$fp" || status=1
 exit $status

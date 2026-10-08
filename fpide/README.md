@@ -47,6 +47,24 @@ from disk each time the browser opens.
 
 Variables: `FPIDE_TV=/path/to/tv3`, `FPIDE_GDBMI=1` (the default), `FPIDE_NOGDB=1` (no debugger), `FPIDE_EXTRA` (extra FPC flags).
 
+## Where the files are
+
+The settings of the user (`fp.ini`, `fp.cfg`) are in the configuration directory of the system, the desktop (`fp.dsk`) in its
+state directory (unit `TvAppDir` of tv3):
+
+| system | `fp.ini`, `fp.cfg` | `fp.dsk` |
+|---|---|---|
+| Linux, BSD | `$XDG_CONFIG_HOME/fp` (`~/.config/fp`) | `$XDG_STATE_HOME/fp` (`~/.local/state/fp`) |
+| macOS | `~/Library/Application Support/fp` | the same |
+| Windows | `%APPDATA%\fp` | `%LOCALAPPDATA%\fp` |
+| DOS, OS/2 | the directory of the program | the same |
+
+On the first start (no `fp.ini` there yet) `fp.ini`, `fp.cfg`, `fp.dsk` and `fp.dir` are copied from `~/.fp` (Unix) or from the
+directory of the program (Windows); the old files are left in place. A project directory keeps its own `fp.ini`, `fp.cfg`,
+`fp.dsk` and `fp.dir` as before (once the user has an `fp.ini`, the IDE asks whether to make them when it starts in a directory without `fp.dir`). The shared
+files (templates `*.pt`, tools `*.tdf`, a system-wide `fp.ini`) are looked up in `lib/fpc/<version>/ide/text` next to the
+program, else in the directory of the program; `fp.ini` is never written there.
+
 ## Acceptance
 
 The screen must match the vanilla IDE after the same actions: **text, colour, background** (and the other screen attributes), bit

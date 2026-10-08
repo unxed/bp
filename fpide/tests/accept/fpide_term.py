@@ -21,7 +21,10 @@ class TmuxTerm:
         self.session = 'fpideacc%d_%d' % (os.getpid(), TmuxTerm.count)
         self.work = tempfile.mkdtemp(prefix='fpide-acc-')
         self.err = os.path.join(self.work, 'stderr.log')
-        e = {'TERM': 'xterm-256color', 'HOME': self.work}
+        # the XDG directories are set so that a value of the tmux server does not lead the IDE out of the temp dir
+        e = {'TERM': 'xterm-256color', 'HOME': self.work,
+             'XDG_CONFIG_HOME': os.path.join(self.work, '.config'), 'XDG_STATE_HOME': os.path.join(self.work, '.local/state'),
+             'XDG_DATA_HOME': os.path.join(self.work, '.local/share'), 'XDG_CACHE_HOME': os.path.join(self.work, '.cache')}
         e.update(env or {})
         envs = ' '.join('%s=%s' % kv for kv in e.items())
         cmd = 'cd %s && %s %s %s 2>%s; echo EXIT=$? >> %s; sleep 600' % (

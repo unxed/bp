@@ -1032,12 +1032,12 @@ def section_misc(t):
             t.pump(0.4)
 
     # Options > Save writes the settings
-    for name in ('fp.ini',):
-        if os.path.exists(os.path.join(w, name)):
-            os.remove(os.path.join(w, name))
+    ini = os.path.join(w, '.config/fp/fp.ini')         # $XDG_CONFIG_HOME/fp
+    if os.path.exists(ini):
+        os.remove(ini)
     menu(t, 'M-o', 'Save', exact=False)
     t.pump(1)
-    check(os.path.exists(os.path.join(w, 'fp.ini')), 'Options > Save writes fp.ini', t)
+    check(os.path.exists(ini), 'Options > Save writes fp.ini into $XDG_CONFIG_HOME/fp', t)
 
     # Help: the help files are not installed (as in the original): the IDE says so; Help > Files... lets add some
     menu(t, 'M-h', 'Contents')

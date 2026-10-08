@@ -285,6 +285,8 @@ begin
   Templates := TTemplateCollection.Create(10,10);
   ScanDir('.');
   ScanDir(IDEDir);
+  if (SystemIDEDir<>'') and (SystemIDEDir<>IDEDir) then
+    ScanDir(SystemIDEDir);
 end;
 
 

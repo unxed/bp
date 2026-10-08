@@ -1426,7 +1426,7 @@ begin
    end;}
   SwitchesPath:=LocateFile(SwitchesName);
   if SwitchesPath='' then
-    SwitchesPath:=SwitchesName;
+    SwitchesPath:=IDEDir+SwitchesName;
   SwitchesPath:=ExpandPath(SwitchesPath);
 end;
 

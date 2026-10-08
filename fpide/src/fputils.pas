@@ -300,6 +300,7 @@ begin
   OK:=CheckFile(ExpandPath('.'),FileName);
   if OK=false then OK:=CheckFile(StartupDir,FileName);
   if OK=false then OK:=CheckFile(IDEDir,FileName);
+  if (OK=false) and (SystemIDEDir<>'') then OK:=CheckFile(SystemIDEDir,FileName);
   LocateSingleFile:=OK;
 end;
 var P: integer;

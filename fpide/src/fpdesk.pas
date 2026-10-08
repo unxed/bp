@@ -56,7 +56,7 @@ uses Dos,
      FPKeys,
 {$endif Unix}
      FPConst,FPVars,FPTools,FPUtils,FPViews,FPHelp,
-     FPCompil,FPCodCmp,FPCodTmp,FPRegs,AsciiTab,FPVideo;
+     FPCompil,FPCodCmp,FPCodTmp,FPRegs,AsciiTab,FPVideo,TvAppDir;
 
 type
      TWindowInfo =
@@ -133,9 +133,16 @@ const
       msg_readingfileineditor = 'Reading %s into editor...';
 
 procedure InitDesktopFile;
+var StDir: string;
 begin
+  StDir:='';
+  { the desktop that goes with the fp.ini of the user is state: it is kept in the state directory }
+  if (DesktopLocation<>dlCurrentDir) and (DirOf(IniFileName)=IDEDir) then
+    StDir:=StateDir('fp');
   if DesktopLocation=dlCurrentDir then
     DesktopPath:=ExpandPath(DesktopName)
+  else if StDir<>'' then
+    DesktopPath:=CompleteDir(StDir)+DesktopName
   else
     DesktopPath:=ExpandPath(DirOf(IniFileName)+DesktopName);
 end;

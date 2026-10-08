@@ -42,7 +42,7 @@ uses
   Version,
   WConsts,WUtils,TvIni,WViews,WEditor,WCEdit,
   {$ifndef NODEBUG}FPDebug,{$endif}FPConst,FPVars,
-  FPIntf,FPTools,FPSwitch,TvCrc;
+  FPIntf,FPTools,FPSwitch,TvCrc,TvAppDir;
 
 const
   PrinterDevice : string = 'prn';
@@ -157,30 +157,36 @@ const
   ieEditKeys         = 'EditKeys';
 
 
+{ Copies the files of the user from OldDir, the place of the older versions, into the places of this one while the
+  configuration directory has no fp.ini: the desktop into the state directory, the rest into IDEDir. }
+procedure MigrateConfig(const OldDir: string);
+var StDir: string;
+
+  procedure Take(const Name, NewDir: string);
+  begin
+    if ExistsFile(OldDir+Name) and not ExistsFile(NewDir+Name) then
+      CopyFile(OldDir+Name,NewDir+Name);
+  end;
+
+begin
+  if (OldDir='') or SameFileName(OldDir,IDEDir) or ExistsFile(IDEDir+IniName) then
+    Exit;
+  StDir:=StateDir('fp');
+  if StDir='' then
+    StDir:=IDEDir
+  else
+    StDir:=CompleteDir(StDir);
+  Take(IniName,IDEDir);
+  Take(SwitchesName,IDEDir);
+  Take(DirInfoName,IDEDir);
+  Take(DesktopName,StDir);
+end;
+
 Procedure InitDirs;
 begin
   StartupDir:=CompleteDir(ExpandPath('.'));
-{$ifndef unix}
-  IDEDir:=CompleteDir(DirOf(system.Paramstr(0)));
-{$ifdef WINDOWS}
-  SystemIDEDir:=IDEDir;
-  if GetEnv('APPDATA')<>'' then
-    begin
-      IDEdir:=CompleteDir(ExpandPath(GetEnv('APPDATA')+'/fp'));
-      If Not ExistsDir(IDEdir) Then
-        begin
-          IDEDir:=SystemIDEDir;
-          if Not ExistsDir(IDEDir) then
-            begin
-              if DirOf(system.paramstr(0))<>'' then
-                IDEDir:=CompleteDir(DirOf(system.ParamStr(0)))
-              else
-                IDEDir:=StartupDir;
-            end;
-        end;
-   end;
-{$endif WINDOWS}
-{$else}
+  { the shared files (templates, tools, a system-wide fp.ini) }
+{$ifdef unix}
   SystemIDEDir:=ExpandPath(DirOf(system.paramstr(0))+'../lib/fpc/'+version_string+'/ide/text');
   If Not ExistsDir(SystemIDEdir) Then
     begin
@@ -188,18 +194,27 @@ begin
     If Not ExistsDir(SystemIDEdir) Then
       SystemIDEDir:='/usr/lib/fpc/'+version_string+'/ide/text';
     end;
-  IDEdir:=CompleteDir(ExpandPath('~/.fp'));
-  If Not ExistsDir(IDEdir) Then
-    begin
-      IDEDir:=SystemIDEDir;
-      if Not ExistsDir(IDEDir) then
-        begin
-          if DirOf(system.paramstr(0))<>'' then
-            IDEDir:=CompleteDir(DirOf(system.ParamStr(0)))
-          else
-            IDEDir:=StartupDir;
-        end;
-    end;
+  If Not ExistsDir(SystemIDEdir) Then
+    SystemIDEDir:=DirOf(system.paramstr(0));
+{$else}
+{$ifdef WINDOWS}
+  SystemIDEDir:=DirOf(system.paramstr(0));
+{$endif WINDOWS}
+{$endif}
+  if SystemIDEDir<>'' then
+    SystemIDEDir:=CompleteDir(ExpandPath(SystemIDEDir));
+  { the files of the user: the configuration directory of the system (the program directory on DOS) }
+  IDEDir:=ConfigDir('fp');
+  if IDEDir='' then
+    IDEDir:=StartupDir
+  else
+    IDEDir:=CompleteDir(IDEDir);
+{$ifdef unix}
+  if GetEnv('HOME')<>'' then
+    MigrateConfig(CompleteDir(GetEnv('HOME'))+'.fp'+DirSep);
+{$endif}
+{$ifdef WINDOWS}
+  MigrateConfig(SystemIDEDir);
 {$endif}
 end;
 
@@ -208,7 +223,9 @@ var S: string;
 begin
   S:=LocateFile(INIFileName);
   if S<>'' then
-    IniFileName:=S;
+    IniFileName:=S
+  else if IniFileName=IniName then
+    IniFileName:=IDEDir+IniName;
   IniFileName:=ExpandPath(IniFileName);
 end;
 
@@ -218,7 +235,7 @@ var IniDir,CurDir: DirStr;
 const Btns : array[1..2] of string = (btn_config_copyexisting,btn_config_createnew);
 begin
   IniDir:=DirOf(IniFileName); CurDir:=GetCurDir;
-  if CompareText(IniDir,CurDir)<>0 then
+  if (CompareText(IniDir,CurDir)<>0) and ExistsFile(IniFileName) then
    if not ExistsFile(CurDir+DirInfoName) then
      if ConfirmBox(FormatStrStr(msg_doyouwanttocreatelocalconfigfile,IniDir),nil,false)=cmYes then
        begin
@@ -599,23 +616,10 @@ var INIFile: PINIFile;
     I(*,OpenFileCount*): integer;
     OK: boolean;
 begin
-{$ifdef Unix}
-  if not FromSaveAs and (DirOf(IniFileName)=DirOf(SystemIDEDir)) then
-    begin
-      IniFileName:=ExpandPath('~/.fp/'+IniName);
-      If not ExistsDir(DirOf(IniFileName)) then
-        MkDir(ExpandPath('~/.fp'));
-   end;
-{$endif Unix}
-{$ifdef WINDOWS}
-  if not FromSaveAs and (DirOf(IniFileName)=DirOf(SystemIDEDir)) and
-    (GetEnv('APPDATA')<>'') then
-    begin
-      IniFileName:=ExpandPath(GetEnv('APPDATA')+'/fp/'+IniName);
-      If not ExistsDir(DirOf(IniFileName)) then
-        MkDir(ExpandPath(GetEnv('APPDATA')+'/fp'));
-   end;
-{$endif WINDOWS}
+  { the shared place is not written: the settings go to the configuration directory }
+  if not FromSaveAs and (SystemIDEDir<>'') and SameFileName(DirOf(IniFileName),SystemIDEDir) and
+     not SameFileName(SystemIDEDir,IDEDir) then
+    IniFileName:=IDEDir+IniName;
   INIFile := TINIFile.Create(IniFileName);
   { Files }
   { avoid keeping old files }

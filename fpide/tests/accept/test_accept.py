@@ -111,7 +111,7 @@ try:
     check(t.wait_for('Press any key to return to IDE', 10), 'the IDE waits for a key after the program ended', t)
     t.key('Enter')
     check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE is back after the key', t)
-    check(os.path.exists(os.path.join(t.work, 'fp.dsk')), 'the desktop file was saved before the run', t)
+    check(os.path.exists(os.path.join(t.work, '.local/state/fp/fp.dsk')), 'the desktop file was saved before the run', t)
 
     check(t.alive(), 'no runtime error during the whole run (stderr: %r)' % t.stderr()[:80], t)
 finally:
