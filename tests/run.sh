@@ -3,13 +3,15 @@
 # is copied to a working folder, as for a user (safe/SPEC.md §2).
 #   tests/safe/test_*.pas   the safe layer: run twice — with unit Safe and with unit BP (the name Safe is replaced with BP)
 #   tests/ext/test_*.pas    the ext layer (UTF-8, goroutines, threads): with unit BP only
+#   ext/fpc-utf8/           the UTF-8-only variant without BP: built with @utf8.cfg (-Fa), run under C.UTF-8
+#   layout                  bp.pas includes every file that unit Safe includes (BP gives all of Safe)
 #   compile/mf_*.pas        first line "// EXPECT: fail|warn SAFE-Sx", "clean", "run" (clean + exit code 0)
 #                           or "exit N" (builds, terminates with exit code N)
-# usage: tests/run.sh [safe|ext|all]      (default: all)
+# usage: tests/run.sh [safe|ext|fpc-utf8|all]      (default: all)
 # Environment variables (for CI; by default — bare fpc on the host):
 #   FPC          compiler (cross: ppcrossa64 ...)          FPCOPTS  its options (-dSAFE_LIBC, -Tlinux -XP...)
 #   RUN          run prefix (qemu-aarch64)                 OUT      where to put binaries (otherwise mktemp)
-#   SKIP         tests to skip ("test_ffi")                NO_COMPILE_CHECKS=1 — without compile/*.pas
+#   SKIP         tests to skip ("test_ffi fpc-utf8")                NO_COMPILE_CHECKS=1 — without compile/*.pas
 set -u
 FPC=${FPC:-fpc}
 FPCOPTS=${FPCOPTS:-}
@@ -79,12 +81,43 @@ run_layer() {
   done
 }
 
+# every include file of unit Safe is also included by unit BP
+check_layout() {
+  local inc ok=1
+  echo "== layout (bp.pas includes all of safe/safe.pas)"
+  for inc in $(sed -n 's/^{\$I \([^}]*\)}.*/\1/p' "$root/safe/safe.pas"); do
+    if grep -q "^{\$I safe/$inc}" "$root/bp.pas"; then echo "ok   safe/$inc"
+    else echo "FAIL safe/$inc is included by unit Safe but not by unit BP"; ok=0; fail=1; fi
+  done
+  [ $ok = 1 ]
+}
+
+# ext/fpc-utf8: the unit is inserted by -Fa from utf8.cfg; letter case goes through libc, hence C.UTF-8
+run_fpc_utf8() {
+  local dir="$work/fpc-utf8"
+  case " $SKIP " in *" fpc-utf8 "*) echo "== skip fpc-utf8"; return 0 ;; esac
+  mkdir -p "$dir"
+  cp "$root"/ext/fpc-utf8/*.pas "$root"/ext/fpc-utf8/utf8.cfg "$dir/"
+  cd "$dir" || return 1
+  echo "== build test_utf8 (fpc-utf8)"
+  if $FPC $FPCOPTS @utf8.cfg -Fu"$dir" -FU"$dir" test_utf8.pas > build.log 2>&1; then
+    echo "== run test_utf8 (fpc-utf8)"
+    LANG=C.UTF-8 LC_ALL=C.UTF-8 timeout 60 $RUN ./test_utf8 || fail=1
+  else
+    cat build.log; fail=1
+  fi
+}
+
 $FPC -iV
+case "$layers" in all) check_layout ;; esac
 case "$layers" in safe|all)
   run_layer "$here/safe" safe-Safe safe
   run_layer "$here/safe" safe-BP bp ;;
 esac
 case "$layers" in ext|all)
   run_layer "$here/ext" ext-BP raw ;;
+esac
+case "$layers" in fpc-utf8|all)
+  run_fpc_utf8 ;;
 esac
 exit $fail
