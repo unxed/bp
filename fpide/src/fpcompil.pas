@@ -124,6 +124,7 @@ const
     RestartingDebugger    : boolean = false;
 
 procedure DoCompile(Mode: TCompileMode);
+function  GetExePath: string;
 function  NeedRecompile(Mode :TCompileMode; verbose : boolean): boolean;
 procedure ParseUserScreen;
 

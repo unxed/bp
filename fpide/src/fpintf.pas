@@ -45,7 +45,7 @@ uses
   Compiler,
 {$endif}
   Comphook,
-  sysutils,Process,Version,FPExtComp,TvProc,App,Views,Drivers,WEditor,FPConst,FPViews,
+  sysutils,Classes,Process,Version,FPExtComp,TvProc,App,Views,Drivers,WEditor,FPConst,FPViews,
 {$ifndef NODEBUG}
   FPDebug,
 {$endif NODEBUG}
@@ -357,8 +357,8 @@ begin
   {$ifdef Windows}
   Name:=Name+'.exe';
   {$endif}
-  if GetEXEPath<>'' then
-    Result:=FixFileName(GetEXEPath+Name)
+  if GetExePath<>'' then
+    Result:=FixFileName(GetExePath+Name)
   else
     Result:=ExtractFilePath(MainFile)+Name;
 end;
@@ -374,7 +374,7 @@ var
   N,NL: LongInt;
   Aborted: boolean;
   Kind: string;
-  Args: TStringList;
+  Args: Classes.TStringList;
   procedure Feed(const Data: AnsiString);
   begin
     Pending:=Pending+Data;
@@ -404,7 +404,7 @@ begin
     end;
   if Backend<>nil then
     begin
-      Args:=TStringList.Create;
+      Args:=Classes.TStringList.Create;
       try
         Backend.Arguments(TLangMode(CompileModeNow),MainFile,BackendOutFile(Backend),Args);
         CmdLine:='';
