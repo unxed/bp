@@ -799,7 +799,7 @@ var
   end;
 
 begin
-  SName:=FixFileName(FExpand(Name));
+  SName:=FixFileName(ExpandPath(Name));
   EditorWindowFile:=TSourceWindow(pointer(Desktop.FirstThat(@EditorWindow)));
 end;
 
@@ -3980,7 +3980,7 @@ function IsSearchedFile(W : PSourceWindow) : boolean;
           SName:=NameAndExtOf(PSourceWindow(W).Editor.FileName)
         else
           SName:=PSourceWindow(W).Editor.FileName;
-        FSplit(SName,DS,NS,ES);
+        SplitPath(SName,DS,NS,ES);
         SName:=UpcaseStr(NS+ES);
 
         if (E<>'') or (not tryexts) then
@@ -4009,7 +4009,7 @@ begin
 end;
 
 begin
-  FSplit(FileName,D,N,E);
+  SplitPath(FileName,D,N,E);
   SearchOnDesktop:=PSourceWindow(Desktop.FirstThat(@IsSearchedSource));
 end;
 
@@ -4022,7 +4022,7 @@ function TryToOpenFileMulti(Bounds: PRect; FileName: string; CurX,CurY: sw_integ
 var srec:SearchRec;
     dir,name,ext : string;
 begin
- fsplit(filename,dir,name,ext);
+ SplitPath(filename,dir,name,ext);
  dir:=completedir(dir);
  FindFirst(filename,anyfile,Srec);
  while (DosError=0) do
@@ -4084,7 +4084,7 @@ var D : DirStr;
 var Path,DrStr: string;
     Found: boolean;
 begin
-  FSplit(FileName,D,N,E);
+  SplitPath(FileName,D,N,E);
   Found:=CheckDir(D,N,E);
   if not found then
     Found:=TryToLocateIn('.');
@@ -4097,7 +4097,7 @@ begin
         break;
       DrStr:=Copy(DrStr,pos(ListSeparator,DrStr)+1,High(DrStr));
     End;
-  if Found then Path:=FExpand(D+N+E) else Path:='';
+  if Found then Path:=ExpandPath(D+N+E) else Path:='';
   LocateSingleSourceFile:=Path;
 end;
 

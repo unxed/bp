@@ -750,7 +750,7 @@ Function  CompilerGetNamedFileTime(const filename : ansistring) : Longint;
 var t: longint;
     W: PSourceWindow;
 begin
-  W:=EditorWindowFile(FExpand(filename));
+  W:=EditorWindowFile(ExpandPath(filename));
   if Assigned(W) and (W.Editor.GetModified) then
     t:=Now
   else
@@ -766,7 +766,7 @@ begin
      (NameandExtof(filename)=CompilingHiddenFile.Editor.Filename) then
     W:=CompilingHiddenFile
   else
-    W:=EditorWindowFile(FExpand(filename));
+    W:=EditorWindowFile(ExpandPath(filename));
   if Assigned(W) and (W.Editor.GetModified) then
     f:=TFPInputFile.Create(W.Editor)
   else
@@ -827,7 +827,7 @@ begin
           end;
       end;
   if Path<>'' then
-    GetExePath:=CompleteDir(FExpand(Path))
+    GetExePath:=CompleteDir(ExpandPath(Path))
   else
     GetExePath:='';
 end;
@@ -860,10 +860,10 @@ begin
     end;
   {$ifdef Unix}
   If (FileName<>'') then
-    FileName:=FExpand(FileName);
+    FileName:=ExpandPath(FileName);
   {$else}
   If (FileName<>'') then
-    FileName:=FixFileName(FExpand(FileName));
+    FileName:=FixFileName(ExpandPath(FileName));
   {$endif}
   GetMainFile:=FileName;
 end;
@@ -937,7 +937,7 @@ begin
   CloseAllBrowsers;
   if ((DesktopFileFlags and dfSymbolInformation)<>0) then
     WriteSymbolsFile(BrowserName);
-{  MainFile:=FixFileName(FExpand(FileName));}
+{  MainFile:=FixFileName(ExpandPath(FileName));}
   SetStatus('Preparing to compile...'+NameOf(MainFile));
 { Reset }
   CtrlBreakHit:=false;

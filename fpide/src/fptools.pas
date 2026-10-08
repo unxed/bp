@@ -1152,7 +1152,7 @@ begin
               if ReadTill(S,')')=false then Err:=I else
               begin
                 Consume(')');
-                FSplit(S,D,N,E);
+                SplitPath(S,D,N,E);
 {$ifndef Unix}
                 L:=Pos(':',D);if L>0 then Delete(D,1,L);   { the drive part; Unix has no drives }
 {$endif}
@@ -1166,7 +1166,7 @@ begin
               if ReadTill(S,')')=false then Err:=I else
               begin
                 Consume(')');
-                FSplit(S,D,N,E);
+                SplitPath(S,D,N,E);
 {$ifdef Unix}
                 D:='';   { no drives }
 {$else}
@@ -1197,7 +1197,7 @@ begin
               if ReadTill(S,')')=false then Err:=I else
               begin
                 Consume(')');
-                FSplit(S,D,N,E); E:=copy(E,2,High(E));
+                SplitPath(S,D,N,E); E:=copy(E,2,High(E));
                 I:=I+ReplacePart(LastWordStart,I-1,E)-1;
               end;
           end else
@@ -1217,7 +1217,7 @@ begin
               if ReadTill(S,')')=false then Err:=I else
               begin
                 Consume(')');
-                FSplit(S,D,N,E);
+                SplitPath(S,D,N,E);
                 I:=I+ReplacePart(LastWordStart,I-1,N)-1;
               end;
           end else
@@ -1228,7 +1228,7 @@ begin
               if ReadTill(S,')')=false then Err:=I else
               begin
                 Consume(')');
-                FSplit(S,D,N,E);
+                SplitPath(S,D,N,E);
                 I:=I+ReplacePart(LastWordStart,I-1,N+E)-1;
               end;
           end else
@@ -1247,7 +1247,7 @@ begin
               if ReadTill(S,')')=false then Err:=I else
               begin
                 Consume(')');
-                FSplit(S,D,N,E);
+                SplitPath(S,D,N,E);
 {$ifdef Unix}
                 D:='';   { no drives }
 {$else}

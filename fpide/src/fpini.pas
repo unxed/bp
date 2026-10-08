@@ -159,14 +159,14 @@ const
 
 Procedure InitDirs;
 begin
-  StartupDir:=CompleteDir(FExpand('.'));
+  StartupDir:=CompleteDir(ExpandPath('.'));
 {$ifndef unix}
   IDEDir:=CompleteDir(DirOf(system.Paramstr(0)));
 {$ifdef WINDOWS}
   SystemIDEDir:=IDEDir;
   if GetEnv('APPDATA')<>'' then
     begin
-      IDEdir:=CompleteDir(FExpand(GetEnv('APPDATA')+'/fp'));
+      IDEdir:=CompleteDir(ExpandPath(GetEnv('APPDATA')+'/fp'));
       If Not ExistsDir(IDEdir) Then
         begin
           IDEDir:=SystemIDEDir;
@@ -181,14 +181,14 @@ begin
    end;
 {$endif WINDOWS}
 {$else}
-  SystemIDEDir:=FExpand(DirOf(system.paramstr(0))+'../lib/fpc/'+version_string+'/ide/text');
+  SystemIDEDir:=ExpandPath(DirOf(system.paramstr(0))+'../lib/fpc/'+version_string+'/ide/text');
   If Not ExistsDir(SystemIDEdir) Then
     begin
-    SystemIDEDir:=FExpand(DirOf(system.paramstr(0))+'../lib64/fpc/'+version_string+'/ide/text');
+    SystemIDEDir:=ExpandPath(DirOf(system.paramstr(0))+'../lib64/fpc/'+version_string+'/ide/text');
     If Not ExistsDir(SystemIDEdir) Then
       SystemIDEDir:='/usr/lib/fpc/'+version_string+'/ide/text';
     end;
-  IDEdir:=CompleteDir(FExpand('~/.fp'));
+  IDEdir:=CompleteDir(ExpandPath('~/.fp'));
   If Not ExistsDir(IDEdir) Then
     begin
       IDEDir:=SystemIDEDir;
@@ -209,7 +209,7 @@ begin
   S:=LocateFile(INIFileName);
   if S<>'' then
     IniFileName:=S;
-  IniFileName:=FExpand(IniFileName);
+  IniFileName:=ExpandPath(IniFileName);
 end;
 
 procedure CheckINIFile;
@@ -602,18 +602,18 @@ begin
 {$ifdef Unix}
   if not FromSaveAs and (DirOf(IniFileName)=DirOf(SystemIDEDir)) then
     begin
-      IniFileName:=FExpand('~/.fp/'+IniName);
+      IniFileName:=ExpandPath('~/.fp/'+IniName);
       If not ExistsDir(DirOf(IniFileName)) then
-        MkDir(FExpand('~/.fp'));
+        MkDir(ExpandPath('~/.fp'));
    end;
 {$endif Unix}
 {$ifdef WINDOWS}
   if not FromSaveAs and (DirOf(IniFileName)=DirOf(SystemIDEDir)) and
     (GetEnv('APPDATA')<>'') then
     begin
-      IniFileName:=FExpand(GetEnv('APPDATA')+'/fp/'+IniName);
+      IniFileName:=ExpandPath(GetEnv('APPDATA')+'/fp/'+IniName);
       If not ExistsDir(DirOf(IniFileName)) then
-        MkDir(FExpand(GetEnv('APPDATA')+'/fp'));
+        MkDir(ExpandPath(GetEnv('APPDATA')+'/fp'));
    end;
 {$endif WINDOWS}
   INIFile := TINIFile.Create(IniFileName);

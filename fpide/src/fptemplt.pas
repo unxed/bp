@@ -271,7 +271,7 @@ procedure InitTemplates;
       S:=NameOf(SR.Name);
       S:=LowerCaseStr(S);
       S[1]:=Upcase(S[1]);
-      PT:=NewTemplate(S,FExpand(Dir+SR.Name));
+      PT:=NewTemplate(S,ExpandPath(Dir+SR.Name));
       if not Templates.Search(PT,i) then
         Templates.Insert(PT)
       else

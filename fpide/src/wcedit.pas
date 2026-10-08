@@ -498,7 +498,7 @@ begin
   SavedDiskLoadTime:=Core.OnDiskLoadTime;
   if EditorDialog(edSaveAs, @FileName) <> cmCancel then
   begin
-    FileName:=FExpand(FileName);
+    FileName:=ExpandPath(FileName);
     Message(Owner, evBroadcast, cmUpdateTitle, Self);
     { the new name has no known state on disk }
     Core.OnDiskLoadTime:=0;

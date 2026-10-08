@@ -1427,7 +1427,7 @@ begin
   SwitchesPath:=LocateFile(SwitchesName);
   if SwitchesPath='' then
     SwitchesPath:=SwitchesName;
-  SwitchesPath:=FExpand(SwitchesPath);
+  SwitchesPath:=ExpandPath(SwitchesPath);
 end;
 
 procedure SetDefaultSwitches;
