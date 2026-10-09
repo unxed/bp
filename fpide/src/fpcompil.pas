@@ -539,7 +539,7 @@ procedure TCompilerMessageWindow.UpdateCommands;
 var Active: boolean;
 begin
   Active:=GetState(sfActive);
-  SetCmdState(CompileCmds,Active);
+  SetCmdState(CommandSetOf(CompileCmds),Active);
   Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 

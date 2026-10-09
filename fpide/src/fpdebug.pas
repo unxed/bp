@@ -1012,7 +1012,7 @@ begin
       SetDir(StartupDir);
     end;
   DebuggerScreen;
-  TView.SetCmdState([cmResetDebugger,cmUntilReturn],true);
+  TView.SetCmdState(CommandSetOf([cmResetDebugger,cmUntilReturn]),true);
   IDEApp.UpdateRunMenu(true);
   UpdateDebugViews;
 end;
@@ -1213,7 +1213,7 @@ begin
   { In case we have something that the compiler touched }
   If IDEApp.IsRunning then
     begin
-      TView.SetCmdState([cmResetDebugger,cmUntilReturn],false);
+      TView.SetCmdState(CommandSetOf([cmResetDebugger,cmUntilReturn]),false);
       IDEApp.UpdateRunMenu(false);
       AskToReloadAllModifiedFiles;
       ResetDebuggerRows;
@@ -1521,7 +1521,7 @@ end;
 procedure TDebugController.DoEndSession(code:longint);
 var P :Array[1..2] of longint;
 begin
-   TView.SetCmdState([cmUntilReturn,cmResetDebugger],false);
+   TView.SetCmdState(CommandSetOf([cmUntilReturn,cmResetDebugger]),false);
    IDEApp.UpdateRunMenu(false);
    ResetDebuggerRows;
    LastExitCode:=Code;

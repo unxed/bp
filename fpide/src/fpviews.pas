@@ -522,11 +522,11 @@ procedure DoneVESAScreenModes;
 procedure NoDebugger;
 
 const
-      SourceCmds  : TCommandSet =
+      SourceCmds  : TCommandBytes =
         ([cmSave,cmSaveAs,cmCompile,cmHide,cmDoReload]);
-      EditorCmds  : TCommandSet =
+      EditorCmds  : TCommandBytes =
         ([cmPrint,cmFind,cmReplace,cmSearchAgain,cmJumpLine,cmHelpTopicSearch,cmSelectAll,cmUnselect]);
-      CompileCmds : TCommandSet =
+      CompileCmds : TCommandBytes =
         ([cmMake,cmBuild,cmRun,cmTestLang]);
 
       CalcClipboard   : extended = 0;
@@ -2322,10 +2322,10 @@ begin
   Active:=GetState(sfActive);
   if Editor.IsClipboard=false then
   begin
-    SetCmdState(SourceCmds+CompileCmds,Active);
-    SetCmdState(EditorCmds,Active);
+    SetCmdState(CommandSetOf(SourceCmds+CompileCmds),Active);
+    SetCmdState(CommandSetOf(EditorCmds),Active);
   end;
-  SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,Active);
+  SetCmdState(CommandSetOf(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd),Active);
   Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
@@ -2632,9 +2632,9 @@ procedure TGDBWindow.UpdateCommands;
 var Active: boolean;
 begin
   Active:=GetState(sfActive);
-  SetCmdState([cmSaveAs,cmHide,cmRun],Active);
-  SetCmdState(EditorCmds,Active);
-  SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,Active);
+  SetCmdState(CommandSetOf([cmSaveAs,cmHide,cmRun]),Active);
+  SetCmdState(CommandSetOf(EditorCmds),Active);
+  SetCmdState(CommandSetOf(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd),Active);
   Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
@@ -2928,9 +2928,9 @@ procedure TDisassemblyWindow.UpdateCommands;
 var Active: boolean;
 begin
   Active:=GetState(sfActive);
-  SetCmdState(SourceCmds+CompileCmds,Active);
-  SetCmdState(EditorCmds,Active);
-  SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,false);
+  SetCmdState(CommandSetOf(SourceCmds+CompileCmds),Active);
+  SetCmdState(CommandSetOf(EditorCmds),Active);
+  SetCmdState(CommandSetOf(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd),false);
   Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
@@ -3036,7 +3036,7 @@ begin
   OldState:=State;
   inherited SetState(AState,Enable);
   if ((AState and sfActive)<>0) and (((OldState xor State) and sfActive)<>0) then
-    SetCmdState([cmSaveAs],Enable);
+    SetCmdState(CommandSetOf([cmSaveAs]),Enable);
 end;
 
 

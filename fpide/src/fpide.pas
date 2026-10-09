@@ -1224,14 +1224,14 @@ begin
       IdeItem('help.about',
       nil))))))))),
     nil))))))))))));
-   SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,false);
+   SetCmdState(CommandSetOf(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd),false);
 end;
 
 procedure TIDEApp.InitMenuBar;
 
 begin
   LoadMenuBar;
-  DisableCommands(EditorCmds+SourceCmds+CompileCmds);
+  DisableCommands(CommandSetOf(EditorCmds+SourceCmds+CompileCmds));
   // Update; Desktop is still nil at that point ...
 end;
 
@@ -1370,9 +1370,9 @@ begin
       if (E<>LastAnyEditor) or (W<>LastAnyWindow) or (V<>LastVisWindow) then
         begin
           LastAnyEditor:=E; LastAnyWindow:=W; LastVisWindow:=V;
-          SetCmdState([cmSaveAll],E<>0);
-          SetCmdState([cmCloseAll,cmWindowList],W<>0);
-          SetCmdState([cmTile,cmCascade],V<>0);
+          SetCmdState(CommandSetOf([cmSaveAll]),E<>0);
+          SetCmdState(CommandSetOf([cmCloseAll,cmWindowList]),W<>0);
+          SetCmdState(CommandSetOf([cmTile,cmCascade]),V<>0);
           Message(Application,evBroadcast,cmCommandSetChanged,nil);
         end;
     end;
@@ -1853,14 +1853,14 @@ end;
 
 procedure TIDEApp.Update;
 begin
-  SetCmdState([cmSaveAll],IsThereAnyEditor);
-  SetCmdState([cmCloseAll,cmWindowList],IsThereAnyWindow);
-  SetCmdState([cmTile,cmCascade],IsThereAnyVisibleWindow);
-  SetCmdState([cmFindProcedure,cmObjects,cmModules,cmGlobals,cmSymbol],IsSymbolInfoAvailable);
+  SetCmdState(CommandSetOf([cmSaveAll]),IsThereAnyEditor);
+  SetCmdState(CommandSetOf([cmCloseAll,cmWindowList]),IsThereAnyWindow);
+  SetCmdState(CommandSetOf([cmTile,cmCascade]),IsThereAnyVisibleWindow);
+  SetCmdState(CommandSetOf([cmFindProcedure,cmObjects,cmModules,cmGlobals,cmSymbol]),IsSymbolInfoAvailable);
 {$ifndef NODEBUG}
-  SetCmdState([cmResetDebugger,cmUntilReturn],(assigned(debugger) and debugger.debuggee_started) or GoDebugActive);
+  SetCmdState(CommandSetOf([cmResetDebugger,cmUntilReturn]),(assigned(debugger) and debugger.debuggee_started) or GoDebugActive);
 {$endif}
-  SetCmdState([cmToolsMsgNext,cmToolsMsgPrev],MessagesWindow<>nil);
+  SetCmdState(CommandSetOf([cmToolsMsgNext,cmToolsMsgPrev]),MessagesWindow<>nil);
   UpdateTools;
   UpdateRecentFileList;
   UpdatePrimaryFile;
@@ -1887,9 +1887,9 @@ end;
 procedure TIDEApp.UpdatePrimaryFile;
 begin
   SetMenuItemParam(SearchMenuItem(MenuBar.Menu,cmPrimaryFile),SmartPath(PrimaryFile));
-  SetCmdState([cmClearPrimary],PrimaryFile<>'');
+  SetCmdState(CommandSetOf([cmClearPrimary]),PrimaryFile<>'');
   if PrimaryFile<>'' then
-     SetCmdState(CompileCmds,true);
+     SetCmdState(CommandSetOf(CompileCmds),true);
   UpdateMenu(MenuBar.Menu);
 end;
 

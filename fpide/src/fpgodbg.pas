@@ -221,7 +221,7 @@ end;
 
 procedure UpdateMenus(Running: Boolean);
 begin
-  TView.SetCmdState([cmResetDebugger, cmUntilReturn], Running);
+  TView.SetCmdState(CommandSetOf([cmResetDebugger, cmUntilReturn]), Running);
   IDEApp.UpdateRunMenu(Running);
 end;
 

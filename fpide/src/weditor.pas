@@ -597,14 +597,14 @@ const
 
      CodeCompleteMinLen : byte = 4; { minimum length of text to try to complete }
 
-     ToClipCmds         : TCommandSet = ([cmCut,cmCopy,
+     ToClipCmds         : TCommandBytes = ([cmCut,cmCopy,
        { cmUnselect should because like cut, copy, copywin:
          if there is a selection, it is active, else it isn't }
        cmUnselect]);
-     FromClipCmds       : TCommandSet = ([cmPaste]);
-     NulClipCmds        : TCommandSet = ([cmClear]);
-     UndoCmd            : TCommandSet = ([cmUndo]);
-     RedoCmd            : TCommandSet = ([cmRedo]);
+     FromClipCmds       : TCommandBytes = ([cmPaste]);
+     NulClipCmds        : TCommandBytes = ([cmClear]);
+     UndoCmd            : TCommandBytes = ([cmUndo]);
+     RedoCmd            : TCommandBytes = ([cmRedo]);
 
 function ExtractTabs(S: string; TabSize: Sw_integer): string;
 
@@ -2072,12 +2072,12 @@ begin
   if ((State and sfFocused)<>0) then
     begin
       Enable:=Editor.HasSelection and (Clipboard<>nil);
-      SetCmdState(ToClipCmds,Enable and (Clipboard<>TCustomCodeEditor(Self)));
-      SetCmdState(NulClipCmds,Enable);
+      SetCmdState(CommandSetOf(ToClipCmds),Enable and (Clipboard<>TCustomCodeEditor(Self)));
+      SetCmdState(CommandSetOf(NulClipCmds),Enable);
       CanPaste:=Clipboard<>nil;
-      SetCmdState(FromClipCmds,CanPaste and (Clipboard<>TCustomCodeEditor(Self)));
-      SetCmdState(UndoCmd,(GetUndoActionCount>0));
-      SetCmdState(RedoCmd,(GetRedoActionCount>0));
+      SetCmdState(CommandSetOf(FromClipCmds),CanPaste and (Clipboard<>TCustomCodeEditor(Self)));
+      SetCmdState(CommandSetOf(UndoCmd),(GetUndoActionCount>0));
+      SetCmdState(CommandSetOf(RedoCmd),(GetRedoActionCount>0));
       Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
       FLastUndo:=GetUndoActionCount;
       FLastRedo:=GetRedoActionCount;
@@ -2882,7 +2882,7 @@ begin
       Clipboard.Editor.SelectAll;
       Clipboard.Refresh;
       SendToSystemClipboard(T);
-      SetCmdState(FromClipCmds,true);
+      SetCmdState(CommandSetOf(FromClipCmds),true);
       ClipCopy:=true;
     end;
 end;
@@ -3611,9 +3611,9 @@ begin
            case Event.Message.Command of
                    cminputlinelen : begin
                                       if PtrInt(Event.Message.InfoPtr)=0 then
-                                        okbutton.DisableCommands([cmok])
+                                        okbutton.DisableCommands(CommandSetOf([cmok]))
                                       else
-                                        okbutton.EnableCommands([cmok]);
+                                        okbutton.EnableCommands(CommandSetOf([cmok]));
                                       clearevent(event);
                                     end;
              end;
