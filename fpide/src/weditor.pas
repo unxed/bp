@@ -1341,37 +1341,37 @@ end;
 { the colours: the 18 entries of the palette of the editor (see CEditor) }
 function TCustomCodeEditor.NormalAttr: TColorAttr;
 begin
-  Result:=GetColor(1).Lo;
+  Result:=GetColor(1)[0];
 end;
 
 function TCustomCodeEditor.SelectedAttr: TColorAttr;
 begin
-  Result:=GetColor(10).Lo;
+  Result:=GetColor(10)[0];
 end;
 
 function TCustomCodeEditor.MessageAttr: TColorAttr;
 begin
-  Result:=GetColor(16).Lo;
+  Result:=GetColor(16)[0];
 end;
 
 function TCustomCodeEditor.HighlightAttr: TColorAttr;
 begin
-  Result:=GetColor(10).Lo;
+  Result:=GetColor(10)[0];
 end;
 
 function TCustomCodeEditor.ClassAttr(C: Integer): TColorAttr;
 begin
   case C of
-    hcComment: Result:=GetColor(3).Lo;
-    hcKeyword,hcType: Result:=GetColor(4).Lo;
-    hcBuiltin: Result:=GetColor(4).Lo;
-    hcString,hcEscape: Result:=GetColor(6).Lo;
-    hcNumber: Result:=GetColor(7).Lo;
-    hcAsm: Result:=GetColor(8).Lo;
-    hcOperator,hcDelimiter: Result:=GetColor(9).Lo;
-    hcPreproc: Result:=GetColor(13).Lo;
+    hcComment: Result:=GetColor(3)[0];
+    hcKeyword,hcType: Result:=GetColor(4)[0];
+    hcBuiltin: Result:=GetColor(4)[0];
+    hcString,hcEscape: Result:=GetColor(6)[0];
+    hcNumber: Result:=GetColor(7)[0];
+    hcAsm: Result:=GetColor(8)[0];
+    hcOperator,hcDelimiter: Result:=GetColor(9)[0];
+    hcPreproc: Result:=GetColor(13)[0];
   else
-    Result:=GetColor(1).Lo;
+    Result:=GetColor(1)[0];
   end;
 end;
 
@@ -1385,17 +1385,17 @@ begin
   if (F and (lfHighlightRow or lfDebuggerRow))<>0 then
     begin
       { the row where the debugger stopped / a highlighted row; on a breakpoint it still differs from the breakpoint colour }
-      Attr:=GetColor(12).Lo;
+      Attr:=GetColor(12)[0];
       Result:=true;
     end
   else if (F and lfBreakpoint)<>0 then
     begin
-      Attr:=GetColor(16).Lo;
+      Attr:=GetColor(16)[0];
       Result:=true;
     end
   else if (F and lfSpecialRow)<>0 then
     begin
-      Attr:=GetColor(3).Lo;
+      Attr:=GetColor(3)[0];
       Result:=true;
     end;
 end;

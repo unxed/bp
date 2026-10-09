@@ -18,7 +18,7 @@ end;
 
 function CellBios(const Cell: TScreenCell): Byte;
 begin
-  Result := AttrAsBIOSByte(Cell.Attribute);
+  Result := Byte(Cell.Attribute);
 end;
 
 procedure SetCellBios(var Cell: TScreenCell; Attr: Byte);
