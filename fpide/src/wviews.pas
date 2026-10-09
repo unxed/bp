@@ -381,9 +381,9 @@ var
 function IsDisabled(Item: PMenuItem): boolean;
 var Found: boolean;
 begin
-  Found:=Item^.Disabled or IsSeparator(Item);
+  Found:=Item.Disabled or IsSeparator(Item);
   if (Found=false) and (IsSubMenu(Item)=false) then
-     Found:=CommandEnabled(Item^.Command)=false;
+     Found:=CommandEnabled(Item.Command)=false;
   IsDisabled:=Found;
 end;
 
@@ -393,7 +393,7 @@ var
   R: TRect;
 begin
   Mouse := MakeLocal(E.Mouse.Where);
-  Current := Menu^.Items;
+  Current := Menu.Items;
   while Current <> nil do
   begin
     R := GetItemRect(Current);
@@ -402,7 +402,7 @@ begin
       MouseActive := True;
       Break;
     end;
-    Current := Current^.Next;
+    Current := Current.Next;
   end;
   if (Current<>nil) and IsDisabled(Current) then
   begin
@@ -415,8 +415,8 @@ procedure TrackKey(FindNext: Boolean);
 
 procedure NextItem;
 begin
-  Current := Current^.Next;
-  if Current = nil then Current := Menu^.Items;
+  Current := Current.Next;
+  if Current = nil then Current := Menu.Items;
 end;
 
 procedure PrevItem;
@@ -424,15 +424,15 @@ var
   P: PMenuItem;
 begin
   P := Current;
-  if P = Menu^.Items then P := nil;
-  repeat NextItem until Current^.Next = P;
+  if P = Menu.Items then P := nil;
+  repeat NextItem until Current.Next = P;
 end;
 
 begin
   if Current <> nil then
     repeat
       if FindNext then NextItem else PrevItem;
-    until (Current^.Name <> nil) and (IsDisabled(Current)=false);
+    until (Current.Name <> nil) and (IsDisabled(Current)=false);
 end;
 
 function MouseInOwner: Boolean;
@@ -472,12 +472,12 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Deflt;
+  Current := Menu.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
   if Current<>nil then
-    if Current^.Disabled then
+    if Current.Disabled then
        TrackKey(true);
   repeat
     Action := DoNothing;
@@ -493,16 +493,16 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Deflt
+            Current := Menu.Deflt
           else
-            if (Current <> nil) and (Current^.Name <> nil) then
+            if (Current <> nil) and (Current.Name <> nil) then
               Action := DoSelect
             else
               if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Deflt;
-                if Current = nil then Current := Menu^.Items;
+                Current := Menu.Deflt;
+                if Current = nil then Current := Menu.Items;
                 Action := DoNothing;
               end;
         end;
@@ -531,7 +531,7 @@ begin
           kbHome, kbEnd:
             if Size.Y <> 1 then
             begin
-              Current := Menu^.Items;
+              Current := Menu.Items;
               if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
@@ -561,9 +561,9 @@ begin
           if P = nil then
           begin
             P := TopMenu.HotKey(EventKey(E));
-            if (P <> nil) and CommandEnabled(P^.Command) then
+            if (P <> nil) and CommandEnabled(P.Command) then
             begin
-              Res := P^.Command;
+              Res := P.Command;
               Action := DoReturn;
             end
           end else
@@ -589,7 +589,7 @@ begin
       DrawView;
     end;
     if (Action = DoSelect) or ((Action = DoNothing) and AutoSelect) then
-      if Current <> nil then with Current^ do if Name <> nil then
+      if Current <> nil then with Current do if Name <> nil then
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
@@ -622,7 +622,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Deflt := Current;
+    Menu.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -651,9 +651,9 @@ var
 function IsDisabled(Item: PMenuItem): boolean;
 var Found: boolean;
 begin
-  Found:=Item^.Disabled or IsSeparator(Item);
+  Found:=Item.Disabled or IsSeparator(Item);
   if (Found=false) and (IsSubMenu(Item)=false) then
-     Found:=CommandEnabled(Item^.Command)=false;
+     Found:=CommandEnabled(Item.Command)=false;
   IsDisabled:=Found;
 end;
 
@@ -663,7 +663,7 @@ var
   R: TRect;
 begin
   Mouse := MakeLocal(E.Mouse.Where);
-  Current := Menu^.Items;
+  Current := Menu.Items;
   while Current <> nil do
   begin
     R := GetItemRect(Current);
@@ -672,7 +672,7 @@ begin
       MouseActive := True;
       Break;
     end;
-    Current := Current^.Next;
+    Current := Current.Next;
   end;
   if (Current<>nil) and IsDisabled(Current) then
   begin
@@ -685,8 +685,8 @@ procedure TrackKey(FindNext: Boolean);
 
 procedure NextItem;
 begin
-  Current := Current^.Next;
-  if Current = nil then Current := Menu^.Items;
+  Current := Current.Next;
+  if Current = nil then Current := Menu.Items;
 end;
 
 procedure PrevItem;
@@ -694,15 +694,15 @@ var
   P: PMenuItem;
 begin
   P := Current;
-  if P = Menu^.Items then P := nil;
-  repeat NextItem until Current^.Next = P;
+  if P = Menu.Items then P := nil;
+  repeat NextItem until Current.Next = P;
 end;
 
 begin
   if Current <> nil then
     repeat
       if FindNext then NextItem else PrevItem;
-    until (Current^.Name <> nil) and (IsDisabled(Current)=false);
+    until (Current.Name <> nil) and (IsDisabled(Current)=false);
 end;
 
 function MouseInOwner: Boolean;
@@ -742,12 +742,12 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Deflt;
+  Current := Menu.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
   if Current<>nil then
-    if Current^.Disabled then
+    if Current.Disabled then
        TrackKey(true);
   repeat
     Action := DoNothing;
@@ -763,16 +763,16 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Deflt
+            Current := Menu.Deflt
           else
-            if (Current <> nil) and (Current^.Name <> nil) then
+            if (Current <> nil) and (Current.Name <> nil) then
               Action := DoSelect
             else
               if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Deflt;
-                if Current = nil then Current := Menu^.Items;
+                Current := Menu.Deflt;
+                if Current = nil then Current := Menu.Items;
                 Action := DoNothing;
               end;
         end;
@@ -801,7 +801,7 @@ begin
           kbHome, kbEnd:
             if Size.Y <> 1 then
             begin
-              Current := Menu^.Items;
+              Current := Menu.Items;
               if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
@@ -831,9 +831,9 @@ begin
           if P = nil then
           begin
             P := TopMenu.HotKey(EventKey(E));
-            if (P <> nil) and CommandEnabled(P^.Command) then
+            if (P <> nil) and CommandEnabled(P.Command) then
             begin
-              Res := P^.Command;
+              Res := P.Command;
               Action := DoReturn;
             end
           end else
@@ -859,7 +859,7 @@ begin
       DrawView;
     end;
     if (Action = DoSelect) or ((Action = DoNothing) and AutoSelect) then
-      if Current <> nil then with Current^ do if Name <> nil then
+      if Current <> nil then with Current do if Name <> nil then
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
@@ -892,7 +892,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Deflt := Current;
+    Menu.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -928,34 +928,34 @@ type
 var Cur : PMenuItem;
     Up,NUp  : PItemChain;
 begin
-  Cur:=Menu^.Items;
+  Cur:=Menu.Items;
   Up:=nil;
   if cm=0 then
     begin
       GetMenuItem:=nil;
       exit;
     end;
-  while assigned(Cur) and (Cur^.Command<>cm) do
+  while assigned(Cur) and (Cur.Command<>cm) do
     begin
-      if (Cur^.Command=0) and assigned(Cur^.SubMenu) and
-         assigned(Cur^.Name) and
-         assigned(Cur^.SubMenu^.Items) then
+      if (Cur.Command=0) and assigned(Cur.SubMenu) and
+         assigned(Cur.Name) and
+         assigned(Cur.SubMenu.Items) then
         {subMenu}
         begin
-          If assigned(Cur^.Next) then
+          If assigned(Cur.Next) then
             begin
               New(Nup);
               Nup^.Up:=Up;
-              Nup^.next:=Cur^.Next;
+              Nup^.next:=Cur.Next;
               Up:=Nup;
             end;
-          Cur:=Cur^.SubMenu^.Items;
+          Cur:=Cur.SubMenu.Items;
         end
       else
         { normal item }
         begin
-          if assigned(Cur^.Next) then
-            Cur:=Cur^.Next
+          if assigned(Cur.Next) then
+            Cur:=Cur.Next
           else if assigned(Up) then
             begin
               Cur:=Up^.next;
@@ -1004,9 +1004,9 @@ var
 function IsDisabled(Item: PMenuItem): boolean;
 var Dis : boolean;
 begin
-  Dis:=Item^.Disabled or IsSeparator(Item);
+  Dis:=Item.Disabled or IsSeparator(Item);
   if (Dis=false) and (IsSubMenu(Item)=false) then
-     Dis:=CommandEnabled(Item^.Command)=false;
+     Dis:=CommandEnabled(Item.Command)=false;
   IsDisabled:=Dis;
 end;
 
@@ -1016,7 +1016,7 @@ var
   R: TRect;
 begin
   Mouse := MakeLocal(E.Mouse.Where);
-  Current := Menu^.Items;
+  Current := Menu.Items;
   while Current <> nil do
   begin
     R := GetItemRect(Current);
@@ -1025,7 +1025,7 @@ begin
       MouseActive := True;
       Break;
     end;
-    Current := Current^.Next;
+    Current := Current.Next;
   end;
   if (Current<>nil) and IsDisabled(Current) then
     Current:=nil;
@@ -1035,8 +1035,8 @@ procedure TrackKey(FindNext: Boolean);
 
 procedure NextItem;
 begin
-  Current := Current^.Next;
-  if Current = nil then Current := Menu^.Items;
+  Current := Current.Next;
+  if Current = nil then Current := Menu.Items;
 end;
 
 procedure PrevItem;
@@ -1044,15 +1044,15 @@ var
   P: PMenuItem;
 begin
   P := Current;
-  if P = Menu^.Items then P := nil;
-  repeat NextItem until Current^.Next = P;
+  if P = Menu.Items then P := nil;
+  repeat NextItem until Current.Next = P;
 end;
 
 begin
   if Current <> nil then
     repeat
       if FindNext then NextItem else PrevItem;
-    until (Current^.Name <> nil) and (IsDisabled(Current)=false);
+    until (Current.Name <> nil) and (IsDisabled(Current)=false);
 end;
 
 function MouseInOwner: Boolean;
@@ -1091,12 +1091,12 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Deflt;
+  Current := Menu.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
   if Current<>nil then
-    if Current^.Disabled then
+    if Current.Disabled then
        TrackKey(true);
   repeat
     Action := DoNothing;
@@ -1112,16 +1112,16 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Deflt
+            Current := Menu.Deflt
           else
-            if (Current <> nil) and (Current^.Name <> nil) then
+            if (Current <> nil) and (Current.Name <> nil) then
               Action := DoSelect
             else
               if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Deflt;
-                if Current = nil then Current := Menu^.Items;
+                Current := Menu.Deflt;
+                if Current = nil then Current := Menu.Items;
                 Action := DoNothing;
               end;
         end;
@@ -1150,7 +1150,7 @@ begin
           kbHome, kbEnd:
             if Size.Y <> 1 then
             begin
-              Current := Menu^.Items;
+              Current := Menu.Items;
               if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
@@ -1180,9 +1180,9 @@ begin
           if P = nil then
           begin
             P := TopMenu.HotKey(EventKey(E));
-            if (P <> nil) and CommandEnabled(P^.Command) then
+            if (P <> nil) and CommandEnabled(P.Command) then
             begin
-              Res := P^.Command;
+              Res := P.Command;
               Action := DoReturn;
             end
           end else
@@ -1208,7 +1208,7 @@ begin
       DrawView;
     end;
     if (Action = DoSelect) or ((Action = DoNothing) and AutoSelect) then
-      if Current <> nil then with Current^ do if Name <> nil then
+      if Current <> nil then with Current do if Name <> nil then
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
@@ -1241,7 +1241,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Deflt := Current;
+    Menu.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -1534,13 +1534,13 @@ begin
   M:=GetLocalMenu;
   if M=nil then Exit;
   if LastLocalCmd<>0 then
-     M^.Deflt:=SearchMenuItem(M,LastLocalCmd);
+     M.Deflt:=SearchMenuItem(M,LastLocalCmd);
   R := TProgram.DeskTop.GetExtent;
   R.A := MakeGlobal(P); {R.A := Desktop.MakeLocal(R.A);}
   MV := TAdvancedMenuPopUp.Create(R, M, nil);
   Re:=TProgram.Application.ExecView(MV);
-  if M^.Deflt=nil then LastLocalCmd:=0
-     else LastLocalCmd:=M^.Deflt^.Command;
+  if M.Deflt=nil then LastLocalCmd:=0
+     else LastLocalCmd:=M.Deflt.Command;
   MV.Free;
   if Re<>0 then
     Message(GetCommandTarget,evCommand,Re, Pointer(Self));
@@ -1682,26 +1682,26 @@ end;
 
 function IsSeparator(P: PMenuItem): boolean;
 begin
-  IsSeparator:=(P<>nil) and (P^.Name=nil) and (P^.HelpCtx=hcNoContext);
+  IsSeparator:=(P<>nil) and (P.Name=nil) and (P.HelpCtx=hcNoContext);
 end;
 
 function IsSubMenu(P: PMenuItem): boolean;
 begin
-  IsSubMenu:=(P<>nil) and (P^.Name<>nil) and (P^.Command=0) and (P^.SubMenu<>nil);
+  IsSubMenu:=(P<>nil) and (P.Name<>nil) and (P.Command=0) and (P.SubMenu<>nil);
 end;
 
 function SearchMenuItem(Menu: PMenu; Cmd: word): PMenuItem;
 var P,I: PMenuItem;
 begin
   I:=nil;
-  if Menu=nil then P:=nil else P:=Menu^.Items;
+  if Menu=nil then P:=nil else P:=Menu.Items;
   while (P<>nil) and (I=nil) do
   begin
     if IsSubMenu(P) then
-       I:=SearchMenuItem(P^.SubMenu,Cmd);
+       I:=SearchMenuItem(P.SubMenu,Cmd);
     if I=nil then
-    if P^.Command=Cmd then I:=P else
-    P:=P^.Next;
+    if P.Command=Cmd then I:=P else
+    P:=P.Next;
   end;
   SearchMenuItem:=I;
 end;
@@ -1709,8 +1709,8 @@ end;
 procedure SetMenuItemParam(Menu: PMenuItem; Param: string);
 begin
   if Menu=nil then Exit;
-  if Menu^.Param<>nil then DisposeStr(Menu^.Param);
-  Menu^.Param:=NewStr(Param);
+  if Menu.Param<>nil then DisposeStr(Menu.Param);
+  Menu.Param:=NewStr(Param);
 end;
 
 function UpdateMenu(M: PMenu): boolean;
@@ -1718,25 +1718,25 @@ var P: PMenuItem;
     IsEnabled: boolean;
 begin
   if M=nil then begin UpdateMenu:=false; Exit; end;
-  P:=M^.Items; IsEnabled:=false;
+  P:=M.Items; IsEnabled:=false;
   while (P<>nil) do
   begin
     if IsSubMenu(P) then
        begin
-         P^.Disabled:=not UpdateMenu(P^.SubMenu);
-         if not P^.Disabled then
+         P.Disabled:=not UpdateMenu(P.SubMenu);
+         if not P.Disabled then
            IsEnabled:=true;
        end
     else
       begin
         if not IsSeparator(P) and
-           TView.CommandEnabled(P^.Command) then
+           TView.CommandEnabled(P.Command) then
           begin
-            p^.disabled:=false;
+            p.disabled:=false;
             IsEnabled:=true;
           end;
        end;
-    P:=P^.Next;
+    P:=P.Next;
   end;
   UpdateMenu:=IsEnabled;
 end;
@@ -1746,7 +1746,7 @@ var P,C: PMenuItem;
     Count: Sw_integer;
 begin
   P:=nil; Count:=-1;
-  if M<>nil then C:=M^.Items else C:=nil;
+  if M<>nil then C:=M.Items else C:=nil;
   while (C<>nil) and (P=nil) do
   begin
     if IsSubMenu(C) then
@@ -1754,7 +1754,7 @@ begin
        Inc(Count);
        if Count=Index then P:=C;
      end;
-    C:=C^.Next;
+    C:=C.Next;
   end;
   SearchSubMenu:=P;
 end;
@@ -1763,42 +1763,36 @@ procedure AppendMenuItem(M: PMenu; I: PMenuItem);
 var P: PMenuItem;
 begin
   if (M=nil) or (I=nil) then Exit;
-  I^.Next:=nil;
-  if M^.Items=nil then M^.Items:=I else
+  I.Next:=nil;
+  if M.Items=nil then M.Items:=I else
   begin
-    P:=M^.Items;
-    while (P^.Next<>nil) do P:=P^.Next;
-    P^.Next:=I;
+    P:=M.Items;
+    while (P.Next<>nil) do P:=P.Next;
+    P.Next:=I;
   end;
 end;
 
 procedure DisposeMenuItem(P: PMenuItem);
 begin
   if P<>nil then
-  begin
-    if IsSubMenu(P) then DisposeMenu(P^.SubMenu) else
-      if IsSeparator(P)=false then
-       if P^.Param<>nil then DisposeStr(P^.Param);
-    if P^.Name<>nil then DisposeStr(P^.Name);
-    Dispose(P);
-  end;
+    P.Free;  { the name, and the parameter or the submenu, go with it }
 end;
 
 procedure RemoveMenuItem(Menu: PMenu; I: PMenuItem);
 var P,PrevP: PMenuItem;
 begin
   if (Menu=nil) or (I=nil) then Exit;
-  P:=Menu^.Items; PrevP:=nil;
+  P:=Menu.Items; PrevP:=nil;
   while (P<>nil) do
   begin
     if P=I then
       begin
-        if Menu^.Items<>I then PrevP^.Next:=P^.Next
-                          else Menu^.Items:=P^.Next;
+        if Menu.Items<>I then PrevP.Next:=P.Next
+                          else Menu.Items:=P.Next;
         DisposeMenuItem(P);
         Break;
       end;
-    PrevP:=P; P:=P^.Next;
+    PrevP:=P; P:=P.Next;
   end;
 end;
 
@@ -1806,11 +1800,11 @@ function GetMenuItemBefore(Menu: PMenu; BeforeOf: PMenuItem): PMenuItem;
 var P,C: PMenuItem;
 begin
   P:=nil;
-  if Menu<>nil then C:=Menu^.Items else C:=nil;
+  if Menu<>nil then C:=Menu.Items else C:=nil;
   while (C<>nil) do
     begin
-      if C^.Next=BeforeOf then begin P:=C; Break; end;
-      C:=C^.Next;
+      if C.Next=BeforeOf then begin P:=C; Break; end;
+      C:=C.Next;
     end;
   GetMenuItemBefore:=P;
 end;
