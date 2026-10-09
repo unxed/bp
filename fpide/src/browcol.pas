@@ -216,6 +216,9 @@ type
        function  LookUp(const S: string; var Idx: sw_integer): string; virtual;
       function StreamableName: ShortString; override;
       class function Build: TStreamable; static;
+    protected
+      function ReadItem(Ip: ipstream): Pointer; override;
+      procedure WriteItem(Item: Pointer; Os: opstream); override;
     end;
 
     TSortedSymbolCollection = class(TSymbolCollection)
@@ -243,12 +246,18 @@ type
       function At(Index: Sw_Integer): PObjectSymbol;
       function StreamableName: ShortString; override;
       class function Build: TStreamable; static;
+    protected
+      function ReadItem(Ip: ipstream): Pointer; override;
+      procedure WriteItem(Item: Pointer; Os: opstream); override;
     end;
 
     TReferenceCollection = class(TCollection)
        function At(Index: Sw_Integer): PReference;
       function StreamableName: ShortString; override;
       class function Build: TStreamable; static;
+    protected
+      function ReadItem(Ip: ipstream): Pointer; override;
+      procedure WriteItem(Item: Pointer; Os: opstream); override;
     end;
 
     TSourceFile = class;
@@ -1923,7 +1932,7 @@ end;
 
 procedure BuildObjectInfo;
 var C,D: PIDSortedSymbolCollection;
-    E : PCollection;
+    E : TNSCollection;
     ObjectC: PObjectSymbolCollection;
     ObjectsSymbol: PObjectSymbol;
 procedure InsertSymbolCollection(Symbols: PSymbolCollection);
@@ -1986,7 +1995,7 @@ var Pass: integer;
 begin
   C := TIDSortedSymbolCollection.Create(1000,5000);
   D := TIDSortedSymbolCollection.Create(1000,5000);
-  E := TCollection.Create(1000,5000);
+  E := TNSCollection.Create(1000,5000);
   InsertSymbolCollection(Modules);
 
   { --- Resolve ancestor<->descendant references --- }
@@ -2163,7 +2172,7 @@ type
 
      TPointerDictionary = class;
      PPointerDictionary = TPointerDictionary;
-     TPointerDictionary = class(TSortedCollection)
+     TPointerDictionary = class(TNSSortedCollection)
        function  At(Index: sw_Integer): PPointerXRef;
        function  Compare(Key1, Key2: Pointer): sw_Integer; override;
        procedure FreeItem(Item: Pointer); override;
@@ -2257,6 +2266,39 @@ begin
     S.Read(P,SizeOf(P));
     D.AddPtr(P,C.At(I));
   end;
+end;
+
+{ the items are streamable objects }
+function TSymbolCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := Ip.ReadPointer;
+end;
+
+procedure TSymbolCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  Os.WritePointer(TStreamable(Item));
+end;
+
+{ the items are streamable objects }
+function TObjectSymbolCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := Ip.ReadPointer;
+end;
+
+procedure TObjectSymbolCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  Os.WritePointer(TStreamable(Item));
+end;
+
+{ the items are streamable objects }
+function TReferenceCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := Ip.ReadPointer;
+end;
+
+procedure TReferenceCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  Os.WritePointer(TStreamable(Item));
 end;
 
 function LoadBrowserCol(S: TStream): boolean;
