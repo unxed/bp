@@ -26,7 +26,7 @@ The build log must have no `An inherited method is hidden by ...` warnings (a lo
 Only Ubuntu/Debian with `apt` and git are needed. One command (installs the packages, fetches `fpide/tv/`, builds; with `test` it also runs the tests):
 
 ```sh
-git clone --recurse-submodules https://github.com/unxed/sp && cd sp
+git clone --recurse-submodules https://github.com/unxed/bp && cd bp
 fpide/tools/fpide-setup-build.sh [test]     # result: fpide/out/linux64/fp
 ```
 
