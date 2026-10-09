@@ -82,6 +82,35 @@ try:
 finally:
     t.close()
 
+# a start in a new directory, answered Yes and Copy existing: the local configuration gets the desktop of the main one
+t = TmuxTerm(sys.argv[1], env={'TV_FAR2L': '0'})
+home = t.work
+try:
+    with open(os.path.join(home, 'hello.pas'), 'w') as f:
+        f.write("program hello;\nbegin\nend.\n")
+    check(t.wait_for('Window  Help'), 'the IDE starts (main configuration)', t)
+    t.key('F3'); t.wait_for('Open a file'); t.type('hello.pas'); t.key('Enter')
+    check(t.wait_for('program hello'), 'hello.pas is opened (main configuration)', t)
+    check(leave(t), 'Alt+X leaves the IDE (main configuration)', t)
+finally:
+    t.stop()
+xdg = {'HOME': home, 'XDG_CONFIG_HOME': os.path.join(home, '.config'), 'XDG_STATE_HOME': os.path.join(home, '.local/state'),
+       'XDG_DATA_HOME': os.path.join(home, '.local/share'), 'XDG_CACHE_HOME': os.path.join(home, '.cache')}
+t = TmuxTerm(sys.argv[1], env=dict(xdg, TV_FAR2L='0'))
+try:
+    check(t.wait_for('never started'), 'a new directory asks for a local configuration', t)
+    t.key('Enter')                          # Yes
+    check(t.wait_for('xisting'), 'the IDE asks to copy the configuration or to create a new one', t)
+    t.key('Enter')                          # Copy existing
+    check(t.wait_for('Window  Help'), 'the IDE starts with the copied configuration', t)
+    check(t.wait_for('hello.pas') and 'program hello' in t.text(), 'the window of hello.pas is there', t)
+    for name in ('fp.ini', 'fp.dsk'):
+        check(os.path.isfile(os.path.join(t.work, name)), '%s is in the new directory' % name, t)
+    check(leave(t), 'Alt+X leaves the IDE (local configuration)', t)
+finally:
+    t.close()
+    shutil.rmtree(home, ignore_errors=True)
+
 # a start with the files of an older version in ~/.fp: they are copied into the new places
 home = tempfile.mkdtemp(prefix='fpide-home-')
 old = os.path.join(home, '.fp')

@@ -229,6 +229,32 @@ begin
   IniFileName:=ExpandPath(IniFileName);
 end;
 
+{ Copies the desktop of the configuration MainIni to the place of the desktop of a configuration in CurDir. A desktop
+  kept in the current directory belongs to that directory and is not copied. }
+procedure CopyDesktop(const MainIni, CurDir: string);
+var INI: PINIFile;
+    StDir,Src,Dst: string;
+    Loc: longint;
+begin
+  INI := TINIFile.Create(MainIni);
+  INI.Read;
+  Loc:=INI.GetIntEntry(secPreferences,ieDesktopLocation,DesktopLocation);
+  INI.Free;
+  if Loc=dlCurrentDir then
+    Exit;
+  StDir:='';
+  if DirOf(MainIni)=IDEDir then
+    StDir:=StateDir('fp');
+  if StDir<>'' then
+    Src:=CompleteDir(StDir)+DesktopName
+  else
+    Src:=DirOf(MainIni)+DesktopName;
+  Dst:=CurDir+DesktopName;
+  if ExistsFile(Src) and not SameFileName(ExpandPath(Src),ExpandPath(Dst)) then
+    if CopyFile(Src,Dst)=false then
+      ErrorBox(FormatStrStr(msg_errorwritingfile,Dst),nil);
+end;
+
 procedure CheckINIFile;
 var IniDir,CurDir: DirStr;
     INI: PINIFile;
@@ -252,6 +278,7 @@ begin
          else
            begin
              { copy config here }
+             CopyDesktop(IniFileName,CurDir);
              if CopyFile(IniFileName,CurDir+IniName)=false then
                ErrorBox(FormatStrStr(msg_errorwritingfile,CurDir+IniName),nil)
              else
