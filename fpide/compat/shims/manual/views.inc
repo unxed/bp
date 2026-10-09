@@ -12,8 +12,8 @@ type
 
 { Free Vision phases of the focus chain (TGroup.Phase). }
 type
-  TPhaseType = TvViews.TPhaseType;
+  TPhaseType = TvViews.TView.PhaseType;
 const
-  phFocused     = TvViews.phFocused;
-  phPreProcess  = TvViews.phPreProcess;
-  phPostProcess = TvViews.phPostProcess;
+  phFocused     = TvViews.TView.PhaseType.phFocused;
+  phPreProcess  = TvViews.TView.PhaseType.phPreProcess;
+  phPostProcess = TvViews.TView.PhaseType.phPostProcess;
