@@ -8,12 +8,12 @@ type
 
 function FVAttr(Attr: Byte): TColorAttr;
 begin
-  Result := CellFromBIOS(Word(Attr) shl 8).Attribute;
+  Result := TColorAttr(LongInt(Attr));
 end;
 
 procedure SetCellChar(var Cell: TScreenCell; C: Char);
 begin
-  ScInitChar(Cell.Character, Byte(C));
+  Cell.Character.InitWithChar(Byte(C));
 end;
 
 function CellBios(const Cell: TScreenCell): Byte;
@@ -42,7 +42,7 @@ begin
   if (Byte(Str[I]) < $80) or (not Utf8Enabled) or
      (not Utf8Decode(@Str[I], Length(Str) - I + 1, CP, Used)) or (Used <= 1) then
   begin
-    ScInitChar(Cells[P].Character, Byte(Str[I]));
+    Cells[P].Character.InitWithChar(Byte(Str[I]));
     if SetAttr then Cells[P].Attribute := A;
     Inc(P);
     Exit;
@@ -53,17 +53,17 @@ begin
   begin
     { a combining character goes onto the cell before }
     if P > 0 then
-      ScAppendZeroWidth(Cells[P - 1].Character, @Str[I], Used);
+      Cells[P - 1].Character.AppendZeroWidthChar(@Str[I], Used);
     Exit;
   end;
   if (W >= 2) and (P + 1 > High(Cells)) then
     W := 1;
-  ScInitText(Cells[P].Character, @Str[I], Used, W >= 2);
+  Cells[P].Character.InitWithMultiByteChar(@Str[I], Used, W >= 2);
   if SetAttr then Cells[P].Attribute := A;
   Inc(P);
   if W >= 2 then
   begin
-    ScInitWideTrail(Cells[P].Character);
+    Cells[P].Character.InitAsWideCharTrail;
     if SetAttr then Cells[P].Attribute := A;
     Inc(P);
   end;
@@ -80,7 +80,7 @@ begin
     if Attr <> 0 then
       Cells^[I].Attribute := FVAttr(Attr);
     if Ord(C) <> 0 then
-      ScInitChar(Cells^[I].Character, Byte(C));
+      Cells^[I].Character.InitWithChar(Byte(C));
   end;
 end;
 
@@ -146,7 +146,7 @@ begin
   begin
     if Attr <> 0 then
       Cells^[I].Attribute := FVAttr(Attr);
-    ScInitChar(Cells^[I].Character, S^);
+    Cells^[I].Character.InitWithChar(S^);
     Inc(S);
   end;
 end;
