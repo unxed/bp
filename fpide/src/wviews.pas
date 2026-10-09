@@ -472,7 +472,7 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Default;
+  Current := Menu^.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
@@ -493,7 +493,7 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Default
+            Current := Menu^.Deflt
           else
             if (Current <> nil) and (Current^.Name <> nil) then
               Action := DoSelect
@@ -501,7 +501,7 @@ begin
               if MouseActive or MouseInView(E.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Default;
+                Current := Menu^.Deflt;
                 if Current = nil then Current := Menu^.Items;
                 Action := DoNothing;
               end;
@@ -622,7 +622,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Default := Current;
+    Menu^.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -742,7 +742,7 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Default;
+  Current := Menu^.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
@@ -763,7 +763,7 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Default
+            Current := Menu^.Deflt
           else
             if (Current <> nil) and (Current^.Name <> nil) then
               Action := DoSelect
@@ -771,7 +771,7 @@ begin
               if MouseActive or MouseInView(E.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Default;
+                Current := Menu^.Deflt;
                 if Current = nil then Current := Menu^.Items;
                 Action := DoNothing;
               end;
@@ -892,7 +892,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Default := Current;
+    Menu^.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -1091,7 +1091,7 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Default;
+  Current := Menu^.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
@@ -1112,7 +1112,7 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Default
+            Current := Menu^.Deflt
           else
             if (Current <> nil) and (Current^.Name <> nil) then
               Action := DoSelect
@@ -1120,7 +1120,7 @@ begin
               if MouseActive or MouseInView(E.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Default;
+                Current := Menu^.Deflt;
                 if Current = nil then Current := Menu^.Items;
                 Action := DoNothing;
               end;
@@ -1241,7 +1241,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Default := Current;
+    Menu^.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -1534,13 +1534,13 @@ begin
   M:=GetLocalMenu;
   if M=nil then Exit;
   if LastLocalCmd<>0 then
-     M^.Default:=SearchMenuItem(M,LastLocalCmd);
+     M^.Deflt:=SearchMenuItem(M,LastLocalCmd);
   Desktop.GetExtent(R);
   MakeGlobal(P,R.A); {Desktop.MakeLocal(R.A,R.A);}
   MV := TAdvancedMenuPopUp.Create(R, M, nil);
   Re:=Application.ExecView(MV);
-  if M^.Default=nil then LastLocalCmd:=0
-     else LastLocalCmd:=M^.Default^.Command;
+  if M^.Deflt=nil then LastLocalCmd:=0
+     else LastLocalCmd:=M^.Deflt^.Command;
   MV.Free;
   if Re<>0 then
     Message(GetCommandTarget,evCommand,Re, Pointer(Self));
@@ -2535,7 +2535,7 @@ var
   Cols,Rows: integer;
 begin
   FormatStr(S, Msg, Params^);
-  if R.Empty then
+  if R.IsEmpty then
   begin
     GetStaticTextDimensions(S,40,Cols,Rows);
     if Cols<32 then Cols:=32; if Rows=0 then Rows:=1;
@@ -2592,10 +2592,10 @@ end;
 
 procedure InitAdvMsgBox;
 begin
-  ButtonName[0] := MsgYesText;
-  ButtonName[1] := MsgNoText;
-  ButtonName[2] := MsgOKText;
-  ButtonName[3] := MsgCancelText;
+  ButtonName[0] := MsgBoxText.YesText;
+  ButtonName[1] := MsgBoxText.NoText;
+  ButtonName[2] := MsgBoxText.OkText;
+  ButtonName[3] := MsgBoxText.CancelText;
   Titles[0] := sWarning;
   Titles[1] := sError;
   Titles[2] := sInformation;

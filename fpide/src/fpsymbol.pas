@@ -320,19 +320,19 @@ procedure RemoveBrowsersCollection;
 begin
   if assigned(GlobalsCollection) then
     begin
-      GlobalsCollection.deleteAll;
+      GlobalsCollection.RemoveAll;
       GlobalsCollection.Free;
       GlobalsCollection:=nil;
     end;
   if assigned(ProcedureCollection) then
     begin
-      ProcedureCollection.deleteAll;
+      ProcedureCollection.RemoveAll;
       ProcedureCollection.Free;
       ProcedureCollection:=nil;
     end;
   if assigned(ModulesCollection) then
     begin
-      ModulesCollection.deleteAll;
+      ModulesCollection.RemoveAll;
       ModulesCollection.Free;
       ModulesCollection:=nil;
     end;
@@ -1965,7 +1965,7 @@ begin
                  begin
                    PB:=BreakpointsCollection.GetType(bt_function,copy(GetStr(PS),1,l-1));
                    If Assigned(PB) then
-                     BreakpointsCollection.Delete(PB);
+                     BreakpointsCollection.Remove(PB);
                    Sym.Name:=NewStr(copy(GetStr(PS),1,l-1));
                    DrawView;
                    DisposeStr(PS);
@@ -1990,7 +1990,7 @@ begin
                  begin
                    PB:=BreakpointsCollection.GetType(bt_awatch,copy(PS^,1,l-1));
                    If Assigned(PB) then
-                     BreakpointsCollection.Delete(PB);
+                     BreakpointsCollection.Remove(PB);
                    Sym.Name:=NewStr(copy(PS^,1,l-1));
                    DrawView;
                    DisposeStr(PS);

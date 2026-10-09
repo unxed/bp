@@ -1088,12 +1088,12 @@ begin
     DisposeStr(LoadedFrom);
   if Assigned(UsedUnits) then
   begin
-    UsedUnits.DeleteAll;
+    UsedUnits.RemoveAll;
     UsedUnits.Free;
   end;
   if Assigned(DependentUnits) then
   begin
-    DependentUnits.DeleteAll;
+    DependentUnits.RemoveAll;
     DependentUnits.Free;
   end;
   if Assigned(SourceFiles) then SourceFiles.Free;
@@ -1913,7 +1913,7 @@ begin
           OS := TObjectSymbol.Create(Parent, Symbol);
           Parent.AddDescendant(OS);
           ObjectC.Insert(OS);
-          C.AtDelete(I);
+          C.AtRemove(I);
         end
       else
         Inc(I);
@@ -1953,11 +1953,11 @@ begin
     end;
 
   { E is not needed anymore }
-  E.DeleteAll;
+  E.RemoveAll;
   E.Free;
 
   { D is not needed anymore }
-  D.DeleteAll;
+  D.RemoveAll;
   D.Free;
 
   { --- Build object tree --- }
@@ -1975,8 +1975,8 @@ begin
     Inc(Pass);
   until (C.Count=0) or (Pass>20); { more than 20 levels ? - then there must be a bug }
 
-  ObjectC.DeleteAll; ObjectC.Free;
-  C.DeleteAll; C.Free;
+  ObjectC.RemoveAll; ObjectC.Free;
+  C.RemoveAll; C.Free;
 end;
 
 function SearchObjectForSymbol(O: PSymbol): PObjectSymbol;

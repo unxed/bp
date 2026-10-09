@@ -3097,7 +3097,7 @@ end;
 procedure TMessageListBox.AddItem(P: PMessageItem);
 var W : integer;
 begin
-  if List=nil then List := TCollection.Create(500,500);
+  if List=nil then Items := TCollection.Create(500,500);
   W:=length(P.GetText(255));
   if W>MaxWidth then
   begin
@@ -3135,7 +3135,7 @@ procedure TMessageListBox.Clear;
 begin
   if assigned(List) then
     List.Free;
-  List:=nil;
+  Items:=nil;
   MaxWidth:=0;
   if assigned(ModuleNames) then
     ModuleNames.FreeAll;
@@ -3329,12 +3329,12 @@ var OL: PCollection;
 begin
   OL:=List; ORV:=Range;
 
-  List := TCollection.Create(1,1); Range:=0;
+  Items := TCollection.Create(1,1); Range:=0;
 
   inherited Store(S);
 
   List.Free;
-  List:=OL; Range:=ORV;
+  Items:=OL; Range:=ORV;
   { ^^^ nasty trick - has anyone a better idea how to avoid storing the
     collection? Pasting here a modified version of TListBox.Store+
     TAdvancedListBox.Store isn't a better solution, since by eventually

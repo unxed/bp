@@ -2300,7 +2300,7 @@ end;
 procedure TBreakpointsListBox.AddBreakpoint(P: PBreakpointItem);
 var W : integer;
 begin
-  if List=nil then List := TCollection.Create(20,20);
+  if List=nil then Items := TCollection.Create(20,20);
   W:=length(P.GetText(255));
   if W>MaxWidth then
   begin
@@ -2329,7 +2329,7 @@ procedure TBreakpointsListBox.Clear;
 begin
   if assigned(List) then
     List.Free;
-  List:=nil;
+  Items:=nil;
   MaxWidth:=0;
   SetRange(0); DrawView;
   Message(Application,evBroadcast,cmClearLineHighlights,Self);
@@ -2507,13 +2507,13 @@ begin
   OL:=List;
   OldR:=Range;
   Range:=0;
-  List := TCollection.Create(1,1);
+  Items := TCollection.Create(1,1);
 
   inherited Store(S);
 
   List.Free;
   Range:=OldR;
-  List:=OL;
+  Items:=OL;
   { ^^^ nasty trick - has anyone a better idea how to avoid storing the
     collection? Pasting here a modified version of TListBox.Store+
     TAdvancedListBox.Store isn't a better solution, since by eventually
@@ -3060,7 +3060,7 @@ constructor TWatchesListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: 
     inherited Create(Bounds,1,AHScrollBar,AVScrollBar);
     If assigned(List) then
       list.Free;
-    List:=WatchesCollection;
+    Items:=WatchesCollection;
   end;
 
 procedure TWatchesListBox.Update(AMaxWidth : integer);
@@ -3339,7 +3339,7 @@ end;
           inherited Load(S);
           If assigned(List) then
             list.Free;
-          List:=WatchesCollection;
+          Items:=WatchesCollection;
           { we must set Range PM }
           SetRange(List.count+1);
         end;
@@ -3351,10 +3351,10 @@ end;
           OL:=List;
           OldRange:=Range;
           Range:=0;
-          List := TCollection.Create(1,1);
+          Items := TCollection.Create(1,1);
           inherited Store(S);
           List.Free;
-          List:=OL;
+          Items:=OL;
           { ^^^ nasty trick - has anyone a better idea how to avoid storing the
             collection? Pasting here a modified version of TListBox.Store+
             TAdvancedListBox.Store isn't a better solution, since by eventually
@@ -3364,7 +3364,7 @@ end;
 
       destructor  TWatchesListBox.Destroy;
         begin
-          List:=nil;
+          Items:=nil;
           inherited Destroy;
         end;
 

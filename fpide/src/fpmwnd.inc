@@ -156,7 +156,7 @@ begin
      C.Insert(P);
 end;
 begin
-  C.DeleteAll;
+  C.RemoveAll;
   VisState:=true; Desktop.ForEach(@AddIt); { add visible windows to list }
   VisState:=false; Desktop.ForEach(@AddIt); { add hidden windows }
   LB.SetRange(C.Count);
@@ -255,7 +255,7 @@ end;
 
 destructor TWindowListDialog.Destroy;
 begin
-  if C<>nil then begin C.DeleteAll; C.Free; end;
+  if C<>nil then begin C.RemoveAll; C.Free; end;
   inherited Destroy;
 end;
 

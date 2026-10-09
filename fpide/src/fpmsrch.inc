@@ -94,7 +94,7 @@ begin
   Overflow:=false;
   if assigned(ProcedureCollection) then
     begin
-      ProcedureCollection.deleteAll;
+      ProcedureCollection.RemoveAll;
       ProcedureCollection.Free;
     end;
   S := TSortedSymbolCollection.Create(500,500);
@@ -151,7 +151,7 @@ begin
   Overflow:=false;
   if assigned(GlobalsCollection) then
     begin
-      GlobalsCollection.deleteAll;
+      GlobalsCollection.RemoveAll;
       GlobalsCollection.Free;
     end;
   S := TSortedSymbolCollection.Create(500,500);
@@ -178,7 +178,7 @@ begin
      begin ErrorBox(msg_nodebuginfoavailable,nil); Exit; end;
   if assigned(ModulesCollection) then
     begin
-      ModulesCollection.deleteAll;
+      ModulesCollection.RemoveAll;
       ModulesCollection.Free;
     end;
   S := TSortedSymbolCollection.Create(500,500);

@@ -3281,13 +3281,13 @@ begin
   M:=GetLocalMenu;
   if M=nil then Exit;
   if LastLocalCmd<>0 then
-     M^.Default:=SearchMenuItem(M,LastLocalCmd);
+     M^.Deflt:=SearchMenuItem(M,LastLocalCmd);
   Desktop.GetExtent(R);
   MakeGlobal(P,R.A);
   MV:=CreateLocalMenuView(R,M);
   Re:=Application.ExecView(MV);
-  if M^.Default=nil then LastLocalCmd:=0
-     else LastLocalCmd:=M^.Default^.Command;
+  if M^.Deflt=nil then LastLocalCmd:=0
+     else LastLocalCmd:=M^.Deflt^.Command;
   MV.Free;
   if Re<>0 then
     Message(GetCommandTarget, evCommand, Re, Pointer(Self));

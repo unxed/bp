@@ -1535,7 +1535,7 @@ end;
 procedure TToolMessageListBox.NewList(AList: PCollection);
 begin
   if (List=ToolMessages) or (ToolMessages=nil) then
-    begin List:=nil; SetRange(0); end;
+    begin Items:=nil; SetRange(0); end;
   inherited NewList(AList);
 end;
 
@@ -1562,18 +1562,18 @@ procedure TToolMessageListBox.Store(S: TStream);
 var OL: PCollection;
 begin
   OL:=List;
-  List := TCollection.Create(1,1);
+  Items := TCollection.Create(1,1);
 
   inherited Store(S);
 
   List.Free;
-  List:=OL;
+  Items:=OL;
 end;
 
 destructor TToolMessageListBox.Destroy;
 begin
   HScrollBar:=nil; VScrollBar:=nil;
-  if List=ToolMessages then begin List:=nil; SetRange(0); end;
+  if List=ToolMessages then begin Items:=nil; SetRange(0); end;
   inherited Destroy;
 end;
 

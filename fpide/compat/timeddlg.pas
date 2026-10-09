@@ -111,11 +111,11 @@ end;
 function BoxTitle(AOptions: Word): ShortString;
 begin
   case AOptions and 3 of
-    mfError: BoxTitle := MsgErrorText;
-    mfInformation: BoxTitle := MsgInformationText;
-    mfConfirmation: BoxTitle := MsgConfirmText;
+    mfError: BoxTitle := MsgBoxText.ErrorText;
+    mfInformation: BoxTitle := MsgBoxText.InformationText;
+    mfConfirmation: BoxTitle := MsgBoxText.ConfirmText;
   else
-    BoxTitle := MsgWarningText;
+    BoxTitle := MsgBoxText.WarningText;
   end;
 end;
 
@@ -145,10 +145,10 @@ var
   Names: array[0..3] of PShortString;
   Btn: TButton;
 begin
-  Names[0] := @MsgYesText;
-  Names[1] := @MsgNoText;
-  Names[2] := @MsgOKText;
-  Names[3] := @MsgCancelText;
+  Names[0] := @MsgBoxText.YesText;
+  Names[1] := @MsgBoxText.NoText;
+  Names[2] := @MsgBoxText.OkText;
+  Names[3] := @MsgBoxText.CancelText;
   Dlg := TTimedDialog.Create(R, BoxTitle(AOptions), ASecs);
   R2.Assign(3, Dlg.Size.Y - 5, Dlg.Size.X - 2, Dlg.Size.Y - 4);
   TimedText := TTimedDialogText.Create(R2);

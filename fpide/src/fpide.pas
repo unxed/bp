@@ -1920,8 +1920,8 @@ begin
       if (cmRecentFileBase<P.Command) and (P.Command<=cmRecentFileBase+MaxRecentFileCount) then
         begin
           RemoveMenuItem(FileMenu.SubMenu,P);
-          if FileMenu.SubMenu.Default=P then
-            FileMenu.SubMenu.Default:=FileMenu.SubMenu.Items;
+          if FileMenu.SubMenu.Deflt=P then
+            FileMenu.SubMenu.Deflt:=FileMenu.SubMenu.Items;
         end
       else
         P:=nil;
@@ -1969,8 +1969,8 @@ begin
       if (cmToolsBase<P.Command) and (P.Command<=cmToolsBase+MaxToolCount) then
         begin
           RemoveMenuItem(ToolsMenu.SubMenu,P);
-          if ToolsMenu.SubMenu.Default=P then
-            ToolsMenu.SubMenu.Default:=ToolsMenu.SubMenu.Items;
+          if ToolsMenu.SubMenu.Deflt=P then
+            ToolsMenu.SubMenu.Deflt:=ToolsMenu.SubMenu.Items;
         end
       else
         P:=nil;
