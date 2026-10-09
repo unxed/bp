@@ -287,7 +287,7 @@ var
 begin
   p := GDBErrorBuf.buf;
   if (p^=#0) and got_error then
-    GetError := PChar(PtrInt(GDBOutputBuf.buf) + GDBOutputBuf.idx)
+    GetError := GDBOutputBuf.buf + GDBOutputBuf.idx
   else
     GetError := p;
 end;
@@ -554,6 +554,8 @@ end;
 
 function TGDBInterface.DoSelectSourceline(const fn: string; line, BreakIndex: LongInt): Boolean;
 begin
+  { no line to show here: the debuggee stays stopped }
+  DoSelectSourceline := True;
 end;
 
 procedure TGDBInterface.DoStartSession;

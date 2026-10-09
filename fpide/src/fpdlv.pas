@@ -686,7 +686,7 @@ end;
 
 function TDlvSession.FrameAt(Index: LongInt): TDlvFrame;
 begin
-  FillChar(Result, SizeOf(Result), 0);
+  Result := Default(TDlvFrame);
   if (Index >= 0) and (Index < Length(FFrames)) then
     Result := FFrames[Index];
 end;

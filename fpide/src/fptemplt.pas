@@ -61,7 +61,7 @@ type
 
     TTemplateCollection = class;
     PTemplateCollection = TTemplateCollection;
-    TTemplateCollection = class(TSortedCollection)
+    TTemplateCollection = class(TNSSortedCollection)
       function  At(Index: Integer): PTemplate;
       procedure FreeItem(Item: Pointer); override;
       function  Compare(Key1, Key2: Pointer): Sw_Integer; override;

@@ -23,7 +23,7 @@ interface
 
 uses Objects,Drivers,Views,Dialogs,Validate,
      BrowCol,
-     WEditor,WViews,
+     WUtils,WEditor,WViews,
      FPViews;
 
 const
@@ -34,7 +34,7 @@ type
 
     TTool = class;
   PTool = TTool;
-    TTool = class(TObject)
+    TTool = class(System.TObject)
       constructor Create(const ATitle, AProgramPath, ACommandLine: string; AHotKey: word);
       function    GetTitle: string; virtual;
       procedure   GetParams(var ATitle, AProgramPath, ACommandLine: string; var AHotKey: word); virtual;
@@ -49,7 +49,7 @@ type
 
     TToolCollection = class;
   PToolCollection = TToolCollection;
-    TToolCollection = class(TCollection)
+    TToolCollection = class(TUnstoredCollection)
       function At(Index: sw_Integer): PTool;
     end;
 
@@ -175,7 +175,7 @@ implementation
 uses Dos,
      FVConsts,
      App,MsgBox,
-     WConsts,WUtils,TvIni,
+     WConsts,TvIni,
      FPConst,FPVars,FPUtils,TvCStr;
 
 {$ifndef NOOBJREG}
@@ -1475,7 +1475,7 @@ procedure AddToolMessage(ModuleName, Text: string; Row, Col: longint);
 var MN: PString;
 begin
   if ToolMessages=nil then
-    ToolMessages := TCollection.Create(500,1000);
+    ToolMessages := TUnstoredCollection.Create(500,1000);
   if ToolModuleNames=nil then
     ToolModuleNames := TStoreCollection.Create(50,100);
   MN:=ToolModuleNames.Add(ModuleName);
@@ -1565,11 +1565,11 @@ procedure TToolMessageListBox.Write(Os: opstream);
 var OL: PCollection;
 begin
   OL:=List;
-  Items := TCollection.Create(1,1);
+  { the messages are not stored: the list is written as nil }
+  Items := nil;
 
   inherited Write(Os);
 
-  List.Free;
   Items:=OL;
 end;
 

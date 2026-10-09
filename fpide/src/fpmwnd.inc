@@ -112,7 +112,7 @@ begin
   R := TRect.Create(0, 0, round(Drivers.TScreen.ScreenWidth*5/8), 15);
   inherited Create(R, dialog_windowlist);
   HelpCtx:=hcWindowList;
-  C := TCollection.Create(20,10);
+  C := TUnstoredCollection.Create(20,10);
 
   R := GetExtent; R.Grow(-2,-2); Inc(R.A.Y); R.B.X:=R.B.X-14;
   R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;

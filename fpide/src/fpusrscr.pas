@@ -38,7 +38,7 @@ type
 
     TScreen = class;
     PScreen = TScreen;
-    TScreen = class(TObject)
+    TScreen = class(System.TObject)
       function    GetWidth: integer; virtual;
       function    GetHeight: integer; virtual;
       procedure   GetLine(Line: integer; var Text, Attr: string); virtual;

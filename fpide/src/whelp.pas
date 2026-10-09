@@ -90,7 +90,7 @@ type
 
       TTopicCollection = class;
       PTopicCollection = TTopicCollection;
-      TTopicCollection = class(TSortedCollection)
+      TTopicCollection = class(TNSSortedCollection)
         function   At(Index: sw_Integer): PTopic;
         procedure  FreeItem(Item: Pointer); override;
         function   Compare(Key1, Key2: Pointer): Sw_Integer; override;
@@ -99,7 +99,7 @@ type
 
       TIndexEntryCollection = class;
       PIndexEntryCollection = TIndexEntryCollection;
-      TIndexEntryCollection = class(TSortedCollection)
+      TIndexEntryCollection = class(TNSSortedCollection)
         function   At(Index: Sw_Integer): PIndexEntry;
         procedure  FreeItem(Item: Pointer); override;
         function   Compare(Key1, Key2: Pointer): Sw_Integer; override;
@@ -107,14 +107,14 @@ type
 
       TUnsortedIndexEntryCollection = class;
       PUnsortedIndexEntryCollection = TUnsortedIndexEntryCollection;
-      TUnsortedIndexEntryCollection = class(TCollection)
+      TUnsortedIndexEntryCollection = class(TNSCollection)
         function   At(Index: Sw_Integer): PIndexEntry;
         procedure  FreeItem(Item: Pointer); override;
       end;
 
       THelpFile = class;
       PHelpFile = THelpFile;
-      THelpFile = class(TObject)
+      THelpFile = class(System.TObject)
         ID           : word;
         Topics       : PTopicCollection;
         IndexEntries : PUnsortedIndexEntryCollection;
@@ -133,11 +133,11 @@ type
         procedure MaintainTopicCache;
       end;
 
-      PHelpFileCollection = PCollection;
+      PHelpFileCollection = TNSCollection;
 
       THelpFacility = class;
       PHelpFacility = THelpFacility;
-      THelpFacility = class(TObject)
+      THelpFacility = class(System.TObject)
         HelpFiles: PHelpFileCollection;
         IndexTabSize: sw_integer;
         constructor Create;
@@ -210,7 +210,7 @@ uses
 type
   THelpFileTypeCollection = class;
   PHelpFileTypeCollection = THelpFileTypeCollection;
-  THelpFileTypeCollection = class(TCollection)
+  THelpFileTypeCollection = class(TNSCollection)
     function At(Index: sw_Integer): PHelpFileType;
     procedure FreeItem(Item: Pointer); override;
   end;
@@ -727,7 +727,7 @@ end;
 constructor THelpFacility.Create;
 begin
   inherited Create;
-  HelpFiles := TCollection.Create(10,10);
+  HelpFiles := TNSCollection.Create(10,10);
   IndexTabSize:=40;
 end;
 

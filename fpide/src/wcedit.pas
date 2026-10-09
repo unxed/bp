@@ -49,7 +49,7 @@ type
 
     TLineCollection = class;
     PLineCollection = TLineCollection;
-    TLineCollection = class(TCollection)
+    TLineCollection = class(TNSCollection)
       function  At(Index: sw_Integer): PCustomLine;
     end;
 

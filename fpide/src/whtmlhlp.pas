@@ -37,7 +37,7 @@ type
 
     TTableElement = class;
     PTableElement = TTableElement;
-    TTableElement = class(Tobject)
+    TTableElement = class(System.TObject)
       TextBegin,TextEnd, TextLength, NumNL : sw_word;
       Alignment : TParagraphAlign;
       NextEl : PTableElement;
@@ -46,7 +46,7 @@ type
 
     TTableLine = class;
     PTableLine = TTableLine;
-    TTableLine = class(Tobject)
+    TTableLine = class(System.TObject)
       NumElements : sw_word;
       Nextline : PTableLine;
       FirstEl,LastEl : PTableElement;
@@ -59,7 +59,7 @@ type
     PHTMLTopicRenderer = THTMLTopicRenderer;
     TTable = class;
     PTable = TTable;
-    TTable = class(Tobject)
+    TTable = class(System.TObject)
       NumLines,NumCols : sw_word;
       GlobalOffset,
       GlobalTextBegin : sw_word;

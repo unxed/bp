@@ -64,7 +64,7 @@ type
      TResourceEnumFunc = function(P: PResource): Boolean is nested;
      TResourceEnumProc = procedure(P: PResource) is nested;
 
-     TResourceEntry = class(TObject)
+     TResourceEntry = class(System.TObject)
        constructor Create(AID, ALangID, AFlags, ADataLen: longint);
      private
        ID      : longint;
@@ -77,7 +77,7 @@ type
 
      TResourceEntryCollection = class;
      PResourceEntryCollection = TResourceEntryCollection;
-     TResourceEntryCollection = class(TSortedCollection)
+     TResourceEntryCollection = class(TNSSortedCollection)
        function  At(Index: Sw_Integer): PResourceEntry;
        function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
        function  SearchEntryForLang(ALangID: longint): PResourceEntry;
@@ -85,12 +85,12 @@ type
 
      TGlobalResourceEntryCollection = class;
      PGlobalResourceEntryCollection = TGlobalResourceEntryCollection;
-     TGlobalResourceEntryCollection = class(TSortedCollection)
+     TGlobalResourceEntryCollection = class(TNSSortedCollection)
        function  At(Index: Sw_Integer): PResourceEntry;
        function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
      end;
 
-     TResource = class(TObject)
+     TResource = class(System.TObject)
        constructor Create(const AName: string; AClass, AFlags: longint);
        function    GetName: string; virtual;
        function    FirstThatEntry(Func: TResourceEntryEnumFunc): PResourceEntry; virtual;
@@ -104,14 +104,14 @@ type
        procedure   BuildHeader(var Header : TResourceHeader);
      end;
 
-     TResourceCollection = class(TSortedCollection)
+     TResourceCollection = class(TNSSortedCollection)
        function  At(Index: Sw_Integer): PResource;
        function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
        function  SearchResourceByName(const AName: string): PResource;
      end;
      PResourceCollection = TResourceCollection;
 
-     TResourceFile = class(TObject)
+     TResourceFile = class(System.TObject)
        constructor Create(ARS: TStream; ALoad: boolean);
        constructor Create(ARS: TStream);
        constructor Load(ARS: TStream);
@@ -586,10 +586,6 @@ begin
       S.Seek(BaseOfs+E.DataOfs);
       OK:=(S.Status=stOK);
       CurOfs:=0;
-      { this results sometimes in endless loops
-      when the resource are changed PM }
-      if E.DataLen<0 then
-        OK:=false;
       while OK and (CurOfs<E.DataLen) do
       begin
         CurFrag:=Min(E.DataLen-CurOfs,TempBufSize);

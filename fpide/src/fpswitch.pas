@@ -47,7 +47,7 @@ type
 
     TSwitchItem = class;
     PSwitchItem = TSwitchItem;
-    TSwitchItem = class(TObject)
+    TSwitchItem = class(System.TObject)
       Typ       : TSwitchItemTyp;
       Name      : string[50];
       Param     : string[10];
@@ -155,7 +155,7 @@ type
       IsSel  : boolean;
       Prefix : char;
       SelNr  : array[TSwitchMode] of integer;
-      Items  : PCollection;
+      Items  : TNSCollection;
     end;
 
 const
@@ -583,7 +583,7 @@ end;
 
 constructor TSwitches.Create(ch:char);
 begin
-  Items := TCollection.Create(10,5);
+  Items := TNSCollection.Create(10,5);
   Prefix:=ch;
   FillChar(SelNr,SizeOf(SelNr),#0);
   IsSel:=false;
@@ -592,7 +592,7 @@ end;
 
 constructor TSwitches.InitSelect(ch:char);
 begin
-  Items := TCollection.Create(10,5);
+  Items := TNSCollection.Create(10,5);
   Prefix:=ch;
   FillChar(SelNr,SizeOf(SelNr),#0);
   IsSel:=true;

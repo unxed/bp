@@ -25,7 +25,7 @@ uses Objects, WUtils;
 type
     TTextFile = class;
     PTextFile = TTextFile;
-    TTextFile = class(TObject)
+    TTextFile = class(System.TObject)
       function GetLine(Idx: sw_integer; var S: string): boolean; virtual;
       function GetFileName : string; virtual;
     end;
@@ -54,7 +54,7 @@ type
 
     TSGMLParser = class;
     PSGMLParser = TSGMLParser;
-    TSGMLParser = class(TObject)
+    TSGMLParser = class(System.TObject)
       constructor Create;
       function    Process(HTMLFile: PTextFile): boolean; virtual;
       function    ProcessLine(LineText: string): boolean; virtual;

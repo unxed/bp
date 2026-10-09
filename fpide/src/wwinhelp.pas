@@ -249,7 +249,7 @@ uses Strings;
 type
   TPointerMethod = function(P: pointer): boolean of object;
 
-function CallPointerMethod(Code: pointer; Obj: TObject; P: pointer): longint;
+function CallPointerMethod(Code: pointer; Obj: System.TObject; P: pointer): longint;
 var M: TMethod;
 begin
   M.Code:=Code; M.Data:=Pointer(Obj);

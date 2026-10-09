@@ -980,7 +980,7 @@ end;*)
 type
      TVideoModeCollection = class;
      PVideoModeCollection = TVideoModeCollection;
-     TVideoModeCollection = class(TSortedCollection)
+     TVideoModeCollection = class(TUnstoredSortedCollection)
        function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
        procedure FreeItem(Item: Pointer); override;
      end;

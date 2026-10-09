@@ -47,7 +47,7 @@ type
 
     TGDBValue = class;
     PGDBValue = TGDBValue;
-    TGDBValue = class(TObject)
+    TGDBValue = class(System.TObject)
       constructor Create(Const AExpr : String;ASym : PSymbol);
       procedure GetValue;
       function  GetText : String;
@@ -59,7 +59,7 @@ type
       GDBI : longint;
       end;
 
-    TGDBValueCollection = class(TCollection)
+    TGDBValueCollection = class(TNSCollection)
       function  At(Index: sw_Integer): PGDBValue;
       end;
 
@@ -1803,7 +1803,7 @@ begin
         cmDebuggerStopped :
           begin
             if Assigned(DebuggerValue) and
-               (DebuggerValue.GDBI<>PtrInt(Event.Message.InfoPtr)) then
+               (PtrUInt(DebuggerValue.GDBI)<>PtrUInt(Event.Message.InfoPtr)) then
               begin
                 If Assigned(ST.Text) then
                   DisposeStr(ST.Text);

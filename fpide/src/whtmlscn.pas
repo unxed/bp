@@ -61,7 +61,7 @@ type
 
      TNameID = class;
      PNameID = TNameID;
-     TNameID  = class(TObject)
+     TNameID  = class(System.TObject)
        constructor Create(const AName : string; Astate : TNameIDState);
        destructor Destroy; override;
        procedure SetState(Astate : TNameIDState; enabled : boolean);
@@ -80,7 +80,7 @@ type
 
      TNameIDCollection = class;
      PNameIDCollection = TNameIDCollection;
-     TNameIDCollection = class(TSortedCollection)
+     TNameIDCollection = class(TNSSortedCollection)
        function At(Index: sw_Integer): PNameID;
        function Compare(Key1, Key2: Pointer): sw_Integer; override;
      end;
@@ -147,7 +147,7 @@ type
 
      THTMLLinkScanFile = class;
      PHTMLLinkScanFile = THTMLLinkScanFile;
-     THTMLLinkScanFile = class(TObject)
+     THTMLLinkScanFile = class(System.TObject)
        constructor Create(const ADocumentURL: string);
        function    GetDocumentURL: string;
        destructor Destroy; override;
@@ -165,7 +165,7 @@ type
 
      THTMLLinkScanFileCollection = class;
      PHTMLLinkScanFileCollection = THTMLLinkScanFileCollection;
-     THTMLLinkScanFileCollection = class(TSortedCollection)
+     THTMLLinkScanFileCollection = class(TNSSortedCollection)
        function   At(Index: sw_Integer): PHTMLLinkScanFile;
        function   Compare(Key1, Key2: Pointer): sw_Integer; override;
        function   SearchFile(const DocURL: string): PHTMLLinkScanFile;

@@ -533,7 +533,7 @@ end;
 procedure TCompilerMessageWindow.Write(Os: opstream);
 begin
   if MsgLB.List=nil then
-    MsgLB.NewList(TCollection.Create(100,100));
+    MsgLB.NewList(TUnstoredCollection.Create(100,100));
   inherited Write(Os);
   Os.WritePointer(MsgLB);
 end;

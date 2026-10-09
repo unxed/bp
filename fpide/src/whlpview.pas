@@ -62,19 +62,19 @@ type
 
       TLinkCollection = class;
       PLinkCollection = TLinkCollection;
-      TLinkCollection = class(TCollection)
+      TLinkCollection = class(TNSCollection)
         procedure FreeItem(Item: Pointer); override;
       end;
 
       TColorAreaCollection = class;
       PColorAreaCollection = TColorAreaCollection;
-      TColorAreaCollection = class(TCollection)
+      TColorAreaCollection = class(TNSCollection)
         procedure FreeItem(Item: Pointer); override;
       end;
 
       TKeywordCollection = class;
       PKeywordCollection = TKeywordCollection;
-      TKeywordCollection = class({TSorted}TCollection)
+      TKeywordCollection = class(TNSCollection)
         function  At(Index: sw_Integer): PHelpKeyword;
         procedure FreeItem(Item: Pointer); override;
         function  Compare(Key1, Key2: Pointer): sw_Integer; virtual;
@@ -90,7 +90,7 @@ type
 
       TNamedMark = class;
       PNamedMark = TNamedMark;
-      TNamedMark = class(TObject)
+      TNamedMark = class(System.TObject)
         constructor Create(const AName: string; AX, AY: integer);
         function    GetName: string;
         destructor Destroy; override;
@@ -101,7 +101,7 @@ type
 
       TNamedMarkCollection = class;
       PNamedMarkCollection = TNamedMarkCollection;
-      TNamedMarkCollection = class(TSortedCollection)
+      TNamedMarkCollection = class(TNSSortedCollection)
         function At(Index: sw_Integer): PNamedMark;
         function Compare(Key1, Key2: Pointer): sw_Integer; override;
         function SearchMark(const Name: string): PNamedMark;
@@ -118,7 +118,7 @@ type
 
       THelpTopic = class;
       PHelpTopic = THelpTopic;
-      THelpTopic = class(TObject)
+      THelpTopic = class(System.TObject)
         Topic: PTopic;
         Lines: PUnsortedStringCollection;
         LinesPos: PLinePosCollection;
@@ -414,7 +414,7 @@ end;
 
 function TLinePosCollection.At(Index: sw_Integer): sw_integer;
 begin
-  at := longint (inherited at(Index));
+  at := sw_integer(PtrUInt(inherited at(Index)));
 end;
 
 procedure TLinePosCollection.Insert (Item: pointer);
@@ -497,7 +497,7 @@ begin
       Bounds.Move(Delta,0);
   if Line='' then Line:=' ';
   Lines.Insert(NewStr(Line));
-  LinesPos.Insert(pointer(LinePos));
+  LinesPos.Insert(pointer(PtrUInt(LinePos)));
   ClearLine;
   LineStart:=NextLineStart;
   CurPos.X:=Margin+LineStart; Line:=CharStr(#255,LineStart); Inc(CurPos.Y);
