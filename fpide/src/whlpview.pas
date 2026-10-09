@@ -1449,7 +1449,7 @@ end;
 
 function THelpWindow.GetPalette: TPalette;
 begin
-  GetPalette:=nil;
+  GetPalette:=Default(TPalette);
 end;
 
 END.

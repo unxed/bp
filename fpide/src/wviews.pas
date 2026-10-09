@@ -1297,7 +1297,7 @@ end;
 
 function TColorStaticText.GetPalette: TPalette;
 begin
-  Result := nil;
+  Result := Default(TPalette);
 end;
 
 procedure TColorStaticText.Draw;

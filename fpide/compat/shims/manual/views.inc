@@ -19,3 +19,7 @@ const
   phPostProcess = TvViews.TView.PhaseType.phPostProcess;
 
 function CommandSetOf(const Commands: TCommandBytes): TCommandSet;
+
+{ the palette of the Pascal API: a string of color indices (TPalette.Create of tv/), and the number of its entries }
+function MakePalette(const S: ShortString): TPalette;
+function PaletteSize(const P: TPalette): Integer;

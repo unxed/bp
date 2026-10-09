@@ -3625,7 +3625,7 @@ end;
 
 function TTab.GetPalette: TPalette;
 begin
-  GetPalette:=nil;
+  GetPalette:=Default(TPalette);
 end;
 
 procedure TTab.Draw;
