@@ -534,7 +534,7 @@ begin
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
-            { a letter of another keyboard layout (Alt+Ы, Ы): the Latin letter of the same key (TvXlat) }
+            { a letter of another keyboard layout, with Alt or without: the Latin letter of the same key (TvXlat) }
             XE := E;
             if XlatModded(XE) or XlatPlain(XE) then
             begin
@@ -816,7 +816,7 @@ begin
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
-            { a letter of another keyboard layout (Alt+Ы, Ы): the Latin letter of the same key (TvXlat) }
+            { a letter of another keyboard layout, with Alt or without: the Latin letter of the same key (TvXlat) }
             XE := E;
             if XlatModded(XE) or XlatPlain(XE) then
             begin
@@ -1177,7 +1177,7 @@ begin
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
-            { a letter of another keyboard layout (Alt+Ы, Ы): the Latin letter of the same key (TvXlat) }
+            { a letter of another keyboard layout, with Alt or without: the Latin letter of the same key (TvXlat) }
             XE := E;
             if XlatModded(XE) or XlatPlain(XE) then
             begin
