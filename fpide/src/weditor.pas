@@ -1911,14 +1911,19 @@ procedure TCustomCodeEditor.SetContent(ALines: PUnsortedStringCollection);
 var I: sw_integer;
     T: AnsiString;
 begin
+  { nil is no lines (an empty text) }
   T:='';
-  for I:=0 to ALines.Count-1 do
-    begin
-      if I>0 then T:=T+#10;
-      T:=T+GetStr(ALines.At(I));
-    end;
+  if Assigned(ALines) then
+    for I:=0 to ALines.Count-1 do
+      begin
+        if I>0 then T:=T+#10;
+        T:=T+GetStr(ALines.At(I));
+      end;
   Doc.LoadText(T);
-  FCore.FAddedLines:=ALines.Count;
+  if Assigned(ALines) then
+    FCore.FAddedLines:=ALines.Count
+  else
+    FCore.FAddedLines:=0;
   Editor.GotoOffset(0);
   Refresh;
 end;
