@@ -26,6 +26,8 @@ type
      TCodeCompleteWordList = class;
      PCodeCompleteWordList = TCodeCompleteWordList;
      TCodeCompleteWordList = class(TTextCollection)
+       function StreamableName: ShortString; override;
+       class function Build: TStreamable; static;
      end;
 
     TCodeCompleteDialog = class;
@@ -74,7 +76,6 @@ uses App,Views,MsgBox,Validate,
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RCodeCompleteWordList: TStreamRec;
 
 {$endif}
 {$endif}
@@ -328,7 +329,7 @@ var C: PCodeCompleteWordList;
     NewCodeCompleteCase : TCodeCompleteCase;
     StPtr : PString;
 begin
-  C := TCodeCompleteWordList.Load(S);
+  C := TCodeCompleteWordList(GetObject(S));
   OK:=Assigned(C) and (S.Status=stOk);
   if OK then
     begin
@@ -383,7 +384,7 @@ begin
   OK:=Assigned(CodeCompleteWords);
   if OK then
   begin
-    CodeCompleteWords.Store(S);
+    PutObject(S, CodeCompleteWords);
     S.Write(CodeCompleteCase,Sizeof(TCodeCompleteCase));
     { New fields added }
     S.Write(UseStandardUnitsInCodeComplete,Sizeof(UseStandardUnitsInCodeComplete));
@@ -657,24 +658,12 @@ begin
 end;
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RCodeCompleteWordList(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TCodeCompleteWordList.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RCodeCompleteWordList(P: TStreamable; S: TStream);
-begin
-  TCodeCompleteWordList(Pointer(P)).Store(S);
-end;
 
-procedure FillStreamRecs_fpcodcmp;
+procedure RegisterStreamables_fpcodcmp;
 begin
-  RCodeCompleteWordList.ObjType := 14401;
-  RCodeCompleteWordList.VmtLink := PtrUInt(System.TClass(TCodeCompleteWordList));
-  RCodeCompleteWordList.Load := @Build_RCodeCompleteWordList;
-  RCodeCompleteWordList.Store := @Store_RCodeCompleteWordList;
-  RCodeCompleteWordList.Next := nil;
+  TStreamableClass.Create('fpcodcmp.TCodeCompleteWordList', @TCodeCompleteWordList.Build);
 end;
 
 {$endif}
@@ -682,9 +671,19 @@ end;
 procedure RegisterCodeComplete;
 begin
 {$ifndef NOOBJREG}
-  FillStreamRecs_fpcodcmp;
-  RegisterType(RCodeCompleteWordList);
+  RegisterStreamables_fpcodcmp;
 {$endif}
+end;
+
+
+class function TCodeCompleteWordList.Build: TStreamable;
+begin
+  Result := TCodeCompleteWordList.Create(streamableInit);
+end;
+
+function TCodeCompleteWordList.StreamableName: ShortString;
+begin
+  Result := 'fpcodcmp.TCodeCompleteWordList';
 end;
 
 END.

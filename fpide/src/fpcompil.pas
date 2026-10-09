@@ -64,12 +64,14 @@ type
     TCompilerMessageListBox = class(TMessageListBox)
       function  GetPalette: TPalette; override;
       procedure SelectFirstError;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TCompilerMessageWindow = class;
     PCompilerMessageWindow = TCompilerMessageWindow;
     TCompilerMessageWindow = class(TFPWindow)
-      constructor Create;
+      constructor Create; overload;
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetPalette: TPalette; override;
       procedure   Close;override;
@@ -77,8 +79,10 @@ type
       procedure   SizeLimits(out Min, Max: TPoint); override;
       procedure   AddMessage(AClass: longint;const Msg, Module: string; Line, Column: longint);
       procedure   ClearMessages;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   UpdateCommands; override;
     private
@@ -113,7 +117,7 @@ type
       procedure filegettime; override;
     private
       Editor: PFileEditor;
-      S: PStream;
+      S: TStream;
     end;
 {$endif EMBED_COMPILER}
 
@@ -175,8 +179,6 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RCompilerMessageListBox: TStreamRec;
-var RCompilerMessageWindow: TStreamRec;
 
 {$endif}
 {$endif}
@@ -520,19 +522,30 @@ begin
 end;
 
 
-constructor TCompilerMessageWindow.Load(S: TStream);
+function TCompilerMessageWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  GetSubViewPtr(S,MsgLB);
+  Result := Self;
+  inherited Read(Ip);
+  MsgLB := TCompilerMessageListBox(Ip.ReadPointer);
 end;
 
 
-procedure TCompilerMessageWindow.Store(S: TStream);
+procedure TCompilerMessageWindow.Write(Os: opstream);
 begin
   if MsgLB.List=nil then
     MsgLB.NewList(TCollection.Create(100,100));
-  inherited Store(S);
-  PutSubViewPtr(S,MsgLB);
+  inherited Write(Os);
+  Os.WritePointer(MsgLB);
+end;
+
+class function TCompilerMessageWindow.Build: TStreamable;
+begin
+  Result := TCompilerMessageWindow.Create(streamableInit);
+end;
+
+function TCompilerMessageWindow.StreamableName: ShortString;
+begin
+  Result := 'fpcompil.TCompilerMessageWindow';
 end;
 
 procedure TCompilerMessageWindow.UpdateCommands;
@@ -1324,39 +1337,13 @@ end;
 {$endif EMBED_COMPILER}
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RCompilerMessageListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TCompilerMessageListBox.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RCompilerMessageListBox(P: TStreamable; S: TStream);
-begin
-  TCompilerMessageListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RCompilerMessageWindow(S: TStream): TStreamable;
+procedure RegisterStreamables_fpcompil;
 begin
-  Result := TStreamable(Pointer(TCompilerMessageWindow.Load(S)));
-end;
-
-procedure Store_RCompilerMessageWindow(P: TStreamable; S: TStream);
-begin
-  TCompilerMessageWindow(Pointer(P)).Store(S);
-end;
-
-procedure FillStreamRecs_fpcompil;
-begin
-  RCompilerMessageListBox.ObjType := 1211;
-  RCompilerMessageListBox.VmtLink := PtrUInt(System.TClass(TCompilerMessageListBox));
-  RCompilerMessageListBox.Load := @Build_RCompilerMessageListBox;
-  RCompilerMessageListBox.Store := @Store_RCompilerMessageListBox;
-  RCompilerMessageListBox.Next := nil;
-  RCompilerMessageWindow.ObjType := 1212;
-  RCompilerMessageWindow.VmtLink := PtrUInt(System.TClass(TCompilerMessageWindow));
-  RCompilerMessageWindow.Load := @Build_RCompilerMessageWindow;
-  RCompilerMessageWindow.Store := @Store_RCompilerMessageWindow;
-  RCompilerMessageWindow.Next := nil;
+  TStreamableClass.Create('fpcompil.TCompilerMessageListBox', @TCompilerMessageListBox.Build);
+  TStreamableClass.Create('fpcompil.TCompilerMessageWindow', @TCompilerMessageWindow.Build);
 end;
 
 {$endif}
@@ -1375,11 +1362,19 @@ begin
   BuildBrowserHook:=@BrowserFromSources;
 {$endif}
 {$ifndef NOOBJREG}
-  FillStreamRecs_fpcompil;
-  RegisterType(RCompilerMessageListBox);
-  RegisterType(RCompilerMessageWindow);
+  RegisterStreamables_fpcompil;
 {$endif}
 end;
 
+
+class function TCompilerMessageListBox.Build: TStreamable;
+begin
+  Result := TCompilerMessageListBox.Create(streamableInit);
+end;
+
+function TCompilerMessageListBox.StreamableName: ShortString;
+begin
+  Result := 'fpcompil.TCompilerMessageListBox';
+end;
 
 end.

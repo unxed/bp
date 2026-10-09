@@ -288,7 +288,7 @@ procedure TIDEApp.Print;
                 exit;
               end;
           end;
-        write(f,#12);
+        System.write(f,#12);
         close(f);
       end;
   end;

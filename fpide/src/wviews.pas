@@ -54,7 +54,7 @@ type
     TCenterDialog = class;
     PCenterDialog = TCenterDialog;
     TCenterDialog = class(TDialog)
-      constructor Create(const Bounds: TRect; ATitle: TTitleStr);
+      constructor Create(const Bounds: TRect; ATitle: TTitleStr); overload;
     end;
 
     TAdvancedMenuBox = class;
@@ -96,8 +96,10 @@ type
       Default: boolean;
       procedure   FocusItem(Item: sw_integer); override;
       procedure   HandleEvent(var Event: TEvent); override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     end;
 
     TNoUpdateButton = class;
@@ -123,27 +125,33 @@ type
       Color: word;
       DontWrap: boolean;
       Delta: TPoint;
-      constructor Create(const Bounds: TRect; AText: String; AColor: word; AWrap: boolean);
+      constructor Create(const Bounds: TRect; AText: String; AColor: word; AWrap: boolean); overload;
       function    GetPalette: TPalette; override;
       procedure   Draw; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     end;
 
     THSListBox = class;
     PHSListBox = THSListBox;
     THSListBox = class(TLocalMenuListBox)
-      constructor Create(const Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(const Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar); overload;
       function    SaveToFile(const AFileName: string): boolean; virtual;
       function    SaveAs: Boolean; virtual;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TDlgWindow = class;
     PDlgWindow = TDlgWindow;
     TDlgWindow = class(TDialog)
-      constructor Create(const Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer);
+      constructor Create(const Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer); overload;
       procedure   HandleEvent(var Event: TEvent); override;
       procedure Update; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TAdvancedStatusLine = class;
@@ -294,40 +302,6 @@ uses Mouse,
      WConsts,WUtils;
 
 {$ifndef NOOBJREG}
-function BuildAdvancedListBox(S: TStream): TStreamable;
-begin
-  Result := TAdvancedListBox.Load(S);
-end;
-procedure StoreAdvancedListBox(P: TStreamable; S: TStream);
-begin
-  TAdvancedListBox(P).Store(S);
-end;
-function BuildColorStaticText(S: TStream): TStreamable;
-begin
-  Result := TColorStaticText.Load(S);
-end;
-procedure StoreColorStaticText(P: TStreamable; S: TStream);
-begin
-  TColorStaticText(P).Store(S);
-end;
-function BuildHSListBox(S: TStream): TStreamable;
-begin
-  Result := THSListBox.Load(S);
-end;
-procedure StoreHSListBox(P: TStreamable; S: TStream);
-begin
-  THSListBox(P).Store(S);
-end;
-function BuildDlgWindow(S: TStream): TStreamable;
-begin
-  Result := TDlgWindow.Load(S);
-end;
-procedure StoreDlgWindow(P: TStreamable; S: TStream);
-begin
-  TDlgWindow(P).Store(S);
-end;
-var
-  RAdvancedListBox, RColorStaticText, RHSListBox, RDlgWindow: TStreamRec;
 {$endif}
 
 {$ifdef USERESSTRINGS}
@@ -1427,22 +1401,33 @@ begin
  end;
 end;
 
-constructor TColorStaticText.Load(S: TStream);
+function TColorStaticText.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 
-  S.Read(Color,SizeOf(Color));
-  S.Read(DontWrap,SizeOf(DontWrap));
-  S.Read(Delta,SizeOf(Delta));
+  Ip.ReadBytes(Color,SizeOf(Color));
+  Ip.ReadBytes(DontWrap,SizeOf(DontWrap));
+  Ip.ReadBytes(Delta,SizeOf(Delta));
 end;
 
-procedure TColorStaticText.Store(S: TStream);
+procedure TColorStaticText.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 
-  S.Write(Color,SizeOf(Color));
-  S.Write(DontWrap,SizeOf(DontWrap));
-  S.Write(Delta,SizeOf(Delta));
+  Os.WriteBytes(Color,SizeOf(Color));
+  Os.WriteBytes(DontWrap,SizeOf(DontWrap));
+  Os.WriteBytes(Delta,SizeOf(Delta));
+end;
+
+class function TColorStaticText.Build: TStreamable;
+begin
+  Result := TColorStaticText.Create(streamableInit);
+end;
+
+function TColorStaticText.StreamableName: ShortString;
+begin
+  Result := 'wviews.TColorStaticText';
 end;
 
 constructor THSListBox.Create(const Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar);
@@ -2334,18 +2319,29 @@ begin
   Result := MakePalette(CPlainCluster);
 end;
 
-constructor TAdvancedListBox.Load(S: TStream);
+function TAdvancedListBox.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 
-  S.Read(Default,SizeOf(Default));
+  Ip.ReadBytes(Default,SizeOf(Default));
 end;
 
-procedure TAdvancedListBox.Store(S: TStream);
+procedure TAdvancedListBox.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 
-  S.Write(Default,SizeOf(Default));
+  Os.WriteBytes(Default,SizeOf(Default));
+end;
+
+class function TAdvancedListBox.Build: TStreamable;
+begin
+  Result := TAdvancedListBox.Create(streamableInit);
+end;
+
+function TAdvancedListBox.StreamableName: ShortString;
+begin
+  Result := 'wviews.TAdvancedListBox';
 end;
 
 procedure TNoUpdateButton.HandleEvent(var Event: TEvent);
@@ -2604,32 +2600,32 @@ end;
 procedure RegisterWViews;
 begin
 {$ifndef NOOBJREG}
-  RAdvancedListBox.ObjType := 1120;
-  RAdvancedListBox.VmtLink := PtrUInt(System.TClass(TAdvancedListBox));
-  RAdvancedListBox.Load := @BuildAdvancedListBox;
-  RAdvancedListBox.Store := @StoreAdvancedListBox;
-  RAdvancedListBox.Next := nil;
-  RegisterType(RAdvancedListBox);
-  RColorStaticText.ObjType := 1121;
-  RColorStaticText.VmtLink := PtrUInt(System.TClass(TColorStaticText));
-  RColorStaticText.Load := @BuildColorStaticText;
-  RColorStaticText.Store := @StoreColorStaticText;
-  RColorStaticText.Next := nil;
-  RegisterType(RColorStaticText);
-  RHSListBox.ObjType := 1122;
-  RHSListBox.VmtLink := PtrUInt(System.TClass(THSListBox));
-  RHSListBox.Load := @BuildHSListBox;
-  RHSListBox.Store := @StoreHSListBox;
-  RHSListBox.Next := nil;
-  RegisterType(RHSListBox);
-  RDlgWindow.ObjType := 1123;
-  RDlgWindow.VmtLink := PtrUInt(System.TClass(TDlgWindow));
-  RDlgWindow.Load := @BuildDlgWindow;
-  RDlgWindow.Store := @StoreDlgWindow;
-  RDlgWindow.Next := nil;
-  RegisterType(RDlgWindow);
+  TStreamableClass.Create('wviews.TAdvancedListBox', @TAdvancedListBox.Build);
+  TStreamableClass.Create('wviews.TColorStaticText', @TColorStaticText.Build);
+  TStreamableClass.Create('wviews.THSListBox', @THSListBox.Build);
+  TStreamableClass.Create('wviews.TDlgWindow', @TDlgWindow.Build);
 {$endif}
 end;
 
+
+class function TDlgWindow.Build: TStreamable;
+begin
+  Result := TDlgWindow.Create(streamableInit);
+end;
+
+function TDlgWindow.StreamableName: ShortString;
+begin
+  Result := 'wviews.TDlgWindow';
+end;
+
+class function THSListBox.Build: TStreamable;
+begin
+  Result := THSListBox.Create(streamableInit);
+end;
+
+function THSListBox.StreamableName: ShortString;
+begin
+  Result := 'wviews.THSListBox';
+end;
 
 END.

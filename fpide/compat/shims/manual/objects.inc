@@ -20,7 +20,6 @@ type
   TObject = TStreamable;
   PObject = TObject;
   PCollection = TCollection;
-  PStream = TStream;
   PBufStream = TBufStream;
   PMemoryStream = TMemoryStream;
   PDosStream = TDosStream;
@@ -38,6 +37,15 @@ type
   buffer/file/search path is fully UTF-8; do not switch these to AnsiString. }
 function NewStr(const S: ShortString): PString;
 procedure DisposeStr(P: PString);
+
+{ One streamable (or nil) read from or written to a byte stream at its position, through an ipstream or an opstream
+  made for it (the format of the streams of tvision). }
+function GetObject(S: TStream): Pointer;
+procedure PutObject(S: TStream; P: TStreamable);
+
+{ A zero-terminated string in the streams (ipstream, opstream): a 16-bit length and the characters; nil is length 0. }
+function StrRead(Ip: ipstream): PChar;
+procedure StrWrite(Os: opstream; P: PChar);
 
 { FV Objects.Abstract — call from methods that must be overridden. }
 procedure Abstract;

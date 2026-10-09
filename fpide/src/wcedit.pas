@@ -74,7 +74,7 @@ type
       procedure   SetReadOnly(V: boolean);
     public
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
-          PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore);
+          PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore); overload;
       destructor Destroy; override;
       property    ReadOnly: boolean read FReadOnly write SetReadOnly;
       property    Flags: longint read GetFlags write SetFlags;
@@ -94,7 +94,7 @@ type
     TFileEditor = class(TCodeEditor)
       FileName: string;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
-          PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore; const AFileName: string);
+          PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore; const AFileName: string); overload;
       function    Save: Boolean; virtual;
       function    SaveAs: Boolean; virtual;
       function    SaveAsk(Force: boolean): Boolean; virtual;

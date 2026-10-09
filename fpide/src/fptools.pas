@@ -108,20 +108,24 @@ type
       procedure   Clear; override;
       procedure   Update; override;
       function    GetPalette: TPalette; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
     TMessagesWindow = class;
   PMessagesWindow = TMessagesWindow;
     TMessagesWindow = class(TFPWindow)
-      constructor Create;
+      constructor Create; overload;
       procedure   Update; override;
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetPalette: TPalette; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
       procedure   FocusItem(i : sw_integer);
       procedure   SizeLimits(out Min, Max: TPoint); override;
@@ -177,8 +181,6 @@ uses Dos,
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RToolMessageListBox: TStreamRec;
-var RMessagesWindow: TStreamRec;
 
 {$endif}
 {$endif}
@@ -1553,21 +1555,32 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TToolMessageListBox.Load(S: TStream);
+function TToolMessageListBox.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 end;
 
-procedure TToolMessageListBox.Store(S: TStream);
+procedure TToolMessageListBox.Write(Os: opstream);
 var OL: PCollection;
 begin
   OL:=List;
   Items := TCollection.Create(1,1);
 
-  inherited Store(S);
+  inherited Write(Os);
 
   List.Free;
   Items:=OL;
+end;
+
+class function TToolMessageListBox.Build: TStreamable;
+begin
+  Result := TToolMessageListBox.Create(streamableInit);
+end;
+
+function TToolMessageListBox.StreamableName: ShortString;
+begin
+  Result := 'fptools.TToolMessageListBox';
 end;
 
 destructor TToolMessageListBox.Destroy;
@@ -1637,21 +1650,32 @@ begin
   GetPalette:=MakePalette(CBrowserWindow);
 end;
 
-constructor TMessagesWindow.Load(S: TStream);
+function TMessagesWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 
-  GetSubViewPtr(S,MsgLB);
+  MsgLB := TToolMessageListBox(Ip.ReadPointer);
 
   Update;
   MessagesWindow:=Self;
 end;
 
-procedure TMessagesWindow.Store(S: TStream);
+procedure TMessagesWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 
-  PutSubViewPtr(S,MsgLB);
+  Os.WritePointer(MsgLB);
+end;
+
+class function TMessagesWindow.Build: TStreamable;
+begin
+  Result := TMessagesWindow.Create(streamableInit);
+end;
+
+function TMessagesWindow.StreamableName: ShortString;
+begin
+  Result := 'fptools.TMessagesWindow';
 end;
 
 destructor TMessagesWindow.Destroy;
@@ -1661,39 +1685,13 @@ begin
 end;
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RToolMessageListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TToolMessageListBox.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RToolMessageListBox(P: TStreamable; S: TStream);
-begin
-  TToolMessageListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RMessagesWindow(S: TStream): TStreamable;
+procedure RegisterStreamables_fptools;
 begin
-  Result := TStreamable(Pointer(TMessagesWindow.Load(S)));
-end;
-
-procedure Store_RMessagesWindow(P: TStreamable; S: TStream);
-begin
-  TMessagesWindow(Pointer(P)).Store(S);
-end;
-
-procedure FillStreamRecs_fptools;
-begin
-  RToolMessageListBox.ObjType := 1600;
-  RToolMessageListBox.VmtLink := PtrUInt(System.TClass(TToolMessageListBox));
-  RToolMessageListBox.Load := @Build_RToolMessageListBox;
-  RToolMessageListBox.Store := @Store_RToolMessageListBox;
-  RToolMessageListBox.Next := nil;
-  RMessagesWindow.ObjType := 1601;
-  RMessagesWindow.VmtLink := PtrUInt(System.TClass(TMessagesWindow));
-  RMessagesWindow.Load := @Build_RMessagesWindow;
-  RMessagesWindow.Store := @Store_RMessagesWindow;
-  RMessagesWindow.Next := nil;
+  TStreamableClass.Create('fptools.TToolMessageListBox', @TToolMessageListBox.Build);
+  TStreamableClass.Create('fptools.TMessagesWindow', @TMessagesWindow.Build);
 end;
 
 {$endif}
@@ -1701,9 +1699,7 @@ end;
 procedure RegisterFPTools;
 begin
 {$ifndef NOOBJREG}
-  FillStreamRecs_fptools;
-  RegisterType(RToolMessageListBox);
-  RegisterType(RMessagesWindow);
+  RegisterStreamables_fptools;
 {$endif}
 end;
 

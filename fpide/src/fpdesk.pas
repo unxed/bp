@@ -153,6 +153,7 @@ end;
 
 function ReadHistory(F: PResourceFile): boolean;
 var S: PMemoryStream;
+    Ip: ipstream;
     OK: boolean;
 begin
   PushStatus(msg_readinghistory);
@@ -160,7 +161,11 @@ begin
   OK:=F.ReadResourceEntryToStream(resHistory,langDefault,S);
   S.Seek(0);
   if OK then
-    HistoryLoad(S);
+  begin
+    Ip := ipstream.Create(S);
+    HistoryLoad(Ip);
+    Ip.Free;
+  end;
   S.Free;
   if OK=false then
     ErrorBox(msg_errorloadinghistory,nil);
@@ -170,12 +175,15 @@ end;
 
 function WriteHistory(F: PResourceFile): boolean;
 var S: PMemoryStream;
+    Os: opstream;
     OK: boolean;
 begin
   PushStatus(msg_storinghistory);
 
   S := TMemoryStream.Create(10*1024,4096);
-  HistoryStore(S);
+  Os := opstream.Create(S);
+  HistoryStore(Os);
+  Os.Free;
   S.Seek(0);
   F.CreateResource(resHistory,rcBinary,0);
   OK:=F.AddResourceEntryFromStream(resHistory,langDefault,0,S,S.GetSize);
@@ -256,7 +264,7 @@ begin
   if OK then
     begin
       OWC:=WatchesCollection;
-      WatchesCollection:=PWatchesCollection(S.Get);
+      WatchesCollection:=PWatchesCollection(GetObject(S));
       OK:=(S.Status=stOK);
       if OK and assigned(OWC) and assigned(WatchesCollection) then
         OWC.Free
@@ -287,7 +295,7 @@ begin
     begin
       PushStatus(msg_storingwatches);
       S := TMemoryStream.Create(30*1024,4096);
-      S.Put(WatchesCollection);
+      PutObject(S, WatchesCollection);
       S.Seek(0);
       F.CreateResource(resWatches,rcBinary,0);
       OK:=F.AddResourceEntryFromStream(resWatches,langDefault,0,S,S.GetSize);
@@ -315,7 +323,7 @@ begin
   if OK then
     begin
       OBC:=BreakpointsCollection;
-      BreakpointsCollection:=PBreakpointCollection(S.get);
+      BreakpointsCollection:=PBreakpointCollection(GetObject(S));
       OK:=(S.Status=stOK);
 
       If OK and assigned(OBC) and assigned(BreakpointsCollection) then
@@ -350,7 +358,7 @@ begin
     begin
       PushStatus(msg_storingbreakpoints);
       S := TMemoryStream.Create(30*1024,4096);
-      S.Put(BreakpointsCollection);
+      PutObject(S, BreakpointsCollection);
       S.Seek(0);
       F.CreateResource(resBreakpoints,rcBinary,0);
       OK:=F.AddResourceEntryFromStream(resBreakpoints,langDefault,0,S,S.GetSize);

@@ -380,7 +380,7 @@ type
       procedure   PushInfo(Const st : string);virtual;
       procedure   PopInfo;virtual;
     public
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar; ACore: PCustomCodeEditorCore);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar; ACore: PCustomCodeEditorCore); overload;
       destructor Destroy; override;
       property    Core_: TCustomCodeEditorCore read FCore;
       procedure   ConvertEvent(var Event: TEvent); virtual;
@@ -453,8 +453,8 @@ type
       procedure   GetContent(ALines: PUnsortedStringCollection); virtual;
       procedure   SetContent(ALines: PUnsortedStringCollection); virtual;
       function    LoadFromStream(Stream: PFastBufStream): boolean; virtual;
-      function    SaveToStream(Stream: PStream): boolean; virtual;
-      function    SaveAreaToStream(Stream: PStream; StartP,EndP: TPoint): boolean;virtual;
+      function    SaveToStream(Stream: TStream): boolean; virtual;
+      function    SaveAreaToStream(Stream: TStream; StartP,EndP: TPoint): boolean;virtual;
       function    LoadFromFile(const AFileName: string): boolean; virtual;
       function    SaveToFile(const AFileName: string): boolean; virtual;
     public
@@ -1952,7 +1952,7 @@ begin
   LoadFromStream:=Stream.Status=stOK;
 end;
 
-function TCustomCodeEditor.SaveToStream(Stream: PStream): boolean;
+function TCustomCodeEditor.SaveToStream(Stream: TStream): boolean;
 var T: AnsiString;
 begin
   T:=Doc.Buffer.AsString;
@@ -1961,7 +1961,7 @@ begin
   SaveToStream:=Stream.Status=stOK;
 end;
 
-function TCustomCodeEditor.SaveAreaToStream(Stream: PStream; StartP,EndP: TPoint): boolean;
+function TCustomCodeEditor.SaveAreaToStream(Stream: TStream; StartP,EndP: TPoint): boolean;
 var T: AnsiString;
     A,B: int64;
 begin

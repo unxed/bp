@@ -87,29 +87,37 @@ type
 
 
      THTMLLinkScanDocument = class(TObject)
-       constructor Create(const ADocName: string);
+       constructor Create(const ADocName: string); overload;
        function    GetName: string;
        function    GetUniqueName: string;
        function    GetAliasCount: sw_integer;
        function    GetAlias(Index: sw_integer): string;
        procedure   AddAlias(const Alias: string);
-       constructor Load(S: TStream);
-       procedure   Store(S: TStream);
+       function Read(Ip: ipstream): Pointer; override;
+       function StreamableName: ShortString; override;
+       class function Build: TStreamable; static;
+       procedure Write(Os: opstream); override;
        destructor Destroy; override;
      private
        DocName: PString;
        Synonym: PHTMLLinkScanDocument;
        Aliases: PStringCollection;
+     public
+       constructor Create(AInit: TStreamableInit); overload;
      end;
 
      THTMLLinkScanDocumentCollection = class;
      PHTMLLinkScanDocumentCollection = THTMLLinkScanDocumentCollection;
      THTMLLinkScanDocumentCollection = class(TSortedCollection)
-       constructor Create(AScanner: PHTMLLinkScanner; ALimit, ADelta: Integer);
+       constructor Create(AScanner: PHTMLLinkScanner; ALimit, ADelta: Integer); overload;
        function    Compare(Key1, Key2: Pointer): sw_Integer; override;
        function    At(Index: sw_Integer): PHTMLLinkScanDocument;
        function    SearchDocument(const DocName: string): PHTMLLinkScanDocument;
        procedure   MoveAliasesToSynonym;
+       function    ReadItem(Ip: ipstream): Pointer; override;
+       procedure   WriteItem(Item: Pointer; Os: opstream); override;
+       function    StreamableName: ShortString; override;
+       class function Build: TStreamable; static;
      private
        Scanner: PHTMLLinkScanner;
      end;
@@ -198,17 +206,6 @@ implementation
 uses
   WUtils;
 
-var
-  RHTMLLinkScanDocument: TStreamRec;
-
-function BuildHTMLLinkScanDocument(S: TStream): TStreamable;
-begin
-  Result := THTMLLinkScanDocument.Load(S);
-end;
-procedure StoreHTMLLinkScanDocument(P: TStreamable; S: TStream);
-begin
-  THTMLLinkScanDocument(P).Store(S);
-end;
 
 const
   CurrentHTMLIndexVersion : sw_integer = HTMLIndexVersion;
@@ -459,23 +456,38 @@ begin
 {$endif DEBUG}
 end;
 
-constructor THTMLLinkScanDocument.Load(S: TStream);
+function THTMLLinkScanDocument.Read(Ip: ipstream): Pointer;
 var
   i: sw_integer;
 begin
+  Result := Self;
   inherited Create;
-  DocName:=S.ReadStr;
+  DocName:=Ip.ReadString;
   if assigned(DocName) then
     for i:=1 to Length(DocName^) do
       if (DocName^[i]='\') or  (DocName^[i]='/') then
         DocName^[i]:=DirSep;
-  Aliases := TStringCollection.Load(S);
+  Aliases := TStringCollection(Ip.ReadPointer);
 end;
 
-procedure THTMLLinkScanDocument.Store(S: TStream);
+procedure THTMLLinkScanDocument.Write(Os: opstream);
 begin
-  S.WriteStr(DocName);
-  Aliases.Store(S);
+  Os.WriteString(DocName);
+  Os.WritePointer(Aliases);
+end;
+
+constructor THTMLLinkScanDocument.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function THTMLLinkScanDocument.Build: TStreamable;
+begin
+  Result := THTMLLinkScanDocument.Create(streamableInit);
+end;
+
+function THTMLLinkScanDocument.StreamableName: ShortString;
+begin
+  Result := 'whtmlscn.THTMLLinkScanDocument';
 end;
 
 destructor THTMLLinkScanDocument.Destroy;
@@ -487,6 +499,26 @@ begin
     DisposeStr(DocName);
   DocName:=nil;
   inherited Destroy;
+end;
+
+function THTMLLinkScanDocumentCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := Ip.ReadPointer;
+end;
+
+procedure THTMLLinkScanDocumentCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  Os.WritePointer(TStreamable(Item));
+end;
+
+function THTMLLinkScanDocumentCollection.StreamableName: ShortString;
+begin
+  Result := 'whtmlscn.THTMLLinkScanDocumentCollection';
+end;
+
+class function THTMLLinkScanDocumentCollection.Build: TStreamable;
+begin
+  Result := THTMLLinkScanDocumentCollection.Create(streamableInit);
 end;
 
 constructor THTMLLinkScanDocumentCollection.Create(AScanner: PHTMLLinkScanner; ALimit, ADelta: Integer);
@@ -634,6 +666,7 @@ end;
 
 constructor THTMLLinkScanner.LoadDocuments(S: TStream);
 var P,L: longint;
+    Ip: ipstream;
     OK: boolean;
     PS: PString;
 begin
@@ -653,9 +686,12 @@ begin
     end
   else
     BaseDir:=S.ReadStr;
-  Documents := THTMLLinkScanDocumentCollection.Load(S);
+  Ip := ipstream.Create(S);
+  Documents := THTMLLinkScanDocumentCollection(Ip.ReadPointer);
+  Ip.Free;
   if not Assigned(Documents) then
     Fail;
+  Documents.Scanner := Self;
   Documents.MoveAliasesToSynonym;
   CurrentHTMLIndexVersion:=HTMLIndexVersion;
 end;
@@ -668,6 +704,7 @@ end;
 
 procedure THTMLLinkScanner.StoreDocuments(S: TStream);
 var L: longint;
+    Os: opstream;
 begin
   L:=HTMLIndexMagicNo;
   S.Write(L,sizeof(L));
@@ -676,7 +713,9 @@ begin
   S.Write(L,sizeof(L));
   S.WriteStr(BaseDir);
   Documents.MoveAliasesToSynonym;
-  Documents.Store(S);
+  Os := opstream.Create(S);
+  Os.WritePointer(Documents);
+  Os.Free;
 end;
 
 destructor THTMLLinkScanner.Destroy;
@@ -1064,12 +1103,8 @@ end;
 procedure RegisterWHTMLScan;
 begin
 {$ifndef NOOBJREG}
-  RHTMLLinkScanDocument.ObjType := 19500;
-  RHTMLLinkScanDocument.VmtLink := PtrUInt(System.TClass(THTMLLinkScanDocument));
-  RHTMLLinkScanDocument.Load := @BuildHTMLLinkScanDocument;
-  RHTMLLinkScanDocument.Store := @StoreHTMLLinkScanDocument;
-  RHTMLLinkScanDocument.Next := nil;
-  RegisterType(RHTMLLinkScanDocument);
+  TStreamableClass.Create('whtmlscn.THTMLLinkScanDocument', @THTMLLinkScanDocument.Build);
+  TStreamableClass.Create('whtmlscn.THTMLLinkScanDocumentCollection', @THTMLLinkScanDocumentCollection.Build);
 {$endif}
 end;
 

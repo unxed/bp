@@ -136,7 +136,7 @@ type
        function    FindResource(const ResName: string): PResource;
        function    FindResourceEntry(const ResName: string; ALangID: longint): PResourceEntry;
      private
-       S         : PStream;
+       S         : TStream;
        MyStream  : boolean;
        Resources : PResourceCollection;
        Entries   : PGlobalResourceEntryCollection;

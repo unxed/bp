@@ -1835,7 +1835,7 @@ begin
 {$ifdef Unix}
     if (DebuggeeTTY='') and (OutFile='') and (ExecType<>exDosShell) then
       begin
-        Write(' Press any key to return to IDE');
+        System.Write(' Press any key to return to IDE');
         InitKeyBoard;
         Keyboard.GetKeyEvent;
         while (Keyboard.PollKeyEvent<>0) do

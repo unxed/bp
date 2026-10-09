@@ -79,8 +79,8 @@ type
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   UpdateCommands; virtual;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       procedure   SelectInDebugSession;
     end;
@@ -90,20 +90,24 @@ type
     TFPHelpViewer = class(THelpViewer)
       function    GetLocalMenu: PMenu; override;
       function    GetCommandTarget: PView; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TFPHelpWindow = class;
     PFPHelpWindow = TFPHelpWindow;
     TFPHelpWindow = class(THelpWindow)
-      constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
+      constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer); overload;
       destructor Destroy;override;
       procedure   InitHelpView; override;
       procedure   Show; {virtual;}
       procedure   Hide; {override;}
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetPalette: TPalette; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     end;
 
     TTextScroller = class;
@@ -150,7 +154,7 @@ type
       CodeCompleteTip: PFPToolTip;
       destructor Destroy; override;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
-          PScrollBar; AIndicator: PIndicator;const AFileName: string);
+          PScrollBar; AIndicator: PIndicator;const AFileName: string); overload;
 {$ifndef NODEBUG}
     private
       ShouldHandleBreakpoints : boolean;
@@ -190,6 +194,8 @@ type
       function    InsertNewLine : Sw_integer;override;
       function    InsertLine(LineNo: sw_integer; const S: string): PCustomLine; override;
       procedure   AddLine(const S: string); override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TSourceWindow = class;
@@ -198,7 +204,7 @@ type
       Editor    : PSourceEditor;
       Indicator : PIndicator;
       NoNameCount : longint;
-      constructor Create(var Bounds: TRect; AFileName: string);
+      constructor Create(var Bounds: TRect; AFileName: string); overload;
       function    GetTitle(MaxSize: sw_Integer): TTitleStr; override;
       procedure   SetTitle(ATitle: string); virtual;
       procedure   UpdateTitle; virtual;
@@ -206,8 +212,10 @@ type
       procedure   Update; override;
       procedure   UpdateCommands; override;
       function    GetPalette: TPalette; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   Close; override;
       destructor Destroy; override;
     end;
@@ -227,6 +235,8 @@ type
       AutoRepeat,
       IgnoreStringAtEnd : boolean;
       LastCommand : String;
+        function StreamableName: ShortString; override;
+        class function Build: TStreamable; static;
       end;
 
     TGDBWindow = class;
@@ -234,7 +244,7 @@ type
     TGDBWindow = class(TFPWindow)
       Editor    : PGDBSourceEditor;
       Indicator : PIndicator;
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   WriteText(Buf : pchar;IsError : boolean);
       procedure   WriteString(Const S : string);
@@ -242,8 +252,10 @@ type
       procedure   WriteOutputText(Buf : pchar);
       procedure   WriteErrorText(Buf : pchar);
       function    GetPalette: TPalette;override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   UpdateCommands; override;
       destructor Destroy; override;
     end;
@@ -266,7 +278,7 @@ type
       CurrentSource : String;
       CurrentLine : longint;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
-          PScrollBar; AIndicator: PIndicator;const AFileName: string);
+          PScrollBar; AIndicator: PIndicator;const AFileName: string); overload;
       procedure  ReleaseSource;
       destructor Destroy;override;
       procedure  AddSourceLine(const AFileName: string;line : longint); virtual;
@@ -278,6 +290,8 @@ type
         DisasLines : PDisasLineCollection;
         MinAddress,MaxAddress : CORE_ADDR;
         CurL : PDisasLine;
+        function StreamableName: ShortString; override;
+        class function Build: TStreamable; static;
       end;
 
     TDisassemblyWindow = class;
@@ -285,7 +299,7 @@ type
     TDisassemblyWindow = class(TFPWindow)
       Editor    : PDisassemblyEditor;
       Indicator : PIndicator;
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   LoadFunction(Const FuncName : string);
       procedure   LoadAddress(Addr : CORE_ADDR);
       function    ProcessPChar(p : pchar) : boolean;
@@ -296,16 +310,20 @@ type
       procedure   UpdateCommands; override;
       function    GetPalette: TPalette;override;
       destructor Destroy; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 {$endif NODEBUG}
 
     TClipboardWindow = class;
     PClipboardWindow = TClipboardWindow;
     TClipboardWindow = class(TSourceWindow)
-      constructor Create;
+      constructor Create; overload;
       procedure   Close; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -330,7 +348,7 @@ type
       NoSelection : boolean;
       MaxWidth    : Sw_integer;
       ModuleNames : PStoreCollection;
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   AddItem(P: PMessageItem); virtual;
       function    AddModuleName(const Name: string): PString; virtual;
@@ -341,8 +359,10 @@ type
       procedure   Draw; override;
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetLocalMenu: PMenu; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -351,6 +371,8 @@ type
     PFPDlgWindow = TFPDlgWindow;
     TFPDlgWindow = class(TDlgWindow)
       procedure   HandleEvent(var Event: TEvent); override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
 PTabItem = ^TTabItem;
@@ -425,9 +447,11 @@ PTabItem = ^TTabItem;
     TFPASCIIChart = class;
     PFPASCIIChart = TFPASCIIChart;
     TFPASCIIChart = class(TASCIIChart)
-      constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      constructor Create; overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   HandleEvent(var Event: TEvent); override;
       destructor Destroy; override;
     end;
@@ -441,10 +465,12 @@ PTabItem = ^TTabItem;
     TFPDesktop = class;
     PFPDesktop = TFPDesktop;
     TFPDesktop = class(TDesktop)
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   InitBackground; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     end;
 
     TFPMemo = class;
@@ -612,23 +638,10 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RSourceEditor: TStreamRec;
-var RSourceWindow: TStreamRec;
-var RFPHelpViewer: TStreamRec;
-var RFPHelpWindow: TStreamRec;
-var RClipboardWindow: TStreamRec;
-var RMessageListBox: TStreamRec;
-var RFPDesktop: TStreamRec;
-var RFPASCIIChart: TStreamRec;
-var RFPDlgWindow: TStreamRec;
 {$endif}
 {$endif}
 {$endif NOOBJREG}
 {$ifndef NODEBUG}
-var RGDBWindow: TStreamRec;
-var RGDBSourceEditor: TStreamRec;
-var RDisassemblyEditor: TStreamRec;
-var RDisassemblyWindow: TStreamRec;
 
 {$endif NODEBUG}
 const
@@ -2080,16 +2093,17 @@ begin
 end;
 
 
-constructor TFPWindow.Load(S: TStream);
+function TFPWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  S.Read(AutoNumber,SizeOf(AutoNumber));
+  Result := Self;
+  inherited Read(Ip);
+  Ip.ReadBytes(AutoNumber,SizeOf(AutoNumber));
 end;
 
-procedure TFPWindow.Store(S: TStream);
+procedure TFPWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
-  S.Write(AutoNumber,SizeOf(AutoNumber));
+  inherited Write(Os);
+  Os.WriteBytes(AutoNumber,SizeOf(AutoNumber));
 end;
 
 function TFPHelpViewer.GetLocalMenu: PMenu;
@@ -2186,14 +2200,25 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TFPHelpWindow.Load(S: TStream);
+function TFPHelpWindow.Read(Ip: ipstream): Pointer;
+begin
+  Result := Self;
+  Abstract;
+end;
+
+procedure TFPHelpWindow.Write(Os: opstream);
 begin
   Abstract;
 end;
 
-procedure TFPHelpWindow.Store(S: TStream);
+class function TFPHelpWindow.Build: TStreamable;
 begin
-  Abstract;
+  Result := TFPHelpWindow.Create(streamableInit);
+end;
+
+function TFPHelpWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPHelpWindow';
 end;
 
 constructor TSourceWindow.Create(var Bounds: TRect; AFileName: string);
@@ -2341,13 +2366,14 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TSourceWindow.Load(S: TStream);
+function TSourceWindow.Read(Ip: ipstream): Pointer;
 begin
-  Title:=S.ReadStr;
+  Result := Self;
+  Title:=Ip.ReadString;
   PushStatus(FormatStrStr(msg_loadingfile,GetStr(Title)));
-  inherited Load(S);
-  GetSubViewPtr(S,Indicator);
-  GetSubViewPtr(S,Editor);
+  inherited Read(Ip);
+  Indicator := TIndicator(Ip.ReadPointer);
+  Editor := TSourceEditor(Ip.ReadPointer);
 {$ifndef NODEBUG}
   If assigned(BreakpointsCollection) then
     BreakpointsCollection.ShowBreakpoints(Self);
@@ -2355,15 +2381,25 @@ begin
   PopStatus;
 end;
 
-procedure TSourceWindow.Store(S: TStream);
+procedure TSourceWindow.Write(Os: opstream);
 begin
-  S.WriteStr(Title);
+  Os.WriteString(Title);
   PushStatus(FormatStrStr(msg_storingfile,GetStr(Title)));
-  inherited Store(S);
+  inherited Write(Os);
 
-  PutSubViewPtr(S,Indicator);
-  PutSubViewPtr(S,Editor);
+  Os.WritePointer(Indicator);
+  Os.WritePointer(Editor);
   PopStatus;
+end;
+
+class function TSourceWindow.Build: TStreamable;
+begin
+  Result := TSourceWindow.Create(streamableInit);
+end;
+
+function TSourceWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TSourceWindow';
 end;
 
 
@@ -2546,19 +2582,30 @@ begin
   inherited Destroy;
 end;
 
-constructor TGDBWindow.Load(S: TStream);
+function TGDBWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  GetSubViewPtr(S,Indicator);
-  GetSubViewPtr(S,Editor);
+  Result := Self;
+  inherited Read(Ip);
+  Indicator := TIndicator(Ip.ReadPointer);
+  Editor := TGDBSourceEditor(Ip.ReadPointer);
   GDBWindow:=Self;
 end;
 
-procedure TGDBWindow.Store(S: TStream);
+procedure TGDBWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
-  PutSubViewPtr(S,Indicator);
-  PutSubViewPtr(S,Editor);
+  inherited Write(Os);
+  Os.WritePointer(Indicator);
+  Os.WritePointer(Editor);
+end;
+
+class function TGDBWindow.Build: TStreamable;
+begin
+  Result := TGDBWindow.Create(streamableInit);
+end;
+
+function TGDBWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TGDBWindow';
 end;
 
 function TGDBWindow.GetPalette: TPalette;
@@ -2986,16 +3033,27 @@ begin
   Hide;
 end;
 
-constructor TClipboardWindow.Load(S: TStream);
+function TClipboardWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 
   Clipboard:=Editor;
 end;
 
-procedure TClipboardWindow.Store(S: TStream);
+procedure TClipboardWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
+end;
+
+class function TClipboardWindow.Build: TStreamable;
+begin
+  Result := TClipboardWindow.Create(streamableInit);
+end;
+
+function TClipboardWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TClipboardWindow';
 end;
 
 destructor TClipboardWindow.Destroy;
@@ -3316,14 +3374,15 @@ begin
   end;
 end;
 
-constructor TMessageListBox.Load(S: TStream);
+function TMessageListBox.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
   ModuleNames := TStoreCollection.Create(50,100);
   NoSelection:=true;
 end;
 
-procedure TMessageListBox.Store(S: TStream);
+procedure TMessageListBox.Write(Os: opstream);
 var OL: PCollection;
     ORV: sw_integer;
 begin
@@ -3331,7 +3390,7 @@ begin
 
   Items := TCollection.Create(1,1); Range:=0;
 
-  inherited Store(S);
+  inherited Write(Os);
 
   List.Free;
   Items:=OL; Range:=ORV;
@@ -3339,6 +3398,16 @@ begin
     collection? Pasting here a modified version of TListBox.Store+
     TAdvancedListBox.Store isn't a better solution, since by eventually
     changing the obj-hierarchy you'll always have to modify this, too - BG }
+end;
+
+class function TMessageListBox.Build: TStreamable;
+begin
+  Result := TMessageListBox.Create(streamableInit);
+end;
+
+function TMessageListBox.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TMessageListBox';
 end;
 
 destructor TMessageListBox.Destroy;
@@ -4401,14 +4470,25 @@ begin
   ASCIIChart:=Self;
 end;
 
-procedure TFPASCIIChart.Store(S: TStream);
+procedure TFPASCIIChart.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 end;
 
-constructor TFPASCIIChart.Load(S: TStream);
+function TFPASCIIChart.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
+end;
+
+class function TFPASCIIChart.Build: TStreamable;
+begin
+  Result := TFPASCIIChart.Create(streamableInit);
+end;
+
+function TFPASCIIChart.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPASCIIChart';
 end;
 
 procedure TFPASCIIChart.HandleEvent(var Event: TEvent);
@@ -4482,14 +4562,25 @@ begin
   inherited InitBackground;
 end;
 
-constructor TFPDesktop.Load(S: TStream);
+function TFPDesktop.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 end;
 
-procedure TFPDesktop.Store(S: TStream);
+procedure TFPDesktop.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
+end;
+
+class function TFPDesktop.Build: TStreamable;
+begin
+  Result := TFPDesktop.Create(streamableInit);
+end;
+
+function TFPDesktop.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPDesktop';
 end;
 
 constructor TFPToolTip.Create(var Bounds: TRect; const AText: string; AAlign: TAlign);
@@ -4708,226 +4799,117 @@ begin
 end;
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RSourceEditor(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TSourceEditor.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RSourceEditor(P: TStreamable; S: TStream);
-begin
-  TSourceEditor(Pointer(P)).Store(S);
-end;
 
-function Build_RSourceWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TSourceWindow.Load(S)));
-end;
 
-procedure Store_RSourceWindow(P: TStreamable; S: TStream);
-begin
-  TSourceWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RFPHelpViewer(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPHelpViewer.Load(S)));
-end;
 
-procedure Store_RFPHelpViewer(P: TStreamable; S: TStream);
-begin
-  TFPHelpViewer(Pointer(P)).Store(S);
-end;
 
-function Build_RFPHelpWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPHelpWindow.Load(S)));
-end;
 
-procedure Store_RFPHelpWindow(P: TStreamable; S: TStream);
-begin
-  TFPHelpWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RClipboardWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TClipboardWindow.Load(S)));
-end;
 
-procedure Store_RClipboardWindow(P: TStreamable; S: TStream);
-begin
-  TClipboardWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RMessageListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TMessageListBox.Load(S)));
-end;
 
-procedure Store_RMessageListBox(P: TStreamable; S: TStream);
-begin
-  TMessageListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RFPDesktop(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPDesktop.Load(S)));
-end;
 
-procedure Store_RFPDesktop(P: TStreamable; S: TStream);
-begin
-  TFPDesktop(Pointer(P)).Store(S);
-end;
 
-function Build_RFPASCIIChart(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPASCIIChart.Load(S)));
-end;
 
-procedure Store_RFPASCIIChart(P: TStreamable; S: TStream);
-begin
-  TFPASCIIChart(Pointer(P)).Store(S);
-end;
 
-function Build_RFPDlgWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPDlgWindow.Load(S)));
-end;
 
-procedure Store_RFPDlgWindow(P: TStreamable; S: TStream);
-begin
-  TFPDlgWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RGDBWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TGDBWindow.Load(S)));
-end;
 
-procedure Store_RGDBWindow(P: TStreamable; S: TStream);
-begin
-  TGDBWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RGDBSourceEditor(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TGDBSourceEditor.Load(S)));
-end;
 
-procedure Store_RGDBSourceEditor(P: TStreamable; S: TStream);
-begin
-  TGDBSourceEditor(Pointer(P)).Store(S);
-end;
 
-function Build_RDisassemblyEditor(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TDisassemblyEditor.Load(S)));
-end;
 
-procedure Store_RDisassemblyEditor(P: TStreamable; S: TStream);
-begin
-  TDisassemblyEditor(Pointer(P)).Store(S);
-end;
 
-function Build_RDisassemblyWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TDisassemblyWindow.Load(S)));
-end;
 
-procedure Store_RDisassemblyWindow(P: TStreamable; S: TStream);
-begin
-  TDisassemblyWindow(Pointer(P)).Store(S);
-end;
 
-procedure FillStreamRecs_fpviews;
+procedure RegisterStreamables_fpviews;
 begin
-  RSourceEditor.ObjType := 1500;
-  RSourceEditor.VmtLink := PtrUInt(System.TClass(TSourceEditor));
-  RSourceEditor.Load := @Build_RSourceEditor;
-  RSourceEditor.Store := @Store_RSourceEditor;
-  RSourceEditor.Next := nil;
-  RSourceWindow.ObjType := 1501;
-  RSourceWindow.VmtLink := PtrUInt(System.TClass(TSourceWindow));
-  RSourceWindow.Load := @Build_RSourceWindow;
-  RSourceWindow.Store := @Store_RSourceWindow;
-  RSourceWindow.Next := nil;
-  RFPHelpViewer.ObjType := 1502;
-  RFPHelpViewer.VmtLink := PtrUInt(System.TClass(TFPHelpViewer));
-  RFPHelpViewer.Load := @Build_RFPHelpViewer;
-  RFPHelpViewer.Store := @Store_RFPHelpViewer;
-  RFPHelpViewer.Next := nil;
-  RFPHelpWindow.ObjType := 1503;
-  RFPHelpWindow.VmtLink := PtrUInt(System.TClass(TFPHelpWindow));
-  RFPHelpWindow.Load := @Build_RFPHelpWindow;
-  RFPHelpWindow.Store := @Store_RFPHelpWindow;
-  RFPHelpWindow.Next := nil;
-  RClipboardWindow.ObjType := 1504;
-  RClipboardWindow.VmtLink := PtrUInt(System.TClass(TClipboardWindow));
-  RClipboardWindow.Load := @Build_RClipboardWindow;
-  RClipboardWindow.Store := @Store_RClipboardWindow;
-  RClipboardWindow.Next := nil;
-  RMessageListBox.ObjType := 1505;
-  RMessageListBox.VmtLink := PtrUInt(System.TClass(TMessageListBox));
-  RMessageListBox.Load := @Build_RMessageListBox;
-  RMessageListBox.Store := @Store_RMessageListBox;
-  RMessageListBox.Next := nil;
-  RFPDesktop.ObjType := 1506;
-  RFPDesktop.VmtLink := PtrUInt(System.TClass(TFPDesktop));
-  RFPDesktop.Load := @Build_RFPDesktop;
-  RFPDesktop.Store := @Store_RFPDesktop;
-  RFPDesktop.Next := nil;
-  RFPASCIIChart.ObjType := 1509;
-  RFPASCIIChart.VmtLink := PtrUInt(System.TClass(TFPASCIIChart));
-  RFPASCIIChart.Load := @Build_RFPASCIIChart;
-  RFPASCIIChart.Store := @Store_RFPASCIIChart;
-  RFPASCIIChart.Next := nil;
-  RFPDlgWindow.ObjType := 1511;
-  RFPDlgWindow.VmtLink := PtrUInt(System.TClass(TFPDlgWindow));
-  RFPDlgWindow.Load := @Build_RFPDlgWindow;
-  RFPDlgWindow.Store := @Store_RFPDlgWindow;
-  RFPDlgWindow.Next := nil;
-  RGDBWindow.ObjType := 1508;
-  RGDBWindow.VmtLink := PtrUInt(System.TClass(TGDBWindow));
-  RGDBWindow.Load := @Build_RGDBWindow;
-  RGDBWindow.Store := @Store_RGDBWindow;
-  RGDBWindow.Next := nil;
-  RGDBSourceEditor.ObjType := 1507;
-  RGDBSourceEditor.VmtLink := PtrUInt(System.TClass(TGDBSourceEditor));
-  RGDBSourceEditor.Load := @Build_RGDBSourceEditor;
-  RGDBSourceEditor.Store := @Store_RGDBSourceEditor;
-  RGDBSourceEditor.Next := nil;
-  RDisassemblyEditor.ObjType := 1512;
-  RDisassemblyEditor.VmtLink := PtrUInt(System.TClass(TDisassemblyEditor));
-  RDisassemblyEditor.Load := @Build_RDisassemblyEditor;
-  RDisassemblyEditor.Store := @Store_RDisassemblyEditor;
-  RDisassemblyEditor.Next := nil;
-  RDisassemblyWindow.ObjType := 1513;
-  RDisassemblyWindow.VmtLink := PtrUInt(System.TClass(TDisassemblyWindow));
-  RDisassemblyWindow.Load := @Build_RDisassemblyWindow;
-  RDisassemblyWindow.Store := @Store_RDisassemblyWindow;
-  RDisassemblyWindow.Next := nil;
+  TStreamableClass.Create('fpviews.TSourceEditor', @TSourceEditor.Build);
+  TStreamableClass.Create('fpviews.TSourceWindow', @TSourceWindow.Build);
+  TStreamableClass.Create('fpviews.TFPHelpViewer', @TFPHelpViewer.Build);
+  TStreamableClass.Create('fpviews.TFPHelpWindow', @TFPHelpWindow.Build);
+  TStreamableClass.Create('fpviews.TClipboardWindow', @TClipboardWindow.Build);
+  TStreamableClass.Create('fpviews.TMessageListBox', @TMessageListBox.Build);
+  TStreamableClass.Create('fpviews.TFPDesktop', @TFPDesktop.Build);
+  TStreamableClass.Create('fpviews.TFPASCIIChart', @TFPASCIIChart.Build);
+  TStreamableClass.Create('fpviews.TFPDlgWindow', @TFPDlgWindow.Build);
+  TStreamableClass.Create('fpviews.TGDBWindow', @TGDBWindow.Build);
+  TStreamableClass.Create('fpviews.TGDBSourceEditor', @TGDBSourceEditor.Build);
+  TStreamableClass.Create('fpviews.TDisassemblyEditor', @TDisassemblyEditor.Build);
+  TStreamableClass.Create('fpviews.TDisassemblyWindow', @TDisassemblyWindow.Build);
 end;
 
 {$endif}
 
 procedure RegisterFPViews;
 begin
-  FillStreamRecs_fpviews;
-  RegisterType(RSourceEditor);
-  RegisterType(RSourceWindow);
-  RegisterType(RFPHelpViewer);
-  RegisterType(RFPHelpWindow);
-  RegisterType(RClipboardWindow);
-  RegisterType(RMessageListBox);
-  RegisterType(RFPDesktop);
-  RegisterType(RFPASCIIChart);
-  RegisterType(RFPDlgWindow);
-{$ifndef NODEBUG}
-  FillStreamRecs_fpviews;
-  RegisterType(RGDBWindow);
-  RegisterType(RGDBSourceEditor);
-{$endif NODEBUG}
+  RegisterStreamables_fpviews;
 end;
 
+
+
+class function TDisassemblyEditor.Build: TStreamable;
+begin
+  Result := TDisassemblyEditor.Create(streamableInit);
+end;
+
+function TDisassemblyEditor.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TDisassemblyEditor';
+end;
+
+class function TDisassemblyWindow.Build: TStreamable;
+begin
+  Result := TDisassemblyWindow.Create(streamableInit);
+end;
+
+function TDisassemblyWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TDisassemblyWindow';
+end;
+
+class function TFPDlgWindow.Build: TStreamable;
+begin
+  Result := TFPDlgWindow.Create(streamableInit);
+end;
+
+function TFPDlgWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPDlgWindow';
+end;
+
+class function TFPHelpViewer.Build: TStreamable;
+begin
+  Result := TFPHelpViewer.Create(streamableInit);
+end;
+
+function TFPHelpViewer.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPHelpViewer';
+end;
+
+class function TGDBSourceEditor.Build: TStreamable;
+begin
+  Result := TGDBSourceEditor.Create(streamableInit);
+end;
+
+function TGDBSourceEditor.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TGDBSourceEditor';
+end;
+
+class function TSourceEditor.Build: TStreamable;
+begin
+  Result := TSourceEditor.Create(streamableInit);
+end;
+
+function TSourceEditor.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TSourceEditor';
+end;
 
 END.

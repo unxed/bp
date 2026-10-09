@@ -36,6 +36,8 @@ type
   PCalcButton = TCalcButton;
   TCalcButton = class(TButton)
     procedure HandleEvent(var Event: TEvent); override;
+    function StreamableName: ShortString; override;
+    class function Build: TStreamable; static;
   end;
 
   TCalcDisplay = class;
@@ -51,14 +53,16 @@ type
     Memory: extended;
     DispNumber: extended;
     HexShown : boolean;
-    constructor Create(var Bounds: TRect);
-    constructor Load(S: TStream);
+    constructor Create(var Bounds: TRect); overload;
+    function Read(Ip: ipstream): Pointer; override;
+    function StreamableName: ShortString; override;
+    class function Build: TStreamable; static;
     function  CalcKey(Key: string): boolean;
     procedure Clear;
     procedure Draw; override;
     function  GetPalette: TPalette; override;
     procedure HandleEvent(var Event: TEvent); override;
-    procedure Store(S: TStream); override;
+    procedure Write(Os: opstream); override;
   private
     procedure GetDisplay(var R: extended);
     procedure SetDisplay(R: extended;ShouldKeepZeroes : boolean);
@@ -69,20 +73,19 @@ type
   PCalculator = TCalculator;
   TCalculator = class(TCenterDialog)
     CD : PCalcDisplay;
-    constructor Create;
+    constructor Create; overload;
     procedure   HandleEvent(var Event: TEvent); override;
     procedure   Show; {override;}
     procedure   Close; override;
-    constructor Load(S: TStream);
-    procedure   Store(S: TStream); override;
+    function Read(Ip: ipstream): Pointer; override;
+    function StreamableName: ShortString; override;
+    class function Build: TStreamable; static;
+    procedure Write(Os: opstream); override;
   end;
 
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RCalcButton: TStreamRec;
-var RCalcDisplay: TStreamRec;
-var RCalculator: TStreamRec;
 
 {$endif}
 {$endif}
@@ -163,10 +166,11 @@ begin
   HexShown:=false;
 end;
 
-constructor TCalcDisplay.Load(S: TStream);
+function TCalcDisplay.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  S.Read(Status, SizeOf(Status) + SizeOf(Number) + SizeOf(Sign) +
+  Result := Self;
+  inherited Read(Ip);
+  Ip.ReadBytes(Status, SizeOf(Status) + SizeOf(Number) + SizeOf(Sign) +
     SizeOf(_Operator) + SizeOf(Operand));
   HexShown:=false;
 end;
@@ -463,11 +467,21 @@ begin
   end;
 end;
 
-procedure TCalcDisplay.Store(S: TStream);
+procedure TCalcDisplay.Write(Os: opstream);
 begin
-  inherited Store(S);
-  S.Write(Status, SizeOf(Status) + SizeOf(Number) + SizeOf(Sign) +
+  inherited Write(Os);
+  Os.WriteBytes(Status, SizeOf(Status) + SizeOf(Number) + SizeOf(Sign) +
     SizeOf(_Operator) + SizeOf(Operand));
+end;
+
+class function TCalcDisplay.Build: TStreamable;
+begin
+  Result := TCalcDisplay.Create(streamableInit);
+end;
+
+function TCalcDisplay.StreamableName: ShortString;
+begin
+  Result := 'fpcalc.TCalcDisplay';
 end;
 
 { TCalculator }
@@ -573,68 +587,39 @@ begin
   Hide;
 end;
 
-constructor TCalculator.Load(S: TStream);
+function TCalculator.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  GetSubViewPtr(S,CD);
+  Result := Self;
+  inherited Read(Ip);
+  CD := TCalcDisplay(Ip.ReadPointer);
 end;
 
-procedure TCalculator.Store(S: TStream);
+procedure TCalculator.Write(Os: opstream);
 begin
-  inherited Store(S);
-  PutSubViewPtr(S,CD);
+  inherited Write(Os);
+  Os.WritePointer(CD);
+end;
+
+class function TCalculator.Build: TStreamable;
+begin
+  Result := TCalculator.Create(streamableInit);
+end;
+
+function TCalculator.StreamableName: ShortString;
+begin
+  Result := 'fpcalc.TCalculator';
 end;
 
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RCalcButton(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TCalcButton.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RCalcButton(P: TStreamable; S: TStream);
-begin
-  TCalcButton(Pointer(P)).Store(S);
-end;
 
-function Build_RCalcDisplay(S: TStream): TStreamable;
+procedure RegisterStreamables_fpcalc;
 begin
-  Result := TStreamable(Pointer(TCalcDisplay.Load(S)));
-end;
-
-procedure Store_RCalcDisplay(P: TStreamable; S: TStream);
-begin
-  TCalcDisplay(Pointer(P)).Store(S);
-end;
-
-function Build_RCalculator(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TCalculator.Load(S)));
-end;
-
-procedure Store_RCalculator(P: TStreamable; S: TStream);
-begin
-  TCalculator(Pointer(P)).Store(S);
-end;
-
-procedure FillStreamRecs_fpcalc;
-begin
-  RCalcButton.ObjType := 10139;
-  RCalcButton.VmtLink := PtrUInt(System.TClass(TCalcButton));
-  RCalcButton.Load := @Build_RCalcButton;
-  RCalcButton.Store := @Store_RCalcButton;
-  RCalcButton.Next := nil;
-  RCalcDisplay.ObjType := 10140;
-  RCalcDisplay.VmtLink := PtrUInt(System.TClass(TCalcDisplay));
-  RCalcDisplay.Load := @Build_RCalcDisplay;
-  RCalcDisplay.Store := @Store_RCalcDisplay;
-  RCalcDisplay.Next := nil;
-  RCalculator.ObjType := 10141;
-  RCalculator.VmtLink := PtrUInt(System.TClass(TCalculator));
-  RCalculator.Load := @Build_RCalculator;
-  RCalculator.Store := @Store_RCalculator;
-  RCalculator.Next := nil;
+  TStreamableClass.Create('fpcalc.TCalcButton', @TCalcButton.Build);
+  TStreamableClass.Create('fpcalc.TCalcDisplay', @TCalcDisplay.Build);
+  TStreamableClass.Create('fpcalc.TCalculator', @TCalculator.Build);
 end;
 
 {$endif}
@@ -642,11 +627,19 @@ end;
 procedure RegisterFPCalc;
 begin
 {$ifndef NOOBJREG}
-  FillStreamRecs_fpcalc;
-  RegisterType(RCalcButton);
-  RegisterType(RCalcDisplay);
-  RegisterType(RCalculator);
+  RegisterStreamables_fpcalc;
 {$endif}
+end;
+
+
+class function TCalcButton.Build: TStreamable;
+begin
+  Result := TCalcButton.Create(streamableInit);
+end;
+
+function TCalcButton.StreamableName: ShortString;
+begin
+  Result := 'fpcalc.TCalcButton';
 end;
 
 end.

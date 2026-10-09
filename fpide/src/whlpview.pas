@@ -159,7 +159,7 @@ type
         Margin: sw_integer;
         HelpTopic: PHelpTopic;
         CurLink: sw_integer;
-        constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+        constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
         procedure   ChangeBounds(const Bounds: TRect); override;
         procedure   Draw; override;
         procedure   HandleEvent(var Event: TEvent); override;
@@ -188,8 +188,8 @@ type
         procedure   RenderTopic; virtual;
         procedure   Lookup(S: string); virtual;
         function    GetPalette: TPalette; override;
-        constructor Load(S: TStream);
-        procedure   Store(S: TStream); override;
+        function Read(Ip: ipstream): Pointer; override;
+        procedure Write(Os: opstream); override;
         destructor Destroy; override;
       private
         History    : array[0..HistorySize] of THelpHistoryEntry;
@@ -217,7 +217,7 @@ type
         HSB,VSB : PScrollBar;
         HelpView: PHelpViewer;
         HideOnClose: boolean;
-        constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
+        constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer); overload;
         procedure   InitFrame; override;
         procedure   InitScrollBars; virtual;
         procedure   InitHelpView; virtual;
@@ -1339,14 +1339,15 @@ begin
   Result := MakePalette(CHelpViewer);
 end;
 
-constructor THelpViewer.Load(S: TStream);
+function THelpViewer.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 end;
 
-procedure THelpViewer.Store(S: TStream);
+procedure THelpViewer.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 end;
 
 destructor THelpViewer.Destroy;

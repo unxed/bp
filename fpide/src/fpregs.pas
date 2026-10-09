@@ -87,18 +87,22 @@ uses
       GDBCount : longint;
       first : boolean;
       LastOK : boolean;
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   Draw;override;
       destructor Destroy; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TRegistersWindow = class;
   PRegistersWindow = TRegistersWindow;
     TRegistersWindow = class(TFPDlgWindow)
       RV : PRegistersView;
-      constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      constructor Create; overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -137,18 +141,22 @@ uses
 {$endif not cpu_known}
       first : boolean;
       LastOK : boolean;
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   Draw;override;
       destructor Destroy; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TFPUWindow = class;
   PFPUWindow = TFPUWindow;
     TFPUWindow = class(TFPDlgWindow)
       RV : PFPUView;
-      constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      constructor Create; overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -201,9 +209,11 @@ uses
 {$endif not cpu_known}
       first : boolean;
       LastOK : boolean;
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   Draw;override;
       destructor Destroy; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TVectorWindow = class;
@@ -211,8 +221,8 @@ uses
     TVectorWindow = class(TFPDlgWindow)
       RV : PVectorView;
       constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -247,11 +257,6 @@ uses
 
 
 {$ifndef NOOBJREG}
-var RRegistersWindow: TStreamRec;
-var RRegistersView: TStreamRec;
-var RFPUWindow: TStreamRec;
-var RFPUView: TStreamRec;
-var RVectorView: TStreamRec;
 
 {$endif}
 
@@ -800,22 +805,33 @@ const
        Update;
     end;
 
-  constructor TRegistersWindow.Load(S: TStream);
+  function TRegistersWindow.Read(Ip: ipstream): Pointer;
 
     begin
-       inherited load(S);
-       GetSubViewPtr(S,RV);
+      Result := Self;
+       inherited Read(Ip);
+       RV := TRegistersView(Ip.ReadPointer);
        If assigned(RegistersWindow) then
          RegistersWindow.Free;
        RegistersWindow:=Self;
     end;
 
-  procedure TRegistersWindow.Store(S: TStream);
+  procedure TRegistersWindow.Write(Os: opstream);
 
     begin
-       inherited Store(s);
-       PutSubViewPtr(S,RV);
+       inherited Write(Os);
+       Os.WritePointer(RV);
     end;
+
+class function TRegistersWindow.Build: TStreamable;
+begin
+  Result := TRegistersWindow.Create(streamableInit);
+end;
+
+function TRegistersWindow.StreamableName: ShortString;
+begin
+  Result := 'fpregs.TRegistersWindow';
+end;
 
   procedure TRegistersWindow.Update;
 
@@ -1229,22 +1245,33 @@ const
        Update;
     end;
 
-  constructor TFPUWindow.Load(S: TStream);
+  function TFPUWindow.Read(Ip: ipstream): Pointer;
 
     begin
-       inherited load(S);
-       GetSubViewPtr(S,RV);
+      Result := Self;
+       inherited Read(Ip);
+       RV := TFPUView(Ip.ReadPointer);
        If assigned(FPUWindow) then
          FPUWindow.Free;
        FPUWindow:=Self;
     end;
 
-  procedure TFPUWindow.Store(S: TStream);
+  procedure TFPUWindow.Write(Os: opstream);
 
     begin
-       inherited Store(s);
-       PutSubViewPtr(S,RV);
+       inherited Write(Os);
+       Os.WritePointer(RV);
     end;
+
+class function TFPUWindow.Build: TStreamable;
+begin
+  Result := TFPUWindow.Create(streamableInit);
+end;
+
+function TFPUWindow.StreamableName: ShortString;
+begin
+  Result := 'fpregs.TFPUWindow';
+end;
 
   procedure TFPUWindow.Update;
 
@@ -1560,21 +1587,22 @@ const
        Update;
     end;
 
-  constructor TVectorWindow.Load(S: TStream);
+  function TVectorWindow.Read(Ip: ipstream): Pointer;
 
     begin
-       inherited load(S);
-       GetSubViewPtr(S,RV);
+      Result := Self;
+       inherited Read(Ip);
+       RV := TVectorView(Ip.ReadPointer);
        If assigned(VectorWindow) then
          VectorWindow.Free;
        VectorWindow:=Self;
     end;
 
-  procedure TVectorWindow.Store(S: TStream);
+  procedure TVectorWindow.Write(Os: opstream);
 
     begin
-       inherited Store(s);
-       PutSubViewPtr(S,RV);
+       inherited Write(Os);
+       Os.WritePointer(RV);
     end;
 
   procedure TVectorWindow.Update;
@@ -1652,84 +1680,16 @@ end;
 
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RRegistersWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TRegistersWindow.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RRegistersWindow(P: TStreamable; S: TStream);
-begin
-  TRegistersWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RRegistersView(S: TStream): TStreamable;
+procedure RegisterStreamables_fpregs;
 begin
-  Result := TStreamable(Pointer(TRegistersView.Load(S)));
-end;
-
-procedure Store_RRegistersView(P: TStreamable; S: TStream);
-begin
-  TRegistersView(Pointer(P)).Store(S);
-end;
-
-function Build_RFPUWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPUWindow.Load(S)));
-end;
-
-procedure Store_RFPUWindow(P: TStreamable; S: TStream);
-begin
-  TFPUWindow(Pointer(P)).Store(S);
-end;
-
-function Build_RFPUView(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPUView.Load(S)));
-end;
-
-procedure Store_RFPUView(P: TStreamable; S: TStream);
-begin
-  TFPUView(Pointer(P)).Store(S);
-end;
-
-function Build_RVectorView(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TVectorView.Load(S)));
-end;
-
-procedure Store_RVectorView(P: TStreamable; S: TStream);
-begin
-  TVectorView(Pointer(P)).Store(S);
-end;
-
-procedure FillStreamRecs_fpregs;
-begin
-  RRegistersWindow.ObjType := 1711;
-  RRegistersWindow.VmtLink := PtrUInt(System.TClass(TRegistersWindow));
-  RRegistersWindow.Load := @Build_RRegistersWindow;
-  RRegistersWindow.Store := @Store_RRegistersWindow;
-  RRegistersWindow.Next := nil;
-  RRegistersView.ObjType := 1712;
-  RRegistersView.VmtLink := PtrUInt(System.TClass(TRegistersView));
-  RRegistersView.Load := @Build_RRegistersView;
-  RRegistersView.Store := @Store_RRegistersView;
-  RRegistersView.Next := nil;
-  RFPUWindow.ObjType := 1713;
-  RFPUWindow.VmtLink := PtrUInt(System.TClass(TFPUWindow));
-  RFPUWindow.Load := @Build_RFPUWindow;
-  RFPUWindow.Store := @Store_RFPUWindow;
-  RFPUWindow.Next := nil;
-  RFPUView.ObjType := 1714;
-  RFPUView.VmtLink := PtrUInt(System.TClass(TFPUView));
-  RFPUView.Load := @Build_RFPUView;
-  RFPUView.Store := @Store_RFPUView;
-  RFPUView.Next := nil;
-  RVectorView.ObjType := 1715;
-  RVectorView.VmtLink := PtrUInt(System.TClass(TVectorView));
-  RVectorView.Load := @Build_RVectorView;
-  RVectorView.Store := @Store_RVectorView;
-  RVectorView.Next := nil;
+  TStreamableClass.Create('fpregs.TRegistersWindow', @TRegistersWindow.Build);
+  TStreamableClass.Create('fpregs.TRegistersView', @TRegistersView.Build);
+  TStreamableClass.Create('fpregs.TFPUWindow', @TFPUWindow.Build);
+  TStreamableClass.Create('fpregs.TFPUView', @TFPUView.Build);
+  TStreamableClass.Create('fpregs.TVectorView', @TVectorView.Build);
 end;
 
 {$endif}
@@ -1737,14 +1697,40 @@ end;
 procedure RegisterFPRegsViews;
 begin
   {$ifndef NOOBJREG}
-FillStreamRecs_fpregs;
-RegisterType(RRegistersWindow);
-  RegisterType(RRegistersView);
-  RegisterType(RFPUWindow);
-  RegisterType(RFPUView);
-  RegisterType(RVectorView);
+RegisterStreamables_fpregs;
 {$endif}
 
+end;
+
+
+class function TFPUView.Build: TStreamable;
+begin
+  Result := TFPUView.Create(streamableInit);
+end;
+
+function TFPUView.StreamableName: ShortString;
+begin
+  Result := 'fpregs.TFPUView';
+end;
+
+class function TRegistersView.Build: TStreamable;
+begin
+  Result := TRegistersView.Create(streamableInit);
+end;
+
+function TRegistersView.StreamableName: ShortString;
+begin
+  Result := 'fpregs.TRegistersView';
+end;
+
+class function TVectorView.Build: TStreamable;
+begin
+  Result := TVectorView.Create(streamableInit);
+end;
+
+function TVectorView.StreamableName: ShortString;
+begin
+  Result := 'fpregs.TVectorView';
 end;
 
 end.

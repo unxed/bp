@@ -14,9 +14,9 @@ type
   TTimedDialog = class(TDialog)
     Secs: LongInt;
     constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASecs: Word); reintroduce;
-    constructor Load(S: TStream);
+    function Read(Ip: ipstream): Pointer; override;
     procedure GetEvent(var Event: TEvent); override;
-    procedure Store(S: TStream); override;
+    procedure Write(Os: opstream); override;
   private
     Secs0: LongInt;
     Secs2: LongInt;
@@ -90,22 +90,23 @@ begin
     end;
 end;
 
-constructor TTimedDialog.Load(S: TStream);
+function TTimedDialog.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  S.Read(Secs, SizeOf(Secs));
-  S.Read(Secs0, SizeOf(Secs0));
-  S.Read(Secs2, SizeOf(Secs2));
-  S.Read(DayWrap, SizeOf(DayWrap));
+  Result := Self;
+  inherited Read(Ip);
+  Ip.ReadBytes(Secs, SizeOf(Secs));
+  Ip.ReadBytes(Secs0, SizeOf(Secs0));
+  Ip.ReadBytes(Secs2, SizeOf(Secs2));
+  Ip.ReadBytes(DayWrap, SizeOf(DayWrap));
 end;
 
-procedure TTimedDialog.Store(S: TStream);
+procedure TTimedDialog.Write(Os: opstream);
 begin
-  inherited Store(S);
-  S.Write(Secs, SizeOf(Secs));
-  S.Write(Secs0, SizeOf(Secs0));
-  S.Write(Secs2, SizeOf(Secs2));
-  S.Write(DayWrap, SizeOf(DayWrap));
+  inherited Write(Os);
+  Os.WriteBytes(Secs, SizeOf(Secs));
+  Os.WriteBytes(Secs0, SizeOf(Secs0));
+  Os.WriteBytes(Secs2, SizeOf(Secs2));
+  Os.WriteBytes(DayWrap, SizeOf(DayWrap));
 end;
 
 function BoxTitle(AOptions: Word): ShortString;

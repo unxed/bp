@@ -131,7 +131,7 @@ type
         function    LoadIndex: boolean; override;
         function    ReadTopic(T: PTopic): boolean; override;
       public { protected }
-        F: PStream;
+        F: TStream;
         TopicsRead     : boolean;
         IndexTableRead : boolean;
         CompressionRead: boolean;

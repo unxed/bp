@@ -64,11 +64,15 @@ type
     TModuleNameCollection = class;
     PModuleNameCollection = TModuleNameCollection;
     TModuleNameCollection = class(TStoreCollection)
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TTypeNameCollection = class;
     PTypeNameCollection = TTypeNameCollection;
     TTypeNameCollection = class(TStoreCollection)
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TSymbolCollection = class;
@@ -83,11 +87,15 @@ type
     TReference = class(TObject)
       FileName  : PString;
       Position  : TPoint;
-      constructor Create(AFileName: PString; ALine, AColumn: Sw_integer);
+      constructor Create(AFileName: PString; ALine, AColumn: Sw_integer); overload;
       function    GetFileName: string;
       destructor Destroy; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
+    public
+      constructor Create(AInit: TStreamableInit); overload;
     end;
 
     PSymbolMemInfo = ^TSymbolMemInfo;
@@ -115,7 +123,7 @@ type
       Ancestor   : PSymbol;
       Flags      : longint;
       MemInfo    : PSymbolMemInfo;
-      constructor Create(const AName: string; ATyp: tsymtyp; AParams: string; AMemInfo: PSymbolMemInfo);
+      constructor Create(const AName: string; ATyp: tsymtyp; AParams: string; AMemInfo: PSymbolMemInfo); overload;
       procedure   SetMemInfo(const AMemInfo: TSymbolMemInfo);
       function    GetReferenceCount: Sw_integer;
       function    GetReference(Index: Sw_integer): PReference;
@@ -127,8 +135,12 @@ type
       destructor Destroy; override;
       procedure   SetVarSpez(const AVarSpez : TVarSpez);
       procedure   SetVarOptions(const AVarOptions : TVarOptions);
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
+    public
+      constructor Create(AInit: TStreamableInit); overload;
     end;
 
     TExport = class;
@@ -179,31 +191,39 @@ type
       Parent     : PObjectSymbol;
       Symbol     : PSymbol;
       Expanded   : boolean;
-      constructor Create(AParent: PObjectSymbol; ASymbol: PSymbol);
+      constructor Create(AParent: PObjectSymbol; ASymbol: PSymbol); overload;
       constructor CreateName(const AName: string);
       function    GetName: string;
       function    GetDescendantCount: sw_integer;
       function    GetDescendant(Index: sw_integer): PObjectSymbol;
       procedure   AddDescendant(P: PObjectSymbol);
       destructor Destroy; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     private
       Name: PString;
       Descendants: PObjectSymbolCollection;
+    public
+      constructor Create(AInit: TStreamableInit); overload;
     end;
 
     TSymbolCollection = class(TSortedCollection)
-       constructor Create(ALimit, ADelta: Integer);
+       constructor Create(ALimit, ADelta: Integer); overload;
        function  At(Index: Sw_Integer): PSymbol;
        procedure Insert(Item: Pointer); override;
        function  LookUp(const S: string; var Idx: sw_integer): string; virtual;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TSortedSymbolCollection = class(TSymbolCollection)
       function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
       procedure Insert(Item: Pointer); override;
       function  LookUp(const S: string; var Idx: sw_integer): string; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TIDSortedSymbolCollection = class;
@@ -212,17 +232,23 @@ type
       function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
       procedure Insert(Item: Pointer); override;
       function  SearchSymbolByID(AID: longint): PSymbol;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TObjectSymbolCollection = class(TSortedCollection)
-      constructor Create(ALimit, ADelta: Integer);
+      constructor Create(ALimit, ADelta: Integer); overload;
       function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
       function  LookUp(const S: string; var Idx: sw_integer): string; virtual;
       function At(Index: Sw_Integer): PObjectSymbol;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TReferenceCollection = class(TCollection)
        function At(Index: Sw_Integer): PReference;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TSourceFile = class;
@@ -254,12 +280,14 @@ type
       DependentUnits: PSymbolCollection;
       MainSource: PString;
       SourceFiles: pstringCollection;
-      constructor Create(const AName, AMainSource: string);
+      constructor Create(const AName, AMainSource: string); overload;
       procedure   SetLoadedFrom(const AModuleName: string);
       procedure   AddUsedUnit(P: PSymbol);
       procedure   AddDependentUnit(P: PSymbol);
       procedure   AddSourceFile(const Path: string);
       destructor Destroy; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
 const
@@ -283,8 +311,8 @@ var
 procedure RefreshBrowserCol;
 procedure DoneBrowserCol;
 
-function  LoadBrowserCol(S: PStream): boolean;
-function  StoreBrowserCol(S: PStream) : boolean;
+function  LoadBrowserCol(S: TStream): boolean;
+function  StoreBrowserCol(S: TStream) : boolean;
 
 procedure BuildObjectInfo;
 
@@ -318,18 +346,6 @@ begin
 end;
 {$endif}
 
-var
-  RModuleNameCollection,
-  RTypeNameCollection,
-  RReference,
-  RSymbol,
-  RObjectSymbol,
-  RSymbolCollection,
-  RSortedSymbolCollection,
-  RIDSortedSymbolCollection,
-  RObjectSymbolCollection,
-  RReferenceCollection,
-  RModuleSymbol: TStreamRec;
 
 const
   SymbolCount : longint = 0;
@@ -680,20 +696,35 @@ begin
   inherited Destroy;
 end;
 
-constructor TReference.Load(S: TStream);
+function TReference.Read(Ip: ipstream): Pointer;
 begin
-  S.Read(Position, SizeOf(Position));
+  Result := Self;
+  Ip.ReadBytes(Position, SizeOf(Position));
 
   { --- items needing fixup --- }
-  S.Read(FileName, SizeOf(FileName)); { ->ModulesNames.Item }
+  Ip.ReadBytes(FileName, SizeOf(FileName)); { ->ModulesNames.Item }
 end;
 
-procedure TReference.Store(S: TStream);
+procedure TReference.Write(Os: opstream);
 begin
-  S.Write(Position, SizeOf(Position));
+  Os.WriteBytes(Position, SizeOf(Position));
 
   { --- items needing fixup --- }
-  S.Write(FileName, SizeOf(FileName));
+  Os.WriteBytes(FileName, SizeOf(FileName));
+end;
+
+constructor TReference.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function TReference.Build: TStreamable;
+begin
+  Result := TReference.Create(streamableInit);
+end;
+
+function TReference.StreamableName: ShortString;
+begin
+  Result := 'browcol.TReference';
 end;
 
 {****************************************************************************
@@ -863,14 +894,15 @@ begin
   inherited Destroy;
 end;
 
-constructor TSymbol.Load(S: TStream);
+function TSymbol.Read(Ip: ipstream): Pointer;
 var MI: TSymbolMemInfo;
     W: word;
 begin
+  Result := Self;
   inherited Create;
   inc(SymbolCount);
 
-  S.Read(Typ,SizeOf(Typ));
+  Ip.ReadBytes(Typ,SizeOf(Typ));
   case Typ of
     abstractsym,
     absolutevarsym,
@@ -878,8 +910,8 @@ begin
     localvarsym,
     paravarsym :
     begin
-      S.Read(VarSpez,SizeOf(VarSpez));
-      S.Read(VarOptions,SizeOf(VarOptions));
+      Ip.ReadBytes(VarSpez,SizeOf(VarSpez));
+      Ip.ReadBytes(VarOptions,SizeOf(VarOptions));
     end;
   else
     begin
@@ -887,33 +919,33 @@ begin
       VarOptions:=[];
     end;
   end;
-  S.Read(TypeID, SizeOf(TypeID));
-  S.Read(RelatedTypeID, SizeOf(RelatedTypeID));
-  S.Read(Flags, SizeOf(Flags));
-  Name:=S.ReadStr;
+  Ip.ReadBytes(TypeID, SizeOf(TypeID));
+  Ip.ReadBytes(RelatedTypeID, SizeOf(RelatedTypeID));
+  Ip.ReadBytes(Flags, SizeOf(Flags));
+  Name:=Ip.ReadString;
   if (Flags and sfHasMemInfo)<>0 then
     begin
-      S.Read(MI,SizeOf(MI));
+      Ip.ReadBytes(MI,SizeOf(MI));
       SetMemInfo(MI);
     end;
 
   W:=0;
-  S.Read(W,SizeOf(W));
+  Ip.ReadBytes(W,SizeOf(W));
   if (W and 1)<>0 then
-    References := TReferenceCollection.Load(S);
+    References := TReferenceCollection(Ip.ReadPointer);
   if (W and 2)<>0 then
-    Items := TSymbolCollection.Load(S);
+    Items := TSymbolCollection(Ip.ReadPointer);
 
   { --- items needing fixup --- }
-  S.Read(DType, SizeOf(DType));
-  S.Read(VType, SizeOf(VType));
-  S.Read(Params, SizeOf(Params));
+  Ip.ReadBytes(DType, SizeOf(DType));
+  Ip.ReadBytes(VType, SizeOf(VType));
+  Ip.ReadBytes(Params, SizeOf(Params));
 end;
 
-procedure TSymbol.Store(S: TStream);
+procedure TSymbol.Write(Os: opstream);
 var W: word;
 begin
-  S.Write(Typ,SizeOf(Typ));
+  Os.WriteBytes(Typ,SizeOf(Typ));
   case Typ of
     abstractsym,
     absolutevarsym,
@@ -921,29 +953,43 @@ begin
     localvarsym,
     paravarsym :
     begin
-      S.Write(VarSpez,SizeOf(VarSpez));
-      S.Write(VarOptions,SizeOf(VarOptions));
+      Os.WriteBytes(VarSpez,SizeOf(VarSpez));
+      Os.WriteBytes(VarOptions,SizeOf(VarOptions));
     end;
   end;
-  S.Write(TypeID, SizeOf(TypeID));
-  S.Write(RelatedTypeID, SizeOf(RelatedTypeID));
-  S.Write(Flags, SizeOf(Flags));
-  S.WriteStr(Name);
+  Os.WriteBytes(TypeID, SizeOf(TypeID));
+  Os.WriteBytes(RelatedTypeID, SizeOf(RelatedTypeID));
+  Os.WriteBytes(Flags, SizeOf(Flags));
+  Os.WriteString(Name);
 
   if (Flags and sfHasMemInfo)<>0 then
-    S.Write(MemInfo^,SizeOf(MemInfo^));
+    Os.WriteBytes(MemInfo^,SizeOf(MemInfo^));
 
   W:=0;
   if Assigned(References) then W:=W or 1;
   if Assigned(Items) then W:=W or 2;
-  S.Write(W,SizeOf(W));
-  if Assigned(References) then References.Store(S);
-  if Assigned(Items) then Items.Store(S);
+  Os.WriteBytes(W,SizeOf(W));
+  if Assigned(References) then Os.WritePointer(References);
+  if Assigned(Items) then Os.WritePointer(Items);
 
   { --- items needing fixup --- }
-  S.Write(DType, SizeOf(DType));
-  S.Write(VType, SizeOf(VType));
-  S.Write(Params, SizeOf(Params));
+  Os.WriteBytes(DType, SizeOf(DType));
+  Os.WriteBytes(VType, SizeOf(VType));
+  Os.WriteBytes(Params, SizeOf(Params));
+end;
+
+constructor TSymbol.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function TSymbol.Build: TStreamable;
+begin
+  Result := TSymbol.Create(streamableInit);
+end;
+
+function TSymbol.StreamableName: ShortString;
+begin
+  Result := 'browcol.TSymbol';
 end;
 
 constructor TExport.Create(const AName: string; AIndex: longint; ASymbol: PSymbol);
@@ -1149,12 +1195,27 @@ begin
   inherited Destroy;
 end;
 
-constructor TObjectSymbol.Load(S: TStream);
+function TObjectSymbol.Read(Ip: ipstream): Pointer;
+begin
+  Result := Self;
+end;
+
+procedure TObjectSymbol.Write(Os: opstream);
 begin
 end;
 
-procedure TObjectSymbol.Store(S: TStream);
+constructor TObjectSymbol.Create(AInit: TStreamableInit);
 begin
+end;
+
+class function TObjectSymbol.Build: TStreamable;
+begin
+  Result := TObjectSymbol.Create(streamableInit);
+end;
+
+function TObjectSymbol.StreamableName: ShortString;
+begin
+  Result := 'browcol.TObjectSymbol';
 end;
 
 {****************************************************************************
@@ -2186,7 +2247,7 @@ begin
   Move(V,P,SizeOf(V));
 end;
 
-procedure ReadPointers(S: PStream; C: PCollection; D: PPointerDictionary);
+procedure ReadPointers(S: TStream; C: PCollection; D: PPointerDictionary);
 var W,I: sw_integer;
     P: pointer;
 begin
@@ -2198,8 +2259,9 @@ begin
   end;
 end;
 
-function LoadBrowserCol(S: PStream): boolean;
+function LoadBrowserCol(S: TStream): boolean;
 var PD: PPointerDictionary;
+    Ip: ipstream;
 procedure FixupPointers;
 procedure FixupReference(P: PReference);
 begin
@@ -2241,9 +2303,11 @@ end;
 begin
   DisposeBrowserCol;
 
-  ModuleNames := TModuleNameCollection.Load(S);
-  TypeNames := TTypeNameCollection.Load(S);
-  Modules := TSymbolCollection.Load(S);
+  Ip := ipstream.Create(S);
+  ModuleNames := TModuleNameCollection(Ip.ReadPointer);
+  TypeNames := TTypeNameCollection(Ip.ReadPointer);
+  Modules := TSymbolCollection(Ip.ReadPointer);
+  Ip.Free;
 
   PD := TPointerDictionary.Create(4000,1000);
   ReadPointers(S,ModuleNames,PD);
@@ -2257,7 +2321,7 @@ begin
   LoadBrowserCol:=(S.Status=stOK);
 end;
 
-procedure StorePointers(S: PStream; C: PCollection);
+procedure StorePointers(S: TStream; C: PCollection);
 var W,I: sw_integer;
     P: pointer;
 begin
@@ -2270,7 +2334,8 @@ begin
   end;
 end;
 
-function StoreBrowserCol(S: PStream) : boolean;
+function StoreBrowserCol(S: TStream) : boolean;
+var Os: opstream;
 procedure WriteSymbolPointers(Item: Pointer);
 var P: PSymbol;
     I: sw_integer;
@@ -2283,9 +2348,11 @@ begin
        WriteSymbolPointers(At(I));
 end;
 begin
-  ModuleNames.Store(S);
-  TypeNames.Store(S);
-  Modules.Store(S);
+  Os := opstream.Create(S);
+  Os.WritePointer(ModuleNames);
+  Os.WritePointer(TypeNames);
+  Os.WritePointer(Modules);
+  Os.Free;
 
   StorePointers(S,ModuleNames);
   StorePointers(S,TypeNames);
@@ -2299,165 +2366,102 @@ end;
                          Stream registration helpers
 ****************************************************************************}
 
-function BuildModuleNameCollection(S: TStream): TStreamable;
-begin
-  Result := TModuleNameCollection.Load(S);
-end;
-procedure StoreModuleNameCollection(P: TStreamable; S: TStream);
-begin
-  TModuleNameCollection(P).Store(S);
-end;
-function BuildTypeNameCollection(S: TStream): TStreamable;
-begin
-  Result := TTypeNameCollection.Load(S);
-end;
-procedure StoreTypeNameCollection(P: TStreamable; S: TStream);
-begin
-  TTypeNameCollection(P).Store(S);
-end;
-function BuildReference(S: TStream): TStreamable;
-begin
-  Result := TReference.Load(S);
-end;
-procedure StoreReference(P: TStreamable; S: TStream);
-begin
-  TReference(P).Store(S);
-end;
-function BuildSymbol(S: TStream): TStreamable;
-begin
-  Result := TSymbol.Load(S);
-end;
-procedure StoreSymbol(P: TStreamable; S: TStream);
-begin
-  TSymbol(P).Store(S);
-end;
-function BuildObjectSymbol(S: TStream): TStreamable;
-begin
-  Result := TObjectSymbol.Load(S);
-end;
-procedure StoreObjectSymbol(P: TStreamable; S: TStream);
-begin
-  TObjectSymbol(P).Store(S);
-end;
-function BuildSymbolCollection(S: TStream): TStreamable;
-begin
-  Result := TSymbolCollection.Load(S);
-end;
-procedure StoreSymbolCollection(P: TStreamable; S: TStream);
-begin
-  TSymbolCollection(P).Store(S);
-end;
-function BuildSortedSymbolCollection(S: TStream): TStreamable;
-begin
-  Result := TSortedSymbolCollection.Load(S);
-end;
-procedure StoreSortedSymbolCollection(P: TStreamable; S: TStream);
-begin
-  TSortedSymbolCollection(P).Store(S);
-end;
-function BuildIDSortedSymbolCollection(S: TStream): TStreamable;
-begin
-  Result := TIDSortedSymbolCollection.Load(S);
-end;
-procedure StoreIDSortedSymbolCollection(P: TStreamable; S: TStream);
-begin
-  TIDSortedSymbolCollection(P).Store(S);
-end;
-function BuildObjectSymbolCollection(S: TStream): TStreamable;
-begin
-  Result := TObjectSymbolCollection.Load(S);
-end;
-procedure StoreObjectSymbolCollection(P: TStreamable; S: TStream);
-begin
-  TObjectSymbolCollection(P).Store(S);
-end;
-function BuildReferenceCollection(S: TStream): TStreamable;
-begin
-  Result := TReferenceCollection.Load(S);
-end;
-procedure StoreReferenceCollection(P: TStreamable; S: TStream);
-begin
-  TReferenceCollection(P).Store(S);
-end;
-function BuildModuleSymbol(S: TStream): TStreamable;
-begin
-  Result := TModuleSymbol.Load(S);
-end;
-procedure StoreModuleSymbol(P: TStreamable; S: TStream);
-begin
-  TModuleSymbol(P).Store(S);
-end;
 
 procedure RegisterSymbols;
 begin
 {$ifndef NOOBJREG}
-  RModuleNameCollection.ObjType := 3001;
-  RModuleNameCollection.VmtLink := PtrUInt(System.TClass(TModuleNameCollection));
-  RModuleNameCollection.Load := @BuildModuleNameCollection;
-  RModuleNameCollection.Store := @StoreModuleNameCollection;
-  RModuleNameCollection.Next := nil;
-  RegisterType(RModuleNameCollection);
-  RTypeNameCollection.ObjType := 3002;
-  RTypeNameCollection.VmtLink := PtrUInt(System.TClass(TTypeNameCollection));
-  RTypeNameCollection.Load := @BuildTypeNameCollection;
-  RTypeNameCollection.Store := @StoreTypeNameCollection;
-  RTypeNameCollection.Next := nil;
-  RegisterType(RTypeNameCollection);
-  RReference.ObjType := 3003;
-  RReference.VmtLink := PtrUInt(System.TClass(TReference));
-  RReference.Load := @BuildReference;
-  RReference.Store := @StoreReference;
-  RReference.Next := nil;
-  RegisterType(RReference);
-  RSymbol.ObjType := 3004;
-  RSymbol.VmtLink := PtrUInt(System.TClass(TSymbol));
-  RSymbol.Load := @BuildSymbol;
-  RSymbol.Store := @StoreSymbol;
-  RSymbol.Next := nil;
-  RegisterType(RSymbol);
-  RObjectSymbol.ObjType := 3005;
-  RObjectSymbol.VmtLink := PtrUInt(System.TClass(TObjectSymbol));
-  RObjectSymbol.Load := @BuildObjectSymbol;
-  RObjectSymbol.Store := @StoreObjectSymbol;
-  RObjectSymbol.Next := nil;
-  RegisterType(RObjectSymbol);
-  RSymbolCollection.ObjType := 3006;
-  RSymbolCollection.VmtLink := PtrUInt(System.TClass(TSymbolCollection));
-  RSymbolCollection.Load := @BuildSymbolCollection;
-  RSymbolCollection.Store := @StoreSymbolCollection;
-  RSymbolCollection.Next := nil;
-  RegisterType(RSymbolCollection);
-  RSortedSymbolCollection.ObjType := 3007;
-  RSortedSymbolCollection.VmtLink := PtrUInt(System.TClass(TSortedSymbolCollection));
-  RSortedSymbolCollection.Load := @BuildSortedSymbolCollection;
-  RSortedSymbolCollection.Store := @StoreSortedSymbolCollection;
-  RSortedSymbolCollection.Next := nil;
-  RegisterType(RSortedSymbolCollection);
-  RIDSortedSymbolCollection.ObjType := 3008;
-  RIDSortedSymbolCollection.VmtLink := PtrUInt(System.TClass(TIDSortedSymbolCollection));
-  RIDSortedSymbolCollection.Load := @BuildIDSortedSymbolCollection;
-  RIDSortedSymbolCollection.Store := @StoreIDSortedSymbolCollection;
-  RIDSortedSymbolCollection.Next := nil;
-  RegisterType(RIDSortedSymbolCollection);
-  RObjectSymbolCollection.ObjType := 3009;
-  RObjectSymbolCollection.VmtLink := PtrUInt(System.TClass(TObjectSymbolCollection));
-  RObjectSymbolCollection.Load := @BuildObjectSymbolCollection;
-  RObjectSymbolCollection.Store := @StoreObjectSymbolCollection;
-  RObjectSymbolCollection.Next := nil;
-  RegisterType(RObjectSymbolCollection);
-  RReferenceCollection.ObjType := 3010;
-  RReferenceCollection.VmtLink := PtrUInt(System.TClass(TReferenceCollection));
-  RReferenceCollection.Load := @BuildReferenceCollection;
-  RReferenceCollection.Store := @StoreReferenceCollection;
-  RReferenceCollection.Next := nil;
-  RegisterType(RReferenceCollection);
-  RModuleSymbol.ObjType := 3011;
-  RModuleSymbol.VmtLink := PtrUInt(System.TClass(TModuleSymbol));
-  RModuleSymbol.Load := @BuildModuleSymbol;
-  RModuleSymbol.Store := @StoreModuleSymbol;
-  RModuleSymbol.Next := nil;
-  RegisterType(RModuleSymbol);
+  TStreamableClass.Create('browcol.TModuleNameCollection', @TModuleNameCollection.Build);
+  TStreamableClass.Create('browcol.TTypeNameCollection', @TTypeNameCollection.Build);
+  TStreamableClass.Create('browcol.TReference', @TReference.Build);
+  TStreamableClass.Create('browcol.TSymbol', @TSymbol.Build);
+  TStreamableClass.Create('browcol.TObjectSymbol', @TObjectSymbol.Build);
+  TStreamableClass.Create('browcol.TSymbolCollection', @TSymbolCollection.Build);
+  TStreamableClass.Create('browcol.TSortedSymbolCollection', @TSortedSymbolCollection.Build);
+  TStreamableClass.Create('browcol.TIDSortedSymbolCollection', @TIDSortedSymbolCollection.Build);
+  TStreamableClass.Create('browcol.TObjectSymbolCollection', @TObjectSymbolCollection.Build);
+  TStreamableClass.Create('browcol.TReferenceCollection', @TReferenceCollection.Build);
+  TStreamableClass.Create('browcol.TModuleSymbol', @TModuleSymbol.Build);
 {$endif}
+end;
+
+class function TIDSortedSymbolCollection.Build: TStreamable;
+begin
+  Result := TIDSortedSymbolCollection.Create(streamableInit);
+end;
+
+function TIDSortedSymbolCollection.StreamableName: ShortString;
+begin
+  Result := 'browcol.TIDSortedSymbolCollection';
+end;
+
+class function TModuleNameCollection.Build: TStreamable;
+begin
+  Result := TModuleNameCollection.Create(streamableInit);
+end;
+
+function TModuleNameCollection.StreamableName: ShortString;
+begin
+  Result := 'browcol.TModuleNameCollection';
+end;
+
+class function TModuleSymbol.Build: TStreamable;
+begin
+  Result := TModuleSymbol.Create(streamableInit);
+end;
+
+function TModuleSymbol.StreamableName: ShortString;
+begin
+  Result := 'browcol.TModuleSymbol';
+end;
+
+class function TObjectSymbolCollection.Build: TStreamable;
+begin
+  Result := TObjectSymbolCollection.Create(streamableInit);
+end;
+
+function TObjectSymbolCollection.StreamableName: ShortString;
+begin
+  Result := 'browcol.TObjectSymbolCollection';
+end;
+
+class function TReferenceCollection.Build: TStreamable;
+begin
+  Result := TReferenceCollection.Create(streamableInit);
+end;
+
+function TReferenceCollection.StreamableName: ShortString;
+begin
+  Result := 'browcol.TReferenceCollection';
+end;
+
+class function TSortedSymbolCollection.Build: TStreamable;
+begin
+  Result := TSortedSymbolCollection.Create(streamableInit);
+end;
+
+function TSortedSymbolCollection.StreamableName: ShortString;
+begin
+  Result := 'browcol.TSortedSymbolCollection';
+end;
+
+class function TSymbolCollection.Build: TStreamable;
+begin
+  Result := TSymbolCollection.Create(streamableInit);
+end;
+
+function TSymbolCollection.StreamableName: ShortString;
+begin
+  Result := 'browcol.TSymbolCollection';
+end;
+
+class function TTypeNameCollection.Build: TStreamable;
+begin
+  Result := TTypeNameCollection.Create(streamableInit);
+end;
+
+function TTypeNameCollection.StreamableName: ShortString;
+begin
+  Result := 'browcol.TTypeNameCollection';
 end;
 
 begin

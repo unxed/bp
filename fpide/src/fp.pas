@@ -294,8 +294,6 @@ begin
 {$ifdef COLORSEL}
   RegisterColorSel;
 {$endif COLORSEL}
-  RegisterType(RAsciiTable);
-  RegisterType(RAsciiReport);
   RegisterWEditor;
   RegisterWCEdit;
   RegisterFPCalc;

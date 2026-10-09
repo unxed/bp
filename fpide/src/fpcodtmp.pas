@@ -32,19 +32,23 @@ type
     TCodeTemplate = class;
   PCodeTemplate = TCodeTemplate;
     TCodeTemplate = class(TObject)
-      constructor Create(const AShortCut: string; AText: PUnsortedStringCollection);
+      constructor Create(const AShortCut: string; AText: PUnsortedStringCollection); overload;
       function    GetShortCut: string;
       procedure   GetText(AList: PUnsortedStringCollection);
       procedure   SetShortCut(const AShortCut: string);
       procedure   SetText(AList: PUnsortedStringCollection);
       procedure   GetParams(var AShortCut: string; Lines: PUnsortedStringCollection);
       procedure   SetParams(const AShortCut: string; Lines: PUnsortedStringCollection);
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     private
       ShortCut: PString;
       Text: PUnsortedStringCollection;
+    public
+      constructor Create(AInit: TStreamableInit); overload;
     end;
 
     TCodeTemplateCollection = class;
@@ -53,6 +57,8 @@ type
       function Compare(Key1, Key2: Pointer): sw_Integer; override;
       function SearchByShortCut(const ShortCut: string): PCodeTemplate; virtual;
       function LookUp(const S: string; AcceptMulti: boolean; var Idx: sw_integer): string; virtual;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TCodeTemplateListBox = class;
@@ -124,8 +130,6 @@ resourcestring  label_codetemplate_shortcut = '~S~hortcut';
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RCodeTemplate: TStreamRec;
-var RCodeTemplateCollection: TStreamRec;
 
 {$endif}
 {$endif}
@@ -181,16 +185,31 @@ begin
   SetText(Lines);
 end;
 
-constructor TCodeTemplate.Load(S: TStream);
+function TCodeTemplate.Read(Ip: ipstream): Pointer;
 begin
-  ShortCut:=S.ReadStr;
-  Text := TUnsortedStringCollection.Load(S);
+  Result := Self;
+  ShortCut:=Ip.ReadString;
+  Text := TUnsortedStringCollection(Ip.ReadPointer);
 end;
 
-procedure TCodeTemplate.Store(S: TStream);
+procedure TCodeTemplate.Write(Os: opstream);
 begin
-  S.WriteStr(ShortCut);
-  Text.Store(S);
+  Os.WriteString(ShortCut);
+  Os.WritePointer(Text);
+end;
+
+constructor TCodeTemplate.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function TCodeTemplate.Build: TStreamable;
+begin
+  Result := TCodeTemplate.Create(streamableInit);
+end;
+
+function TCodeTemplate.StreamableName: ShortString;
+begin
+  Result := 'fpcodtmp.TCodeTemplate';
 end;
 
 destructor TCodeTemplate.Destroy;
@@ -322,7 +341,7 @@ function LoadCodeTemplates(S: TStream): boolean;
 var C: PCodeTemplateCollection;
     OK: boolean;
 begin
-  C := TCodeTemplateCollection.Load(S);
+  C := TCodeTemplateCollection(GetObject(S));
   OK:=Assigned(C) and (S.Status=stOk);
   if OK then
     begin
@@ -341,7 +360,7 @@ begin
   OK:=Assigned(CodeTemplates);
   if OK then
   begin
-    CodeTemplates.Store(S);
+    PutObject(S, CodeTemplates);
     OK:=OK and (S.Status=stOK);
   end;
   StoreCodeTemplates:=OK;
@@ -648,39 +667,13 @@ end;
 
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RCodeTemplate(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TCodeTemplate.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RCodeTemplate(P: TStreamable; S: TStream);
-begin
-  TCodeTemplate(Pointer(P)).Store(S);
-end;
 
-function Build_RCodeTemplateCollection(S: TStream): TStreamable;
+procedure RegisterStreamables_fpcodtmp;
 begin
-  Result := TStreamable(Pointer(TCodeTemplateCollection.Load(S)));
-end;
-
-procedure Store_RCodeTemplateCollection(P: TStreamable; S: TStream);
-begin
-  TCodeTemplateCollection(Pointer(P)).Store(S);
-end;
-
-procedure FillStreamRecs_fpcodtmp;
-begin
-  RCodeTemplate.ObjType := 14501;
-  RCodeTemplate.VmtLink := PtrUInt(System.TClass(TCodeTemplate));
-  RCodeTemplate.Load := @Build_RCodeTemplate;
-  RCodeTemplate.Store := @Store_RCodeTemplate;
-  RCodeTemplate.Next := nil;
-  RCodeTemplateCollection.ObjType := 14502;
-  RCodeTemplateCollection.VmtLink := PtrUInt(System.TClass(TCodeTemplateCollection));
-  RCodeTemplateCollection.Load := @Build_RCodeTemplateCollection;
-  RCodeTemplateCollection.Store := @Store_RCodeTemplateCollection;
-  RCodeTemplateCollection.Next := nil;
+  TStreamableClass.Create('fpcodtmp.TCodeTemplate', @TCodeTemplate.Build);
+  TStreamableClass.Create('fpcodtmp.TCodeTemplateCollection', @TCodeTemplateCollection.Build);
 end;
 
 {$endif}
@@ -688,10 +681,19 @@ end;
 procedure RegisterCodeTemplates;
 begin
 {$ifndef NOOBJREG}
-  FillStreamRecs_fpcodtmp;
-  RegisterType(RCodeTemplate);
-  RegisterType(RCodeTemplateCollection);
+  RegisterStreamables_fpcodtmp;
 {$endif}
+end;
+
+
+class function TCodeTemplateCollection.Build: TStreamable;
+begin
+  Result := TCodeTemplateCollection.Create(streamableInit);
+end;
+
+function TCodeTemplateCollection.StreamableName: ShortString;
+begin
+  Result := 'fpcodtmp.TCodeTemplateCollection';
 end;
 
 END.

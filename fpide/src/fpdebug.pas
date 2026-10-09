@@ -132,8 +132,10 @@ type
      constructor Init_Empty;
      constructor Init_file_line(AFile : String; ALine : longint);
      constructor Init_type(atyp : BreakpointType;Const AnExpr : String);
-     constructor Load(S: TStream);
-     procedure   Store(S: TStream);
+     function Read(Ip: ipstream): Pointer; override;
+     function StreamableName: ShortString; override;
+     class function Build: TStreamable; static;
+     procedure Write(Os: opstream); override;
      procedure  Insert;
      procedure  Remove;
      procedure  Enable;
@@ -141,6 +143,8 @@ type
      procedure  UpdateSource;
      procedure  ResetValues;
      destructor Destroy;override;
+   public
+     constructor Create(AInit: TStreamableInit); overload;
   end;
 
   TBreakpointCollection= class(TCollection)
@@ -153,6 +157,8 @@ type
       function  FindBreakpointAt(Editor : PSourceEditor; Line : longint) : PBreakpoint;
       procedure AdaptBreakpoints(Editor : PSourceEditor; Pos, Change : longint);
       procedure ShowAllBreakpoints;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TBreakpointItem = class;
@@ -172,7 +178,7 @@ type
       NoSelection : boolean;
       MaxWidth    : Sw_integer;
       (* ModuleNames : PStoreCollection; *)
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       procedure   AddBreakpoint(P: PBreakpointItem); virtual;
       function    GetText(Item,MaxLen: Sw_Integer): String; override;
       function    GetLocalMenu: PMenu;override;
@@ -184,8 +190,10 @@ type
       procedure   ToggleCurrent;
       procedure   Draw; override;
       procedure   HandleEvent(var Event: TEvent); override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -193,7 +201,7 @@ type
   PBreakpointsWindow = TBreakpointsWindow;
     TBreakpointsWindow = class(TFPDlgWindow)
       BreakLB : PBreakpointsListBox;
-      constructor Create;
+      constructor Create; overload;
       procedure   AddBreakpoint(ABreakpoint : PBreakpoint);
       procedure   ClearBreakpoints;
       procedure   ReloadBreakpoints;
@@ -201,8 +209,10 @@ type
       procedure   SizeLimits(out Min, Max: TPoint);override;
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   Update; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -226,26 +236,32 @@ type
     TWatch = class(TObject)
       expr : pstring;
       last_value,current_value : pchar;
-      constructor Create(s : string);
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      constructor Create(s : string); overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure rename(s : string);
       procedure Get_new_value;
       procedure Force_new_value;
       destructor Destroy;override;
     private
       GDBRunCount : longint;
+    public
+      constructor Create(AInit: TStreamableInit); overload;
     end;
 
     TWatchesCollection = class;
   PWatchesCollection = TWatchesCollection;
     TWatchesCollection = class(TCollection)
-      constructor Create;
+      constructor Create; overload;
       procedure Insert(Item: Pointer); override;
       function  At(Index: Integer): PWatch;
       procedure Update;
     private
       MaxW : integer;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TWatchesListBox = class;
@@ -253,7 +269,7 @@ type
     TWatchesListBox = class(THSListBox)
       Transparent : boolean;
       MaxWidth    : Sw_integer;
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       (* procedure   AddWatch(P: PWatch); virtual; *)
       procedure   Update(AMaxWidth : integer);
       function    GetText (Item: Sw_Integer; MaxLen: Sw_Integer): String; override;
@@ -267,8 +283,10 @@ type
       (*procedure   ToggleCurrent; *)
       procedure   Draw; override;
       procedure   HandleEvent(var Event: TEvent); override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -288,9 +306,11 @@ type
   PWatchesWindow = TWatchesWindow;
     TWatchesWindow = class(TFPDlgWindow)
       WLB : PWatchesListBox;
-      constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      constructor Create; overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -298,22 +318,26 @@ type
     TFramesListBox = class;
   PFramesListBox = TFramesListBox;
     TFramesListBox = class(TMessageListBox)
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       procedure   Update; override;
       function    GetLocalMenu: PMenu;override;
       procedure   GotoSource; override;
       procedure   GotoAssembly; virtual;
       procedure   HandleEvent(var Event: TEvent); override;
       destructor Destroy; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TStackWindow = class;
   PStackWindow = TStackWindow;
     TStackWindow = class(TFPDlgWindow)
       FLB : PFramesListBox;
-      constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      constructor Create; overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -408,22 +432,12 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RBreakpointsWindow: TStreamRec;
 
 
   {$endif}
 {$endif}
 {$endif NOOBJREG}
 
-var RBreakpointsListBox: TStreamRec;
-var RWatchesWindow: TStreamRec;
-var RWatchesListBox: TStreamRec;
-var RStackWindow: TStreamRec;
-var RFramesListBox: TStreamRec;
-var RBreakpoint: TStreamRec;
-var RWatch: TStreamRec;
-var RBreakpointCollection: TStreamRec;
-var RWatchesCollection: TStreamRec;
 
 
 {$ifdef USERESSTRINGS}
@@ -1727,59 +1741,74 @@ begin
   CurrentValue:=nil;
 end;
 
-constructor TBreakpoint.Load(S: TStream);
+function TBreakpoint.Read(Ip: ipstream): Pointer;
 var
   FName : PString;
 begin
-  S.Read(typ,SizeOf(BreakpointType));
-  S.Read(state,SizeOf(BreakpointState));
+  Result := Self;
+  Ip.ReadBytes(typ,SizeOf(BreakpointType));
+  Ip.ReadBytes(state,SizeOf(BreakpointState));
   GDBState:=bs_deleted;
   case typ of
     bt_file_line :
       begin
         { convert to current target }
-        FName:=S.ReadStr;
+        FName:=Ip.ReadString;
         FileName:=NewStr(OSFileName(GetStr(FName)));
         If Assigned(FName) then
           DisposeStr(FName);
-        S.Read(Line,SizeOf(Line));
+        Ip.ReadBytes(Line,SizeOf(Line));
         Name:=nil;
       end;
   else
     begin
-        Name:=S.ReadStr;
+        Name:=Ip.ReadString;
         Line:=0;
         FileName:=nil;
     end;
   end;
-  S.Read(IgnoreCount,SizeOf(IgnoreCount));
-  Commands:=S.StrRead;
-  Conditions:=S.ReadStr;
+  Ip.ReadBytes(IgnoreCount,SizeOf(IgnoreCount));
+  Commands:=StrRead(Ip);
+  Conditions:=Ip.ReadString;
   OldValue:=nil;
   CurrentValue:=nil;
 end;
 
-procedure TBreakpoint.Store(S: TStream);
+procedure TBreakpoint.Write(Os: opstream);
 var
   St : String;
 begin
-  S.Write(typ,SizeOf(BreakpointType));
-  S.Write(state,SizeOf(BreakpointState));
+  Os.WriteBytes(typ,SizeOf(BreakpointType));
+  Os.WriteBytes(state,SizeOf(BreakpointState));
   case typ of
     bt_file_line :
       begin
         st:=OSFileName(GetStr(FileName));
-        S.WriteStr(@St);
-        S.Write(Line,SizeOf(Line));
+        Os.WriteString(@St);
+        Os.WriteBytes(Line,SizeOf(Line));
       end;
   else
     begin
-        S.WriteStr(Name);
+        Os.WriteString(Name);
     end;
   end;
-  S.Write(IgnoreCount,SizeOf(IgnoreCount));
-  S.StrWrite(Commands);
-  S.WriteStr(Conditions);
+  Os.WriteBytes(IgnoreCount,SizeOf(IgnoreCount));
+  StrWrite(Os, Commands);
+  Os.WriteString(Conditions);
+end;
+
+constructor TBreakpoint.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function TBreakpoint.Build: TStreamable;
+begin
+  Result := TBreakpoint.Create(streamableInit);
+end;
+
+function TBreakpoint.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TBreakpoint';
 end;
 
 procedure TBreakpoint.Insert;
@@ -2495,12 +2524,13 @@ begin
   end;
 end;
 
-constructor TBreakpointsListBox.Load(S: TStream);
+function TBreakpointsListBox.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 end;
 
-procedure TBreakpointsListBox.Store(S: TStream);
+procedure TBreakpointsListBox.Write(Os: opstream);
 var OL: PCollection;
     OldR : integer;
 begin
@@ -2509,7 +2539,7 @@ begin
   Range:=0;
   Items := TCollection.Create(1,1);
 
-  inherited Store(S);
+  inherited Write(Os);
 
   List.Free;
   Range:=OldR;
@@ -2518,6 +2548,16 @@ begin
     collection? Pasting here a modified version of TListBox.Store+
     TAdvancedListBox.Store isn't a better solution, since by eventually
     changing the obj-hierarchy you'll always have to modify this, too - BG }
+end;
+
+class function TBreakpointsListBox.Build: TStreamable;
+begin
+  Result := TBreakpointsListBox.Create(streamableInit);
+end;
+
+function TBreakpointsListBox.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TBreakpointsListBox';
 end;
 
 destructor TBreakpointsListBox.Destroy;
@@ -2599,16 +2639,27 @@ begin
   BreakpointsWindow:=Self;
 end;
 
-constructor TBreakpointsWindow.Load(S: TStream);
+function TBreakpointsWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  GetSubViewPtr(S,BreakLB);
+  Result := Self;
+  inherited Read(Ip);
+  BreakLB := TBreakpointsListBox(Ip.ReadPointer);
 end;
 
-procedure TBreakpointsWindow.Store(S: TStream);
+procedure TBreakpointsWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
-  PutSubViewPtr(S,BreakLB);
+  inherited Write(Os);
+  Os.WritePointer(BreakLB);
+end;
+
+class function TBreakpointsWindow.Build: TStreamable;
+begin
+  Result := TBreakpointsWindow.Create(streamableInit);
+end;
+
+function TBreakpointsWindow.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TBreakpointsWindow';
 end;
 
 procedure TBreakpointsWindow.AddBreakpoint(ABreakpoint : PBreakpoint);
@@ -2841,19 +2892,34 @@ constructor TWatch.Create(s : string);
     GDBRunCount:=-1;
   end;
 
-constructor TWatch.Load(S: TStream);
+function TWatch.Read(Ip: ipstream): Pointer;
   begin
-    expr:=S.ReadStr;
+    Result := Self;
+    expr:=Ip.ReadString;
     last_value:=nil;
     current_value:=nil;
     Get_new_value;
     GDBRunCount:=-1;
   end;
 
-procedure TWatch.Store(S: TStream);
+procedure TWatch.Write(Os: opstream);
   begin
-    S.WriteStr(expr);
+    Os.WriteString(expr);
   end;
+
+constructor TWatch.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function TWatch.Build: TStreamable;
+begin
+  Result := TWatch.Create(streamableInit);
+end;
+
+function TWatch.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TWatch';
+end;
 
 procedure TWatch.rename(s : string);
   begin
@@ -3334,9 +3400,10 @@ begin
   inherited HandleEvent(Event);
 end;
 
-      constructor TWatchesListBox.Load(S: TStream);
+      function TWatchesListBox.Read(Ip: ipstream): Pointer;
         begin
-          inherited Load(S);
+          Result := Self;
+          inherited Read(Ip);
           If assigned(List) then
             list.Free;
           Items:=WatchesCollection;
@@ -3344,7 +3411,7 @@ end;
           SetRange(List.count+1);
         end;
 
-      procedure   TWatchesListBox.Store(S: TStream);
+      procedure TWatchesListBox.Write(Os: opstream);
         var OL: PCollection;
             OldRange : Sw_integer;
         begin
@@ -3352,7 +3419,7 @@ end;
           OldRange:=Range;
           Range:=0;
           Items := TCollection.Create(1,1);
-          inherited Store(S);
+          inherited Write(Os);
           List.Free;
           Items:=OL;
           { ^^^ nasty trick - has anyone a better idea how to avoid storing the
@@ -3361,6 +3428,16 @@ end;
             changing the obj-hierarchy you'll always have to modify this, too - BG }
           SetRange(OldRange);
         end;
+
+class function TWatchesListBox.Build: TStreamable;
+begin
+  Result := TWatchesListBox.Create(streamableInit);
+end;
+
+function TWatchesListBox.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TWatchesListBox';
+end;
 
       destructor  TWatchesListBox.Destroy;
         begin
@@ -3413,20 +3490,31 @@ end;
       Draw;
     end;
 
-  constructor TWatchesWindow.Load(S: TStream);
+  function TWatchesWindow.Read(Ip: ipstream): Pointer;
     begin
-      inherited Load(S);
-      GetSubViewPtr(S,WLB);
+      Result := Self;
+      inherited Read(Ip);
+      WLB := TWatchesListBox(Ip.ReadPointer);
       If assigned(WatchesWindow) then
         WatchesWindow.Free;
       WatchesWindow:=Self;
     end;
 
-  procedure TWatchesWindow.Store(S: TStream);
+  procedure TWatchesWindow.Write(Os: opstream);
     begin
-      inherited Store(S);
-      PutSubViewPtr(S,WLB);
+      inherited Write(Os);
+      Os.WritePointer(WLB);
     end;
+
+class function TWatchesWindow.Build: TStreamable;
+begin
+  Result := TWatchesWindow.Create(streamableInit);
+end;
+
+function TWatchesWindow.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TWatchesWindow';
+end;
 
   Destructor TWatchesWindow.Destroy;
     begin
@@ -3687,20 +3775,31 @@ end;
       DrawView;
     end;
 
-  constructor TStackWindow.Load(S: TStream);
+  function TStackWindow.Read(Ip: ipstream): Pointer;
     begin
-      inherited Load(S);
-      GetSubViewPtr(S,FLB);
+      Result := Self;
+      inherited Read(Ip);
+      FLB := TFramesListBox(Ip.ReadPointer);
       If assigned(StackWindow) then
         StackWindow.Free;
       StackWindow:=Self;
     end;
 
-  procedure TStackWindow.Store(S: TStream);
+  procedure TStackWindow.Write(Os: opstream);
     begin
-      inherited Store(S);
-      PutSubViewPtr(S,FLB);
+      inherited Write(Os);
+      Os.WritePointer(FLB);
     end;
+
+class function TStackWindow.Build: TStreamable;
+begin
+  Result := TStackWindow.Create(streamableInit);
+end;
+
+function TStackWindow.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TStackWindow';
+end;
 
   Destructor TStackWindow.Destroy;
     begin
@@ -4003,176 +4102,77 @@ begin
 end;
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RBreakpointsWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TBreakpointsWindow.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RBreakpointsWindow(P: TStreamable; S: TStream);
-begin
-  TBreakpointsWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RBreakpointsListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TBreakpointsListBox.Load(S)));
-end;
 
-procedure Store_RBreakpointsListBox(P: TStreamable; S: TStream);
-begin
-  TBreakpointsListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RWatchesWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TWatchesWindow.Load(S)));
-end;
 
-procedure Store_RWatchesWindow(P: TStreamable; S: TStream);
-begin
-  TWatchesWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RWatchesListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TWatchesListBox.Load(S)));
-end;
 
-procedure Store_RWatchesListBox(P: TStreamable; S: TStream);
-begin
-  TWatchesListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RStackWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TStackWindow.Load(S)));
-end;
 
-procedure Store_RStackWindow(P: TStreamable; S: TStream);
-begin
-  TStackWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RFramesListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFramesListBox.Load(S)));
-end;
 
-procedure Store_RFramesListBox(P: TStreamable; S: TStream);
-begin
-  TFramesListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RBreakpoint(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TBreakpoint.Load(S)));
-end;
 
-procedure Store_RBreakpoint(P: TStreamable; S: TStream);
-begin
-  TBreakpoint(Pointer(P)).Store(S);
-end;
 
-function Build_RWatch(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TWatch.Load(S)));
-end;
 
-procedure Store_RWatch(P: TStreamable; S: TStream);
-begin
-  TWatch(Pointer(P)).Store(S);
-end;
 
-function Build_RBreakpointCollection(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TBreakpointCollection.Load(S)));
-end;
 
-procedure Store_RBreakpointCollection(P: TStreamable; S: TStream);
-begin
-  TBreakpointCollection(Pointer(P)).Store(S);
-end;
 
-function Build_RWatchesCollection(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TWatchesCollection.Load(S)));
-end;
 
-procedure Store_RWatchesCollection(P: TStreamable; S: TStream);
-begin
-  TWatchesCollection(Pointer(P)).Store(S);
-end;
 
-procedure FillStreamRecs_fpdebug;
+procedure RegisterStreamables_fpdebug;
 begin
-  RBreakpointsWindow.ObjType := 1701;
-  RBreakpointsWindow.VmtLink := PtrUInt(System.TClass(TBreakpointsWindow));
-  RBreakpointsWindow.Load := @Build_RBreakpointsWindow;
-  RBreakpointsWindow.Store := @Store_RBreakpointsWindow;
-  RBreakpointsWindow.Next := nil;
-  RBreakpointsListBox.ObjType := 1702;
-  RBreakpointsListBox.VmtLink := PtrUInt(System.TClass(TBreakpointsListBox));
-  RBreakpointsListBox.Load := @Build_RBreakpointsListBox;
-  RBreakpointsListBox.Store := @Store_RBreakpointsListBox;
-  RBreakpointsListBox.Next := nil;
-  RWatchesWindow.ObjType := 1703;
-  RWatchesWindow.VmtLink := PtrUInt(System.TClass(TWatchesWindow));
-  RWatchesWindow.Load := @Build_RWatchesWindow;
-  RWatchesWindow.Store := @Store_RWatchesWindow;
-  RWatchesWindow.Next := nil;
-  RWatchesListBox.ObjType := 1704;
-  RWatchesListBox.VmtLink := PtrUInt(System.TClass(TWatchesListBox));
-  RWatchesListBox.Load := @Build_RWatchesListBox;
-  RWatchesListBox.Store := @Store_RWatchesListBox;
-  RWatchesListBox.Next := nil;
-  RStackWindow.ObjType := 1705;
-  RStackWindow.VmtLink := PtrUInt(System.TClass(TStackWindow));
-  RStackWindow.Load := @Build_RStackWindow;
-  RStackWindow.Store := @Store_RStackWindow;
-  RStackWindow.Next := nil;
-  RFramesListBox.ObjType := 1706;
-  RFramesListBox.VmtLink := PtrUInt(System.TClass(TFramesListBox));
-  RFramesListBox.Load := @Build_RFramesListBox;
-  RFramesListBox.Store := @Store_RFramesListBox;
-  RFramesListBox.Next := nil;
-  RBreakpoint.ObjType := 1707;
-  RBreakpoint.VmtLink := PtrUInt(System.TClass(TBreakpoint));
-  RBreakpoint.Load := @Build_RBreakpoint;
-  RBreakpoint.Store := @Store_RBreakpoint;
-  RBreakpoint.Next := nil;
-  RWatch.ObjType := 1708;
-  RWatch.VmtLink := PtrUInt(System.TClass(TWatch));
-  RWatch.Load := @Build_RWatch;
-  RWatch.Store := @Store_RWatch;
-  RWatch.Next := nil;
-  RBreakpointCollection.ObjType := 1709;
-  RBreakpointCollection.VmtLink := PtrUInt(System.TClass(TBreakpointCollection));
-  RBreakpointCollection.Load := @Build_RBreakpointCollection;
-  RBreakpointCollection.Store := @Store_RBreakpointCollection;
-  RBreakpointCollection.Next := nil;
-  RWatchesCollection.ObjType := 1710;
-  RWatchesCollection.VmtLink := PtrUInt(System.TClass(TWatchesCollection));
-  RWatchesCollection.Load := @Build_RWatchesCollection;
-  RWatchesCollection.Store := @Store_RWatchesCollection;
-  RWatchesCollection.Next := nil;
+  TStreamableClass.Create('fpdebug.TBreakpointsWindow', @TBreakpointsWindow.Build);
+  TStreamableClass.Create('fpdebug.TBreakpointsListBox', @TBreakpointsListBox.Build);
+  TStreamableClass.Create('fpdebug.TWatchesWindow', @TWatchesWindow.Build);
+  TStreamableClass.Create('fpdebug.TWatchesListBox', @TWatchesListBox.Build);
+  TStreamableClass.Create('fpdebug.TStackWindow', @TStackWindow.Build);
+  TStreamableClass.Create('fpdebug.TFramesListBox', @TFramesListBox.Build);
+  TStreamableClass.Create('fpdebug.TBreakpoint', @TBreakpoint.Build);
+  TStreamableClass.Create('fpdebug.TWatch', @TWatch.Build);
+  TStreamableClass.Create('fpdebug.TBreakpointCollection', @TBreakpointCollection.Build);
+  TStreamableClass.Create('fpdebug.TWatchesCollection', @TWatchesCollection.Build);
 end;
 
 {$endif}
 
 procedure RegisterFPDebugViews;
 begin
-  FillStreamRecs_fpdebug;
-  RegisterType(RWatchesWindow);
-  RegisterType(RBreakpointsWindow);
-  RegisterType(RWatchesListBox);
-  RegisterType(RBreakpointsListBox);
-  RegisterType(RStackWindow);
-  RegisterType(RFramesListBox);
-  RegisterType(RBreakpoint);
-  RegisterType(RWatch);
-  RegisterType(RBreakpointCollection);
-  RegisterType(RWatchesCollection);
+  RegisterStreamables_fpdebug;
+end;
+
+
+class function TBreakpointCollection.Build: TStreamable;
+begin
+  Result := TBreakpointCollection.Create(streamableInit);
+end;
+
+function TBreakpointCollection.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TBreakpointCollection';
+end;
+
+class function TFramesListBox.Build: TStreamable;
+begin
+  Result := TFramesListBox.Create(streamableInit);
+end;
+
+function TFramesListBox.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TFramesListBox';
+end;
+
+class function TWatchesCollection.Build: TStreamable;
+begin
+  Result := TWatchesCollection.Create(streamableInit);
+end;
+
+function TWatchesCollection.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TWatchesCollection';
 end;
 
 end.
