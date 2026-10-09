@@ -235,9 +235,11 @@ var IniDir,CurDir: DirStr;
 const Btns : array[1..2] of string = (btn_config_copyexisting,btn_config_createnew);
 begin
   IniDir:=DirOf(IniFileName); CurDir:=GetCurDir;
-  if (CompareText(IniDir,CurDir)<>0) and ExistsFile(IniFileName) then
+  { the first start (no fp.ini yet) asks nothing, but it marks the directory as one the IDE was started in }
+  if (CompareText(IniDir,CurDir)<>0) then
    if not ExistsFile(CurDir+DirInfoName) then
-     if ConfirmBox(FormatStrStr(msg_doyouwanttocreatelocalconfigfile,IniDir),nil,false)=cmYes then
+     if ExistsFile(IniFileName) and
+        (ConfirmBox(FormatStrStr(msg_doyouwanttocreatelocalconfigfile,IniDir),nil,false)=cmYes) then
        begin
          if (not ExistsFile(IniFileName)) or
             (ChoiceBox(msg_configcopyexistingorcreatenew,nil,

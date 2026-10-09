@@ -61,7 +61,8 @@ state directory (unit `TvAppDir` of tv3):
 
 On the first start (no `fp.ini` there yet) `fp.ini`, `fp.cfg`, `fp.dsk` and `fp.dir` are copied from `~/.fp` (Unix) or from the
 directory of the program (Windows); the old files are left in place. A project directory keeps its own `fp.ini`, `fp.cfg`,
-`fp.dsk` and `fp.dir` as before (once the user has an `fp.ini`, the IDE asks whether to make them when it starts in a directory without `fp.dir`). The shared
+`fp.dsk` and `fp.dir` as before (once the user has an `fp.ini`, the IDE asks whether to make them when it starts in a directory without `fp.dir`; the first
+start, which asks nothing, leaves an `fp.dir` in its directory). The shared
 files (templates `*.pt`, tools `*.tdf`, a system-wide `fp.ini`) are looked up in `lib/fpc/<version>/ide/text` next to the
 program, else in the directory of the program; `fp.ini` is never written there.
 

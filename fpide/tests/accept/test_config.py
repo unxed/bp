@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Where fpide keeps the files of the user: fp.ini and fp.cfg in $XDG_CONFIG_HOME/fp, the desktop fp.dsk in
-$XDG_STATE_HOME/fp, nothing in the current directory; the files of ~/.fp are taken over on the first start.
+$XDG_STATE_HOME/fp, nothing in the current directory; the files of ~/.fp are taken over on the first start; the next
+start in the same directory brings back the windows and the breakpoints.
 usage: test_config.py PATH/TO/fp        (needs tmux; HOME and the XDG directories are temp dirs)"""
 import os
 import shutil
@@ -50,6 +51,34 @@ try:
     left = [n for n in ('fp.ini', 'fp.cfg', 'fp.dsk') if os.path.exists(os.path.join(t.work, n))]
     check(not left, 'nothing is written into the current directory: %r' % left, t)
     check(not os.path.exists(os.path.join(t.work, '.fp')), 'no ~/.fp is made', t)
+finally:
+    t.close()
+
+# the desktop and the breakpoints come back on the next start in the same directory
+t = TmuxTerm(sys.argv[1], env={'TV_FAR2L': '0'})
+work = t.work
+try:
+    with open(os.path.join(work, 'hello.pas'), 'w') as f:
+        f.write("program hello;\nbegin\n  writeln(1);\nend.\n")
+    check(t.wait_for('Window  Help'), 'the IDE starts (desktop)', t)
+    t.key('F3'); t.wait_for('Open a file'); t.type('hello.pas'); t.key('Enter')
+    check(t.wait_for('program hello'), 'hello.pas is opened', t)
+    t.key('Down', 'Down')
+    check(t.wait_until(lambda: t.indicator() == (3, 1)), 'the cursor is on line 3: %r' % (t.indicator(),), t)
+    check(t.menu('M-d', 'Breakpoint', exact=True), 'Debug > Breakpoint sets a breakpoint on line 3', t)
+    t.pump(0.3)
+    check(leave(t), 'Alt+X leaves the IDE (desktop)', t)
+finally:
+    t.stop()
+t = TmuxTerm(sys.argv[1], env={'TV_FAR2L': '0'}, work=work)
+try:
+    check(t.wait_for('Window  Help'), 'the IDE starts again in the same directory', t)
+    check(t.wait_for('hello.pas') and 'program hello' in t.text(), 'the window of hello.pas is back', t)
+    check('never started' not in t.text(), 'no question about a config file of this directory', t)
+    check('noname' not in t.text(), 'no empty file is opened beside it', t)
+    check(t.wait_until(lambda: t.indicator() == (3, 1)), 'the cursor is back on line 3: %r' % (t.indicator(),), t)
+    t.menu('M-d', 'Breakpoint List')
+    check(t.wait_for('Breakpoint list', 3) and t.wait_for('hello.pas:3', 3), 'the breakpoint on hello.pas:3 is back', t)
 finally:
     t.close()
 

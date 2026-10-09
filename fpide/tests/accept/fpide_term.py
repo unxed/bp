@@ -15,14 +15,17 @@ import time
 class TmuxTerm:
     ids = itertools.count(1)
 
-    def __init__(self, binary, cols=100, rows=30, args=(), env=None):
+    def __init__(self, binary, cols=100, rows=30, args=(), env=None, work=None):
+        """work: the directory (and HOME) of an earlier terminal that was left with stop(), for a second start there"""
         binary = os.path.abspath(binary)
         self.binary = binary
         # a tmux server of its own (-L) and a session name of its own: the tests (and the threads of a test) run side by side
         self.session = 'fpideacc%d_%d' % (os.getpid(), next(TmuxTerm.ids))
         self.socket = self.session
-        self.work = tempfile.mkdtemp(prefix='fpide-acc-')
+        self.work = work or tempfile.mkdtemp(prefix='fpide-acc-')
         self.err = os.path.join(self.work, 'stderr.log')
+        if os.path.exists(self.err):
+            os.unlink(self.err)
         # the XDG directories are set so that a value of the tmux server does not lead the IDE out of the temp dir
         e = {'TERM': 'xterm-256color', 'HOME': self.work,
              'XDG_CONFIG_HOME': os.path.join(self.work, '.config'), 'XDG_STATE_HOME': os.path.join(self.work, '.local/state'),
@@ -230,11 +233,15 @@ class TmuxTerm:
         except OSError:
             return ''
 
-    def close(self):
+    def stop(self):
+        """the terminal is closed, its directory is kept (see work of __init__)"""
         self._tmux('kill-server')
         if self.socket_path:
             try:
                 os.unlink(self.socket_path)        # tmux leaves the socket file
             except OSError:
                 pass
+
+    def close(self):
+        self.stop()
         shutil.rmtree(self.work, ignore_errors=True)
