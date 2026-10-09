@@ -180,6 +180,22 @@ def section_edit(t):
     check(t.wait_for('Clipboard') and 'one' in t.text(), 'the clipboard window holds the cut text', t)
     t.key('Escape')
 
+    # a selection made with Shift ends when Shift is released: the moves without it do not extend the block
+    new_file(t)
+    type_lines(t, 'abcdefgh', 'ijkl')
+    t.key('C-PPage', 'S-Right', 'S-Right', 'S-Right', 'Right', 'Right', 'Down')
+    check(menu(t, 'M-e', 'Cut'), 'Edit > Cut for the block made with Shift')
+    check(editor_lines(t)[:2] == ['defgh', 'ijkl'], 'the block is the three characters selected with Shift: %r' % editor_lines(t)[:2], t)
+
+    # Alt with a letter of the Russian layout is the shortcut of the Latin key at the same place (Alt+а is Alt+F), never text
+    before = editor_lines(t)[:2]
+    for letter, title in (('а', 'New from template'), ('ы', 'Find')):
+        t._tmux('send-keys', '-t', t.session, '-H', *['%02x' % b for b in b'\x1b' + letter.encode()])
+        check(t.wait_for(title, 3), 'Alt+%s opens the menu of the Latin key' % letter, t)
+        t.key('Escape')
+        time.sleep(0.3)
+    check(editor_lines(t)[:2] == before, 'Alt+letter typed nothing: %r' % editor_lines(t)[:2], t)
+
 
 def section_search(t):
     new_file(t)

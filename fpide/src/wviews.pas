@@ -299,7 +299,7 @@ uses Mouse,
 {     Resource,}
      FVConsts,
      App,MsgBox,StdDlg,
-     WConsts,WUtils;
+     WConsts,WUtils,TvXlat;
 
 {$ifndef NOOBJREG}
 {$endif}
@@ -350,7 +350,7 @@ var
   ItemShown, P: PMenuItem;
   Target: PMenuView;
   R: TRect;
-  E: TEvent;
+  E, XE: TEvent;
   MouseActive: Boolean;
 function IsDisabled(Item: PMenuItem): boolean;
 var Found: boolean;
@@ -534,6 +534,18 @@ begin
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
+            { a letter of another keyboard layout (Alt+Ы, Ы): the Latin letter of the same key (TvXlat) }
+            XE := E;
+            if XlatModded(XE) or XlatPlain(XE) then
+            begin
+              Target := Self;
+              Ch := GetAltChar(XE.KeyDown.KeyCode);
+              if Ch = #0 then Ch := Char(XE.KeyDown.CharScan.CharCode) else Target := TopMenu;
+              P := Target.FindItem(ShortString(Ch));
+            end;
+          end;
+          if P = nil then
+          begin
             P := TopMenu.HotKey(EventKey(E));
             if (P <> nil) and CommandEnabled(P.Command) then
             begin
@@ -620,7 +632,7 @@ var
   ItemShown, P: PMenuItem;
   Target: PMenuView;
   R: TRect;
-  E: TEvent;
+  E, XE: TEvent;
   MouseActive: Boolean;
 function IsDisabled(Item: PMenuItem): boolean;
 var Found: boolean;
@@ -802,6 +814,18 @@ begin
           Ch := GetAltChar(E.KeyDown.KeyCode);
           if Ch = #0 then Ch := Char(E.KeyDown.CharScan.CharCode) else Target := TopMenu;
           P := Target.FindItem(ShortString(Ch));
+          if P = nil then
+          begin
+            { a letter of another keyboard layout (Alt+Ы, Ы): the Latin letter of the same key (TvXlat) }
+            XE := E;
+            if XlatModded(XE) or XlatPlain(XE) then
+            begin
+              Target := Self;
+              Ch := GetAltChar(XE.KeyDown.KeyCode);
+              if Ch = #0 then Ch := Char(XE.KeyDown.CharScan.CharCode) else Target := TopMenu;
+              P := Target.FindItem(ShortString(Ch));
+            end;
+          end;
           if P = nil then
           begin
             P := TopMenu.HotKey(EventKey(E));
@@ -973,7 +997,7 @@ var
   ItemShown, P: PMenuItem;
   Target: PMenuView;
   R: TRect;
-  E: TEvent;
+  E, XE: TEvent;
   MouseActive: Boolean;
 function IsDisabled(Item: PMenuItem): boolean;
 var Dis : boolean;
@@ -1151,6 +1175,18 @@ begin
           Ch := GetAltChar(E.KeyDown.KeyCode);
           if Ch = #0 then Ch := Char(E.KeyDown.CharScan.CharCode) else Target := TopMenu;
           P := Target.FindItem(ShortString(Ch));
+          if P = nil then
+          begin
+            { a letter of another keyboard layout (Alt+Ы, Ы): the Latin letter of the same key (TvXlat) }
+            XE := E;
+            if XlatModded(XE) or XlatPlain(XE) then
+            begin
+              Target := Self;
+              Ch := GetAltChar(XE.KeyDown.KeyCode);
+              if Ch = #0 then Ch := Char(XE.KeyDown.CharScan.CharCode) else Target := TopMenu;
+              P := Target.FindItem(ShortString(Ch));
+            end;
+          end;
           if P = nil then
           begin
             P := TopMenu.HotKey(EventKey(E));

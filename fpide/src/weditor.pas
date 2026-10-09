@@ -3361,6 +3361,10 @@ begin
                 if IsModal then
                   DontClear:=true;
            else
+            { a character with Ctrl or Alt is a shortcut, not text: Alt+Cyrillic letter goes on to the shortcut of the Latin key (TvXlat) }
+            if (Event.KeyDown.ControlKeyState and (kbCtrlShift or kbAltShift))<>0 then
+              DontClear:=true
+            else
             if Utf8Enabled and (Event.KeyDown.TextLength>0) and (Byte(Event.KeyDown.Text[0])>=$80) then
               begin
                 NoSelect:=true;
