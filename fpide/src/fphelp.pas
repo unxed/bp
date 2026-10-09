@@ -514,12 +514,12 @@ begin
   CheckHelpSystem;
   if HelpWindow=nil then
   begin
-     Desktop.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
+     TProgram.DeskTop.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
      HelpWindow := TFPHelpWindow.Create(R, dialog_help, 0, 0, SearchFreeWindowNo);
      if HelpWindow<>nil then
      begin
        HelpWindow.Hide;
-       Desktop.Insert(HelpWindow);
+       TProgram.DeskTop.Insert(HelpWindow);
      end;
   end;
 end;
@@ -534,7 +534,7 @@ var R: TRect;
     Ctx: THelpCtx;
 begin
   CheckHelpSystem;
-  Desktop.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
+  TProgram.DeskTop.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
   W:=TFPHelpWindow.Create(R, dialog_help, 0, 0, 0);
   W.HideOnClose:=false;
   if (Context<>0) and (HelpFacility.GetTopicInfo(FileID,Context)<>'Not found') then
@@ -543,7 +543,7 @@ begin
     W.ShowTopic(Id,Ctx)
   else
     W.ShowIndex;
-  Desktop.ExecView(W);
+  TProgram.DeskTop.ExecView(W);
   W.Free;
 end;
 
@@ -558,7 +558,7 @@ begin
     if GetState(sfVisible)=false then Show;
     MakeFirst;
   end;
-  Message(Application,evCommand,cmUpdate,nil);
+  Message(TProgram.Application,evCommand,cmUpdate,nil);
 end;
 
 procedure HelpTopicSearch(Editor: PEditor);
@@ -597,7 +597,7 @@ begin
     if GetState(sfVisible)=false then Show;
     MakeFirst;
   end;
-  Message(Application,evCommand,cmUpdate,nil);
+  Message(TProgram.Application,evCommand,cmUpdate,nil);
 end;
 
 procedure HelpDebugInfos;
@@ -608,19 +608,19 @@ end;
 
 procedure PushStatus(S: string);
 begin
-  if StatusLine=nil then
+  if TProgram.StatusLine=nil then
     Exit;
   If StatusStackPtr<=MaxStatusLevel then
-    StatusStack[StatusStackPtr]:=PAdvancedStatusLine(StatusLine).GetStatusText
+    StatusStack[StatusStackPtr]:=PAdvancedStatusLine(TProgram.StatusLine).GetStatusText
   else
-    StatusStack[MaxStatusLevel]:=PAdvancedStatusLine(StatusLine).GetStatusText;
+    StatusStack[MaxStatusLevel]:=PAdvancedStatusLine(TProgram.StatusLine).GetStatusText;
   SetStatus(S);
   Inc(StatusStackPtr);
 end;
 
 procedure PopStatus;
 begin
-  if StatusLine=nil then
+  if TProgram.StatusLine=nil then
     Exit;
   Dec(StatusStackPtr);
   If StatusStackPtr<=MaxStatusLevel then
@@ -631,14 +631,14 @@ end;
 
 procedure SetStatus(S: string);
 begin
-  if StatusLine=nil then
+  if TProgram.StatusLine=nil then
     Exit;
-  PAdvancedStatusLine(StatusLine).SetStatusText(S);
+  PAdvancedStatusLine(TProgram.StatusLine).SetStatusText(S);
 end;
 
 procedure ClearStatus;
 begin
-  PAdvancedStatusLine(StatusLine).ClearStatusText;
+  PAdvancedStatusLine(TProgram.StatusLine).ClearStatusText;
 end;
 
 function FPHTMLGetSectionColor(Section: THTMLSection; var Color: byte): boolean;
@@ -651,8 +651,8 @@ begin
   begin
     S:=#0;
     S:=copy(CHTMLSectionAttrs,ord(Section),1);
-    if Assigned(Application)=false then Color:=0 else
-    Color:=Application.GetColorW(ord(S[1]));
+    if Assigned(TProgram.Application)=false then Color:=0 else
+    Color:=TProgram.Application.GetColorW(ord(S[1]));
     if (Color and $0f) = ((Color and $f0) shr 4) then { same color ? }
       OK:=false;
   end;
@@ -715,7 +715,7 @@ begin
     end;
 end;
 begin
-  Desktop.ForEach(@CloseIfHelpWindow);
+  TProgram.DeskTop.ForEach(@CloseIfHelpWindow);
 end;
 
 END.

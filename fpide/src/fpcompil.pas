@@ -421,7 +421,7 @@ constructor TCompilerMessageWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  Desktop.GetExtent(R);
+  TProgram.DeskTop.GetExtent(R);
   R.A.Y:=R.B.Y-7;
   inherited Create(R,dialog_compilermessages,{SearchFreeWindowNo}wnNoNumber);
   HelpCtx:=hcCompilerMessagesWindow;
@@ -454,7 +454,7 @@ begin
     begin
       if not GetState(sfVisible) then
         Show;
-      if Desktop.First<>PView(CompilerMessageWindow) then
+      if TProgram.DeskTop.First<>PView(CompilerMessageWindow) then
         MakeFirst;
     end;
 end;
@@ -493,7 +493,7 @@ begin
       case Event.Command of
         cmListFocusChanged :
           if Event.InfoPtr=Pointer(MsgLB) then
-            Message(Application,evBroadcast,cmClearLineHighlights,Self);
+            Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
       end;
   end;
   inherited HandleEvent(Event);
@@ -540,7 +540,7 @@ var Active: boolean;
 begin
   Active:=GetState(sfActive);
   SetCmdState(CompileCmds,Active);
-  Message(Application,evBroadcast,cmCommandSetChanged,nil);
+  Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
 procedure TCompilerMessageWindow.SetState(AState: Word; Enable: Boolean);
@@ -789,7 +789,7 @@ begin
 
      if not CompilerMessageWindow.GetState(sfVisible) then
        CompilerMessageWindow.Show;
-     if Desktop.First<>PView(CompilerMessageWindow) then
+     if TProgram.DeskTop.First<>PView(CompilerMessageWindow) then
        CompilerMessageWindow.MakeFirst;
      CompilerMessageWindow.AddMessage(Level,S,status.currentsourcepath+status.currentsource,
        status.currentline,status.currentcolumn);
@@ -839,7 +839,7 @@ begin
   if assigned(CompilingHiddenFile) then
     P:=CompilingHiddenFile
   else
-    P:=TSourceWindow(Message(Desktop,evBroadcast,cmSearchWindow,nil));
+    P:=TSourceWindow(Message(TProgram.DeskTop,evBroadcast,cmSearchWindow,nil));
   if (PrimaryFileMain='') and (P=nil) then
     FileName:='' { nothing to compile }
   else
@@ -876,7 +876,7 @@ procedure ResetErrorMessages;
        PSourceWindow(P).Editor.SetErrorMessage('');
   end;
 begin
-  Desktop.ForEach(@ResetErrorLine);
+  TProgram.DeskTop.ForEach(@ResetErrorLine);
 end;
 
 
@@ -950,7 +950,7 @@ begin
       CompilerStatusDialog.SetState(sfModal,true);
       { disable window closing }
       CompilerStatusDialog.Flags:=CompilerStatusDialog.Flags and not wfclose;
-      Application.Insert(CompilerStatusDialog);
+      TProgram.Application.Insert(CompilerStatusDialog);
       CompilerStatusDialog.Update;
     end;
   { Restore dir that could be changed during debugging }
@@ -1123,7 +1123,7 @@ begin
          Application.PutEvent(E);}
       if assigned(CompilerStatusDialog) then
         begin
-          Application.Delete(CompilerStatusDialog);
+          TProgram.Application.Delete(CompilerStatusDialog);
           CompilerStatusDialog.Free;
         end;
     end;
@@ -1137,8 +1137,8 @@ begin
      MainHasDebugInfo:=DebugInfoSwitches.GetCurrSelParam<>'-';
    end;
 { Update the app }
-  Message(Application,evCommand,cmUpdate,nil);
-  DummyView:=Desktop.First;
+  Message(TProgram.Application,evCommand,cmUpdate,nil);
+  DummyView:=TProgram.DeskTop.First;
   while (DummyView<>nil) and (DummyView.GetState(sfVisible)=false) do
   begin
     DummyView:=DummyView.NextView;

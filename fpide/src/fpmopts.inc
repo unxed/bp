@@ -1485,7 +1485,7 @@ procedure TIDEApp.Colors;
 {$Ifdef COLORSEL}
 var D: PColorDialog;
 begin
-  D := TColorDialog.Create(AppPalette,
+  D := TColorDialog.Create(FPVars.AppPalette,
     ColorGroup(label_colors_grp_browser,
       ColorItem(label_colors_framepassive   , 215,
       ColorItem(label_colors_frameactive    , 216,
@@ -1550,7 +1550,7 @@ begin
       nil))))))))))),
     nil))))))))));
   D.HelpCtx:=hcColors;
-  if ExecuteDialog(D, @AppPalette)=cmOK then
+  if ExecuteDialog(D, @FPVars.AppPalette)=cmOK then
     begin
       DoneMemory;
       Message(Application,evBroadcast,cmUpdate,nil);

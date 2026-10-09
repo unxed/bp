@@ -709,7 +709,7 @@ begin
   EditorWindow:=(P.HelpCtx=hcSourceWindow);
 end;
 begin
-  IsThereAnyEditor:=Desktop.FirstThat(@EditorWindow)<>nil;
+  IsThereAnyEditor:=TProgram.DeskTop.FirstThat(@EditorWindow)<>nil;
 end;
 
 procedure AskToReloadAllModifiedFiles;
@@ -719,7 +719,7 @@ begin
     PSourceWindow(P).Editor.ReloadFile;
 end;
 begin
-  Desktop.ForEach(@EditorWindowModifiedOnDisk);
+  TProgram.DeskTop.ForEach(@EditorWindowModifiedOnDisk);
 end;
 
 function IsThereAnyHelpWindow: boolean;
@@ -730,7 +730,7 @@ end;
 function IsThereAnyNumberedWindow: boolean;
 var _Is: boolean;
 begin
-  _Is:=Message(Desktop,evBroadcast,cmSearchWindow,nil)<>nil;
+  _Is:=Message(TProgram.DeskTop,evBroadcast,cmSearchWindow,nil)<>nil;
   _Is:=_Is or ( (ClipboardWindow<>nil) and ClipboardWindow.GetState(sfVisible));
   IsThereAnyNumberedWindow:=_Is;
 end;
@@ -767,7 +767,7 @@ begin
   CheckIt:=IsWindow(P);
 end;
 begin
-  IsThereAnyWindow:=Desktop.FirstThat(@CheckIt)<>nil;
+  IsThereAnyWindow:=TProgram.DeskTop.FirstThat(@CheckIt)<>nil;
 end;
 
 function IsThereAnyVisibleWindow: boolean;
@@ -776,7 +776,7 @@ begin
   CheckIt:=IsWindow(P) and P.GetState(sfVisible);
 end;
 begin
-  IsThereAnyVisibleWindow:=Desktop.FirstThat(@CheckIt)<>nil;
+  IsThereAnyVisibleWindow:=TProgram.DeskTop.FirstThat(@CheckIt)<>nil;
 end;
 
 function FirstEditorWindow: PSourceWindow;
@@ -785,7 +785,7 @@ begin
   EditorWindow:=(P.HelpCtx=hcSourceWindow);
 end;
 begin
-  FirstEditorWindow:=TSourceWindow(pointer(Desktop.FirstThat(@EditorWindow)));
+  FirstEditorWindow:=TSourceWindow(pointer(TProgram.DeskTop.FirstThat(@EditorWindow)));
 end;
 
 function EditorWindowFile(const Name : String): PSourceWindow;
@@ -800,7 +800,7 @@ var
 
 begin
   SName:=FixFileName(ExpandPath(Name));
-  EditorWindowFile:=TSourceWindow(pointer(Desktop.FirstThat(@EditorWindow)));
+  EditorWindowFile:=TSourceWindow(pointer(TProgram.DeskTop.FirstThat(@EditorWindow)));
 end;
 
 
@@ -819,7 +819,7 @@ begin
      (P.HelpCtx <> hcFPURegisters);
 end;
 begin
-  PW:=PWindow(Desktop.FirstThat(@CheckIt));
+  PW:=PWindow(TProgram.DeskTop.FirstThat(@CheckIt));
   InDisassemblyWindow:=Assigned(PW) and
     ((PW is TDisassemblyWindow));
 end;
@@ -1156,8 +1156,8 @@ end;
 function SearchWindowWithNo(No: integer): PWindow;
 var P: PWindow;
 begin
-  P:=TWindow(Message(Desktop,evBroadcast,cmSearchWindow+No,nil));
-  if pointer(P)=pointer(Desktop) then P:=nil;
+  P:=TWindow(Message(TProgram.DeskTop,evBroadcast,cmSearchWindow+No,nil));
+  if pointer(P)=pointer(TProgram.DeskTop) then P:=nil;
   SearchWindowWithNo:=P;
 end;
 
@@ -1170,7 +1170,7 @@ begin
   { we have a crash here because of the TStatusLine
     that can also have one of these values
     but is not a Window object PM }
-  if Pointer(P)<>Pointer(StatusLine) then
+  if Pointer(P)<>Pointer(TProgram.StatusLine) then
   if IsWindow(P) then
     W:=PWindow(P);
   OK:=(W<>nil);
@@ -1182,9 +1182,9 @@ begin
 end;
 var W: PView;
 begin
-  W:=Application.FirstThat(@Match);
+  W:=TProgram.Application.FirstThat(@Match);
 {    This is wrong because TStatusLine is also considered PM }
-  if not Assigned(W) then W:=Desktop.FirstThat(@Match);
+  if not Assigned(W) then W:=TProgram.DeskTop.FirstThat(@Match);
   { But why do we need to check all ??
     Probably because of the ones which were not inserted into
     Desktop as the Messages view
@@ -1247,7 +1247,7 @@ begin
   AFileName:=FixFileName(AFileName);
   { do not use the same core for all new files }
   if AFileName<>'' then
-    Desktop.FirstThat(@Check);
+    TProgram.DeskTop.FirstThat(@Check);
   SearchCoreForFileName:=EC;
 end;
 
@@ -1349,7 +1349,7 @@ var D: PCodeTemplatesDialog;
     OK: boolean;
 begin
   D := TCodeTemplatesDialog.Create(true,ShortCut);
-  OK:=Desktop.ExecView(D)=cmOK;
+  OK:=TProgram.DeskTop.ExecView(D)=cmOK;
   if OK then ShortCut:=D.GetSelectedShortCut;
   D.Free;
   SelectCodeTemplate:=OK;
@@ -1511,7 +1511,7 @@ begin
         begin
           CodeCompleteTip := TFPToolTip.Create(R, S, alCenter);
           CodeCompleteTip.Hide;
-          Application.Insert(CodeCompleteTip);
+          TProgram.Application.Insert(CodeCompleteTip);
         end
       else
         CodeCompleteTip.SetText(S);
@@ -1949,10 +1949,10 @@ begin
               OpenFileName:=S+'.pp'+ListSeparator+
                             S+'.pas'+ListSeparator+
                             S+'.inc';
-              Message(Application,evCommand,cmOpen,nil);
+              Message(TProgram.Application,evCommand,cmOpen,nil);
             end;
           cmEditorOptions :
-            Message(Application,evCommand,cmEditorOptions,Self);
+            Message(TProgram.Application,evCommand,cmEditorOptions,Self);
           cmHelp :
             Message(Self,evCommand,cmHelpTopicSearch,Self);
           cmHelpTopicSearch :
@@ -2042,8 +2042,8 @@ procedure   TFPWindow.SelectInDebugSession;
 var
   F,PrevCurrent : PView;
 begin
-  DeskTop.Lock;
-  PrevCurrent:=Desktop.Current;
+  TProgram.DeskTop.Lock;
+  PrevCurrent:=TProgram.DeskTop.Current;
   F:=PrevCurrent;
   While assigned(F) and
     ((F.HelpCtx = hcGDBWindow) or
@@ -2058,10 +2058,10 @@ begin
     Select;
   if PrevCurrent<>F then
     Begin
-      Desktop.InsertBefore(Self,F);
+      TProgram.DeskTop.InsertBefore(Self,F);
       PrevCurrent.Select;
     End;
-  DeskTop.Unlock;
+  TProgram.DeskTop.Unlock;
 end;
 
 procedure TFPWindow.HandleEvent(var Event: TEvent);
@@ -2115,7 +2115,7 @@ end;
 
 function TFPHelpViewer.GetCommandTarget: PView;
 begin
-  GetCommandTarget:=Application;
+  GetCommandTarget:=TProgram.Application;
 end;
 
 constructor TFPHelpWindow.Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word;
@@ -2326,7 +2326,7 @@ begin
     SetCmdState(EditorCmds,Active);
   end;
   SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,Active);
-  Message(Application,evBroadcast,cmCommandSetChanged,nil);
+  Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
 procedure TSourceWindow.Update;
@@ -2376,7 +2376,7 @@ destructor TSourceWindow.Destroy;
 begin
   PushStatus(FormatStrStr(msg_closingfile,GetStr(Title)));
   if not IDEApp.IsClosing then
-    Message(Application,evBroadcast,cmSourceWndClosing,Self);
+    Message(TProgram.Application,evBroadcast,cmSourceWndClosing,Self);
   inherited Destroy;
   IDEApp.SourceWindowClosed;
 {  if not IDEApp.IsClosing then
@@ -2594,7 +2594,7 @@ procedure TGDBWindow.WriteText(Buf : pchar;IsError : boolean);
       s : string;
 begin
   p:=buf;
-  DeskTop.Lock;
+  TProgram.DeskTop.Lock;
   While assigned(p) and (p^<>#0) do
     begin
        pe:=strscan(p,#10);
@@ -2624,7 +2624,7 @@ begin
            inc(p);
          end;
     end;
-  DeskTop.Unlock;
+  TProgram.DeskTop.Unlock;
   Editor.Draw;
 end;
 
@@ -2635,7 +2635,7 @@ begin
   SetCmdState([cmSaveAs,cmHide,cmRun],Active);
   SetCmdState(EditorCmds,Active);
   SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,Active);
-  Message(Application,evBroadcast,cmCommandSetChanged,nil);
+  Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
 
@@ -2671,7 +2671,7 @@ procedure TDisassemblyEditor.ReleaseSource;
 begin
   if OwnsSource and assigned(source) then
     begin
-      Desktop.Delete(Source);
+      TProgram.DeskTop.Delete(Source);
       Source.Free;
     end;
   OwnsSource:=false;
@@ -2931,7 +2931,7 @@ begin
   SetCmdState(SourceCmds+CompileCmds,Active);
   SetCmdState(EditorCmds,Active);
   SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,false);
-  Message(Application,evBroadcast,cmCommandSetChanged,nil);
+  Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
 
@@ -2955,7 +2955,7 @@ constructor TClipboardWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  Desktop.GetExtent(R);
+  TProgram.DeskTop.GetExtent(R);
   inherited Create(R, '*');
   SetTitle(dialog_clipboard);
   HelpCtx:=hcClipboardWindow;
@@ -3140,7 +3140,7 @@ begin
   if assigned(ModuleNames) then
     ModuleNames.FreeAll;
   SetRange(0); DrawView;
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
 end;
 
 procedure TMessageListBox.TrackSource;
@@ -3150,11 +3150,11 @@ var W: PSourceWindow;
     Row,Col: sw_integer;
     Found : boolean;
 begin
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
   if Range=0 then Exit;
   P:=TMessageItem(List.At(Focused));
   if P.Row=0 then Exit;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   GetNextEditorBounds(R);
   R.B.Y:=Owner.Origin.Y;
   if P.Row>0 then Row:=P.Row-1 else Row:=0;
@@ -3172,11 +3172,11 @@ begin
   { Try to find it by browsing }
   if W=nil then
     begin
-      Desktop.UnLock;
+      TProgram.DeskTop.UnLock;
       Found:=IDEApp.OpenSearch(P.GetModuleName+'*');
       if found then
         W:=TryToOpenFile(nil,P.GetModuleName,Col,Row,true);
-      Desktop.Lock;
+      TProgram.DeskTop.Lock;
     end;
   if W<>nil then
     begin
@@ -3186,7 +3186,7 @@ begin
     end;
   if Assigned(Owner) then
     Owner.Select;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
 end;
 
 procedure TMessageListBox.GotoSource;
@@ -3197,11 +3197,11 @@ var W: PSourceWindow;
     Found : boolean;
     Event : TEvent;
 begin
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
   if Range=0 then Exit;
   P:=TMessageItem(List.At(Focused));
   if P.Row=0 then Exit;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   if P.Row>0 then Row:=P.Row-1 else Row:=0;
   if P.Col>0 then Col:=P.Col-1 else Col:=0;
   W:=EditorWindowFile(P.GetModuleName);
@@ -3218,11 +3218,11 @@ begin
   { Try to find it by browsing }
   if W=nil then
     begin
-      Desktop.UnLock;
+      TProgram.DeskTop.UnLock;
       Found:=IDEApp.OpenSearch(P.GetModuleName+'*');
       if found then
         W:=TryToOpenFile(nil,P.GetModuleName,Col,Row,true);
-      Desktop.Lock;
+      TProgram.DeskTop.Lock;
     end;
   if assigned(W) then
     begin
@@ -3236,7 +3236,7 @@ begin
       W.Select;
       Owner.Hide;
     end;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
   if assigned(W) then
     begin
       Event.What:=evCommand;
@@ -3841,7 +3841,7 @@ constructor TScreenWindow.Create(AScreen: PScreen; ANumber: integer);
 var R: TRect;
     VSB,HSB: PScrollBar;
 begin
-  Desktop.GetExtent(R);
+  TProgram.DeskTop.GetExtent(R);
   inherited Create(R, dialog_userscreen, ANumber);
   Options:=Options or ofTileAble;
   GetExtent(R); R.Grow(-1,-1); R.Move(1,0); R.A.X:=R.B.X-1;
@@ -3894,18 +3894,18 @@ end;
 function GetNextEditorBounds(var Bounds: TRect): boolean;
 var P: PView;
 begin
-  P:=Desktop.Current;
+  P:=TProgram.DeskTop.Current;
   while P<>nil do
   begin
     if P.HelpCtx=hcSourceWindow then Break;
     P:=P.NextView;
-    if P=Desktop.Current then
+    if P=TProgram.DeskTop.Current then
       begin
         P:=nil;
         break;
       end;
   end;
-  if P=nil then Desktop.GetExtent(Bounds) else
+  if P=nil then TProgram.DeskTop.GetExtent(Bounds) else
      begin
        P.GetBounds(Bounds);
        Inc(Bounds.A.X); Inc(Bounds.A.Y);
@@ -3932,7 +3932,7 @@ begin
          TrackCursor(do_centre);
        end;
     W.HelpCtx:=hcSourceWindow;
-    Desktop.Insert(W);
+    TProgram.DeskTop.Insert(W);
     { this makes loading a lot slower and is not needed as far as I can see (FK)
     Message(Application,evBroadcast,cmUpdate,nil);
     }
@@ -3959,7 +3959,7 @@ function LastSourceEditor : PSourceWindow;
   end;
 
 begin
-  LastSourceEditor:=PSourceWindow(Desktop.FirstThat(@IsSearchedSource));
+  LastSourceEditor:=PSourceWindow(TProgram.DeskTop.FirstThat(@IsSearchedSource));
 end;
 
 
@@ -4010,7 +4010,7 @@ end;
 
 begin
   SplitPath(FileName,D,N,E);
-  SearchOnDesktop:=PSourceWindow(Desktop.FirstThat(@IsSearchedSource));
+  SearchOnDesktop:=PSourceWindow(TProgram.DeskTop.FirstThat(@IsSearchedSource));
 end;
 
 function TryToOpenFile(Bounds: PRect; FileName: string; CurX,CurY: sw_integer;tryexts:boolean): PSourceWindow;

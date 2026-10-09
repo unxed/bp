@@ -149,7 +149,7 @@ procedure TWindowListDialog.UpdateList;
 var VisState: boolean;
 procedure AddIt(P: PView);
 begin
-  if (Pointer(P)<>Pointer(Desktop.Background)) and
+  if (Pointer(P)<>Pointer(TProgram.DeskTop.Background)) and
      (P.GetState(sfDisabled)=false) and
      ((P.Options and ofSelectable)<>0) and
      (P.GetState(sfVisible)=VisState) then
@@ -157,8 +157,8 @@ begin
 end;
 begin
   C.RemoveAll;
-  VisState:=true; Desktop.ForEach(@AddIt); { add visible windows to list }
-  VisState:=false; Desktop.ForEach(@AddIt); { add hidden windows }
+  VisState:=true; TProgram.DeskTop.ForEach(@AddIt); { add visible windows to list }
+  VisState:=false; TProgram.DeskTop.ForEach(@AddIt); { add hidden windows }
   LB.SetRange(C.Count);
   UpdateButtons;
   ReDraw;

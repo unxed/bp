@@ -567,7 +567,7 @@ begin
     begin
       if Tools<>nil then Tools.Free;
       Tools:=C;
-      Message(Application,evBroadcast,cmUpdateTools,nil);
+      Message(TProgram.Application,evBroadcast,cmUpdateTools,nil);
     end
   else
     C.Free;
@@ -593,7 +593,7 @@ begin
       S1:=''; S2:=''; S3:=''; W:=0;
     end;
   P := TTool.Create(S1,S2,S3,W);
-  if Application.ExecuteDialog(TToolItemDialog.Create(P), nil)=cmOK then
+  if TProgram.Application.ExecuteDialog(TToolItemDialog.Create(P), nil)=cmOK then
     begin
       ToolsLB.List.Insert(P);
       ToolsLB.SetRange(ToolsLB.List.Count);
@@ -608,7 +608,7 @@ var P: PTool;
 begin
   if ToolsLB.Range=0 then Exit;
   P:=PTool(ToolsLB.List.At(ToolsLB.Focused));
-  Application.ExecuteDialog(TToolItemDialog.Create(P), nil);
+  TProgram.Application.ExecuteDialog(TToolItemDialog.Create(P), nil);
   ReDraw;
 end;
 
@@ -1010,7 +1010,7 @@ begin
       if UpcaseStr(ViewNames[I])=S then
         ViewPtrs[I].Select;
     end;
-  Re:=Desktop.ExecView(PromptDialog);
+  Re:=TProgram.DeskTop.ExecView(PromptDialog);
   OK:=OK and (Re=cmOK);
   AbortTool:=(Re<>cmOK);
   if OK then OK:=ExtractPromptDialogParams(F,Params);
@@ -1301,7 +1301,7 @@ begin
             if (Pass=2) then
               begin
                 I:=I+ReplacePart(LastWordStart,I-1,'')-1;
-                Message(Application,evCommand,cmSaveAll,nil);
+                Message(TProgram.Application,evCommand,cmSaveAll,nil);
               end;
           end else
         if (WordS='$SAVE_CUR') then
@@ -1543,7 +1543,7 @@ procedure TToolMessageListBox.Clear;
 begin
   ClearToolMessages;
   Update;
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
 end;
 
 function TToolMessageListBox.GetPalette: TPalette;
@@ -1581,7 +1581,7 @@ constructor TMessagesWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  Desktop.GetExtent(R); R.A.Y:=R.B.Y-7;
+  TProgram.DeskTop.GetExtent(R); R.A.Y:=R.B.Y-7;
   inherited Create(R,dialog_messages,SearchFreeWindowNo);
   HelpCtx:=hcMessagesWindow;
 
@@ -1618,7 +1618,7 @@ begin
           if Event.InfoPtr=Pointer(MsgLB) then
             begin
               LastToolMessageFocused:=PToolMessage(MsgLB.List.At(MsgLB.Focused));
-              Message(Application,evBroadcast,cmClearLineHighlights,Self);
+              Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
             end;
       end;
   end;

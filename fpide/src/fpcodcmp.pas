@@ -285,7 +285,7 @@ var
   R : TRect;
   StoreBrowserSwitchesConfig : string;
 begin
-  Desktop.GetExtent(R);
+  TProgram.DeskTop.GetExtent(R);
   HiddenSource := TSourceWindow.Create(R,'*');
   HiddenSource.NoNameCount:=0;
   HiddenSource.UpdateTitle;

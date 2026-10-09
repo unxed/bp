@@ -2078,7 +2078,7 @@ begin
       SetCmdState(FromClipCmds,CanPaste and (Clipboard<>TCustomCodeEditor(Self)));
       SetCmdState(UndoCmd,(GetUndoActionCount>0));
       SetCmdState(RedoCmd,(GetRedoActionCount>0));
-      Message(Application,evBroadcast,cmCommandSetChanged,nil);
+      Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
       FLastUndo:=GetUndoActionCount;
       FLastRedo:=GetRedoActionCount;
       FLastSel:=Editor.HasSelection;
@@ -3282,10 +3282,10 @@ begin
   if M=nil then Exit;
   if LastLocalCmd<>0 then
      M^.Deflt:=SearchMenuItem(M,LastLocalCmd);
-  Desktop.GetExtent(R);
+  TProgram.DeskTop.GetExtent(R);
   MakeGlobal(P,R.A);
   MV:=CreateLocalMenuView(R,M);
-  Re:=Application.ExecView(MV);
+  Re:=TProgram.Application.ExecView(MV);
   if M^.Deflt=nil then LastLocalCmd:=0
      else LastLocalCmd:=M^.Deflt^.Command;
   MV.Free;
@@ -3482,7 +3482,7 @@ begin
               LocalMenu(P);
             end;
           cmActivateMenu :
-            Message(Application,evCommand,cmMenu,nil);
+            Message(TProgram.Application,evCommand,cmMenu,nil);
         else
           begin
             DontClear:=true;
@@ -3906,7 +3906,7 @@ begin
             end;
         else begin Title:='???'; DefExt:=''; end;
         end;
-        Re:=Application.ExecuteDialog(TFileDialog.Create(DefExt,
+        Re:=TProgram.Application.ExecuteDialog(TFileDialog.Create(DefExt,
           Title, label_name, fdOkButton, FileId), @Name);
         case Dialog of
           edSaveAs     :
@@ -3942,25 +3942,25 @@ begin
       end;
     edGotoLine:
       StdEditorDialog :=
-   Application.ExecuteDialog(CreateGotoLineDialog(Info), Info);
+   TProgram.Application.ExecuteDialog(CreateGotoLineDialog(Info), Info);
     edFind:
       StdEditorDialog :=
-   Application.ExecuteDialog(CreateFindDialog, Info);
+   TProgram.Application.ExecuteDialog(CreateFindDialog, Info);
     edSearchFailed:
       StdEditorDialog := AdvMessageBox(msg_searchstringnotfound,
    nil, mfInsertInApp+ mfError + mfOKButton);
     edReplace:
       StdEditorDialog :=
-   Application.ExecuteDialog(CreateReplaceDialog, Info);
+   TProgram.Application.ExecuteDialog(CreateReplaceDialog, Info);
     edReplacePrompt:
       begin
    { Avoid placing the dialog on the same line as the cursor }
    R.Assign(0, 1, 40, 8);
-   R.Move((Desktop.Size.X - R.B.X) div 2, 0);
-   Desktop.MakeGlobal(R.B, T);
+   R.Move((TProgram.DeskTop.Size.X - R.B.X) div 2, 0);
+   TProgram.DeskTop.MakeGlobal(R.B, T);
    Inc(T.Y);
    if PPoint(Info)^.Y <= T.Y then
-     R.Move(0, Desktop.Size.Y - R.B.Y - 2);
+     R.Move(0, TProgram.DeskTop.Size.Y - R.B.Y - 2);
    StdEditorDialog := AdvMessageBoxRect(R, msg_replacethisoccourence,
      nil, mfInsertInApp+ mfYesNoCancel + mfInformation);
       end;

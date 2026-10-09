@@ -83,7 +83,7 @@ begin
   if Text = '' then
     Exit;
   if MessagesWindow = nil then
-    Message(Application, evCommand, cmToolsMessages, nil);
+    Message(TProgram.Application, evCommand, cmToolsMessages, nil);
   L := TStringList.Create;
   try
     L.Text := Text;
@@ -215,13 +215,13 @@ procedure ClearDebuggerRows;
       PSourceWindow(P).Editor.SetLineFlagExclusive(lfDebuggerRow, -1);
   end;
 begin
-  if Desktop <> nil then
-    Desktop.ForEach(@ResetRow);
+  if TProgram.DeskTop <> nil then
+    TProgram.DeskTop.ForEach(@ResetRow);
 end;
 
 procedure UpdateMenus(Running: Boolean);
 begin
-  SetCmdState([cmResetDebugger, cmUntilReturn], Running);
+  TView.SetCmdState([cmResetDebugger, cmUntilReturn], Running);
   IDEApp.UpdateRunMenu(Running);
 end;
 
@@ -252,7 +252,7 @@ begin
     Result := PrimaryFileMain
   else
   begin
-    P := TSourceWindow(Message(Desktop, evBroadcast, cmSearchWindow, nil));
+    P := TSourceWindow(Message(TProgram.DeskTop, evBroadcast, cmSearchWindow, nil));
     if P <> nil then
       Result := P.Editor.FileName;
   end;
@@ -409,7 +409,7 @@ begin
     InformationBox(#3'Stopped (' + Session.StopReason + ')'#13#3'in code without source here', nil);
     Exit;
   end;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   W := TryToOpenFile(nil, Session.StopFile, 0, Line, False);
   if W <> nil then
   begin
@@ -418,7 +418,7 @@ begin
     W.Editor.TrackCursor(IniCenterDebuggerRow);
     W.SelectInDebugSession;
   end;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
 end;
 
 procedure Finished(R: TDlvResult);
@@ -534,7 +534,7 @@ begin
         Result := Resume(Cmd, '', 0);
       cmGotoCursor:
         begin
-          W := PFPWindow(Desktop.Current);
+          W := PFPWindow(TProgram.DeskTop.Current);
           if (W <> nil) and (W.ClassType = TSourceWindow) then
           begin
             F := PathExpand(PSourceWindow(W).Editor.FileName);
@@ -564,7 +564,7 @@ begin
       end;
     cmGotoCursor:
       begin
-        W := PFPWindow(Desktop.Current);
+        W := PFPWindow(TProgram.DeskTop.Current);
         if (W <> nil) and (W.ClassType = TSourceWindow) then
         begin
           F := PathExpand(PSourceWindow(W).Editor.FileName);

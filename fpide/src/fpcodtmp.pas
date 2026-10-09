@@ -572,7 +572,7 @@ begin
     end;
   P := TCodeTemplate.Create(S,L);
   repeat
-    Cmd:=Application.ExecuteDialog(TCodeTemplateDialog.Create(dialog_newtemplate,P), nil);
+    Cmd:=TProgram.Application.ExecuteDialog(TCodeTemplateDialog.Create(dialog_newtemplate,P), nil);
     CanExit:=(Cmd<>cmOK);
     if CanExit=false then
       begin
@@ -612,7 +612,7 @@ begin
   O.GetParams(S,L);
   P := TCodeTemplate.Create(S, L);
   repeat
-    Cmd:=Application.ExecuteDialog(TCodeTemplateDialog.Create(dialog_modifytemplate,P), nil);
+    Cmd:=TProgram.Application.ExecuteDialog(TCodeTemplateDialog.Create(dialog_modifytemplate,P), nil);
     CanExit:=(Cmd<>cmOK);
     if CanExit=false then
       begin

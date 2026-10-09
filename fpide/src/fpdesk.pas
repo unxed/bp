@@ -402,7 +402,7 @@ var W: PWindow;
     Len : Byte;
 begin
   XDataOfs:=0;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   W:=SearchWindow(Title);
   case WI.HelpCtx of
     hcSourceWindow :
@@ -415,9 +415,9 @@ begin
           begin
             ClearFormatParams;
             AddFormatParamStr(St);
-            Desktop.Unlock;
+            TProgram.DeskTop.Unlock;
             ErrorBox(msg_cantopenfile,@FormatParams);
-            Desktop.Lock;
+            TProgram.DeskTop.Lock;
           end
         else
         begin
@@ -440,7 +440,7 @@ begin
      hcMessagesWindow:
        begin
          if MessagesWindow=nil then
-           Desktop.Insert(TMessagesWindow.Create);
+           TProgram.DeskTop.Insert(TMessagesWindow.Create);
          W:=MessagesWindow;
        end;
      hcCompilerMessagesWindow:
@@ -461,7 +461,7 @@ begin
          if WatchesWindow=nil then
            begin
              WatchesWindow := TWatchesWindow.Create;
-             Desktop.Insert(WatchesWindow);
+             TProgram.DeskTop.Insert(WatchesWindow);
            end;
          W:=WatchesWindow;
        end;
@@ -470,7 +470,7 @@ begin
          if StackWindow=nil then
            begin
              StackWindow := TStackWindow.Create;
-             Desktop.Insert(StackWindow);
+             TProgram.DeskTop.Insert(StackWindow);
            end;
          W:=StackWindow;
        end;
@@ -479,7 +479,7 @@ begin
          if FPUWindow=nil then
            begin
              FPUWindow := TFPUWindow.Create;
-             Desktop.Insert(FPUWindow);
+             TProgram.DeskTop.Insert(FPUWindow);
            end;
          W:=FPUWindow;
        end;
@@ -488,7 +488,7 @@ begin
          if VectorWindow=nil then
            begin
              VectorWindow := TVectorWindow.Create;
-             Desktop.Insert(VectorWindow);
+             TProgram.DeskTop.Insert(VectorWindow);
            end;
          W:=VectorWindow;
        end;
@@ -497,7 +497,7 @@ begin
          if RegistersWindow=nil then
            begin
              RegistersWindow := TRegistersWindow.Create;
-             Desktop.Insert(RegistersWindow);
+             TProgram.DeskTop.Insert(RegistersWindow);
            end;
          W:=RegistersWindow;
        end;
@@ -506,7 +506,7 @@ begin
          if BreakpointsWindow=nil then
            begin
              BreakpointsWindow := TBreakpointsWindow.Create;
-             Desktop.Insert(BreakpointsWindow);
+             TProgram.DeskTop.Insert(BreakpointsWindow);
            end;
          W:=BreakpointsWindow;
        end;
@@ -516,7 +516,7 @@ begin
          if ASCIIChart=nil then
            begin
              ASCIIChart := TFPASCIIChart.Create;
-             Desktop.Insert(ASCIIChart);
+             TProgram.DeskTop.Insert(ASCIIChart);
            end;
          W:=ASCIIChart;
          if DV>=$A then
@@ -528,7 +528,7 @@ begin
   end;
   if W=nil then
     begin
-      Desktop.Unlock;
+      TProgram.DeskTop.Unlock;
       Exit;
     end;
   W.GetBounds(R);
@@ -549,7 +549,7 @@ begin
     else
       W.Hide;
   ZZ:=0;
-  Desktop.GetExtent(Z);
+  TProgram.DeskTop.GetExtent(Z);
   if R.A.Y>Z.B.Y-7 then
     begin
       R.A.Y:=Z.B.Y-7;
@@ -572,7 +572,7 @@ begin
     end;
   if ZZ<>0 then W.MoveTo(R.A.X,R.A.Y);
   W.Number:=WI.WinNb;
-  Desktop.Unlock;
+  TProgram.DeskTop.Unlock;
 end;
 begin
   PushStatus(msg_readingdesktopcontents);
@@ -744,7 +744,7 @@ begin
       CollectInfo(PV);
       PV:=PV.PrevView;
     end;}
-    PV:=Desktop.Last;
+    PV:=TProgram.DeskTop.Last;
     while PV<>nil do
     begin
       CollectInfo(PV);

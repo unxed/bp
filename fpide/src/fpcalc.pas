@@ -538,7 +538,7 @@ begin
            CD.GetDisplay(R); {Re:=R;}
            Close;
            CalcClipboard:=R;
-           Message(Application,evBroadcast,cmCalculatorPaste,nil);
+           Message(TProgram.Application,evBroadcast,cmCalculatorPaste,nil);
          end;
        kbEsc :
          begin

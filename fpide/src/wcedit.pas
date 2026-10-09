@@ -514,7 +514,7 @@ begin
         Message(Owner, evBroadcast, cmUpdateTitle, Self);
       end;
     if IsClipboard then FileName := '';
-    Message(Application,evBroadcast,cmFileNameChanged,Self);
+    Message(TProgram.Application,evBroadcast,cmFileNameChanged,Self);
   end;
 end;
 
@@ -542,7 +542,7 @@ begin
           cmNo     : OK:=true;
           cmCancel : begin
                       OK := False;
-                      Message(Application,evBroadcast,cmSaveCancelled,Self);
+                      Message(TProgram.Application,evBroadcast,cmSaveCancelled,Self);
                     end;
         end;
       end;
@@ -552,7 +552,7 @@ end;
 
 procedure TFileEditor.BindingsChanged;
 begin
-  Message(Application,evBroadcast,cmUpdateTitle,Self);
+  Message(TProgram.Application,evBroadcast,cmUpdateTitle,Self);
 end;
 
 procedure TFileEditor.HandleEvent(var Event: TEvent);

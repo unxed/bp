@@ -143,7 +143,7 @@ begin
    SIGSEGV : begin
                if StopJmpValid then
                  LongJmp(StopJmp,SIGSEGV);
-               if Assigned(Application) then IDEApp.Free;
+               if Assigned(TProgram.Application) then IDEApp.Free;
                Writeln('Internal SIGSEGV Error caught');
 {$ifndef DEBUG}
                Halt;
@@ -154,7 +154,7 @@ begin
     SIGFPE : begin
                 if StopJmpValid then
                   LongJmp(StopJmp,SIGFPE);
-               if Assigned(Application) then IDEApp.Free;
+               if Assigned(TProgram.Application) then IDEApp.Free;
                Writeln('Internal SIGFPE Error caught');
 {$ifndef DEBUG}
                Halt;
@@ -165,7 +165,7 @@ begin
     SIGILL : begin
                 if StopJmpValid then
                   LongJmp(StopJmp,SIGILL);
-               if Assigned(Application) then IDEApp.Free;
+               if Assigned(TProgram.Application) then IDEApp.Free;
                Writeln('Internal SIGILL Error caught');
 {$ifndef DEBUG}
                Halt;
@@ -176,7 +176,7 @@ begin
     SIGINT : begin
                if StopJmpValid then
                  LongJmp(StopJmp,SIGINT);
-               IF NOT CtrlCPressed and Assigned(Application) then
+               IF NOT CtrlCPressed and Assigned(TProgram.Application) then
                  begin
                    MustQuit:=false;
                    if GetDosTicks>LastCtrlC+10 then
@@ -188,14 +188,14 @@ begin
                  end
                else
                  begin
-                   if Assigned(Application) then
+                   if Assigned(TProgram.Application) then
                      MustQuit:=MessageBox(#3+msg_QuitConfirm,mferror+mfyesbutton+mfnobutton)=cmYes
                    else
                      MustQuit:=true;
                  end;
                if MustQuit then
                 begin
-                  if Assigned(Application) then IDEApp.Free;
+                  if Assigned(TProgram.Application) then IDEApp.Free;
 {$ifndef DEBUG}
                   Halt;
 {$else DEBUG}

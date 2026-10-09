@@ -227,7 +227,7 @@ begin
     else
       begin
         St:='';
-        Application.GetEvent(E);
+        TProgram.Application.GetEvent(E);
       end;
     if E.What= evNothing then
       begin
@@ -336,7 +336,7 @@ begin
   NotImplemented;
 {$else not NotUseTree}
   D := TKeyDialog.Create('Learn keys');
-  Application.ExecuteDialog(D,nil);
+  TProgram.Application.ExecuteDialog(D,nil);
 {$endif not NotUseTree}
 end;
 

@@ -2108,7 +2108,7 @@ end;
 
 function TIDEApp.GetPalette: TPalette;
 begin
-  GetPalette:=MakePalette(AppPalette);
+  GetPalette:=MakePalette(FPVars.AppPalette);
 end;
 
 function TIDEApp.IsClosing: Boolean;

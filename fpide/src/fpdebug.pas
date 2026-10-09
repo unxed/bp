@@ -642,7 +642,7 @@ procedure UpdateDebugViews;
         Debugger.isRemoteDebugging then
        PushStatus(msg_getting_info_on+RemoteMachine);
 {$endif SUPPORT_REMOTE}
-     DeskTop.Lock;
+     TProgram.DeskTop.Lock;
      If assigned(StackWindow) then
        StackWindow.Update;
      If assigned(RegistersWindow) then
@@ -655,7 +655,7 @@ procedure UpdateDebugViews;
        FPUWindow.Update;
      If assigned(VectorWindow) then
        VectorWindow.Update;
-     DeskTop.UnLock;
+     TProgram.DeskTop.UnLock;
 {$ifdef SUPPORT_REMOTE}
      if assigned(Debugger) and
         Debugger.isRemoteDebugging then
@@ -1012,7 +1012,7 @@ begin
       SetDir(StartupDir);
     end;
   DebuggerScreen;
-  SetCmdState([cmResetDebugger,cmUntilReturn],true);
+  TView.SetCmdState([cmResetDebugger,cmUntilReturn],true);
   IDEApp.UpdateRunMenu(true);
   UpdateDebugViews;
 end;
@@ -1065,7 +1065,7 @@ var
   ModalView : PView;
   res : longint;
 begin
-  if not assigned(Application) then
+  if not assigned(TProgram.Application) then
     begin
       system.Write(question);
       repeat
@@ -1079,11 +1079,11 @@ begin
         query:=0;
       exit;
     end;
-  if assigned(Application.Current) and
-     ((Application.Current.State and sfModal)<>0) then
+  if assigned(TProgram.Application.Current) and
+     ((TProgram.Application.Current.State and sfModal)<>0) then
     begin
       WasModal:=true;
-      ModalView:=Application.Current;
+      ModalView:=TProgram.Application.Current;
       ModalView.SetState(sfModal, false);
       ModalView.Hide;
     end
@@ -1186,7 +1186,7 @@ procedure TDebugController.ResetDebuggerRows;
   end;
 
 begin
-  Desktop.ForEach(@ResetDebuggerRow);
+  TProgram.DeskTop.ForEach(@ResetDebuggerRow);
 end;
 
 procedure TDebugController.Reset;
@@ -1213,7 +1213,7 @@ begin
   { In case we have something that the compiler touched }
   If IDEApp.IsRunning then
     begin
-      SetCmdState([cmResetDebugger,cmUntilReturn],false);
+      TView.SetCmdState([cmResetDebugger,cmUntilReturn],false);
       IDEApp.UpdateRunMenu(false);
       AskToReloadAllModifiedFiles;
       ResetDebuggerRows;
@@ -1345,7 +1345,7 @@ var
   i,ExitCode : longint;
   ExitAddr,ExitFrame : CORE_ADDR;
 begin
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   { 0 based line count in Editor }
   if Line>0 then
     dec(Line);
@@ -1378,7 +1378,7 @@ begin
       end
       else
       begin
-        Desktop.Unlock;
+        TProgram.DeskTop.Unlock;
         DoSelectSourceLine := False;
         exit;
       end;
@@ -1425,13 +1425,13 @@ begin
         { only search a file once }
       else
        begin
-         Desktop.UnLock;
+         TProgram.DeskTop.UnLock;
          if s='' then
            Found:=false
          else
          { it is easier to handle with a * at the end }
            Found:=IDEApp.OpenSearch(s+'*');
-         Desktop.Lock;
+         TProgram.DeskTop.Lock;
          if not Found then
            begin
              InvalidSourceLine:=true;
@@ -1457,7 +1457,7 @@ begin
        end;
     end;
   LastFileName:=s;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
   if BreakIndex>0 then
     begin
       PB:=BreakpointsCollection.GetGDB(BreakIndex);
@@ -1521,7 +1521,7 @@ end;
 procedure TDebugController.DoEndSession(code:longint);
 var P :Array[1..2] of longint;
 begin
-   SetCmdState([cmUntilReturn,cmResetDebugger],false);
+   TView.SetCmdState([cmUntilReturn,cmResetDebugger],false);
    IDEApp.UpdateRunMenu(false);
    ResetDebuggerRows;
    LastExitCode:=Code;
@@ -1554,7 +1554,7 @@ begin
   else
     begin
       IDEApp.ShowIDEScreen;
-      Message(Application,evBroadcast,cmDebuggerStopped,pointer(ptrint(RunCount)));
+      Message(TProgram.Application,evBroadcast,cmDebuggerStopped,pointer(ptrint(RunCount)));
       PopStatus;
     end;
 {$ifdef Windows}
@@ -2332,7 +2332,7 @@ begin
   Items:=nil;
   MaxWidth:=0;
   SetRange(0); DrawView;
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
 end;
 
 procedure TBreakpointsListBox.TrackSource;
@@ -2344,7 +2344,7 @@ begin
   if Range=0 then Exit;*)
   P:=TBreakpointItem(List.At(Focused));
   if P.GetModuleName='' then Exit;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   GetNextEditorBounds(R);
   R.B.Y:=Owner.Origin.Y;
   W:=EditorWindowFile(P.GetModuleName);
@@ -2365,7 +2365,7 @@ begin
     end;
   if Assigned(Owner) then
     Owner.Select;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
 end;
 
 procedure TBreakpointsListBox.ToggleCurrent;
@@ -2390,7 +2390,7 @@ begin
   if Range=0 then Exit;
   P:=TBreakpointItem(List.At(Focused));
   if P=nil then Exit;
-  Application.ExecuteDialog(TBreakpointItemDialog.Create(P.Breakpoint),nil);
+  TProgram.Application.ExecuteDialog(TBreakpointItemDialog.Create(P.Breakpoint),nil);
   P.Breakpoint.UpdateSource;
   BreakpointsCollection.Update;
 end;
@@ -2415,7 +2415,7 @@ var
   P: PBreakpoint;
 begin
   P:=TBreakpoint.Init_Empty;
-  if Application.ExecuteDialog(TBreakpointItemDialog.Create(P),nil)<>cmCancel then
+  if TProgram.Application.ExecuteDialog(TBreakpointItemDialog.Create(P),nil)<>cmCancel then
     begin
       P.UpdateSource;
       BreakpointsCollection.Insert(P);
@@ -2540,7 +2540,7 @@ var R,R2: TRect;
 const
   NumButtons = 5;
 begin
-  Desktop.GetExtent(R); R.A.Y:=R.B.Y-18;
+  TProgram.DeskTop.GetExtent(R); R.A.Y:=R.B.Y-18;
   inherited Create(R, dialog_breakpointlist, wnNoNumber);
 
   HelpCtx:=hcBreakpointListWindow;
@@ -3142,7 +3142,7 @@ begin
     P:=WatchesCollection.At(Focused)
   else
     P := TWatch.Create('');
-  Application.ExecuteDialog(TWatchItemDialog.Create(P),nil);
+  TProgram.Application.ExecuteDialog(TWatchItemDialog.Create(P),nil);
   WatchesCollection.Update;
 end;
 
@@ -3178,7 +3178,7 @@ begin
   else
     S:='';
   P := TWatch.Create(S);
-  if Application.ExecuteDialog(TWatchItemDialog.Create(P),nil)<>cmCancel then
+  if TProgram.Application.ExecuteDialog(TWatchItemDialog.Create(P),nil)<>cmCancel then
     begin
       WatchesCollection.AtInsert(Focused,P);
       WatchesCollection.Update;
@@ -3377,7 +3377,7 @@ end;
       HSB,VSB: PScrollBar;
       R,R2 : trect;
     begin
-      Desktop.GetExtent(R);
+      TProgram.DeskTop.GetExtent(R);
       R.A.Y:=R.B.Y-7;
       inherited Create(R, dialog_watches,SearchFreeWindowNo);
       Palette:=wpCyanWindow;
@@ -3526,7 +3526,7 @@ end;
 {$ifndef NODEBUG}
       if Assigned(ForeignFrameCount) then
         begin
-          DeskTop.Lock;
+          TProgram.DeskTop.Lock;
           Clear;
           for i:=0 to ForeignFrameCount()-1 do
             begin
@@ -3535,13 +3535,13 @@ end;
             end;
           if Assigned(list) and (List.Count > 0) then
             FocusItem(0);
-          DeskTop.Unlock;
+          TProgram.DeskTop.Unlock;
           exit;
         end;
       { call backtrace command }
       If not assigned(Debugger) then
         exit;
-      DeskTop.Lock;
+      TProgram.DeskTop.Lock;
       Clear;
 
       Debugger.Backtrace;
@@ -3584,7 +3584,7 @@ end;
         end;
       if Assigned(list) and (List.Count > 0) then
         FocusItem(0);
-      DeskTop.Unlock;
+      TProgram.DeskTop.Unlock;
 {$endif NODEBUG}
     end;
 
@@ -3653,7 +3653,7 @@ end;
       HSB,VSB: PScrollBar;
       R,R2 : trect;
     begin
-      Desktop.GetExtent(R);
+      TProgram.DeskTop.GetExtent(R);
       R.A.Y:=R.B.Y-5;
       inherited Create(R, dialog_callstack, wnNoNumber);
       Palette:=wpCyanWindow;
@@ -3924,9 +3924,9 @@ var
 begin
   if GDBWindow=nil then
     begin
-      DeskTop.GetExtent(R);
+      TProgram.DeskTop.GetExtent(R);
       GDBWindow := TGDBWindow.Create(R);
-      DeskTop.Insert(GDBWindow);
+      TProgram.DeskTop.Insert(GDBWindow);
     end;
 end;
 
@@ -3935,7 +3935,7 @@ begin
   If IDEApp.IsRunning and
      assigned(GDBWindow) then
     begin
-      DeskTop.Delete(GDBWindow);
+      TProgram.DeskTop.Delete(GDBWindow);
     end;
   GDBWindow:=nil;
 end;
@@ -3946,9 +3946,9 @@ var
 begin
   if DisassemblyWindow=nil then
     begin
-      DeskTop.GetExtent(R);
+      TProgram.DeskTop.GetExtent(R);
       DisassemblyWindow := TDisassemblyWindow.Create(R);
-      DeskTop.Insert(DisassemblyWindow);
+      TProgram.DeskTop.Insert(DisassemblyWindow);
     end;
 end;
 
@@ -3956,7 +3956,7 @@ procedure DoneDisassemblyWindow;
 begin
   if assigned(DisassemblyWindow) then
     begin
-      DeskTop.Delete(DisassemblyWindow);
+      TProgram.DeskTop.Delete(DisassemblyWindow);
       DisassemblyWindow.Free;
       DisassemblyWindow:=nil;
     end;
@@ -3967,7 +3967,7 @@ begin
   if StackWindow=nil then
     begin
       StackWindow := TStackWindow.Create;
-      DeskTop.Insert(StackWindow);
+      TProgram.DeskTop.Insert(StackWindow);
     end;
 end;
 
@@ -3975,7 +3975,7 @@ procedure DoneStackWindow;
 begin
   if assigned(StackWindow) then
     begin
-      DeskTop.Delete(StackWindow);
+      TProgram.DeskTop.Delete(StackWindow);
       StackWindow:=nil;
     end;
 end;

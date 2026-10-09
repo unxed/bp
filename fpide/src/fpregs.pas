@@ -759,7 +759,7 @@ const
        R : TRect;
 
     begin
-       Desktop.GetExtent(R);
+       TProgram.DeskTop.GetExtent(R);
 {$ifdef i386}
        R.A.X:=R.B.X-28;
        R.B.Y:=R.A.Y+11;
@@ -1195,7 +1195,7 @@ const
        R : TRect;
 
     begin
-       Desktop.GetExtent(R);
+       TProgram.DeskTop.GetExtent(R);
 {$if defined(i386) or defined(x86_64)}
        R.A.X:=R.B.X-44;
        R.B.Y:=R.A.Y+14;
@@ -1526,7 +1526,7 @@ const
        R : TRect;
 
     begin
-       Desktop.GetExtent(R);
+       TProgram.DeskTop.GetExtent(R);
 {$if defined(i386) or defined(x86_64)}
        R.A.X:=R.B.X-60;
        R.B.Y:=R.A.Y+20;
@@ -1596,7 +1596,7 @@ begin
   if RegistersWindow=nil then
     begin
       RegistersWindow := TRegistersWindow.Create;
-      DeskTop.Insert(RegistersWindow);
+      TProgram.DeskTop.Insert(RegistersWindow);
     end;
 end;
 
@@ -1605,7 +1605,7 @@ procedure DoneRegistersWindow;
 begin
   if assigned(RegistersWindow) then
     begin
-      DeskTop.Delete(RegistersWindow);
+      TProgram.DeskTop.Delete(RegistersWindow);
       RegistersWindow:=nil;
     end;
 end;
@@ -1616,7 +1616,7 @@ begin
   if FPUWindow=nil then
     begin
       FPUWindow := TFPUWindow.Create;
-      DeskTop.Insert(FPUWindow);
+      TProgram.DeskTop.Insert(FPUWindow);
     end;
 end;
 
@@ -1625,7 +1625,7 @@ procedure DoneFPUWindow;
 begin
   if assigned(FPUWindow) then
     begin
-      DeskTop.Delete(FPUWindow);
+      TProgram.DeskTop.Delete(FPUWindow);
       FPUWindow:=nil;
     end;
 end;
@@ -1636,7 +1636,7 @@ begin
   if VectorWindow=nil then
     begin
       VectorWindow := TVectorWindow.Create;
-      DeskTop.Insert(VectorWindow);
+      TProgram.DeskTop.Insert(VectorWindow);
     end;
 end;
 
@@ -1645,7 +1645,7 @@ procedure DoneVectorWindow;
 begin
   if assigned(VectorWindow) then
     begin
-      DeskTop.Delete(VectorWindow);
+      TProgram.DeskTop.Delete(VectorWindow);
       VectorWindow:=nil;
     end;
 end;

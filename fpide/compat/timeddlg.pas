@@ -126,9 +126,9 @@ var
 begin
   R.Assign(0, 0, 40, 10);
   if (AOptions and mfInsertInApp) = 0 then
-    R.Move((Desktop.Size.X - R.B.X) div 2, (Desktop.Size.Y - R.B.Y) div 2)
+    R.Move((TProgram.DeskTop.Size.X - R.B.X) div 2, (TProgram.DeskTop.Size.Y - R.B.Y) div 2)
   else
-    R.Move((Application.Size.X - R.B.X) div 2, (Application.Size.Y - R.B.Y) div 2);
+    R.Move((TProgram.Application.Size.X - R.B.X) div 2, (TProgram.Application.Size.Y - R.B.Y) div 2);
   TimedMessageBox := TimedMessageBoxRect(R, Msg, Params, AOptions, ASecs);
 end;
 
@@ -174,7 +174,7 @@ begin
     Inc(X, ButtonList[I].Size.X + 2);
   end;
   Dlg.SelectNext(False);
-  TimedMessageBoxRect := Application.ExecView(Dlg);
+  TimedMessageBoxRect := TProgram.Application.ExecView(Dlg);
   Dlg.Free;
 end;
 

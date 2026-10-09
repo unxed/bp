@@ -313,7 +313,7 @@ procedure CloseAllBrowsers;
   end;
 
 begin
-  Desktop.ForEach(@SendCloseIfBrowser);
+  TProgram.DeskTop.ForEach(@SendCloseIfBrowser);
 end;
 
 procedure RemoveBrowsersCollection;
@@ -613,7 +613,7 @@ end;
 
 procedure TSymbolView.ClearHighlights;
 begin
-  Message(Desktop,evBroadcast,cmClearLineHighlights,nil);
+  Message(TProgram.DeskTop,evBroadcast,cmClearLineHighlights,nil);
 end;
 
 procedure TSymbolView.AutoTrackSource;
@@ -645,7 +645,7 @@ begin
           AutoTrackSource;
       end
     else
-      Message(Desktop,evBroadcast,cmClearLineHighlights,nil);
+      Message(TProgram.DeskTop,evBroadcast,cmClearLineHighlights,nil);
 end;
 
 procedure TSymbolView.Browse;
@@ -758,7 +758,7 @@ begin
 end;
 begin
   BW:=nil;
-  Desktop.ForEach(@IsBW);
+  TProgram.DeskTop.ForEach(@IsBW);
   LastBrowserWindow:=BW;
 end;
 
@@ -768,7 +768,7 @@ var W: PSourceWindow;
     P: TPoint;
 begin
   ClearHighlights;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   P.X:=R.Position.X-1; P.Y:=R.Position.Y-1;
   if AutoTrack then
     W:=SearchOnDesktop(R.GetFileName,false)
@@ -776,14 +776,14 @@ begin
     W:=TryToOpenFile(nil,R.GetFileName,P.X,P.Y,true);
   if not assigned(W) then
     begin
-      Desktop.Unlock;
+      TProgram.DeskTop.Unlock;
       if IDEApp.OpenSearch(R.GetFileName+'*') then
         begin
           W:=TryToOpenFile(nil,R.GetFileName,R.Position.X-1,R.Position.Y-1,true);
           if Assigned(W) then
             W.Select;
         end;
-      Desktop.Lock;
+      TProgram.DeskTop.Lock;
     end;
   if W<>nil then
   begin
@@ -792,12 +792,12 @@ begin
       W.Select
     else
       begin
-        Desktop.Delete(W);
-        Desktop.InsertBefore(W,BW.NextView);
+        TProgram.DeskTop.Delete(W);
+        TProgram.DeskTop.InsertBefore(W,BW.NextView);
       end;
     W.Editor.SetLineFlagExclusive(lfHighlightRow,P.Y);
   end;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
   if Assigned(W)=false then
     ErrorBox(FormatStrStr(msg_cantfindfile,R.GetFileName),nil);
 
@@ -807,22 +807,22 @@ end;
 function TSymbolView.GotoReference(R: PReference): boolean;
 var W: PSourceWindow;
 begin
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   W:=TryToOpenFile(nil,R.GetFileName,R.Position.X-1,R.Position.Y-1,true);
   if Assigned(W) then
     W.Select
   else
     begin
-      Desktop.Unlock;
+      TProgram.DeskTop.Unlock;
       if IDEApp.OpenSearch(R.GetFileName+'*') then
         begin
           W:=TryToOpenFile(nil,R.GetFileName,R.Position.X-1,R.Position.Y-1,true);
           if Assigned(W) then
             W.Select;
         end;
-      Desktop.Lock;
+      TProgram.DeskTop.Lock;
     end;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
   if Assigned(W)=false then
     ErrorBox(FormatStrStr(msg_cantfindfile,R.GetFileName),nil);
   GotoReference:=W<>nil;
@@ -1820,21 +1820,21 @@ begin
               begin
                 S:=ScopeView.Symbols.At(ScopeView.Focused);
                 MakeGlobal(ScopeView.Origin,P);
-                Desktop.MakeLocal(P,P); Inc(P.Y,ScopeView.Focused-ScopeView.TopItem);
+                TProgram.DeskTop.MakeLocal(P,P); Inc(P.Y,ScopeView.Focused-ScopeView.TopItem);
                 Inc(P.Y);
               end;
             if (Event.InfoPtr=Pointer(UnitInfoUsed)) then
               begin
                 S:=UnitInfoUsed.Symbols.At(UnitInfoUsed.Focused);
                 MakeGlobal(UnitInfoUsed.Origin,P);
-                Desktop.MakeLocal(P,P); Inc(P.Y,UnitInfoUsed.Focused-UnitInfoUsed.TopItem);
+                TProgram.DeskTop.MakeLocal(P,P); Inc(P.Y,UnitInfoUsed.Focused-UnitInfoUsed.TopItem);
                 Inc(P.Y);
               end;
             if (Event.InfoPtr=Pointer(UnitInfoDependent)) then
               begin
                 S:=UnitInfoDependent.Symbols.At(UnitInfoDependent.Focused);
                 MakeGlobal(UnitInfoDependent.Origin,P);
-                Desktop.MakeLocal(P,P); Inc(P.Y,UnitInfoDependent.Focused-UnitInfoDependent.TopItem);
+                TProgram.DeskTop.MakeLocal(P,P); Inc(P.Y,UnitInfoDependent.Focused-UnitInfoDependent.TopItem);
                 Inc(P.Y);
               end;
             if Assigned(S) then
@@ -2041,10 +2041,10 @@ var R: TRect;
     PB : PBrowserWindow;
     St,st2 : string;
 begin
-  if X=0 then X:=Desktop.Size.X-35;
+  if X=0 then X:=TProgram.DeskTop.Size.X-35;
   R.A.X:=X; R.A.Y:=Y;
   R.B.X:=R.A.X+35; R.B.Y:=R.A.Y+15;
-  while (R.B.Y>Desktop.Size.Y) do R.Move(0,-1);
+  while (R.B.Y>TProgram.DeskTop.Size.Y) do R.Move(0,-1);
   if assigned(ParentBrowser) and assigned(ParentBrowser.Prefix) and
      assigned(ParentBrowser.sym) and
      (ParentBrowser.sym.typ<>unitsym)
@@ -2072,7 +2072,7 @@ begin
      (assigned(ParentBrowser) and ParentBrowser.IsValid) then
     PB.IsValid:=true;
 
-  Desktop.Insert(PB);
+  TProgram.DeskTop.Insert(PB);
 end;
 
 END.

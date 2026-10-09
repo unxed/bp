@@ -255,7 +255,7 @@ procedure SaveModifiedSources;
         Message(P,evCommand,cmSave,nil);
   end;
 begin
-  Desktop.ForEach(@DoSave);
+  TProgram.DeskTop.ForEach(@DoSave);
 end;
 
 { program, unit or library: the first word of the source that is not in a comment }
@@ -350,7 +350,7 @@ begin
               { AddMessage shows the window for plain errors only: a message with a place is shown here }
               if not CompilerMessageWindow.GetState(sfVisible) then
                 CompilerMessageWindow.Show;
-              if Desktop.First<>PView(CompilerMessageWindow) then
+              if TProgram.DeskTop.First<>PView(CompilerMessageWindow) then
                 CompilerMessageWindow.MakeFirst;
             end;
         end

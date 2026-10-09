@@ -269,7 +269,7 @@ begin
   end;
   if ErrS<>'' then
   begin
-    if (application<>nil) and (ideapp.displaymode=dmIDE) then
+    if (TProgram.Application<>nil) and (ideapp.displaymode=dmIDE) then
       ErrorBox('Stream error: '+#13+ErrS,nil)
     else
 
@@ -527,7 +527,7 @@ BEGIN
             { If ExitProc=@InterceptExit then
               ExitProc:=StoreExitProc;}
             Str(SeenExitCode,ErrS);
-            if (application<>nil) and (ideapp.displaymode=dmIDE) then
+            if (TProgram.Application<>nil) and (ideapp.displaymode=dmIDE) then
               begin
                 P.l1:=SeenExitCode;
                 ErrS:=hexstr(PtrUInt(SeenErrorAddr),sizeof(PtrUInt)*2);
@@ -542,7 +542,7 @@ BEGIN
           begin
             Str(SetJmpRes,ErrS);
           { Longjmp was called by fpcatch }
-            if (application<>nil) and (ideapp.displaymode=dmIDE) then
+            if (TProgram.Application<>nil) and (ideapp.displaymode=dmIDE) then
               begin
                 P.l1:=SetJmpRes;
                 if OKCancelBox(error_programexitedwithsignal,@P)=cmCancel then

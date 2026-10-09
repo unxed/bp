@@ -1493,7 +1493,7 @@ begin
   Filename:='listbox.txt';
   DefExt:='*.txt';
   Title:='Save list box content';
-  Re:=Application.ExecuteDialog(TFileDialog.Create(DefExt,
+  Re:=TProgram.Application.ExecuteDialog(TFileDialog.Create(DefExt,
           Title, label_name, fdOkButton, FileId), @FileName);
   if Re <> cmCancel then
     SaveAs := SaveToFile(FileName);
@@ -1535,10 +1535,10 @@ begin
   if M=nil then Exit;
   if LastLocalCmd<>0 then
      M^.Deflt:=SearchMenuItem(M,LastLocalCmd);
-  Desktop.GetExtent(R);
+  TProgram.DeskTop.GetExtent(R);
   MakeGlobal(P,R.A); {Desktop.MakeLocal(R.A,R.A);}
   MV := TAdvancedMenuPopUp.Create(R, M, nil);
-  Re:=Application.ExecView(MV);
+  Re:=TProgram.Application.ExecView(MV);
   if M^.Deflt=nil then LastLocalCmd:=0
      else LastLocalCmd:=M^.Deflt^.Command;
   MV.Free;
@@ -1730,7 +1730,7 @@ begin
     else
       begin
         if not IsSeparator(P) and
-           CommandEnabled(P^.Command) then
+           TView.CommandEnabled(P^.Command) then
           begin
             p^.disabled:=false;
             IsEnabled:=true;
@@ -1861,7 +1861,7 @@ var R: TRect;
     Width: Sw_integer;
 begin
   Width:=length(Msg)+4*2;
-  if Width<(Desktop.Size.X div 2) then Width:=(Desktop.Size.X div 2);
+  if Width<(TProgram.DeskTop.Size.X div 2) then Width:=(TProgram.DeskTop.Size.X div 2);
   R.Assign(0,0,Width,5);
   MessageDialog := TCenterDialog.Create(R, '');
   with MessageDialog do
@@ -1871,14 +1871,14 @@ begin
     if copy(Msg,1,1)<>^C then Msg:=^C+Msg;
     Insert(TStaticText.Create(R, Msg));
   end;
-  Application.Insert(MessageDialog);
+  TProgram.Application.Insert(MessageDialog);
 end;
 
 procedure HideMessage;
 begin
   if MessageDialog<>nil then
     begin
-      Application.Delete(MessageDialog);
+      TProgram.Application.Delete(MessageDialog);
       MessageDialog.Free;
       MessageDialog:=nil;
     end;
@@ -2541,9 +2541,9 @@ begin
     if Cols<32 then Cols:=32; if Rows=0 then Rows:=1;
     R.Assign(0,0,3+Cols+3,Rows+6);
     if (AOptions and mfInsertInApp)= 0 then
-      R.Move((Desktop.Size.X-(R.B.X-R.A.X)) div 2,(Desktop.Size.Y-(R.B.Y-R.A.Y)) div 2)
+      R.Move((TProgram.DeskTop.Size.X-(R.B.X-R.A.X)) div 2,(TProgram.DeskTop.Size.Y-(R.B.Y-R.A.Y)) div 2)
     else
-      R.Move((Application.Size.X-(R.B.X-R.A.X)) div 2,(Application.Size.Y-(R.B.Y-R.A.Y)) div 2);
+      R.Move((TProgram.Application.Size.X-(R.B.X-R.A.X)) div 2,(TProgram.Application.Size.Y-(R.B.Y-R.A.Y)) div 2);
   end;
   Dialog := TAdvMessageBox.Create(R, Titles[AOptions and $3]);
   with Dialog do
@@ -2584,9 +2584,9 @@ begin
      SelectNext(False);
    end;
   if AOptions and mfInsertInApp = 0 then
-    AdvMessageBoxRect := DeskTop.ExecView(Dialog)
+    AdvMessageBoxRect := TProgram.DeskTop.ExecView(Dialog)
   else
-    AdvMessageBoxRect := Application.ExecView(Dialog);
+    AdvMessageBoxRect := TProgram.Application.ExecView(Dialog);
   Dialog.Free;
 end;
 

@@ -200,7 +200,7 @@ begin
               dialog_installhelpfile,
               label_installhelpfile_filename,
               fdOpenButton,hidOpenHelpFile);
-            Re:=Desktop.ExecView(D);
+            Re:=TProgram.DeskTop.ExecView(D);
             if Re<>cmCancel then
             begin
               FileName := D.GetFileName;
