@@ -427,6 +427,7 @@ begin
   if OK then
  begin
   INIFile := TINIFile.Create(IniFileName);
+  INIFile.Read;
   { Files }
   OpenExts:=INIFile.GetEntry(secFiles,ieOpenExts,OpenExts);
   RecentFileCount:=High(RecentFiles);
@@ -621,6 +622,7 @@ begin
      not SameFileName(SystemIDEDir,IDEDir) then
     IniFileName:=IDEDir+IniName;
   INIFile := TINIFile.Create(IniFileName);
+  INIFile.Read;    { what the IDE does not write is kept }
   { Files }
   { avoid keeping old files }
   INIFile.DeleteSection(secFiles);

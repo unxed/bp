@@ -1029,7 +1029,7 @@ begin
   else
     begin
       F := TINIFile.Create(Fn);
-      OK:=F<>nil;
+      OK:=F.Read;
       if OK then
         begin
           OK:=BuildPromptDialogInfo(F);
