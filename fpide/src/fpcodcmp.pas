@@ -26,6 +26,8 @@ type
      TCodeCompleteWordList = class;
      PCodeCompleteWordList = TCodeCompleteWordList;
      TCodeCompleteWordList = class(TTextCollection)
+       function StreamableName: ShortString; override;
+       class function Build: TStreamable; static;
      end;
 
     TCodeCompleteDialog = class;
@@ -74,7 +76,6 @@ uses App,Views,MsgBox,Validate,
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RCodeCompleteWordList: TStreamRec;
 
 {$endif}
 {$endif}
@@ -285,7 +286,7 @@ var
   R : TRect;
   StoreBrowserSwitchesConfig : string;
 begin
-  Desktop.GetExtent(R);
+  R := TProgram.DeskTop.GetExtent;
   HiddenSource := TSourceWindow.Create(R,'*');
   HiddenSource.NoNameCount:=0;
   HiddenSource.UpdateTitle;
@@ -328,7 +329,7 @@ var C: PCodeCompleteWordList;
     NewCodeCompleteCase : TCodeCompleteCase;
     StPtr : PString;
 begin
-  C := TCodeCompleteWordList.Load(S);
+  C := TCodeCompleteWordList(GetObject(S));
   OK:=Assigned(C) and (S.Status=stOk);
   if OK then
     begin
@@ -383,7 +384,7 @@ begin
   OK:=Assigned(CodeCompleteWords);
   if OK then
   begin
-    CodeCompleteWords.Store(S);
+    PutObject(S, CodeCompleteWords);
     S.Write(CodeCompleteCase,Sizeof(TCodeCompleteCase));
     { New fields added }
     S.Write(UseStandardUnitsInCodeComplete,Sizeof(UseStandardUnitsInCodeComplete));
@@ -412,54 +413,54 @@ end;
 
 constructor TCodeCompleteDialog.Create;
 var R,R2,R3: TRect;
-    Items: PSItem;
+    Items: TSItem;
     SB: PScrollBar;
 begin
-  R.Assign(0,0,50,22);
+  R := TRect.Create(0, 0, 50, 22);
   inherited Create(R,dialog_codecomplete);
   HelpCtx:=hcCodeCompleteOptions;
 
   { name list dialog }
-  GetExtent(R); R.Grow(-3,-2); Inc(R.A.Y); R3.Copy(R); Dec(R.B.X,12);
+  R := GetExtent; R.Grow(-3,-2); Inc(R.A.Y); R3 := R; Dec(R.B.X,12);
   Dec(R.B.Y,7);
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); Insert(SB);
   CodeCompleteLB := TAdvancedListBox.Create(R,1,SB);
   Insert(CodeCompleteLB);
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
   Insert(TLabel.Create(R2, label_codecomplete_keywords, CodeCompleteLB));
 
   { Case choice }
-  R.Copy(R3); Dec(R.B.Y,2); R.A.Y:=R.B.Y-4; Inc(R.A.X); R.B.X:=R.A.X+15;
-  Items:=NewSItem('Unc~h~anged',
-           NewSItem('~L~ower',
-           NewSItem('~U~pper',
-           NewSItem('~M~ixed',nil))));
+  R := R3; Dec(R.B.Y,2); R.A.Y:=R.B.Y-4; Inc(R.A.X); R.B.X:=R.A.X+15;
+  Items:=TSItem.Create('Unc~h~anged',
+           TSItem.Create('~L~ower',
+           TSItem.Create('~U~pper',
+           TSItem.Create('~M~ixed',nil))));
   RB := TRadioButtons.Create(R,Items);
   RB.SetData(ord(CodeCompleteCase));
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
   Insert(TLabel.Create(R2, 'Case handling', RB));
   Insert(RB);
 
   { Mininum length inputline }
-  R.Copy(R3); R.A.Y:=R.B.Y-7;R.B.Y:=R.A.Y+1; Dec(R.B.X); R.A.X:=R.B.X -5;
+  R := R3; R.A.Y:=R.B.Y-7;R.B.Y:=R.A.Y+1; Dec(R.B.X); R.A.X:=R.B.X -5;
   MinInputL := TEditorInputLine.Create(R,5);
   MinInputL.SetValidator(TRangeValidator.Create(1,255));
   Insert(MinInputL);
-  R2.Copy(R); R2.A.X:=20;Dec(R2.B.X,5);
+  R2 := R; R2.A.X:=20;Dec(R2.B.X,5);
   Insert(TLabel.Create(R2, 'Min. length', MinInputL));
 
   { Standard/all units booleans }
   Items:=nil;
-  Items:=NewSItem('Add standard units', Items);
-  Items:=NewSItem('Add all units', Items);
-  Items:=NewSItem('Show only unique', Items);
-  R.Copy(R3); R.A.Y:=R.B.Y-5;R.B.Y:=R.A.Y+3; Inc(R.A.X,18); Dec(R.B.X);
+  Items:=TSItem.Create('Add standard units', Items);
+  Items:=TSItem.Create('Add all units', Items);
+  Items:=TSItem.Create('Show only unique', Items);
+  R := R3; R.A.Y:=R.B.Y-5;R.B.Y:=R.A.Y+3; Inc(R.A.X,18); Dec(R.B.X);
   CB := TCheckBoxes.Create(R, Items);
   Insert(CB);
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
   Insert(TLabel.Create(R2, 'Unit handling', CB));
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1;
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1;
   If ShowOnlyUnique then
     CB.Press(0);
   If UseAllUnitsInCodeComplete then
@@ -468,14 +469,14 @@ begin
     CB.Press(2);
 
   { Standard unit name boolean }
-  R.Copy(R3); R.A.Y:=R.B.Y-1; Inc(R.A.X); Dec(R.B.X);
+  R := R3; R.A.Y:=R.B.Y-1; Inc(R.A.X); Dec(R.B.X);
   InputL := TEditorInputLine.Create(R,255);
   Insert(InputL);
   InputL.SetValidator(TFilterValidator.Create(NumberChars+AlphaChars+[',']));
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);R2.B.X:=R2.A.X+25;
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);R2.B.X:=R2.A.X+25;
   Insert(TLabel.Create(R2, '~S~tandard unit list', InputL));
 
-  R.Copy(R3); R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
+  R := R3; R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
   Insert(TButton.Create(R, button_OK, cmOK, bfNormal));
   R.Move(0,2);
   Insert(TButton.Create(R, button_Edit, cmEditItem, bfDefault));
@@ -495,7 +496,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbIns  :
             Message(Self,evCommand,cmAddItem,nil);
           kbDel  :
@@ -505,15 +506,15 @@ begin
         if DontClear=false then ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=pointer(CodeCompleteLB) then
+          if Event.Message.InfoPtr=pointer(CodeCompleteLB) then
             Message(Self,evCommand,cmEditItem,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmAddItem    : Add;
           cmDeleteItem : Delete;
           cmEditItem   : Edit;
@@ -657,24 +658,12 @@ begin
 end;
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RCodeCompleteWordList(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TCodeCompleteWordList.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RCodeCompleteWordList(P: TStreamable; S: TStream);
-begin
-  TCodeCompleteWordList(Pointer(P)).Store(S);
-end;
 
-procedure FillStreamRecs_fpcodcmp;
+procedure RegisterStreamables_fpcodcmp;
 begin
-  RCodeCompleteWordList.ObjType := 14401;
-  RCodeCompleteWordList.VmtLink := PtrUInt(System.TClass(TCodeCompleteWordList));
-  RCodeCompleteWordList.Load := @Build_RCodeCompleteWordList;
-  RCodeCompleteWordList.Store := @Store_RCodeCompleteWordList;
-  RCodeCompleteWordList.Next := nil;
+  TStreamableClass.Create('fpcodcmp.TCodeCompleteWordList', @TCodeCompleteWordList.Build);
 end;
 
 {$endif}
@@ -682,9 +671,19 @@ end;
 procedure RegisterCodeComplete;
 begin
 {$ifndef NOOBJREG}
-  FillStreamRecs_fpcodcmp;
-  RegisterType(RCodeCompleteWordList);
+  RegisterStreamables_fpcodcmp;
 {$endif}
+end;
+
+
+class function TCodeCompleteWordList.Build: TStreamable;
+begin
+  Result := TCodeCompleteWordList.Create(streamableInit);
+end;
+
+function TCodeCompleteWordList.StreamableName: ShortString;
+begin
+  Result := 'fpcodcmp.TCodeCompleteWordList';
 end;
 
 END.

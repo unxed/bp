@@ -74,7 +74,7 @@ type
       procedure   SetReadOnly(V: boolean);
     public
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
-          PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore);
+          PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore); overload;
       destructor Destroy; override;
       property    ReadOnly: boolean read FReadOnly write SetReadOnly;
       property    Flags: longint read GetFlags write SetFlags;
@@ -94,7 +94,7 @@ type
     TFileEditor = class(TCodeEditor)
       FileName: string;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
-          PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore; const AFileName: string);
+          PScrollBar; AIndicator: PIndicator; ACore: PCodeEditorCore; const AFileName: string); overload;
       function    Save: Boolean; virtual;
       function    SaveAs: Boolean; virtual;
       function    SaveAsk(Force: boolean): Boolean; virtual;
@@ -514,7 +514,7 @@ begin
         Message(Owner, evBroadcast, cmUpdateTitle, Self);
       end;
     if IsClipboard then FileName := '';
-    Message(Application,evBroadcast,cmFileNameChanged,Self);
+    Message(TProgram.Application,evBroadcast,cmFileNameChanged,Self);
   end;
 end;
 
@@ -542,7 +542,7 @@ begin
           cmNo     : OK:=true;
           cmCancel : begin
                       OK := False;
-                      Message(Application,evBroadcast,cmSaveCancelled,Self);
+                      Message(TProgram.Application,evBroadcast,cmSaveCancelled,Self);
                     end;
         end;
       end;
@@ -552,7 +552,7 @@ end;
 
 procedure TFileEditor.BindingsChanged;
 begin
-  Message(Application,evBroadcast,cmUpdateTitle,Self);
+  Message(TProgram.Application,evBroadcast,cmUpdateTitle,Self);
 end;
 
 procedure TFileEditor.HandleEvent(var Event: TEvent);
@@ -561,9 +561,9 @@ var SH,B: boolean;
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
    cmFileNameChanged :
-     if (Event.InfoPtr=nil) or (Event.InfoPtr = Pointer(Self)) then
+     if (Event.Message.InfoPtr=nil) or (Event.Message.InfoPtr = Pointer(Self)) then
      begin
        B:=IsFlagSet(efSyntaxHighlight);
        SH:=UseSyntaxHighlight(Self);

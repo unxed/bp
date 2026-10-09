@@ -79,8 +79,8 @@ type
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   UpdateCommands; virtual;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       procedure   SelectInDebugSession;
     end;
@@ -90,20 +90,24 @@ type
     TFPHelpViewer = class(THelpViewer)
       function    GetLocalMenu: PMenu; override;
       function    GetCommandTarget: PView; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TFPHelpWindow = class;
     PFPHelpWindow = TFPHelpWindow;
     TFPHelpWindow = class(THelpWindow)
-      constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer);
+      constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word; AContext: THelpCtx; ANumber: Integer); overload;
       destructor Destroy;override;
       procedure   InitHelpView; override;
       procedure   Show; {virtual;}
       procedure   Hide; {override;}
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetPalette: TPalette; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     end;
 
     TTextScroller = class;
@@ -150,7 +154,7 @@ type
       CodeCompleteTip: PFPToolTip;
       destructor Destroy; override;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
-          PScrollBar; AIndicator: PIndicator;const AFileName: string);
+          PScrollBar; AIndicator: PIndicator;const AFileName: string); overload;
 {$ifndef NODEBUG}
     private
       ShouldHandleBreakpoints : boolean;
@@ -190,6 +194,8 @@ type
       function    InsertNewLine : Sw_integer;override;
       function    InsertLine(LineNo: sw_integer; const S: string): PCustomLine; override;
       procedure   AddLine(const S: string); override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TSourceWindow = class;
@@ -198,7 +204,7 @@ type
       Editor    : PSourceEditor;
       Indicator : PIndicator;
       NoNameCount : longint;
-      constructor Create(var Bounds: TRect; AFileName: string);
+      constructor Create(var Bounds: TRect; AFileName: string); overload;
       function    GetTitle(MaxSize: sw_Integer): TTitleStr; override;
       procedure   SetTitle(ATitle: string); virtual;
       procedure   UpdateTitle; virtual;
@@ -206,8 +212,10 @@ type
       procedure   Update; override;
       procedure   UpdateCommands; override;
       function    GetPalette: TPalette; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   Close; override;
       destructor Destroy; override;
     end;
@@ -227,6 +235,8 @@ type
       AutoRepeat,
       IgnoreStringAtEnd : boolean;
       LastCommand : String;
+        function StreamableName: ShortString; override;
+        class function Build: TStreamable; static;
       end;
 
     TGDBWindow = class;
@@ -234,7 +244,7 @@ type
     TGDBWindow = class(TFPWindow)
       Editor    : PGDBSourceEditor;
       Indicator : PIndicator;
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   WriteText(Buf : pchar;IsError : boolean);
       procedure   WriteString(Const S : string);
@@ -242,8 +252,10 @@ type
       procedure   WriteOutputText(Buf : pchar);
       procedure   WriteErrorText(Buf : pchar);
       function    GetPalette: TPalette;override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   UpdateCommands; override;
       destructor Destroy; override;
     end;
@@ -266,7 +278,7 @@ type
       CurrentSource : String;
       CurrentLine : longint;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
-          PScrollBar; AIndicator: PIndicator;const AFileName: string);
+          PScrollBar; AIndicator: PIndicator;const AFileName: string); overload;
       procedure  ReleaseSource;
       destructor Destroy;override;
       procedure  AddSourceLine(const AFileName: string;line : longint); virtual;
@@ -278,6 +290,8 @@ type
         DisasLines : PDisasLineCollection;
         MinAddress,MaxAddress : CORE_ADDR;
         CurL : PDisasLine;
+        function StreamableName: ShortString; override;
+        class function Build: TStreamable; static;
       end;
 
     TDisassemblyWindow = class;
@@ -285,7 +299,7 @@ type
     TDisassemblyWindow = class(TFPWindow)
       Editor    : PDisassemblyEditor;
       Indicator : PIndicator;
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   LoadFunction(Const FuncName : string);
       procedure   LoadAddress(Addr : CORE_ADDR);
       function    ProcessPChar(p : pchar) : boolean;
@@ -296,16 +310,20 @@ type
       procedure   UpdateCommands; override;
       function    GetPalette: TPalette;override;
       destructor Destroy; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 {$endif NODEBUG}
 
     TClipboardWindow = class;
     PClipboardWindow = TClipboardWindow;
     TClipboardWindow = class(TSourceWindow)
-      constructor Create;
+      constructor Create; overload;
       procedure   Close; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -330,7 +348,7 @@ type
       NoSelection : boolean;
       MaxWidth    : Sw_integer;
       ModuleNames : PStoreCollection;
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       procedure   SetState(AState: Word; Enable: Boolean); override;
       procedure   AddItem(P: PMessageItem); virtual;
       function    AddModuleName(const Name: string): PString; virtual;
@@ -341,8 +359,10 @@ type
       procedure   Draw; override;
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetLocalMenu: PMenu; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -351,6 +371,8 @@ type
     PFPDlgWindow = TFPDlgWindow;
     TFPDlgWindow = class(TDlgWindow)
       procedure   HandleEvent(var Event: TEvent); override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
 PTabItem = ^TTabItem;
@@ -425,9 +447,11 @@ PTabItem = ^TTabItem;
     TFPASCIIChart = class;
     PFPASCIIChart = TFPASCIIChart;
     TFPASCIIChart = class(TASCIIChart)
-      constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      constructor Create; overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   HandleEvent(var Event: TEvent); override;
       destructor Destroy; override;
     end;
@@ -441,10 +465,12 @@ PTabItem = ^TTabItem;
     TFPDesktop = class;
     PFPDesktop = TFPDesktop;
     TFPDesktop = class(TDesktop)
-      constructor Create(var Bounds: TRect);
+      constructor Create(var Bounds: TRect); overload;
       procedure   InitBackground; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     end;
 
     TFPMemo = class;
@@ -522,11 +548,11 @@ procedure DoneVESAScreenModes;
 procedure NoDebugger;
 
 const
-      SourceCmds  : TCommandSet =
+      SourceCmds  : TCommandBytes =
         ([cmSave,cmSaveAs,cmCompile,cmHide,cmDoReload]);
-      EditorCmds  : TCommandSet =
+      EditorCmds  : TCommandBytes =
         ([cmPrint,cmFind,cmReplace,cmSearchAgain,cmJumpLine,cmHelpTopicSearch,cmSelectAll,cmUnselect]);
-      CompileCmds : TCommandSet =
+      CompileCmds : TCommandBytes =
         ([cmMake,cmBuild,cmRun,cmTestLang]);
 
       CalcClipboard   : extended = 0;
@@ -612,23 +638,10 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RSourceEditor: TStreamRec;
-var RSourceWindow: TStreamRec;
-var RFPHelpViewer: TStreamRec;
-var RFPHelpWindow: TStreamRec;
-var RClipboardWindow: TStreamRec;
-var RMessageListBox: TStreamRec;
-var RFPDesktop: TStreamRec;
-var RFPASCIIChart: TStreamRec;
-var RFPDlgWindow: TStreamRec;
 {$endif}
 {$endif}
 {$endif NOOBJREG}
 {$ifndef NODEBUG}
-var RGDBWindow: TStreamRec;
-var RGDBSourceEditor: TStreamRec;
-var RDisassemblyEditor: TStreamRec;
-var RDisassemblyWindow: TStreamRec;
 
 {$endif NODEBUG}
 const
@@ -709,7 +722,7 @@ begin
   EditorWindow:=(P.HelpCtx=hcSourceWindow);
 end;
 begin
-  IsThereAnyEditor:=Desktop.FirstThat(@EditorWindow)<>nil;
+  IsThereAnyEditor:=TProgram.DeskTop.FirstThat(@EditorWindow)<>nil;
 end;
 
 procedure AskToReloadAllModifiedFiles;
@@ -719,7 +732,7 @@ begin
     PSourceWindow(P).Editor.ReloadFile;
 end;
 begin
-  Desktop.ForEach(@EditorWindowModifiedOnDisk);
+  TProgram.DeskTop.ForEach(@EditorWindowModifiedOnDisk);
 end;
 
 function IsThereAnyHelpWindow: boolean;
@@ -730,7 +743,7 @@ end;
 function IsThereAnyNumberedWindow: boolean;
 var _Is: boolean;
 begin
-  _Is:=Message(Desktop,evBroadcast,cmSearchWindow,nil)<>nil;
+  _Is:=Message(TProgram.DeskTop,evBroadcast,cmSearchWindow,nil)<>nil;
   _Is:=_Is or ( (ClipboardWindow<>nil) and ClipboardWindow.GetState(sfVisible));
   IsThereAnyNumberedWindow:=_Is;
 end;
@@ -767,7 +780,7 @@ begin
   CheckIt:=IsWindow(P);
 end;
 begin
-  IsThereAnyWindow:=Desktop.FirstThat(@CheckIt)<>nil;
+  IsThereAnyWindow:=TProgram.DeskTop.FirstThat(@CheckIt)<>nil;
 end;
 
 function IsThereAnyVisibleWindow: boolean;
@@ -776,7 +789,7 @@ begin
   CheckIt:=IsWindow(P) and P.GetState(sfVisible);
 end;
 begin
-  IsThereAnyVisibleWindow:=Desktop.FirstThat(@CheckIt)<>nil;
+  IsThereAnyVisibleWindow:=TProgram.DeskTop.FirstThat(@CheckIt)<>nil;
 end;
 
 function FirstEditorWindow: PSourceWindow;
@@ -785,7 +798,7 @@ begin
   EditorWindow:=(P.HelpCtx=hcSourceWindow);
 end;
 begin
-  FirstEditorWindow:=TSourceWindow(pointer(Desktop.FirstThat(@EditorWindow)));
+  FirstEditorWindow:=TSourceWindow(pointer(TProgram.DeskTop.FirstThat(@EditorWindow)));
 end;
 
 function EditorWindowFile(const Name : String): PSourceWindow;
@@ -800,7 +813,7 @@ var
 
 begin
   SName:=FixFileName(ExpandPath(Name));
-  EditorWindowFile:=TSourceWindow(pointer(Desktop.FirstThat(@EditorWindow)));
+  EditorWindowFile:=TSourceWindow(pointer(TProgram.DeskTop.FirstThat(@EditorWindow)));
 end;
 
 
@@ -819,7 +832,7 @@ begin
      (P.HelpCtx <> hcFPURegisters);
 end;
 begin
-  PW:=PWindow(Desktop.FirstThat(@CheckIt));
+  PW:=PWindow(TProgram.DeskTop.FirstThat(@CheckIt));
   InDisassemblyWindow:=Assigned(PW) and
     ((PW is TDisassemblyWindow));
 end;
@@ -1156,8 +1169,8 @@ end;
 function SearchWindowWithNo(No: integer): PWindow;
 var P: PWindow;
 begin
-  P:=TWindow(Message(Desktop,evBroadcast,cmSearchWindow+No,nil));
-  if pointer(P)=pointer(Desktop) then P:=nil;
+  P:=TWindow(Message(TProgram.DeskTop,evBroadcast,cmSearchWindow+No,nil));
+  if pointer(P)=pointer(TProgram.DeskTop) then P:=nil;
   SearchWindowWithNo:=P;
 end;
 
@@ -1170,7 +1183,7 @@ begin
   { we have a crash here because of the TStatusLine
     that can also have one of these values
     but is not a Window object PM }
-  if Pointer(P)<>Pointer(StatusLine) then
+  if Pointer(P)<>Pointer(TProgram.StatusLine) then
   if IsWindow(P) then
     W:=PWindow(P);
   OK:=(W<>nil);
@@ -1182,9 +1195,9 @@ begin
 end;
 var W: PView;
 begin
-  W:=Application.FirstThat(@Match);
+  W:=TProgram.Application.FirstThat(@Match);
 {    This is wrong because TStatusLine is also considered PM }
-  if not Assigned(W) then W:=Desktop.FirstThat(@Match);
+  if not Assigned(W) then W:=TProgram.DeskTop.FirstThat(@Match);
   { But why do we need to check all ??
     Probably because of the ones which were not inserted into
     Desktop as the Messages view
@@ -1247,7 +1260,7 @@ begin
   AFileName:=FixFileName(AFileName);
   { do not use the same core for all new files }
   if AFileName<>'' then
-    Desktop.FirstThat(@Check);
+    TProgram.DeskTop.FirstThat(@Check);
   SearchCoreForFileName:=EC;
 end;
 
@@ -1349,7 +1362,7 @@ var D: PCodeTemplatesDialog;
     OK: boolean;
 begin
   D := TCodeTemplatesDialog.Create(true,ShortCut);
-  OK:=Desktop.ExecView(D)=cmOK;
+  OK:=TProgram.DeskTop.ExecView(D)=cmOK;
   if OK then ShortCut:=D.GetSelectedShortCut;
   D.Free;
   SelectCodeTemplate:=OK;
@@ -1506,12 +1519,12 @@ begin
     end
   else
     begin
-      R.Assign(0,0,20,1);
+      R := TRect.Create(0, 0, 20, 1);
       if Assigned(CodeCompleteTip)=false then
         begin
           CodeCompleteTip := TFPToolTip.Create(R, S, alCenter);
           CodeCompleteTip.Hide;
-          Application.Insert(CodeCompleteTip);
+          TProgram.Application.Insert(CodeCompleteTip);
         end
       else
         CodeCompleteTip.SetText(S);
@@ -1534,18 +1547,18 @@ begin
 
   P.X:=P.X-Delta.X;
   P.Y:=P.Y-Delta.Y;
-  MakeGlobal(P,P);
+  P := MakeGlobal(P);
   if Assigned(CodeCompleteTip.Owner) then
-    CodeCompleteTip.Owner.MakeLocal(P,P);
+    P := CodeCompleteTip.Owner.MakeLocal(P);
 
   { ensure that the tooltip stays in screen }
-  P.X:=Min(Max(0,P.X),Drivers.ScreenWidth-length(S)-2-1);
+  P.X:=Min(Max(0,P.X),Drivers.TScreen.ScreenWidth-length(S)-2-1);
   { align it vertically }
-  if P.Y>round(Drivers.ScreenHeight*3/4) then
+  if P.Y>round(Drivers.TScreen.ScreenHeight*3/4) then
     Dec(P.Y)
   else
     Inc(P.Y);
-  R.Assign(P.X,P.Y,P.X+1+length(S)+1,P.Y+1);
+  R := TRect.Create(P.X, P.Y, P.X+1+length(S)+1, P.Y+1);
   CodeCompleteTip.Locate(R);
   if CodeCompleteTip.GetState(sfVisible)=false then
     CodeCompleteTip.Show;
@@ -1908,7 +1921,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbCtrlEnter :
             Message(Self,evCommand,cmOpenAtCursor,nil);
         else DontClear:=true;
@@ -1919,7 +1932,7 @@ begin
   inherited HandleEvent(Event);
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
           cmCalculatorPaste :
             begin
               InsertText(FloatToStr(CalcClipboard,0));
@@ -1929,7 +1942,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
 {$ifdef DebugUndo}
           cmDumpUndo    : DumpUndo;
           cmUndoAll     : UndoAll;
@@ -1949,10 +1962,10 @@ begin
               OpenFileName:=S+'.pp'+ListSeparator+
                             S+'.pas'+ListSeparator+
                             S+'.inc';
-              Message(Application,evCommand,cmOpen,nil);
+              Message(TProgram.Application,evCommand,cmOpen,nil);
             end;
           cmEditorOptions :
-            Message(Application,evCommand,cmEditorOptions,Self);
+            Message(TProgram.Application,evCommand,cmEditorOptions,Self);
           cmHelp :
             Message(Self,evCommand,cmHelpTopicSearch,Self);
           cmHelpTopicSearch :
@@ -2042,8 +2055,8 @@ procedure   TFPWindow.SelectInDebugSession;
 var
   F,PrevCurrent : PView;
 begin
-  DeskTop.Lock;
-  PrevCurrent:=Desktop.Current;
+  TProgram.DeskTop.Lock;
+  PrevCurrent:=TProgram.DeskTop.Current;
   F:=PrevCurrent;
   While assigned(F) and
     ((F.HelpCtx = hcGDBWindow) or
@@ -2058,21 +2071,21 @@ begin
     Select;
   if PrevCurrent<>F then
     Begin
-      Desktop.InsertBefore(Self,F);
+      TProgram.DeskTop.InsertBefore(Self,F);
       PrevCurrent.Select;
     End;
-  DeskTop.Unlock;
+  TProgram.DeskTop.Unlock;
 end;
 
 procedure TFPWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate :
           Update;
         cmSearchWindow+1..cmSearchWindow+99 :
-          if (Event.Command-cmSearchWindow=Number) then
+          if (Event.Message.Command-cmSearchWindow=Number) then
               ClearEvent(Event);
       end;
   end;
@@ -2080,16 +2093,17 @@ begin
 end;
 
 
-constructor TFPWindow.Load(S: TStream);
+function TFPWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  S.Read(AutoNumber,SizeOf(AutoNumber));
+  Result := Self;
+  inherited Read(Ip);
+  Ip.ReadBytes(AutoNumber,SizeOf(AutoNumber));
 end;
 
-procedure TFPWindow.Store(S: TStream);
+procedure TFPWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
-  S.Write(AutoNumber,SizeOf(AutoNumber));
+  inherited Write(Os);
+  Os.WriteBytes(AutoNumber,SizeOf(AutoNumber));
 end;
 
 function TFPHelpViewer.GetLocalMenu: PMenu;
@@ -2115,7 +2129,7 @@ end;
 
 function TFPHelpViewer.GetCommandTarget: PView;
 begin
-  GetCommandTarget:=Application;
+  GetCommandTarget:=TProgram.Application;
 end;
 
 constructor TFPHelpWindow.Create(var Bounds: TRect; ATitle: TTitleStr; ASourceFileID: word;
@@ -2136,7 +2150,7 @@ end;
 procedure TFPHelpWindow.InitHelpView;
 var R: TRect;
 begin
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   HelpView := TFPHelpViewer.Create(R, HSB, VSB);
   HelpView.GrowMode:=gfGrowHiX+gfGrowHiY;
 end;
@@ -2161,7 +2175,7 @@ end;
 procedure TFPHelpWindow.HandleEvent(var Event: TEvent);
 begin
   { run modally above a dialog (HelpModal): a window, unlike a dialog, does not end its own modal state }
-  if (Event.What=evCommand) and ((Event.Command=cmCancel) or (Event.Command=cmClose)) and GetState(sfModal) then
+  if (Event.What=evCommand) and ((Event.Message.Command=cmCancel) or (Event.Message.Command=cmClose)) and GetState(sfModal) then
     begin
       EndModal(cmCancel);
       ClearEvent(Event);
@@ -2169,11 +2183,11 @@ begin
     end;
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate :
           ReDraw;
         cmSearchWindow+1..cmSearchWindow+99 :
-          if (Event.Command-cmSearchWindow=Number) then
+          if (Event.Message.Command-cmSearchWindow=Number) then
               ClearEvent(Event);
       end;
   end;
@@ -2186,14 +2200,25 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TFPHelpWindow.Load(S: TStream);
+function TFPHelpWindow.Read(Ip: ipstream): Pointer;
+begin
+  Result := Self;
+  Abstract;
+end;
+
+procedure TFPHelpWindow.Write(Os: opstream);
 begin
   Abstract;
 end;
 
-procedure TFPHelpWindow.Store(S: TStream);
+class function TFPHelpWindow.Build: TStreamable;
 begin
-  Abstract;
+  Result := TFPHelpWindow.Create(streamableInit);
+end;
+
+function TFPHelpWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPHelpWindow';
 end;
 
 constructor TSourceWindow.Create(var Bounds: TRect; AFileName: string);
@@ -2205,15 +2230,15 @@ begin
   inherited Create(Bounds,AFileName,{SearchFreeWindowNo}0);
   AutoNumber:=true;
   Options:=Options or ofTileAble;
-  GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
+  R := GetExtent; R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.A.X:=R.B.X-1; R.Grow(0,-1);
+  R := GetExtent; R.A.X:=R.B.X-1; R.Grow(0,-1);
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
   Indicator := TIndicator.Create(R);
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   LoadFile:=(AFileName<>'') and (AFileName<>'*');
   if (AFileName='') then
     begin
@@ -2284,7 +2309,7 @@ var DontClear: boolean;
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate :
           Update;
         cmUpdateTitle :
@@ -2296,7 +2321,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmHide :
             Hide;
           cmSave :
@@ -2322,11 +2347,11 @@ begin
   Active:=GetState(sfActive);
   if Editor.IsClipboard=false then
   begin
-    SetCmdState(SourceCmds+CompileCmds,Active);
-    SetCmdState(EditorCmds,Active);
+    SetCmdState(CommandSetOf(SourceCmds+CompileCmds),Active);
+    SetCmdState(CommandSetOf(EditorCmds),Active);
   end;
-  SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,Active);
-  Message(Application,evBroadcast,cmCommandSetChanged,nil);
+  SetCmdState(CommandSetOf(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd),Active);
+  Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
 procedure TSourceWindow.Update;
@@ -2341,13 +2366,14 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TSourceWindow.Load(S: TStream);
+function TSourceWindow.Read(Ip: ipstream): Pointer;
 begin
-  Title:=S.ReadStr;
+  Result := Self;
+  Title:=Ip.ReadString;
   PushStatus(FormatStrStr(msg_loadingfile,GetStr(Title)));
-  inherited Load(S);
-  GetSubViewPtr(S,Indicator);
-  GetSubViewPtr(S,Editor);
+  inherited Read(Ip);
+  Indicator := TIndicator(Ip.ReadPointer);
+  Editor := TSourceEditor(Ip.ReadPointer);
 {$ifndef NODEBUG}
   If assigned(BreakpointsCollection) then
     BreakpointsCollection.ShowBreakpoints(Self);
@@ -2355,15 +2381,25 @@ begin
   PopStatus;
 end;
 
-procedure TSourceWindow.Store(S: TStream);
+procedure TSourceWindow.Write(Os: opstream);
 begin
-  S.WriteStr(Title);
+  Os.WriteString(Title);
   PushStatus(FormatStrStr(msg_storingfile,GetStr(Title)));
-  inherited Store(S);
+  inherited Write(Os);
 
-  PutSubViewPtr(S,Indicator);
-  PutSubViewPtr(S,Editor);
+  Os.WritePointer(Indicator);
+  Os.WritePointer(Editor);
   PopStatus;
+end;
+
+class function TSourceWindow.Build: TStreamable;
+begin
+  Result := TSourceWindow.Create(streamableInit);
+end;
+
+function TSourceWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TSourceWindow';
 end;
 
 
@@ -2376,7 +2412,7 @@ destructor TSourceWindow.Destroy;
 begin
   PushStatus(FormatStrStr(msg_closingfile,GetStr(Title)));
   if not IDEApp.IsClosing then
-    Message(Application,evBroadcast,cmSourceWndClosing,Self);
+    Message(TProgram.Application,evBroadcast,cmSourceWndClosing,Self);
   inherited Destroy;
   IDEApp.SourceWindowClosed;
 {  if not IDEApp.IsClosing then
@@ -2489,15 +2525,15 @@ begin
   Options:=Options or ofTileAble;
   AutoNumber:=true;
   HelpCtx:=hcGDBWindow;
-  GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
+  R := GetExtent; R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.A.X:=R.B.X-1; R.Grow(0,-1);
+  R := GetExtent; R.A.X:=R.B.X-1; R.Grow(0,-1);
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
   Indicator := TIndicator.Create(R);
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   Editor := TGDBSourceEditor.Create(R, HSB, VSB, Indicator, GDBOutputFile);
   Editor.GrowMode:=gfGrowHiX+gfGrowHiY;
   Editor.SetFlags(efInsertMode+efSyntaxHighlight+efNoIndent+efExpandAllTabs);
@@ -2528,7 +2564,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmSaveAs :
               Editor.SaveAs;
         else DontClear:=true;
@@ -2546,19 +2582,30 @@ begin
   inherited Destroy;
 end;
 
-constructor TGDBWindow.Load(S: TStream);
+function TGDBWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  GetSubViewPtr(S,Indicator);
-  GetSubViewPtr(S,Editor);
+  Result := Self;
+  inherited Read(Ip);
+  Indicator := TIndicator(Ip.ReadPointer);
+  Editor := TGDBSourceEditor(Ip.ReadPointer);
   GDBWindow:=Self;
 end;
 
-procedure TGDBWindow.Store(S: TStream);
+procedure TGDBWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
-  PutSubViewPtr(S,Indicator);
-  PutSubViewPtr(S,Editor);
+  inherited Write(Os);
+  Os.WritePointer(Indicator);
+  Os.WritePointer(Editor);
+end;
+
+class function TGDBWindow.Build: TStreamable;
+begin
+  Result := TGDBWindow.Create(streamableInit);
+end;
+
+function TGDBWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TGDBWindow';
 end;
 
 function TGDBWindow.GetPalette: TPalette;
@@ -2594,7 +2641,7 @@ procedure TGDBWindow.WriteText(Buf : pchar;IsError : boolean);
       s : string;
 begin
   p:=buf;
-  DeskTop.Lock;
+  TProgram.DeskTop.Lock;
   While assigned(p) and (p^<>#0) do
     begin
        pe:=strscan(p,#10);
@@ -2624,7 +2671,7 @@ begin
            inc(p);
          end;
     end;
-  DeskTop.Unlock;
+  TProgram.DeskTop.Unlock;
   Editor.Draw;
 end;
 
@@ -2632,10 +2679,10 @@ procedure TGDBWindow.UpdateCommands;
 var Active: boolean;
 begin
   Active:=GetState(sfActive);
-  SetCmdState([cmSaveAs,cmHide,cmRun],Active);
-  SetCmdState(EditorCmds,Active);
-  SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,Active);
-  Message(Application,evBroadcast,cmCommandSetChanged,nil);
+  SetCmdState(CommandSetOf([cmSaveAs,cmHide,cmRun]),Active);
+  SetCmdState(CommandSetOf(EditorCmds),Active);
+  SetCmdState(CommandSetOf(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd),Active);
+  Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
 
@@ -2671,7 +2718,7 @@ procedure TDisassemblyEditor.ReleaseSource;
 begin
   if OwnsSource and assigned(source) then
     begin
-      Desktop.Delete(Source);
+      TProgram.DeskTop.Delete(Source);
       Source.Free;
     end;
   OwnsSource:=false;
@@ -2759,15 +2806,15 @@ begin
   Options:=Options or ofTileAble;
   AutoNumber:=true;
   HelpCtx:=hcDisassemblyWindow;
-  GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
+  R := GetExtent; R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.A.X:=R.B.X-1; R.Grow(0,-1);
+  R := GetExtent; R.A.X:=R.B.X-1; R.Grow(0,-1);
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
   Indicator := TIndicator.Create(R);
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   Editor := TDisassemblyEditor.Create(R, HSB, VSB, nil, GDBOutputFile);
   Insert(Editor);
   DisassemblyWindow:=Self;
@@ -2928,10 +2975,10 @@ procedure TDisassemblyWindow.UpdateCommands;
 var Active: boolean;
 begin
   Active:=GetState(sfActive);
-  SetCmdState(SourceCmds+CompileCmds,Active);
-  SetCmdState(EditorCmds,Active);
-  SetCmdState(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd,false);
-  Message(Application,evBroadcast,cmCommandSetChanged,nil);
+  SetCmdState(CommandSetOf(SourceCmds+CompileCmds),Active);
+  SetCmdState(CommandSetOf(EditorCmds),Active);
+  SetCmdState(CommandSetOf(ToClipCmds+FromClipCmds+NulClipCmds+UndoCmd+RedoCmd),false);
+  Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
 end;
 
 
@@ -2955,22 +3002,22 @@ constructor TClipboardWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  Desktop.GetExtent(R);
+  R := TProgram.DeskTop.GetExtent;
   inherited Create(R, '*');
   SetTitle(dialog_clipboard);
   HelpCtx:=hcClipboardWindow;
   Number:=wnNoNumber;
   AutoNumber:=true;
 
-  GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
+  R := GetExtent; R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.A.X:=R.B.X-1; R.Grow(0,-1);
+  R := GetExtent; R.A.X:=R.B.X-1; R.Grow(0,-1);
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
   Indicator := TIndicator.Create(R);
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   Editor := TSourceEditor.Create(R, HSB, VSB, Indicator, '');
   Editor.GrowMode:=gfGrowHiX+gfGrowHiY;
   Insert(Editor);
@@ -2986,16 +3033,27 @@ begin
   Hide;
 end;
 
-constructor TClipboardWindow.Load(S: TStream);
+function TClipboardWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 
   Clipboard:=Editor;
 end;
 
-procedure TClipboardWindow.Store(S: TStream);
+procedure TClipboardWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
+end;
+
+class function TClipboardWindow.Build: TStreamable;
+begin
+  Result := TClipboardWindow.Create(streamableInit);
+end;
+
+function TClipboardWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TClipboardWindow';
 end;
 
 destructor TClipboardWindow.Destroy;
@@ -3036,7 +3094,7 @@ begin
   OldState:=State;
   inherited SetState(AState,Enable);
   if ((AState and sfActive)<>0) and (((OldState xor State) and sfActive)<>0) then
-    SetCmdState([cmSaveAs],Enable);
+    SetCmdState(CommandSetOf([cmSaveAs]),Enable);
 end;
 
 
@@ -3047,7 +3105,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEnter :
             begin
               Message(Self,evCommand,cmMsgGotoSource,nil);
@@ -3061,15 +3119,15 @@ begin
           ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Pointer(Self) then
+          if Event.Message.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmMsgTrackSource,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmMsgGotoSource :
             if Range>0 then
               begin
@@ -3097,7 +3155,7 @@ end;
 procedure TMessageListBox.AddItem(P: PMessageItem);
 var W : integer;
 begin
-  if List=nil then List := TCollection.Create(500,500);
+  if List=nil then Items := TCollection.Create(500,500);
   W:=length(P.GetText(255));
   if W>MaxWidth then
   begin
@@ -3135,12 +3193,12 @@ procedure TMessageListBox.Clear;
 begin
   if assigned(List) then
     List.Free;
-  List:=nil;
+  Items:=nil;
   MaxWidth:=0;
   if assigned(ModuleNames) then
     ModuleNames.FreeAll;
   SetRange(0); DrawView;
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
 end;
 
 procedure TMessageListBox.TrackSource;
@@ -3150,11 +3208,11 @@ var W: PSourceWindow;
     Row,Col: sw_integer;
     Found : boolean;
 begin
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
   if Range=0 then Exit;
   P:=TMessageItem(List.At(Focused));
   if P.Row=0 then Exit;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   GetNextEditorBounds(R);
   R.B.Y:=Owner.Origin.Y;
   if P.Row>0 then Row:=P.Row-1 else Row:=0;
@@ -3162,7 +3220,7 @@ begin
   W:=EditorWindowFile(P.GetModuleName);
   if assigned(W) then
     begin
-      W.GetExtent(R);
+      R := W.GetExtent;
       R.B.Y:=Owner.Origin.Y;
       W.ChangeBounds(R);
       W.Editor.SetCurPtr(Col,Row);
@@ -3172,11 +3230,11 @@ begin
   { Try to find it by browsing }
   if W=nil then
     begin
-      Desktop.UnLock;
+      TProgram.DeskTop.UnLock;
       Found:=IDEApp.OpenSearch(P.GetModuleName+'*');
       if found then
         W:=TryToOpenFile(nil,P.GetModuleName,Col,Row,true);
-      Desktop.Lock;
+      TProgram.DeskTop.Lock;
     end;
   if W<>nil then
     begin
@@ -3186,7 +3244,7 @@ begin
     end;
   if Assigned(Owner) then
     Owner.Select;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
 end;
 
 procedure TMessageListBox.GotoSource;
@@ -3197,17 +3255,17 @@ var W: PSourceWindow;
     Found : boolean;
     Event : TEvent;
 begin
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
   if Range=0 then Exit;
   P:=TMessageItem(List.At(Focused));
   if P.Row=0 then Exit;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   if P.Row>0 then Row:=P.Row-1 else Row:=0;
   if P.Col>0 then Col:=P.Col-1 else Col:=0;
   W:=EditorWindowFile(P.GetModuleName);
   if assigned(W) then
     begin
-      W.GetExtent(R);
+      R := W.GetExtent;
       if Owner.Origin.Y>R.A.Y+4 then
         R.B.Y:=Owner.Origin.Y;
       W.ChangeBounds(R);
@@ -3218,11 +3276,11 @@ begin
   { Try to find it by browsing }
   if W=nil then
     begin
-      Desktop.UnLock;
+      TProgram.DeskTop.UnLock;
       Found:=IDEApp.OpenSearch(P.GetModuleName+'*');
       if found then
         W:=TryToOpenFile(nil,P.GetModuleName,Col,Row,true);
-      Desktop.Lock;
+      TProgram.DeskTop.Lock;
     end;
   if assigned(W) then
     begin
@@ -3230,18 +3288,18 @@ begin
         This calls close on StackWindow
         rendering P invalid
         so postpone it PM }
-      W.GetExtent(R);
+      R := W.GetExtent;
       if (P.TClass<>0) then
         W.Editor.SetErrorMessage(P.GetText(R.B.X-R.A.X));
       W.Select;
       Owner.Hide;
     end;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
   if assigned(W) then
     begin
       Event.What:=evCommand;
-      Event.command:=cmClose;
-      Event.InfoPtr:=nil;
+      Event.Message.Command:=cmClose;
+      Event.Message.InfoPtr:=nil;
       fpide.PutEvent(Owner,Event);
     end;
 end;
@@ -3316,29 +3374,40 @@ begin
   end;
 end;
 
-constructor TMessageListBox.Load(S: TStream);
+function TMessageListBox.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
   ModuleNames := TStoreCollection.Create(50,100);
   NoSelection:=true;
 end;
 
-procedure TMessageListBox.Store(S: TStream);
+procedure TMessageListBox.Write(Os: opstream);
 var OL: PCollection;
     ORV: sw_integer;
 begin
   OL:=List; ORV:=Range;
 
-  List := TCollection.Create(1,1); Range:=0;
+  Items := TCollection.Create(1,1); Range:=0;
 
-  inherited Store(S);
+  inherited Write(Os);
 
   List.Free;
-  List:=OL; Range:=ORV;
+  Items:=OL; Range:=ORV;
   { ^^^ nasty trick - has anyone a better idea how to avoid storing the
     collection? Pasting here a modified version of TListBox.Store+
     TAdvancedListBox.Store isn't a better solution, since by eventually
     changing the obj-hierarchy you'll always have to modify this, too - BG }
+end;
+
+class function TMessageListBox.Build: TStreamable;
+begin
+  Result := TMessageListBox.Create(streamableInit);
+end;
+
+function TMessageListBox.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TMessageListBox';
 end;
 
 destructor TMessageListBox.Destroy;
@@ -3388,9 +3457,9 @@ procedure  TFPDlgWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmSearchWindow+1..cmSearchWindow+99 :
-          if (Event.Command-cmSearchWindow=Number) then
+          if (Event.Message.Command-cmSearchWindow=Number) then
               ClearEvent(Event);
       end;
   end;
@@ -3551,7 +3620,7 @@ end;
 begin
   if (Event.What and evMouseDown)<>0 then
      begin
-       MakeLocal(Event.Where,P);
+       P := MakeLocal(Event.Mouse.Where);
        if P.Y<3 then
           begin
             Index:=-1; X:=1;
@@ -3568,10 +3637,10 @@ begin
   if Event.What=evKeyDown then
      begin
        Index:=-1;
-       case Event.KeyCode of
+       case Event.KeyDown.KeyCode of
             kbCtrlTab :
               begin
-                SelectNextTab((Event.ControlKeyState and kbShift)=0);
+                SelectNextTab((Event.KeyDown.ControlKeyState and kbShift)=0);
                 ClearEvent(Event);
               end;
             kbTab,kbShiftTab  :
@@ -3580,24 +3649,24 @@ begin
                    if Current<>nil then
                    begin
                    LastV:=LastSelectable; FirstV:=FirstSelectable;
-                   if ((Current=LastV) or (Current=PLabel(LastV).Link)) and (Event.KeyCode=kbShiftTab) then
+                   if ((Current=LastV) or (Current=PLabel(LastV).Link)) and (Event.KeyDown.KeyCode=kbShiftTab) then
                       begin
                         if Owner<>nil then Owner.SelectNext(true);
                       end else
-                   if ((Current=FirstV) or (Current=PLabel(FirstV).Link)) and (Event.KeyCode=kbTab) then
+                   if ((Current=FirstV) or (Current=PLabel(FirstV).Link)) and (Event.KeyDown.KeyCode=kbTab) then
                       begin
                         Lock;
                         if Owner<>nil then Owner.SelectNext(false);
                         UnLock;
                       end else
-                   SelectNext(Event.KeyCode=kbShiftTab);
+                   SelectNext(Event.KeyDown.KeyCode=kbShiftTab);
                    ClearEvent(Event);
                    end;
                  end;
        else
        for I:=0 to DefCount-1 do
            begin
-             if Upcase(GetAltChar(Event.KeyCode))=AtTab(I).ShortCut
+             if Upcase(GetAltChar(Event.KeyDown.KeyCode))=AtTab(I).ShortCut
                 then begin
                        Index:=I;
                        ClearEvent(Event);
@@ -3616,7 +3685,7 @@ begin
   CallOrig:=true;
   if Event.What=evKeyDown then
      begin
-     if ((Owner<>nil) and (Owner.Phase=phPostProcess) and (GetAltChar(Event.KeyCode)<>#0)) or GetState(sfFocused)
+     if ((Owner<>nil) and (Owner.Phase=phPostProcess) and (GetAltChar(Event.KeyDown.KeyCode)<>#0)) or GetState(sfFocused)
         then
         else CallOrig:=false;
      end;
@@ -3625,7 +3694,7 @@ end;
 
 function TTab.GetPalette: TPalette;
 begin
-  GetPalette:=nil;
+  GetPalette:=Default(TPalette);
 end;
 
 procedure TTab.Draw;
@@ -3733,9 +3802,9 @@ begin
   end;
   if Buffer <> nil then WriteBufC(0, 0, Size.X, Size.Y, Buffer^) else
   begin
-    GetClipRect(ClipR);
+    ClipR := GetClipRect;
     Redraw;
-    GetExtent(ClipR);
+    ClipR := GetExtent;
   end;
   { - End of TGroup.Draw - }
   InDraw:=false;
@@ -3808,7 +3877,7 @@ procedure TScreenView.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate  : Update;
       end;
   end;
@@ -3841,16 +3910,16 @@ constructor TScreenWindow.Create(AScreen: PScreen; ANumber: integer);
 var R: TRect;
     VSB,HSB: PScrollBar;
 begin
-  Desktop.GetExtent(R);
+  R := TProgram.DeskTop.GetExtent;
   inherited Create(R, dialog_userscreen, ANumber);
   Options:=Options or ofTileAble;
-  GetExtent(R); R.Grow(-1,-1); R.Move(1,0); R.A.X:=R.B.X-1;
+  R := GetExtent; R.Grow(-1,-1); R.Move(1,0); R.A.X:=R.B.X-1;
   VSB := TScrollBar.Create(R); VSB.Options:=VSB.Options or ofPostProcess;
   VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.Grow(-1,-1); R.Move(0,1); R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.Grow(-1,-1); R.Move(0,1); R.A.Y:=R.B.Y-1;
   HSB := TScrollBar.Create(R); HSB.Options:=HSB.Options or ofPostProcess;
   HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   ScreenView := TScreenView.Create(R, HSB, VSB, AScreen);
   ScreenView.GrowMode:=gfGrowHiX+gfGrowHiY;
   Insert(ScreenView);
@@ -3872,10 +3941,10 @@ begin
   if Action<>acNone then
   begin
     E:=Event;
-    E.What:=evMouseDown; E.Buttons:=mbLeftButton;
+    E.What:=evMouseDown; E.Mouse.Buttons:=mbLeftButton;
     View.HandleEvent(E);
     Event.What:=evCommand;
-    Event.Command:=ActionCommands[Action];
+    Event.Message.Command:=ActionCommands[Action];
   end;
 end;
 begin
@@ -3883,9 +3952,9 @@ begin
   InTranslate:=true;
   case Event.What of
     evMouseDown :
-      if (Event.ControlKeyState and kbAltShift)<>0 then
+      if (Event.KeyDown.ControlKeyState and kbAltShift)<>0 then
         TranslateAction(AltMouseAction) else
-      if (Event.ControlKeyState and kbCtrlShift)<>0 then
+      if (Event.KeyDown.ControlKeyState and kbCtrlShift)<>0 then
         TranslateAction(CtrlMouseAction);
   end;
   InTranslate:=false;
@@ -3894,20 +3963,20 @@ end;
 function GetNextEditorBounds(var Bounds: TRect): boolean;
 var P: PView;
 begin
-  P:=Desktop.Current;
+  P:=TProgram.DeskTop.Current;
   while P<>nil do
   begin
     if P.HelpCtx=hcSourceWindow then Break;
     P:=P.NextView;
-    if P=Desktop.Current then
+    if P=TProgram.DeskTop.Current then
       begin
         P:=nil;
         break;
       end;
   end;
-  if P=nil then Desktop.GetExtent(Bounds) else
+  if P=nil then Bounds := TProgram.DeskTop.GetExtent else
      begin
-       P.GetBounds(Bounds);
+       Bounds := P.GetBounds;
        Inc(Bounds.A.X); Inc(Bounds.A.Y);
      end;
   GetNextEditorBounds:=P<>nil;
@@ -3917,7 +3986,7 @@ function IOpenEditorWindow(Bounds: PRect; FileName: string; CurX,CurY: sw_intege
 var R: TRect;
     W: PSourceWindow;
 begin
-  if Assigned(Bounds) then R.Copy(Bounds^) else
+  if Assigned(Bounds) then R := Bounds^ else
     GetNextEditorBounds(R);
   PushStatus(FormatStrStr(msg_openingsourcefile,SmartPath(FileName)));
   W := TSourceWindow.Create(R, FileName);
@@ -3932,7 +4001,7 @@ begin
          TrackCursor(do_centre);
        end;
     W.HelpCtx:=hcSourceWindow;
-    Desktop.Insert(W);
+    TProgram.DeskTop.Insert(W);
     { this makes loading a lot slower and is not needed as far as I can see (FK)
     Message(Application,evBroadcast,cmUpdate,nil);
     }
@@ -3959,7 +4028,7 @@ function LastSourceEditor : PSourceWindow;
   end;
 
 begin
-  LastSourceEditor:=PSourceWindow(Desktop.FirstThat(@IsSearchedSource));
+  LastSourceEditor:=PSourceWindow(TProgram.DeskTop.FirstThat(@IsSearchedSource));
 end;
 
 
@@ -4010,7 +4079,7 @@ end;
 
 begin
   SplitPath(FileName,D,N,E);
-  SearchOnDesktop:=PSourceWindow(Desktop.FirstThat(@IsSearchedSource));
+  SearchOnDesktop:=PSourceWindow(TProgram.DeskTop.FirstThat(@IsSearchedSource));
 end;
 
 function TryToOpenFile(Bounds: PRect; FileName: string; CurX,CurY: sw_integer;tryexts:boolean): PSourceWindow;
@@ -4150,7 +4219,7 @@ var OK: boolean;
     E: PFileEditor;
     R: TRect;
 begin
-  R.Assign(0,0,0,0);
+  R := TRect.Create(0, 0, 0, 0);
   E := TFileEditor.Create(R,nil,nil,nil,nil,FileName);
   OK:=E<>nil;
   if OK then
@@ -4274,11 +4343,11 @@ begin
   C.Insert(NewStr(S));
 end;
 begin
-  R.Assign(0,0,58,14{$ifdef USE_GRAPH_SWITCH}+1{$endif});
+  R := TRect.Create(0, 0, 58, 14{$ifdef USE_GRAPH_SWITCH}+1{$endif});
   inherited Create(R, dialog_about);
   HelpCtx:=hcAbout;
-  GetExtent(R); R.Grow(-3,-2);
-  R2.Copy(R); R2.B.Y:=R2.A.Y+1;
+  R := GetExtent; R.Grow(-3,-2);
+  R2 := R; R2.B.Y:=R2.A.Y+1;
   Insert(TStaticText.Create(R2, ^C'Free Pascal IDE for '+source_info.name));
   R2.Move(0,1);
   Insert(TStaticText.Create(R2, ^C'Target CPU: '+target_cpu_string));
@@ -4348,7 +4417,7 @@ begin
   AddLine(^C'Nikolay Nikolov');
   AddLine('');
 
-  GetExtent(R);
+  R := GetExtent;
   R.Grow(-1,-1); Inc(R.A.Y,3);
   Scroller := TTextScroller.Create(R, 10, C);
   Scroller.Hide;
@@ -4381,7 +4450,7 @@ procedure TFPAboutDialog.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evKeyDown :
-      case Event.KeyCode of
+      case Event.KeyDown.KeyCode of
         kbAltI : { just like in BP }
           begin
             ToggleInfo;
@@ -4401,14 +4470,25 @@ begin
   ASCIIChart:=Self;
 end;
 
-procedure TFPASCIIChart.Store(S: TStream);
+procedure TFPASCIIChart.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 end;
 
-constructor TFPASCIIChart.Load(S: TStream);
+function TFPASCIIChart.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
+end;
+
+class function TFPASCIIChart.Build: TStreamable;
+begin
+  Result := TFPASCIIChart.Create(streamableInit);
+end;
+
+function TFPASCIIChart.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPASCIIChart';
 end;
 
 procedure TFPASCIIChart.HandleEvent(var Event: TEvent);
@@ -4417,7 +4497,7 @@ begin
   {writeln(stderr,'all what=',event.what,' cmd=', event.command);}
   case Event.What of
     evKeyDown :
-      case Event.KeyCode of
+      case Event.KeyDown.KeyCode of
         kbEsc :
           begin
             Close;
@@ -4427,15 +4507,15 @@ begin
     evCommand :
       begin
       {writeln(stderr,'fpascii what=',event.what, ' cmd=', event.command, ' ',cmtransfer,' ',cmsearchwindow);}
-      if Event.Command=AsciiCommandBase+acPicked then
+      if Event.Message.Command=AsciiCommandBase+acPicked then
           begin
             W:=FirstEditorWindow;
             if Assigned(W) and Assigned(Report) then
-              Message(W,evCommand,cmAddChar,Event.InfoPtr);
+              Message(W,evCommand,cmAddChar,Event.Message.InfoPtr);
             ClearEvent(Event);
           end
       else
-      case Event.Command of
+      case Event.Message.Command of
         cmTransfer :
           begin
             W:=FirstEditorWindow;
@@ -4445,7 +4525,7 @@ begin
           end;
 
         cmSearchWindow+1..cmSearchWindow+99 :
-          if (Event.Command-cmSearchWindow=Number) then
+          if (Event.Message.Command-cmSearchWindow=Number) then
               ClearEvent(Event);
       end;
       end;
@@ -4482,14 +4562,25 @@ begin
   inherited InitBackground;
 end;
 
-constructor TFPDesktop.Load(S: TStream);
+function TFPDesktop.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 end;
 
-procedure TFPDesktop.Store(S: TStream);
+procedure TFPDesktop.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
+end;
+
+class function TFPDesktop.Build: TStreamable;
+begin
+  Result := TFPDesktop.Create(streamableInit);
+end;
+
+function TFPDesktop.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPDesktop';
 end;
 
 constructor TFPToolTip.Create(var Bounds: TRect; const AText: string; AAlign: TAlign);
@@ -4578,11 +4669,11 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEsc:
             begin
               Event.What:=evCommand;
-              Event.Command:=cmCancel;
+              Event.Message.Command:=cmCancel;
               PutEvent(Event);
             end;
         else DontClear:=true;
@@ -4708,226 +4799,117 @@ begin
 end;
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RSourceEditor(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TSourceEditor.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RSourceEditor(P: TStreamable; S: TStream);
-begin
-  TSourceEditor(Pointer(P)).Store(S);
-end;
 
-function Build_RSourceWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TSourceWindow.Load(S)));
-end;
 
-procedure Store_RSourceWindow(P: TStreamable; S: TStream);
-begin
-  TSourceWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RFPHelpViewer(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPHelpViewer.Load(S)));
-end;
 
-procedure Store_RFPHelpViewer(P: TStreamable; S: TStream);
-begin
-  TFPHelpViewer(Pointer(P)).Store(S);
-end;
 
-function Build_RFPHelpWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPHelpWindow.Load(S)));
-end;
 
-procedure Store_RFPHelpWindow(P: TStreamable; S: TStream);
-begin
-  TFPHelpWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RClipboardWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TClipboardWindow.Load(S)));
-end;
 
-procedure Store_RClipboardWindow(P: TStreamable; S: TStream);
-begin
-  TClipboardWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RMessageListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TMessageListBox.Load(S)));
-end;
 
-procedure Store_RMessageListBox(P: TStreamable; S: TStream);
-begin
-  TMessageListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RFPDesktop(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPDesktop.Load(S)));
-end;
 
-procedure Store_RFPDesktop(P: TStreamable; S: TStream);
-begin
-  TFPDesktop(Pointer(P)).Store(S);
-end;
 
-function Build_RFPASCIIChart(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPASCIIChart.Load(S)));
-end;
 
-procedure Store_RFPASCIIChart(P: TStreamable; S: TStream);
-begin
-  TFPASCIIChart(Pointer(P)).Store(S);
-end;
 
-function Build_RFPDlgWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFPDlgWindow.Load(S)));
-end;
 
-procedure Store_RFPDlgWindow(P: TStreamable; S: TStream);
-begin
-  TFPDlgWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RGDBWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TGDBWindow.Load(S)));
-end;
 
-procedure Store_RGDBWindow(P: TStreamable; S: TStream);
-begin
-  TGDBWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RGDBSourceEditor(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TGDBSourceEditor.Load(S)));
-end;
 
-procedure Store_RGDBSourceEditor(P: TStreamable; S: TStream);
-begin
-  TGDBSourceEditor(Pointer(P)).Store(S);
-end;
 
-function Build_RDisassemblyEditor(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TDisassemblyEditor.Load(S)));
-end;
 
-procedure Store_RDisassemblyEditor(P: TStreamable; S: TStream);
-begin
-  TDisassemblyEditor(Pointer(P)).Store(S);
-end;
 
-function Build_RDisassemblyWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TDisassemblyWindow.Load(S)));
-end;
 
-procedure Store_RDisassemblyWindow(P: TStreamable; S: TStream);
-begin
-  TDisassemblyWindow(Pointer(P)).Store(S);
-end;
 
-procedure FillStreamRecs_fpviews;
+procedure RegisterStreamables_fpviews;
 begin
-  RSourceEditor.ObjType := 1500;
-  RSourceEditor.VmtLink := PtrUInt(System.TClass(TSourceEditor));
-  RSourceEditor.Load := @Build_RSourceEditor;
-  RSourceEditor.Store := @Store_RSourceEditor;
-  RSourceEditor.Next := nil;
-  RSourceWindow.ObjType := 1501;
-  RSourceWindow.VmtLink := PtrUInt(System.TClass(TSourceWindow));
-  RSourceWindow.Load := @Build_RSourceWindow;
-  RSourceWindow.Store := @Store_RSourceWindow;
-  RSourceWindow.Next := nil;
-  RFPHelpViewer.ObjType := 1502;
-  RFPHelpViewer.VmtLink := PtrUInt(System.TClass(TFPHelpViewer));
-  RFPHelpViewer.Load := @Build_RFPHelpViewer;
-  RFPHelpViewer.Store := @Store_RFPHelpViewer;
-  RFPHelpViewer.Next := nil;
-  RFPHelpWindow.ObjType := 1503;
-  RFPHelpWindow.VmtLink := PtrUInt(System.TClass(TFPHelpWindow));
-  RFPHelpWindow.Load := @Build_RFPHelpWindow;
-  RFPHelpWindow.Store := @Store_RFPHelpWindow;
-  RFPHelpWindow.Next := nil;
-  RClipboardWindow.ObjType := 1504;
-  RClipboardWindow.VmtLink := PtrUInt(System.TClass(TClipboardWindow));
-  RClipboardWindow.Load := @Build_RClipboardWindow;
-  RClipboardWindow.Store := @Store_RClipboardWindow;
-  RClipboardWindow.Next := nil;
-  RMessageListBox.ObjType := 1505;
-  RMessageListBox.VmtLink := PtrUInt(System.TClass(TMessageListBox));
-  RMessageListBox.Load := @Build_RMessageListBox;
-  RMessageListBox.Store := @Store_RMessageListBox;
-  RMessageListBox.Next := nil;
-  RFPDesktop.ObjType := 1506;
-  RFPDesktop.VmtLink := PtrUInt(System.TClass(TFPDesktop));
-  RFPDesktop.Load := @Build_RFPDesktop;
-  RFPDesktop.Store := @Store_RFPDesktop;
-  RFPDesktop.Next := nil;
-  RFPASCIIChart.ObjType := 1509;
-  RFPASCIIChart.VmtLink := PtrUInt(System.TClass(TFPASCIIChart));
-  RFPASCIIChart.Load := @Build_RFPASCIIChart;
-  RFPASCIIChart.Store := @Store_RFPASCIIChart;
-  RFPASCIIChart.Next := nil;
-  RFPDlgWindow.ObjType := 1511;
-  RFPDlgWindow.VmtLink := PtrUInt(System.TClass(TFPDlgWindow));
-  RFPDlgWindow.Load := @Build_RFPDlgWindow;
-  RFPDlgWindow.Store := @Store_RFPDlgWindow;
-  RFPDlgWindow.Next := nil;
-  RGDBWindow.ObjType := 1508;
-  RGDBWindow.VmtLink := PtrUInt(System.TClass(TGDBWindow));
-  RGDBWindow.Load := @Build_RGDBWindow;
-  RGDBWindow.Store := @Store_RGDBWindow;
-  RGDBWindow.Next := nil;
-  RGDBSourceEditor.ObjType := 1507;
-  RGDBSourceEditor.VmtLink := PtrUInt(System.TClass(TGDBSourceEditor));
-  RGDBSourceEditor.Load := @Build_RGDBSourceEditor;
-  RGDBSourceEditor.Store := @Store_RGDBSourceEditor;
-  RGDBSourceEditor.Next := nil;
-  RDisassemblyEditor.ObjType := 1512;
-  RDisassemblyEditor.VmtLink := PtrUInt(System.TClass(TDisassemblyEditor));
-  RDisassemblyEditor.Load := @Build_RDisassemblyEditor;
-  RDisassemblyEditor.Store := @Store_RDisassemblyEditor;
-  RDisassemblyEditor.Next := nil;
-  RDisassemblyWindow.ObjType := 1513;
-  RDisassemblyWindow.VmtLink := PtrUInt(System.TClass(TDisassemblyWindow));
-  RDisassemblyWindow.Load := @Build_RDisassemblyWindow;
-  RDisassemblyWindow.Store := @Store_RDisassemblyWindow;
-  RDisassemblyWindow.Next := nil;
+  TStreamableClass.Create('fpviews.TSourceEditor', @TSourceEditor.Build);
+  TStreamableClass.Create('fpviews.TSourceWindow', @TSourceWindow.Build);
+  TStreamableClass.Create('fpviews.TFPHelpViewer', @TFPHelpViewer.Build);
+  TStreamableClass.Create('fpviews.TFPHelpWindow', @TFPHelpWindow.Build);
+  TStreamableClass.Create('fpviews.TClipboardWindow', @TClipboardWindow.Build);
+  TStreamableClass.Create('fpviews.TMessageListBox', @TMessageListBox.Build);
+  TStreamableClass.Create('fpviews.TFPDesktop', @TFPDesktop.Build);
+  TStreamableClass.Create('fpviews.TFPASCIIChart', @TFPASCIIChart.Build);
+  TStreamableClass.Create('fpviews.TFPDlgWindow', @TFPDlgWindow.Build);
+  TStreamableClass.Create('fpviews.TGDBWindow', @TGDBWindow.Build);
+  TStreamableClass.Create('fpviews.TGDBSourceEditor', @TGDBSourceEditor.Build);
+  TStreamableClass.Create('fpviews.TDisassemblyEditor', @TDisassemblyEditor.Build);
+  TStreamableClass.Create('fpviews.TDisassemblyWindow', @TDisassemblyWindow.Build);
 end;
 
 {$endif}
 
 procedure RegisterFPViews;
 begin
-  FillStreamRecs_fpviews;
-  RegisterType(RSourceEditor);
-  RegisterType(RSourceWindow);
-  RegisterType(RFPHelpViewer);
-  RegisterType(RFPHelpWindow);
-  RegisterType(RClipboardWindow);
-  RegisterType(RMessageListBox);
-  RegisterType(RFPDesktop);
-  RegisterType(RFPASCIIChart);
-  RegisterType(RFPDlgWindow);
-{$ifndef NODEBUG}
-  FillStreamRecs_fpviews;
-  RegisterType(RGDBWindow);
-  RegisterType(RGDBSourceEditor);
-{$endif NODEBUG}
+  RegisterStreamables_fpviews;
 end;
 
+
+
+class function TDisassemblyEditor.Build: TStreamable;
+begin
+  Result := TDisassemblyEditor.Create(streamableInit);
+end;
+
+function TDisassemblyEditor.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TDisassemblyEditor';
+end;
+
+class function TDisassemblyWindow.Build: TStreamable;
+begin
+  Result := TDisassemblyWindow.Create(streamableInit);
+end;
+
+function TDisassemblyWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TDisassemblyWindow';
+end;
+
+class function TFPDlgWindow.Build: TStreamable;
+begin
+  Result := TFPDlgWindow.Create(streamableInit);
+end;
+
+function TFPDlgWindow.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPDlgWindow';
+end;
+
+class function TFPHelpViewer.Build: TStreamable;
+begin
+  Result := TFPHelpViewer.Create(streamableInit);
+end;
+
+function TFPHelpViewer.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TFPHelpViewer';
+end;
+
+class function TGDBSourceEditor.Build: TStreamable;
+begin
+  Result := TGDBSourceEditor.Create(streamableInit);
+end;
+
+function TGDBSourceEditor.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TGDBSourceEditor';
+end;
+
+class function TSourceEditor.Build: TStreamable;
+begin
+  Result := TSourceEditor.Create(streamableInit);
+end;
+
+function TSourceEditor.StreamableName: ShortString;
+begin
+  Result := 'fpviews.TSourceEditor';
+end;
 
 END.

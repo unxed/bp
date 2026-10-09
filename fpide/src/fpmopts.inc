@@ -19,24 +19,24 @@ var R,R2: TRect;
     RB: PRadioButtons;
     i : TSwitchMode;
     SwitchesCount : integer;
-    LastItem: PSItem;
+    LastItem: TSItem;
     L: longint;
 begin
   SwitchesCount:=ord(high(TSwitchMode))-ord(low(TSwitchMode))+1;
-  R.Assign(0,0,36,4+SwitchesCount);
+  R := TRect.Create(0, 0, 36, 4+SwitchesCount);
   D := TCenterDialog.Create(R, dialog_switchesmode);
   with D do
   begin
     HelpCtx:=hcSwitchesMode;
-    GetExtent(R);
+    R := GetExtent;
     R.Grow(-3,-1);
     Inc(R.A.Y);
-    R2.Copy(R);
+    R2 := R;
     Inc(R2.A.Y);
     R2.B.Y:=R2.A.Y+SwitchesCount;
     LastItem:=nil;
     for I:=high(TSwitchMode) downto low(TSwitchMode) do
-      LastItem:=NewSItem(SwitchesModeName[I], LastItem);
+      LastItem:=TSItem.Create(SwitchesModeName[I], LastItem);
     RB := TRadioButtons.Create(R2, LastItem);
     L:=ord(SwitchesMode);
     { ^^^ this is necessary, since TRadioButtons.GetData() reads a full
@@ -46,7 +46,7 @@ begin
       zero, then we will select some items outside the actual ones... }
     RB.SetData(L);
     Insert(RB);
-    R2.Copy(R);
+    R2 := R;
     R2.B.Y:=R2.A.Y+1;
     Insert(TLabel.Create(R2, static_switchesmode_switchesmode, RB));
   end;
@@ -64,7 +64,7 @@ var R,R2,R3,TabR,TabIR: TRect;
     D: PCenterDialog;
     CB1,CB2,CB3,CB4,CB5: PCheckBoxes;
     RB1,RB1b,RB2,RB4,RB5,RB6: PRadioButtons;
-    Items: PSItem;
+    Items: TSItem;
     IL: PEditorInputLine;
     IL2: PEditorInputLine;
     Count : integer;
@@ -75,30 +75,30 @@ var R,R2,R3,TabR,TabIR: TRect;
     Label31,Label41,
     Label51,Label52,Label53: PLabel;
 begin
-  R.Assign(0,0,76,31);
+  R := TRect.Create(0, 0, 76, 31);
   D := TCenterDialog.Create(R, dialog_compilerswitches);
   with D do
   begin
     HelpCtx:=hcCompilerNoAltX;
-    GetExtent(R);
+    R := GetExtent;
     R.Grow(-2,-1);
     Dec(R.B.Y,2);
-    TabR.Copy(R);
+    TabR := R;
     Dec(TabR.B.Y,2);
-    TabIR.Copy(R);
+    TabIR := R;
     Inc(TabIR.A.Y,2);
     TabIR.Grow(0,-1);
 
     { --- Sheet 1 --- }
     Count:=SyntaxSwitches.ItemCount;
-    R.Copy(TabIR);
-    R2.Copy(R);
+    R := TabIR;
+    R2 := R;
     R2.B.X:=(R2.A.X+(R2.B.X-R2.A.X) div 2)-3;{ R2.B.X:=R2.B.X-4;}
 {    R2.B.Y:=R2.A.Y+((Count+1) div 2);}
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(SyntaxSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(SyntaxSwitches.ItemName(I), Items);
     CB1 := TCheckBoxes.Create(R2, Items);
     for I:=0 to Count-1 do
       if SyntaxSwitches.GetBooleanItem(I) then
@@ -108,15 +108,15 @@ begin
     Label11 := TLabel.Create(R2, label_compiler_syntaxswitches, CB1);
 
     Count:=CompilerModeSwitches.ItemCount;
-    R.Copy(TabIR);
-    R2.Copy(R);
+    R := TabIR;
+    R2 := R;
     R2.A.X:=(R2.A.X+(R2.B.X-R2.A.X) div 2)-2;
     R2.B.X:=R2.B.X-3;
 {    R2.B.Y:=R2.A.Y+((Count+1) div 2);}
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(CompilerModeSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(CompilerModeSwitches.ItemName(I), Items);
     RB2 := TRadioButtons.Create(R2, Items);
     L:=CompilerModeSwitches.GetCurrSel;
     RB2.SetData(L);
@@ -126,12 +126,12 @@ begin
 
     { --- Sheet 2 --- }
     Count:=CodegenSwitches.ItemCount;
-    R2.Copy(TabIR);
+    R2 := TabIR;
     R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2-2;
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(CodegenSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(CodegenSwitches.ItemName(I), Items);
     CB3 := TCheckBoxes.Create(R2, Items);
     for I:=0 to Count-1 do
       if CodegenSwitches.GetBooleanItem(I) then
@@ -141,13 +141,13 @@ begin
     Label21 := TLabel.Create(R2, label_compiler_codegeneration, CB3);
 
     Count:=OptimizationSwitches.ItemCount;
-    R2.Copy(TabIR);
+    R2 := TabIR;
     R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2;
     Dec(R2.B.X,4);
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(OptimizationSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(OptimizationSwitches.ItemName(I), Items);
     CB2 := TCheckBoxes.Create(R2, Items);
     for I:=0 to Count-1 do
       if OptimizationSwitches.GetBooleanItem(I) then
@@ -158,14 +158,14 @@ begin
 
     { --- Sheet 3 --- }
     Count:=ProcessorOptimizationSwitches.ItemCount;
-    R.Copy(TabIR);
-    R2.Copy(R);
+    R := TabIR;
+    R2 := R;
     R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2;
     Dec(R2.B.X,4);
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(ProcessorOptimizationSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(ProcessorOptimizationSwitches.ItemName(I), Items);
     RB1 := TRadioButtons.Create(R2, Items);
     L:=ProcessorOptimizationSwitches.GetCurrSel;
     RB1.SetData(L);
@@ -174,14 +174,14 @@ begin
     Label23 := TLabel.Create(R2, label_compiler_opt_targetprocessor, RB1);
 
     Count:=ProcessorCodeGenerationSwitches.ItemCount;
-    R.Copy(TabIR);
-    R2.Copy(R);
+    R := TabIR;
+    R2 := R;
     R2.A.X:=R2.A.X+(R2.B.X-R2.A.X) div 2;
     R2.B.X:=R2.B.X-3;
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(ProcessorCodeGenerationSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(ProcessorCodeGenerationSwitches.ItemName(I), Items);
     RB1b := TRadioButtons.Create(R2, Items);
     L:=ProcessorCodeGenerationSwitches.GetCurrSel;
     RB1b.SetData(L);
@@ -191,13 +191,13 @@ begin
 
     { --- Sheet 4 --- }
     Count:=VerboseSwitches.ItemCount;
-    R.Copy(TabIR);
-    R2.Copy(R);
+    R := TabIR;
+    R2 := R;
     R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2;
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(VerboseSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(VerboseSwitches.ItemName(I), Items);
     CB4 := TCheckBoxes.Create(R2, Items);
     for I:=0 to Count-1 do
       if VerboseSwitches.GetBooleanItem(I) then
@@ -208,13 +208,13 @@ begin
 
     { --- Sheet 5 --- }
     Count:=BrowserSwitches.ItemCount;
-    R.Copy(TabIR);
-    R2.Copy(R);
+    R := TabIR;
+    R2 := R;
     R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2;
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(BrowserSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(BrowserSwitches.ItemName(I), Items);
     RB4 := TRadioButtons.Create(R2, Items);
     L:=BrowserSwitches.GetCurrSel;
     RB4.SetData(L);
@@ -224,13 +224,13 @@ begin
 
     { --- Sheet 6 --- }
     Count:=AsmReaderSwitches.ItemCount;
-    R2.Copy(TabIR);
+    R2 := TabIR;
     R2.B.X:=R2.B.X-(R2.B.X-R2.A.X) div 2;
     Dec(R2.B.X,4);
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(AsmReaderSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(AsmReaderSwitches.ItemName(I), Items);
     RB5 := TRadioButtons.Create(R2, Items);
     L:=AsmReaderSwitches.GetCurrSel;
     RB5.SetData(L);
@@ -238,7 +238,7 @@ begin
     R2.B.Y:=R2.A.Y+1;
     Label51 := TLabel.Create(R2, label_compiler_assemblerreader, RB5);
 
-    R2.Copy(TabIR);
+    R2 := TabIR;
     R2.B.X:=R2.B.X-(R2.B.X-R2.A.X) div 2;
     Dec(R2.B.X,4);
     R2.A.Y:=R2.A.Y+Count+2;
@@ -246,7 +246,7 @@ begin
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(AsmInfoSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(AsmInfoSwitches.ItemName(I), Items);
     CB5 := TCheckBoxes.Create(R2, Items);
     for I:=0 to Count-1 do
       if AsmInfoSwitches.GetBooleanItem(I) then
@@ -256,14 +256,14 @@ begin
     Label52 := TLabel.Create(R2, label_compiler_assemblerinfo, CB5);
 
     Count:=AsmOutputSwitches.ItemCount;
-    R2.Copy(TabIR);
+    R2 := TabIR;
     R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2;
     Dec(R2.B.X,4);
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     UpdateAsmOutputSwitches;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(AsmOutputSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(AsmOutputSwitches.ItemName(I), Items);
     RB6 := TRadioButtons.Create(R2, Items);
     L:=AsmOutputSwitches.GetCurrSel;
     RB6.SetData(L);
@@ -312,11 +312,11 @@ begin
     Insert(Tab);
 
     { conditionnals }
-    R2.Copy(TabR); R2.A.Y:=R2.B.Y+1; R2.B.Y:=R2.A.Y+1; Dec(R2.B.X,4);
+    R2 := TabR; R2.A.Y:=R2.B.Y+1; R2.B.Y:=R2.A.Y+1; Dec(R2.B.X,4);
     IL := TEditorInputLine.Create(R2, 255);
     IL.Data^:=ConditionalSwitches.GetStringItem(0);
     Insert(IL);
-    R3.Copy(R2); R3.A.X:=R2.B.X+1; R3.B.X:=R3.A.X+3;
+    R3 := R2; R3.A.X:=R2.B.X+1; R3.B.X:=R3.A.X+3;
     Insert(THistory.Create(R3, IL, hidConditionalDefines));
     R2.Move(0,-1);
     Insert(TLabel.Create(R2,ConditionalSwitches.ItemName(0), IL));
@@ -326,7 +326,7 @@ begin
     IL2 := TEditorInputLine.Create(R2, 255);
     IL2.Data^:=CustomArg[SwitchesMode];
     Insert(IL2);
-    R3.Copy(R2); R3.A.X:=R2.B.X+1; R3.B.X:=R3.A.X+3;
+    R3 := R2; R3.A.X:=R2.B.X+1; R3.B.X:=R3.A.X+3;
     Insert(THistory.Create(R3, IL2, hidCompilerArgs));
     R2.Move(0,-1);
     Insert(TLabel.Create(R2,label_debugger_compilerargs, IL2));
@@ -362,29 +362,29 @@ var R,R2,R3: TRect;
     ILs: array[0..10] of PIntegerLine;
     I: integer;
 begin
-  R.Assign(0,0,40,2+MemorySwitches.ItemCount*2);
+  R := TRect.Create(0, 0, 40, 2+MemorySwitches.ItemCount*2);
   D := TCenterDialog.Create(R, dialog_memorysizes);
   with D do
   begin
     HelpCtx:=hcmemorysizes;
-    GetExtent(R); R.Grow(-3,-1);
-    R2.Copy(R); Inc(R2.A.Y); R2.B.Y:=R2.A.Y+1;
+    R := GetExtent; R.Grow(-3,-1);
+    R2 := R; Inc(R2.A.Y); R2.B.Y:=R2.A.Y+1;
     for I:=0 to MemorySwitches.ItemCount-1 do
      begin
-       R3.Copy(R2); R3.A.X:=21; R3.B.X:=R3.A.X+10;
+       R3 := R2; R3.A.X:=21; R3.B.X:=R3.A.X+10;
        ILs[I] := TIntegerLine.Create(R3, MinMemSize, MaxMemSize);
        ILs[I].Data^:=IntToStr(MemorySwitches.GetLongintItem(I));
        Insert(ILs[I]);
-       R3.Copy(R2); R3.B.X:=21;
+       R3 := R2; R3.B.X:=21;
        Insert(TLabel.Create(R3, MemorySwitches.ItemName(I), ILs[I]));
        R2.Move(0,2);
      end;
 
-{    R3.Copy(R2); R3.A.X:=21; R3.B.X:=R3.A.X+10;
+{    R3 := R2; R3.A.X:=21; R3.B.X:=R3.A.X+10;
     IL2 := TEditorInputLine.Create(R3, MinHeapSize, MaxHeapSize);
     IL2.Data^:=IntToStr(GetHeapSize);
     Insert(IL2);
-    R3.Copy(R2); R3.B.X:=21;
+    R3 := R2; R3.B.X:=21;
     Insert(TLabel.Create(R3, 'Local ~h~eap size', IL2));}
   end;
   InsertButtons(D);
@@ -407,23 +407,23 @@ var R,R2: TRect;
     RB2: PRadioButtons;
     CB,CB2 : PCheckBoxes;
     Count,I: longint;
-    Items: PSItem;
+    Items: TSItem;
     L: longint;
 begin
-  R.Assign(0,0,66,8);
+  R := TRect.Create(0, 0, 66, 8);
   D := TCenterDialog.Create(R, dialog_linker);
   with D do
   begin
     HelpCtx:=hclinker;
-    GetExtent(R); R.Grow(-3,-1);
+    R := GetExtent; R.Grow(-3,-1);
     Count:=LinkAfterSwitches.ItemCount;
-    R2.Copy(R);
+    R2 := R;
     R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2 - 1;
     Inc(R2.A.Y,1);
     R2.B.Y:=R2.A.Y+Count;
     Items:=nil;
     for I:=Count-1 downto 0 do
-      Items:=NewSItem(LinkAfterSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(LinkAfterSwitches.ItemName(I), Items);
     CB := TCheckBoxes.Create(R2, Items);
     for I:=0 to Count-1 do
       if LinkAfterSwitches.GetBooleanItem(I) then
@@ -432,27 +432,27 @@ begin
     Dec(R2.A.Y);
     R2.B.Y:=R2.A.Y+1;
     Insert(TLabel.Create(R2, label_compiler_linkafter, CB));
-    R2.Copy(R);
+    R2 := R;
     R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2 - 1;
     Inc(R2.A.Y,Count+2);
     R2.B.Y:=R2.A.Y+1;
-    Items:=NewSItem(OtherLinkerSwitches.ItemName(1), Nil);
+    Items:=TSItem.Create(OtherLinkerSwitches.ItemName(1), Nil);
     CB2 := TCheckBoxes.Create(R2, Items);
     if OtherLinkerSwitches.GetBooleanItem(1) then
       CB2.Press(0);
     Insert(CB2);
-    R2.Copy(R); Inc(R2.A.Y);
+    R2 := R; Inc(R2.A.Y);
     R2.B.Y:=R2.A.Y+LibLinkerSwitches.ItemCount;
     R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2+1;
     Items:=nil;
     for I:=LibLinkerSwitches.ItemCount-1 downto 0 do
-      Items:=NewSItem(LibLinkerSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(LibLinkerSwitches.ItemName(I), Items);
     RB2 := TRadioButtons.Create(R2, Items);
     L:=LibLinkerSwitches.GetCurrSel;
     RB2.SetData(L);
     Insert(RB2);
 
-    R2.Copy(R); R2.B.Y:=R2.A.Y+1; R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2+1;
+    R2 := R; R2.B.Y:=R2.A.Y+1; R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2+1;
     Insert(TLabel.Create(R2, label_linker_preferredlibtype, RB2));
   end;
   InsertButtons(D);
@@ -488,7 +488,7 @@ var R,R2,R3: TRect;
     IL: PEditorInputLine;
 {$endif Unix}
     L,I: longint;
-    Items: PSItem;
+    Items: TSItem;
 const
 {$ifdef Windows}
   OtherFieldLines = 3;
@@ -500,37 +500,37 @@ const
 {$endif Unix}
 {$endif Windows}
 begin
-  R.Assign(0,0,60,2+DebugInfoSwitches.ItemCount+1+2
+  R := TRect.Create(0, 0, 60, 2+DebugInfoSwitches.ItemCount+1+2
       +ProfileInfoSwitches.ItemCount+2+OtherFieldLines);
   D := TCenterDialog.Create(R, dialog_debugger);
   with D do
   begin
     HelpCtx:=hcdebugger;
     { Strip all }
-    GetExtent(R); R.Grow(-3,-1);
-    R2.Copy(R); Inc(R2.A.Y,2); R2.B.Y:=R2.A.Y+1;
-    Items:=NewSItem(OtherLinkerSwitches.ItemName(0), Nil);
+    R := GetExtent; R.Grow(-3,-1);
+    R2 := R; Inc(R2.A.Y,2); R2.B.Y:=R2.A.Y+1;
+    Items:=TSItem.Create(OtherLinkerSwitches.ItemName(0), Nil);
     CBStrip := TCheckBoxes.Create(R2, Items);
     if OtherLinkerSwitches.GetBooleanItem(0) then
       CBStrip.Press(0);
     Insert(CBStrip);
 
-    GetExtent(R); R.Grow(-3,-1);
-    R2.Copy(R); Inc(R2.A.Y,3); R2.B.Y:=R2.A.Y+DebugInfoSwitches.ItemCount;
+    R := GetExtent; R.Grow(-3,-1);
+    R2 := R; Inc(R2.A.Y,3); R2.B.Y:=R2.A.Y+DebugInfoSwitches.ItemCount;
     Items:=nil;
     for I:=DebugInfoSwitches.ItemCount-1 downto 0 do
-      Items:=NewSItem(DebugInfoSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(DebugInfoSwitches.ItemName(I), Items);
     RB := TRadioButtons.Create(R2, Items);
     L:=DebugInfoSwitches.GetCurrSel;
     RB.SetData(L);
     Insert(RB);
-    R2.Copy(R); Inc(R2.A.Y); R2.B.Y:=R2.A.Y+1;
+    R2 := R; Inc(R2.A.Y); R2.B.Y:=R2.A.Y+1;
     Insert(TLabel.Create(R2, label_debugger_debuginfo, RB));
 
-    R2.Copy(R); Inc(R2.A.Y,3+DebugInfoSwitches.ItemCount+2); R2.B.Y:=R2.A.Y+ProfileInfoSwitches.ItemCount;
+    R2 := R; Inc(R2.A.Y,3+DebugInfoSwitches.ItemCount+2); R2.B.Y:=R2.A.Y+ProfileInfoSwitches.ItemCount;
     Items:=nil;
     for I:=ProfileInfoSwitches.ItemCount-1 downto 0 do
-      Items:=NewSItem(ProfileInfoSwitches.ItemName(I), Items);
+      Items:=TSItem.Create(ProfileInfoSwitches.ItemName(I), Items);
     RB2 := TRadioButtons.Create(R2, Items);
     L:=ProfileInfoSwitches.GetCurrSel;
     RB2.SetData(L);
@@ -540,7 +540,7 @@ begin
 
 {$ifdef Windows}
     R2.Move(0,ProfileInfoSwitches.ItemCount+3);
-    CB2 := TCheckBoxes.Create(R2,NewSItem(label_debugger_useanotherconsole, nil));
+    CB2 := TCheckBoxes.Create(R2,TSItem.Create(label_debugger_useanotherconsole, nil));
     Insert(CB2);
     if DebuggeeTTY<>'' then
       L:=1
@@ -603,13 +603,13 @@ begin
      RemoteSendCommand : string = 'scp $CONFIG $IDENT $LOCALFILE $REMOTEMACHINE:$REMOTEDIR';
 
 }
-  R.Assign(0,0,60,2+2*FieldLines+2);
+  R := TRect.Create(0, 0, 60, 2+2*FieldLines+2);
   D := TCenterDialog.Create(R, dialog_remote);
   with D do
     begin
       HelpCtx:=hcremotedialog;
-      GetExtent(R); R.Grow(-3,-1);
-      R2.Copy(R);
+      R := GetExtent; R.Grow(-3,-1);
+      R2 := R;
       R2.B.Y:=R2.A.Y+1;
       { remote machine name }
       R2.Move(0,3);
@@ -731,7 +731,7 @@ var tab:Ptab;
 const LW=25;
 
 begin
-  R.assign(0,0,Drivers.screenwidth*64 div 80,18);
+  R := TRect.Create(0, 0, Drivers.TScreen.ScreenWidth*64 div 80, 18);
   D := TCenterDialog.Create(R,dialog_directories);
   if d.size.x<72 then
     misc_string:='~M~isc.'
@@ -739,30 +739,30 @@ begin
     misc_string:='~M~iscellaneous';
 
   {Create editors.}
-  R.assign(1,4,d.size.x-4,d.size.y-4);
+  R := TRect.Create(1, 4, d.size.x-4, d.size.y-4);
   E_units := Tfpmemo.Create(R,nil,nil,nil);
-  R.assign(1,3,d.size.x-4,4);
+  R := TRect.Create(1, 3, d.size.x-4, 4);
   L_units := Tlabel.Create(R,'Unit ~d~irectories:',E_units);
 
-  R.assign(1,4,d.size.x-4,d.size.y-4);
+  R := TRect.Create(1, 4, d.size.x-4, d.size.y-4);
   E_includes := Tfpmemo.Create(R,nil,nil,nil);
-  R.assign(1,3,d.size.x-4,4);
+  R := TRect.Create(1, 3, d.size.x-4, 4);
   L_includes := Tlabel.Create(R,'Include ~d~irectories:',E_includes);
 
-  R.assign(1,4,d.size.x-4,d.size.y-4);
+  R := TRect.Create(1, 4, d.size.x-4, d.size.y-4);
   E_libraries := Tfpmemo.Create(R,nil,nil,nil);
-  R.assign(1,3,d.size.x-4,4);
+  R := TRect.Create(1, 3, d.size.x-4, 4);
   L_libraries := Tlabel.Create(R,'Library ~d~irectories:',E_libraries);
 
-  R.assign(1,4,d.size.x-4,d.size.y-4);
+  R := TRect.Create(1, 4, d.size.x-4, d.size.y-4);
   E_objects := Tfpmemo.Create(R,nil,nil,nil);
-  R.assign(1,3,d.size.x-4,4);
+  R := TRect.Create(1, 3, d.size.x-4, 4);
   L_objects := Tlabel.Create(R,'Object file ~d~irectories:',E_objects);
 
   {The switches that are put into the editors are of type multistring.
    We add multistrings to the editor. Other inputboxes are created on
    demand on the "Miscellaneous" tab.}
-  R.assign(1,4,d.size.x-5,5);
+  R := TRect.Create(1, 4, d.size.x-5, 5);
   count:=DirectorySwitches.ItemCount;
   misc_items:=nil;
   misc_tabfocus:=nil;
@@ -788,14 +788,14 @@ begin
         end
       else
         begin
-          R2.copy(R);
+          R2 := R;
           R2.A.X:=LW;
           IL[i] := TEditorInputLine.Create(R2,255);
           IL[i].data^:=DirectorySwitches.GetStringItem(i);
           misc_items:=newTabItem(IL[i],misc_items);
           if misc_tabfocus=nil then
             misc_tabfocus:=IL[i];
-          R2.copy(R);
+          R2 := R;
           R2.B.X:=LW;
           misc_items:=newTabItem(
                         Tlabel.Create(R2,
@@ -820,7 +820,7 @@ begin
   misc_items:=newmisc_items;
 
   {Create some tabs in the window.}
-  tabR.assign(1,1,d.size.x-2,d.size.y-1);
+  tabR := TRect.Create(1, 1, d.size.x-2, d.size.y-1);
   tab := Ttab.Create(tabR,
     newtabdef('~U~nits',e_units,
       NewTabItem(L_units,
@@ -907,7 +907,7 @@ var R,R2: TRect;
     RB1 : PRadioButtons;
     CountModes : integer;
     hp : pvideomodelist;
-    items : PSItem;
+    items : TSItem;
     videomode : tvideomode;
     i,modevalue : longint;
 
@@ -930,7 +930,7 @@ begin
   CountModes:=0;
   i:=0;
   modevalue:=0;
-  R.Assign(0,0,64,18);
+  R := TRect.Create(0, 0, 64, 18);
   D := TCenterDialog.Create(R, 'Preferences');
   with D do
   begin
@@ -939,7 +939,7 @@ begin
      r2.assign(2,3,24,17);
      while assigned(hp) do
        begin
-          items:=NewSItem(ToStr(hp.col)+'x'+ToStr(hp.row)+' '+color2str[hp.color],items);
+          items:=TSItem.Create(ToStr(hp.col)+'x'+ToStr(hp.row)+' '+color2str[hp.color],items);
           if (hp.col=videomode.col) and (hp.row=videomode.row) and
             (hp.color=videomode.color) then
             modevalue:=i;
@@ -1030,16 +1030,16 @@ begin
          (VM.Color=CurVideoMode.Color) then
        CurVP:=VP;
    end;
-  R.Assign(0,0,64,15);
+  R := TRect.Create(0, 0, 64, 15);
   D := TCenterDialog.Create(R, dialog_preferences);
   with D do
   begin
     HelpCtx:=hcpreferences;
-    GetExtent(R); R.Grow(-2,-2);
+    R := GetExtent; R.Grow(-2,-2);
     R.B.X:=R.A.X+(R.B.X-R.A.X) div 2 - 1;
 
     R.B.Y:=R.A.Y+3;
-    R2.Copy(R); R2.Grow(-1,-1);
+    R2 := R; R2.Grow(-1,-1);
     VMLB := TVideoModeListBox.Create(R2, Min(4,C.Count), C);
     if CurVP=nil then CurIdx:=-1 else
       CurIdx:=C.IndexOf(CurVP);
@@ -1049,36 +1049,36 @@ begin
     Insert(VMLB);
 
     R.Move(0,R.B.Y-R.A.Y{+1}); R.B.Y:=R.A.Y+4;
-    R2.Copy(R); R2.Grow(-1,-1);
+    R2 := R; R2.Grow(-1,-1);
     RB1 := TPlainRadioButtons.Create(R2,
-      NewSItem(label_preferences_currentdirectory,
-      NewSItem(label_preferences_configdirectory,
+      TSItem.Create(label_preferences_currentdirectory,
+      TSItem.Create(label_preferences_configdirectory,
       nil)));
     RB1.Press(DesktopLocation);
     Insert(TGroupView.Create(R, label_preferences_desktopfile, RB1));
     Insert(RB1);
 
     R.Move(0,R.B.Y-R.A.Y{+1}); R.B.Y:=R.A.Y+5;
-    R2.Copy(R); R2.Grow(-1,-1);
+    R2 := R; R2.Grow(-1,-1);
     CB1 := TPlainCheckBoxes.Create(R2,
-      NewSItem(label_preferences_editorfiles,
-      NewSItem(label_preferences_environment,
-      NewSItem(label_preferences_desktop,
+      TSItem.Create(label_preferences_editorfiles,
+      TSItem.Create(label_preferences_environment,
+      TSItem.Create(label_preferences_desktop,
       nil))));
     CB1.Value:=AutoSaveOptions;
     Insert(TGroupView.Create(R, label_preferences_autosave, CB1));
     Insert(CB1);
 
-    GetExtent(R); R.Grow(-2,-2);
+    R := GetExtent; R.Grow(-2,-2);
     R.A.X:=R.B.X-(R.B.X-R.A.X) div 2 + 1;
     R.B.Y:=R.A.Y+7;
 
     R.Move(0,R.B.Y-R.A.Y{+1}); R.B.Y:=R.A.Y+5;
-    R2.Copy(R); R2.Grow(-1,-1);
+    R2 := R; R2.Grow(-1,-1);
     CB2 := TPlainCheckBoxes.Create(R2,
-      NewSItem(label_preferences_autotracksource,
-      NewSItem(label_preferences_closeongotosource,
-      NewSItem(label_preferences_changedironopen,
+      TSItem.Create(label_preferences_autotracksource,
+      TSItem.Create(label_preferences_closeongotosource,
+      TSItem.Create(label_preferences_changedironopen,
       nil))));
     CB2.Value:=MiscOptions;
     Insert(TGroupView.Create(R, label_preferences_options, CB2));
@@ -1169,30 +1169,30 @@ begin
   if (EFlags and efFolds             )<>0 then EFValue:=EFValue or (1 shl 14);
   if (EFlags and efSoftWrap          )<>0 then EFValue:=EFValue or (1 shl 15);
 
-  R.Assign(0,0,66,20);
+  R := TRect.Create(0, 0, 66, 20);
   D := TCenterDialog.Create(R, Title);
   with D do
   begin
     HelpCtx:=hcEditor;
-    GetExtent(R); R.Grow(-2,-2); R.B.Y:=R.A.Y+9;
-    R2.Copy(R); Inc(R2.A.Y);
+    R := GetExtent; R.Grow(-2,-2); R.B.Y:=R.A.Y+9;
+    R2 := R; Inc(R2.A.Y);
     CB := TCheckBoxes.Create(R2,
-      NewSItem(label_editor_backupfiles,
-      NewSItem(label_editor_insertmode,
-      NewSItem(label_editor_autoindentmode,
-      NewSItem(label_editor_usetabcharacters,
-      NewSItem(label_editor_backspaceunindents,
-      NewSItem(label_editor_persistentblocks,
-      NewSItem(label_editor_syntaxhighlight,
-      NewSItem(label_editor_blockinsertcursor,
-      NewSItem(label_editor_verticalblocks,
-      NewSItem(label_editor_highlightcolumn,
-      NewSItem(label_editor_highlightrow,
-      NewSItem(label_editor_autoclosingbrackets,
-      NewSItem(label_editor_keeptrailingspaces,
-      NewSItem(label_editor_codecomplete,
-      NewSItem(label_editor_folds,
-      NewSItem(label_editor_softwrap,
+      TSItem.Create(label_editor_backupfiles,
+      TSItem.Create(label_editor_insertmode,
+      TSItem.Create(label_editor_autoindentmode,
+      TSItem.Create(label_editor_usetabcharacters,
+      TSItem.Create(label_editor_backspaceunindents,
+      TSItem.Create(label_editor_persistentblocks,
+      TSItem.Create(label_editor_syntaxhighlight,
+      TSItem.Create(label_editor_blockinsertcursor,
+      TSItem.Create(label_editor_verticalblocks,
+      TSItem.Create(label_editor_highlightcolumn,
+      TSItem.Create(label_editor_highlightrow,
+      TSItem.Create(label_editor_autoclosingbrackets,
+      TSItem.Create(label_editor_keeptrailingspaces,
+      TSItem.Create(label_editor_codecomplete,
+      TSItem.Create(label_editor_folds,
+      TSItem.Create(label_editor_softwrap,
       nil)))))))))))))))));
     CB.Value:=EFValue;
     Insert(CB);
@@ -1200,22 +1200,22 @@ begin
     Insert(TLabel.Create(R2, label_editor_editoroptions, CB));
 
     R.Move(0,(R.B.Y-R.A.Y)+1); R.B.Y:=R.A.Y+1;
-    R2.Copy(R); Inc(R2.A.Y); R2.B.Y:=R2.A.Y;
-    R3.Copy(R); Inc(R3.A.X,10); R3.B.X:=R3.A.X+5;
+    R2 := R; Inc(R2.A.Y); R2.B.Y:=R2.A.Y;
+    R3 := R; Inc(R3.A.X,10); R3.B.X:=R3.A.X+5;
     ILTab := TIntegerLine.Create(R3, 0,100);
     ILTab.Data^:=IntToStr(TabSize);
     Insert(ILTab);
-    R3.Copy(R); R3.B.X:=R3.A.X+10;
+    R3 := R; R3.B.X:=R3.A.X+10;
     Insert(TLabel.Create(R3, label_editor_tabsize, ILTab));
-    R3.Copy(R); Inc(R3.A.X,40); R3.B.X:=R3.A.X+5;
+    R3 := R; Inc(R3.A.X,40); R3.B.X:=R3.A.X+5;
     ILIdent := TIntegerLine.Create(R3, 0,100);
     ILIdent.Data^:=IntToStr(IndentSize);
     Insert(ILIdent);
-    R3.Copy(R); Inc(R3.A.X,28); R3.B.X:=R3.A.X+12;
+    R3 := R; Inc(R3.A.X,28); R3.B.X:=R3.A.X+12;
     Insert(TLabel.Create(R3, label_editor_IndentSize, ILIdent));
 
     R.Move(0,(R.B.Y-R.A.Y)+1); R.B.Y:=R.A.Y+2;
-    R2.Copy(R); Inc(R2.A.Y);
+    R2 := R; Inc(R2.A.Y);
     ExtIL := TEditorInputLine.Create(R2, 128);
     ExtIL.SetData(HighlightExts);
     Insert(ExtIL);
@@ -1223,7 +1223,7 @@ begin
     Insert(TLabel.Create(R2, label_editor_highlightextensions, ExtIL));
 
     R.Move(0,(R.B.Y-R.A.Y)+1); R.B.Y:=R.A.Y+2;
-    R2.Copy(R); Inc(R2.A.Y);
+    R2 := R; Inc(R2.A.Y);
     TabExtIL := TEditorInputLine.Create(R2, 128);
     TabExtIL.SetData(TabsPattern);
     Insert(TabExtIL);
@@ -1295,20 +1295,20 @@ begin
     TitleS:=dialog_browseroptions
   else
     TitleS:=dialog_localbrowseroptions;
-  R.Assign(0,0,56,15);
+  R := TRect.Create(0, 0, 56, 15);
   D := TCenterDialog.Create(R, TitleS);
   with D do
   begin
     HelpCtx:=hcBrowser;
-    GetExtent(R); R.Grow(-2,-2);
-    R.B.Y:=R.A.Y+1+3; R2.Copy(R); Inc(R2.A.Y);
+    R := GetExtent; R.Grow(-2,-2);
+    R.B.Y:=R.A.Y+1+3; R2 := R; Inc(R2.A.Y);
     CB1 := TCheckBoxes.Create(R2,
-      NewSItem(RExpand(label_browser_labels,21+2),
-      NewSItem(label_browser_constants,
-      NewSItem(label_browser_types,
-      NewSItem(label_browser_variables,
-      NewSItem(label_browser_procedures,
-      NewSItem(label_browser_inherited,
+      TSItem.Create(RExpand(label_browser_labels,21+2),
+      TSItem.Create(label_browser_constants,
+      TSItem.Create(label_browser_types,
+      TSItem.Create(label_browser_variables,
+      TSItem.Create(label_browser_procedures,
+      TSItem.Create(label_browser_inherited,
       nil))))))
     );
     Insert(CB1);
@@ -1316,20 +1316,20 @@ begin
     Insert(TLabel.Create(R2, label_browser_symbols, CB1));
 
     R.Move(0,R.B.Y-R.A.Y+1);
-    R.B.Y:=R.A.Y+1+2; R2.Copy(R);
-    R3.Copy(R2); R3.B.X:=R3.A.X+(R3.B.X-R3.A.X) div 2-1; Inc(R3.A.Y);
+    R.B.Y:=R.A.Y+1+2; R2 := R;
+    R3 := R2; R3.B.X:=R3.A.X+(R3.B.X-R3.A.X) div 2-1; Inc(R3.A.Y);
     RB1 := TPlainRadioButtons.Create(R3,
-      NewSItem(label_browser_newbrowser,
-      NewSItem(label_browser_currentbrowser,
+      TSItem.Create(label_browser_newbrowser,
+      TSItem.Create(label_browser_currentbrowser,
       nil))
     );
     Insert(RB1);
     R3.Move(0,-1); R3.B.Y:=R3.A.Y+1;
     Insert(TLabel.Create(R3, label_browser_subbrowsing, RB1));
-    R3.Copy(R2); R3.A.X:=R3.B.X-(R3.B.X-R3.A.X) div 2+1; Inc(R3.A.Y);
+    R3 := R2; R3.A.X:=R3.B.X-(R3.B.X-R3.A.X) div 2+1; Inc(R3.A.Y);
     RB2 := TRadioButtons.Create(R3,
-      NewSItem(label_browser_scope,
-      NewSItem(label_browser_reference,
+      TSItem.Create(label_browser_scope,
+      TSItem.Create(label_browser_reference,
       nil))
     );
     Insert(RB2);
@@ -1337,10 +1337,10 @@ begin
     Insert(TLabel.Create(R3, label_browser_preferredpane, RB2));
 
     R.Move(0,R.B.Y-R.A.Y+1);
-    R.B.Y:=R.A.Y+1+1; R2.Copy(R); Inc(R2.A.Y);
+    R.B.Y:=R.A.Y+1+1; R2 := R; Inc(R2.A.Y);
     CB2 := TCheckBoxes.Create(R2,
-      NewSItem(RExpand(label_browser_qualifiedsymbols,21+2),
-      NewSItem(label_browser_sortsymbols,
+      TSItem.Create(RExpand(label_browser_qualifiedsymbols,21+2),
+      TSItem.Create(label_browser_sortsymbols,
       nil))
     );
     Insert(CB2);
@@ -1365,21 +1365,21 @@ var R: TRect;
     D: PCenterDialog;
     CB: PCheckBoxes;
 begin
-  R.Assign(0,0,40,12);
+  R := TRect.Create(0, 0, 40, 12);
   D := TCenterDialog.Create(R, dialog_desktoppreferences);
   with D do
   begin
     HelpCtx:=hcDesktopOptions;
-    GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y); R.B.Y:=R.A.Y+8;
+    R := GetExtent; R.Grow(-2,-2); Inc(R.A.Y); R.B.Y:=R.A.Y+8;
     CB := TCheckBoxes.Create(R,
-      NewSItem(label_desktop_historylists,
-      NewSItem(label_desktop_clipboard,
-      NewSItem(label_desktop_watches,
-      NewSItem(label_desktop_breakpoints,
-      NewSItem(label_desktop_openwindow,
-      NewSItem(label_desktop_symbolinfo,
-      NewSItem(label_desktop_codecompletewords,
-      NewSItem(label_desktop_codetemplates,
+      TSItem.Create(label_desktop_historylists,
+      TSItem.Create(label_desktop_clipboard,
+      TSItem.Create(label_desktop_watches,
+      TSItem.Create(label_desktop_breakpoints,
+      TSItem.Create(label_desktop_openwindow,
+      TSItem.Create(label_desktop_symbolinfo,
+      TSItem.Create(label_desktop_codecompletewords,
+      TSItem.Create(label_desktop_codetemplates,
       nil)))))))));
     CB.Value:=DesktopFileFlags;
     Insert(CB);
@@ -1402,15 +1402,15 @@ var R,R2: TRect;
     CB: PCheckBoxes;
     RB1,RB2,RBKB: PRadioButtons;
 begin
-  R.Assign(0,0,62,19);
+  R := TRect.Create(0, 0, 62, 19);
   D := TCenterDialog.Create(R, dialog_mouseoptions);
   with D do
   begin
     HelpCtx:=hcMouse;
-    GetExtent(R); R.Grow(-3,-2); inc(R.A.Y); R.B.Y:=R.A.Y+2;
+    R := GetExtent; R.Grow(-3,-2); inc(R.A.Y); R.B.Y:=R.A.Y+2;
     RBkb := TRadioButtons.Create(R,
-      NewSItem('~C~UA-91 convention (Shift+Del,Ctrl+Ins,Shift+Ins)',
-      NewSItem('~M~icrosoft convention (Ctrl+X,Ctrl+C,Ctrl+V)',
+      TSItem.Create('~C~UA-91 convention (Shift+Del,Ctrl+Ins,Shift+Ins)',
+      TSItem.Create('~M~icrosoft convention (Ctrl+X,Ctrl+C,Ctrl+V)',
       nil)));
     RBkb.Press(integer(EditKeys));
     Insert(RBkb);
@@ -1418,45 +1418,45 @@ begin
     Insert(TLabel.Create(R, '~K~eys for cut, copy and paste:', RBkb));
 
     R.Move(0,(R.B.Y-R.A.Y)+3); R.B.Y:=R.A.Y+3;
-    R2.Copy(R); Inc(R2.A.Y,2); R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2 -1;
+    R2 := R; Inc(R2.A.Y,2); R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2 -1;
     SB := TScrollBar.Create(R2); SB.GrowMode:=0; SB.Options:=SB.Options or ofSelectable;
-    SB.SetParams(DoubleDelay,1,20,1,1);
+    SB.SetParams(TEventQueue.DoubleDelay,1,20,1,1);
     Insert(SB);
     R2.Move(0,-1);
     Insert(TStaticText.Create(R2, label_mouse_speedbar));
     R2.Move(-1,-1);
     Insert(TLabel.Create(R2, label_mouse_doubleclickspeed, SB));
 
-    R2.Copy(R); Inc(R2.A.Y,2); R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2 +1;
-    CB := TCheckBoxes.Create(R2, NewSItem(label_mouse_reversebuttons, nil));
-    if MouseReverse then CB.Press(0);
+    R2 := R; Inc(R2.A.Y,2); R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2 +1;
+    CB := TCheckBoxes.Create(R2, TSItem.Create(label_mouse_reversebuttons, nil));
+    if TEventQueue.MouseReverse then CB.Press(0);
     Insert(CB);
 
     R.Move(0,(R.B.Y-R.A.Y)+1); R.B.Y:=R.A.Y+8;
-    R2.Copy(R); Inc(R2.A.Y); R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2 -1;
+    R2 := R; Inc(R2.A.Y); R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2 -1;
     RB1 := TPlainRadioButtons.Create(R2,
-      NewSItem(label_mouse_act_nothing,
-      NewSItem(label_mouse_act_topicsearch,
-      NewSItem(label_mouse_act_gotocursor,
-      NewSItem(label_mouse_act_breakpoint,
-      NewSItem(label_mouse_act_evaluate,
-      NewSItem(label_mouse_act_addwatch,
-      NewSItem(label_mouse_act_browsesymbol,
+      TSItem.Create(label_mouse_act_nothing,
+      TSItem.Create(label_mouse_act_topicsearch,
+      TSItem.Create(label_mouse_act_gotocursor,
+      TSItem.Create(label_mouse_act_breakpoint,
+      TSItem.Create(label_mouse_act_evaluate,
+      TSItem.Create(label_mouse_act_addwatch,
+      TSItem.Create(label_mouse_act_browsesymbol,
       nil))))))));
     RB1.Press(CtrlMouseAction);
     Insert(RB1);
     R2.Move(0,-1); R2.B.Y:=R2.A.Y+1;
     Insert(TLabel.Create(R2, label_mouse_crtlrightmousebuttonaction, RB1));
 
-    R2.Copy(R); Inc(R2.A.Y); R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2 +1;
+    R2 := R; Inc(R2.A.Y); R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2 +1;
     RB2 := TRadioButtons.Create(R2,
-      NewSItem(label_mouse_act_nothing,
-      NewSItem(label_mouse_act_topicsearch,
-      NewSItem(label_mouse_act_gotocursor,
-      NewSItem(label_mouse_act_breakpoint,
-      NewSItem(label_mouse_act_evaluate,
-      NewSItem(label_mouse_act_addwatch,
-      NewSItem(label_mouse_act_browsesymbol,
+      TSItem.Create(label_mouse_act_nothing,
+      TSItem.Create(label_mouse_act_topicsearch,
+      TSItem.Create(label_mouse_act_gotocursor,
+      TSItem.Create(label_mouse_act_breakpoint,
+      TSItem.Create(label_mouse_act_evaluate,
+      TSItem.Create(label_mouse_act_addwatch,
+      TSItem.Create(label_mouse_act_browsesymbol,
       nil))))))));
     RB2.Press(AltMouseAction);
     Insert(RB2);
@@ -1468,8 +1468,8 @@ begin
   RBkb.Select;
   if Desktop.ExecView(D)=cmOK then
   begin
-    MouseReverse:=CB.Mark(0);
-    DoubleDelay:=SB.Value;
+    TEventQueue.MouseReverse:=CB.Mark(0);
+    TEventQueue.DoubleDelay:=SB.Value;
     CtrlMouseAction:=RB1.Value;
     AltMouseAction:=RB2.Value;
     if Tedit_key_modes(RBkb.value)<>EditKeys then
@@ -1485,7 +1485,7 @@ procedure TIDEApp.Colors;
 {$Ifdef COLORSEL}
 var D: PColorDialog;
 begin
-  D := TColorDialog.Create(AppPalette,
+  D := TColorDialog.Create(FPVars.AppPalette,
     ColorGroup(label_colors_grp_browser,
       ColorItem(label_colors_framepassive   , 215,
       ColorItem(label_colors_frameactive    , 216,
@@ -1550,7 +1550,7 @@ begin
       nil))))))))))),
     nil))))))))));
   D.HelpCtx:=hcColors;
-  if ExecuteDialog(D, @AppPalette)=cmOK then
+  if ExecuteDialog(D, @FPVars.AppPalette)=cmOK then
     begin
       DoneMemory;
       Message(Application,evBroadcast,cmUpdate,nil);

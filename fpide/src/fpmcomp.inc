@@ -18,25 +18,25 @@ var R,R2: TRect;
     D: PCenterDialog;
     RB: PRadioButtons;
     TargetCount,I: integer;
-    LastItem: PSItem;
+    LastItem: TSItem;
     L: longint;
 begin
   TargetCount:=TargetSwitches.ItemCount;
-  R.Assign(0,0,60,4+TargetCount);
+  R := TRect.Create(0, 0, 60, 4+TargetCount);
   D := TCenterDialog.Create(R, dialog_target);
   with D do
   begin
     HelpCtx:=hcTarget;
-    GetExtent(R); R.Grow(-3,-1); Inc(R.A.Y);
-    R2.Copy(R); Inc(R2.A.Y); R2.B.Y:=R2.A.Y+TargetCount;
+    R := GetExtent; R.Grow(-3,-1); Inc(R.A.Y);
+    R2 := R; Inc(R2.A.Y); R2.B.Y:=R2.A.Y+TargetCount;
     LastItem:=nil;
     for I:=TargetCount-1 downto 0 do
-      LastItem:=NewSItem(TargetSwitches.ItemName(I), LastItem);
+      LastItem:=TSItem.Create(TargetSwitches.ItemName(I), LastItem);
     RB := TRadioButtons.Create(R2, LastItem);
     L:=ord(TargetSwitches.GetCurrSel);
     RB.SetData(L);
     Insert(RB);
-    R2.Copy(R);
+    R2 := R;
     R2.B.Y:=R2.A.Y+1;
     Insert(TLabel.Create(R2, label_target_platform, RB));
   end;

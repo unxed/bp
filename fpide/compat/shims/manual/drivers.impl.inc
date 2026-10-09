@@ -8,17 +8,17 @@ type
 
 function FVAttr(Attr: Byte): TColorAttr;
 begin
-  Result := CellFromBIOS(Word(Attr) shl 8).Attribute;
+  Result := TColorAttr(LongInt(Attr));
 end;
 
 procedure SetCellChar(var Cell: TScreenCell; C: Char);
 begin
-  ScInitChar(Cell.Character, Byte(C));
+  Cell.Character.InitWithChar(Byte(C));
 end;
 
 function CellBios(const Cell: TScreenCell): Byte;
 begin
-  Result := AttrAsBIOSByte(Cell.Attribute);
+  Result := Byte(Cell.Attribute);
 end;
 
 procedure SetCellBios(var Cell: TScreenCell; Attr: Byte);
@@ -42,7 +42,7 @@ begin
   if (Byte(Str[I]) < $80) or (not Utf8Enabled) or
      (not Utf8Decode(@Str[I], Length(Str) - I + 1, CP, Used)) or (Used <= 1) then
   begin
-    ScInitChar(Cells[P].Character, Byte(Str[I]));
+    Cells[P].Character.InitWithChar(Byte(Str[I]));
     if SetAttr then Cells[P].Attribute := A;
     Inc(P);
     Exit;
@@ -53,17 +53,17 @@ begin
   begin
     { a combining character goes onto the cell before }
     if P > 0 then
-      ScAppendZeroWidth(Cells[P - 1].Character, @Str[I], Used);
+      Cells[P - 1].Character.AppendZeroWidthChar(@Str[I], Used);
     Exit;
   end;
   if (W >= 2) and (P + 1 > High(Cells)) then
     W := 1;
-  ScInitText(Cells[P].Character, @Str[I], Used, W >= 2);
+  Cells[P].Character.InitWithMultiByteChar(@Str[I], Used, W >= 2);
   if SetAttr then Cells[P].Attribute := A;
   Inc(P);
   if W >= 2 then
   begin
-    ScInitWideTrail(Cells[P].Character);
+    Cells[P].Character.InitAsWideCharTrail;
     if SetAttr then Cells[P].Attribute := A;
     Inc(P);
   end;
@@ -80,7 +80,7 @@ begin
     if Attr <> 0 then
       Cells^[I].Attribute := FVAttr(Attr);
     if Ord(C) <> 0 then
-      ScInitChar(Cells^[I].Character, Byte(C));
+      Cells^[I].Character.InitWithChar(Byte(C));
   end;
 end;
 
@@ -146,7 +146,7 @@ begin
   begin
     if Attr <> 0 then
       Cells^[I].Attribute := FVAttr(Attr);
-    ScInitChar(Cells^[I].Character, S^);
+    Cells^[I].Character.InitWithChar(S^);
     Inc(S);
   end;
 end;
@@ -154,18 +154,179 @@ end;
 function GetDosTicks: LongInt;
 begin
   { 1 DOS tick ≈ 55 ms }
-  Result := LongInt(ClockMs div 55);
+  Result := LongInt(THardwareInfo.GetTickCount);
 end;
 
+{ The slots become an array of const for TvFormat.FormatStr: each % item of Format is written again as an item of
+  SysUtils.Format with its argument. What Format cannot write the same way is passed as text: %c as a string, %x and %X
+  as the digits (Format has no lower case hex and fills hex with at most 31 zeros), an unknown item as itself. }
 procedure FormatStr(var Result: String; const Format: String; var Params);
+type
+  TSlots = array[0..(MaxInt div SizeOf(PtrInt)) - 1] of PtrInt;
+var
+  Slots: ^TSlots;
+  Next, I, Start, Width, N: Integer;
+  Left, Zero: Boolean;
+  Conv: Char;
+  Fmt: AnsiString;
+  Args: array of TVarRec;
+  Texts: array of ShortString;
+  Nums: array of Int64;
+  V: LongInt;
+  P: PShortString;
+  Hex: AnsiString;
+
+  function Take: PtrInt;
+  begin
+    Result := Slots^[Next];
+    Inc(Next);
+  end;
+
+  function Literal(const S: AnsiString): AnsiString;
+  begin
+    Result := StringReplace(S, '%', '%%', [rfReplaceAll]);
+  end;
+
+  procedure AddText(const S: ShortString);
+  begin
+    Texts[N] := S;
+    Args[N].VType := vtString;
+    Args[N].VString := @Texts[N];
+    Inc(N);
+  end;
+
+  procedure AddNum(X: Int64);
+  begin
+    Nums[N] := X;
+    Args[N].VType := vtInt64;
+    Args[N].VInt64 := @Nums[N];
+    Inc(N);
+  end;
+
+  { the item %[-][width]Spec; Format fills at most 255 characters, the rest of a wider item is a literal text of spaces }
+  procedure Item(const Spec: ShortString);
+  var
+    W: Integer;
+  begin
+    W := Width;
+    if W > 255 then
+      W := 255;
+    if not Left then
+      Fmt := Fmt + StringOfChar(' ', Width - W);
+    Fmt := Fmt + '%';
+    if Left then
+      Fmt := Fmt + '-';
+    if W > 0 then
+      Fmt := Fmt + IntToStr(W);
+    Fmt := Fmt + Spec;
+    if Left then
+      Fmt := Fmt + StringOfChar(' ', Width - W);
+  end;
+
 begin
-  FormatSlots(Result, Format, Params);
+  Slots := @Params;
+  Next := 0;
+  N := 0;
+  SetLength(Args, Length(Format));
+  SetLength(Texts, Length(Format));
+  SetLength(Nums, Length(Format));
+  Fmt := '';
+  I := 1;
+  while I <= Length(Format) do
+  begin
+    if Format[I] <> '%' then
+    begin
+      Fmt := Fmt + Format[I];
+      Inc(I);
+      Continue;
+    end;
+    Start := I;
+    Inc(I);
+    Left := (I <= Length(Format)) and (Format[I] = '-');
+    if Left then
+      Inc(I);
+    Zero := (I <= Length(Format)) and (Format[I] = '0');
+    if Zero then
+      Inc(I);
+    Zero := Zero and not Left;
+    Width := 0;
+    while (I <= Length(Format)) and (Format[I] in ['0'..'9']) do
+    begin
+      if Width < 1000 then
+        Width := Width * 10 + Ord(Format[I]) - Ord('0');
+      Inc(I);
+    end;
+    if I > Length(Format) then
+    begin
+      Fmt := Fmt + Literal(Copy(Format, Start, MaxInt));
+      Break;
+    end;
+    Conv := Format[I];
+    Inc(I);
+    case Conv of
+      '%':
+        Fmt := Fmt + '%%';
+      's':
+        begin
+          P := PShortString(Pointer(Take));
+          if P = nil then
+            AddText('')
+          else
+            AddText(P^);
+          Item('s');
+        end;
+      'c':
+        begin
+          AddText(Chr(Byte(Take)));
+          Item('s');
+        end;
+      'd', 'u':
+        begin
+          if Conv = 'd' then
+          begin
+            V := LongInt(Take);
+            AddNum(V);
+          end
+          else
+          begin
+            V := 0;
+            AddNum(LongWord(Take));
+          end;
+          if Zero and (Width > 0) then
+          begin
+            if V < 0 then
+              Fmt := Fmt + '%.' + IntToStr(Width - 1) + 'd'
+            else
+              Fmt := Fmt + '%.' + IntToStr(Width) + 'd';
+          end
+          else
+            Item('d');
+        end;
+      'x', 'X':
+        begin
+          Hex := IntToHex(LongWord(Take), 1);
+          if Conv = 'x' then
+            Hex := LowerCase(Hex);
+          if Zero and (Length(Hex) < Width) then
+            Hex := StringOfChar('0', Width - Length(Hex)) + Hex;
+          AddText(Hex);
+          if Zero then
+            Fmt := Fmt + '%s'
+          else
+            Item('s');
+        end;
+    else
+      Fmt := Fmt + Literal(Copy(Format, Start, I - Start));
+    end;
+  end;
+  SetLength(Args, N);
+  Result := TvFormat.FormatStr(Fmt, Args);
 end;
 
 
 procedure GetKeyEvent(var Event: TEvent);
 begin
-  TvSys.PollKeyEvent(Event);
+  TEventQueue.GetKeyEvent(Event);
 end;
 
 function ShrinkPath(Path: string; MaxLen: Integer): string;

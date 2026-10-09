@@ -132,8 +132,10 @@ type
      constructor Init_Empty;
      constructor Init_file_line(AFile : String; ALine : longint);
      constructor Init_type(atyp : BreakpointType;Const AnExpr : String);
-     constructor Load(S: TStream);
-     procedure   Store(S: TStream);
+     function Read(Ip: ipstream): Pointer; override;
+     function StreamableName: ShortString; override;
+     class function Build: TStreamable; static;
+     procedure Write(Os: opstream); override;
      procedure  Insert;
      procedure  Remove;
      procedure  Enable;
@@ -141,6 +143,8 @@ type
      procedure  UpdateSource;
      procedure  ResetValues;
      destructor Destroy;override;
+   public
+     constructor Create(AInit: TStreamableInit); overload;
   end;
 
   TBreakpointCollection= class(TCollection)
@@ -153,6 +157,8 @@ type
       function  FindBreakpointAt(Editor : PSourceEditor; Line : longint) : PBreakpoint;
       procedure AdaptBreakpoints(Editor : PSourceEditor; Pos, Change : longint);
       procedure ShowAllBreakpoints;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TBreakpointItem = class;
@@ -172,7 +178,7 @@ type
       NoSelection : boolean;
       MaxWidth    : Sw_integer;
       (* ModuleNames : PStoreCollection; *)
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       procedure   AddBreakpoint(P: PBreakpointItem); virtual;
       function    GetText(Item,MaxLen: Sw_Integer): String; override;
       function    GetLocalMenu: PMenu;override;
@@ -184,8 +190,10 @@ type
       procedure   ToggleCurrent;
       procedure   Draw; override;
       procedure   HandleEvent(var Event: TEvent); override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -193,7 +201,7 @@ type
   PBreakpointsWindow = TBreakpointsWindow;
     TBreakpointsWindow = class(TFPDlgWindow)
       BreakLB : PBreakpointsListBox;
-      constructor Create;
+      constructor Create; overload;
       procedure   AddBreakpoint(ABreakpoint : PBreakpoint);
       procedure   ClearBreakpoints;
       procedure   ReloadBreakpoints;
@@ -201,8 +209,10 @@ type
       procedure   SizeLimits(out Min, Max: TPoint);override;
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   Update; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -226,26 +236,32 @@ type
     TWatch = class(TObject)
       expr : pstring;
       last_value,current_value : pchar;
-      constructor Create(s : string);
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      constructor Create(s : string); overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure rename(s : string);
       procedure Get_new_value;
       procedure Force_new_value;
       destructor Destroy;override;
     private
       GDBRunCount : longint;
+    public
+      constructor Create(AInit: TStreamableInit); overload;
     end;
 
     TWatchesCollection = class;
   PWatchesCollection = TWatchesCollection;
     TWatchesCollection = class(TCollection)
-      constructor Create;
+      constructor Create; overload;
       procedure Insert(Item: Pointer); override;
       function  At(Index: Integer): PWatch;
       procedure Update;
     private
       MaxW : integer;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TWatchesListBox = class;
@@ -253,7 +269,7 @@ type
     TWatchesListBox = class(THSListBox)
       Transparent : boolean;
       MaxWidth    : Sw_integer;
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       (* procedure   AddWatch(P: PWatch); virtual; *)
       procedure   Update(AMaxWidth : integer);
       function    GetText (Item: Sw_Integer; MaxLen: Sw_Integer): String; override;
@@ -267,8 +283,10 @@ type
       (*procedure   ToggleCurrent; *)
       procedure   Draw; override;
       procedure   HandleEvent(var Event: TEvent); override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
@@ -288,9 +306,11 @@ type
   PWatchesWindow = TWatchesWindow;
     TWatchesWindow = class(TFPDlgWindow)
       WLB : PWatchesListBox;
-      constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      constructor Create; overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -298,22 +318,26 @@ type
     TFramesListBox = class;
   PFramesListBox = TFramesListBox;
     TFramesListBox = class(TMessageListBox)
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       procedure   Update; override;
       function    GetLocalMenu: PMenu;override;
       procedure   GotoSource; override;
       procedure   GotoAssembly; virtual;
       procedure   HandleEvent(var Event: TEvent); override;
       destructor Destroy; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TStackWindow = class;
   PStackWindow = TStackWindow;
     TStackWindow = class(TFPDlgWindow)
       FLB : PFramesListBox;
-      constructor Create;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      constructor Create; overload;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       procedure   Update; override;
       destructor Destroy; override;
     end;
@@ -408,22 +432,12 @@ uses
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RBreakpointsWindow: TStreamRec;
 
 
   {$endif}
 {$endif}
 {$endif NOOBJREG}
 
-var RBreakpointsListBox: TStreamRec;
-var RWatchesWindow: TStreamRec;
-var RWatchesListBox: TStreamRec;
-var RStackWindow: TStreamRec;
-var RFramesListBox: TStreamRec;
-var RBreakpoint: TStreamRec;
-var RWatch: TStreamRec;
-var RBreakpointCollection: TStreamRec;
-var RWatchesCollection: TStreamRec;
 
 
 {$ifdef USERESSTRINGS}
@@ -642,7 +656,7 @@ procedure UpdateDebugViews;
         Debugger.isRemoteDebugging then
        PushStatus(msg_getting_info_on+RemoteMachine);
 {$endif SUPPORT_REMOTE}
-     DeskTop.Lock;
+     TProgram.DeskTop.Lock;
      If assigned(StackWindow) then
        StackWindow.Update;
      If assigned(RegistersWindow) then
@@ -655,7 +669,7 @@ procedure UpdateDebugViews;
        FPUWindow.Update;
      If assigned(VectorWindow) then
        VectorWindow.Update;
-     DeskTop.UnLock;
+     TProgram.DeskTop.UnLock;
 {$ifdef SUPPORT_REMOTE}
      if assigned(Debugger) and
         Debugger.isRemoteDebugging then
@@ -1012,7 +1026,7 @@ begin
       SetDir(StartupDir);
     end;
   DebuggerScreen;
-  SetCmdState([cmResetDebugger,cmUntilReturn],true);
+  TView.SetCmdState(CommandSetOf([cmResetDebugger,cmUntilReturn]),true);
   IDEApp.UpdateRunMenu(true);
   UpdateDebugViews;
 end;
@@ -1065,7 +1079,7 @@ var
   ModalView : PView;
   res : longint;
 begin
-  if not assigned(Application) then
+  if not assigned(TProgram.Application) then
     begin
       system.Write(question);
       repeat
@@ -1079,11 +1093,11 @@ begin
         query:=0;
       exit;
     end;
-  if assigned(Application.Current) and
-     ((Application.Current.State and sfModal)<>0) then
+  if assigned(TProgram.Application.Current) and
+     ((TProgram.Application.Current.State and sfModal)<>0) then
     begin
       WasModal:=true;
-      ModalView:=Application.Current;
+      ModalView:=TProgram.Application.Current;
       ModalView.SetState(sfModal, false);
       ModalView.Hide;
     end
@@ -1186,7 +1200,7 @@ procedure TDebugController.ResetDebuggerRows;
   end;
 
 begin
-  Desktop.ForEach(@ResetDebuggerRow);
+  TProgram.DeskTop.ForEach(@ResetDebuggerRow);
 end;
 
 procedure TDebugController.Reset;
@@ -1213,7 +1227,7 @@ begin
   { In case we have something that the compiler touched }
   If IDEApp.IsRunning then
     begin
-      SetCmdState([cmResetDebugger,cmUntilReturn],false);
+      TView.SetCmdState(CommandSetOf([cmResetDebugger,cmUntilReturn]),false);
       IDEApp.UpdateRunMenu(false);
       AskToReloadAllModifiedFiles;
       ResetDebuggerRows;
@@ -1345,7 +1359,7 @@ var
   i,ExitCode : longint;
   ExitAddr,ExitFrame : CORE_ADDR;
 begin
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   { 0 based line count in Editor }
   if Line>0 then
     dec(Line);
@@ -1378,7 +1392,7 @@ begin
       end
       else
       begin
-        Desktop.Unlock;
+        TProgram.DeskTop.Unlock;
         DoSelectSourceLine := False;
         exit;
       end;
@@ -1425,13 +1439,13 @@ begin
         { only search a file once }
       else
        begin
-         Desktop.UnLock;
+         TProgram.DeskTop.UnLock;
          if s='' then
            Found:=false
          else
          { it is easier to handle with a * at the end }
            Found:=IDEApp.OpenSearch(s+'*');
-         Desktop.Lock;
+         TProgram.DeskTop.Lock;
          if not Found then
            begin
              InvalidSourceLine:=true;
@@ -1457,7 +1471,7 @@ begin
        end;
     end;
   LastFileName:=s;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
   if BreakIndex>0 then
     begin
       PB:=BreakpointsCollection.GetGDB(BreakIndex);
@@ -1521,7 +1535,7 @@ end;
 procedure TDebugController.DoEndSession(code:longint);
 var P :Array[1..2] of longint;
 begin
-   SetCmdState([cmUntilReturn,cmResetDebugger],false);
+   TView.SetCmdState(CommandSetOf([cmUntilReturn,cmResetDebugger]),false);
    IDEApp.UpdateRunMenu(false);
    ResetDebuggerRows;
    LastExitCode:=Code;
@@ -1554,7 +1568,7 @@ begin
   else
     begin
       IDEApp.ShowIDEScreen;
-      Message(Application,evBroadcast,cmDebuggerStopped,pointer(ptrint(RunCount)));
+      Message(TProgram.Application,evBroadcast,cmDebuggerStopped,pointer(ptrint(RunCount)));
       PopStatus;
     end;
 {$ifdef Windows}
@@ -1727,59 +1741,74 @@ begin
   CurrentValue:=nil;
 end;
 
-constructor TBreakpoint.Load(S: TStream);
+function TBreakpoint.Read(Ip: ipstream): Pointer;
 var
   FName : PString;
 begin
-  S.Read(typ,SizeOf(BreakpointType));
-  S.Read(state,SizeOf(BreakpointState));
+  Result := Self;
+  Ip.ReadBytes(typ,SizeOf(BreakpointType));
+  Ip.ReadBytes(state,SizeOf(BreakpointState));
   GDBState:=bs_deleted;
   case typ of
     bt_file_line :
       begin
         { convert to current target }
-        FName:=S.ReadStr;
+        FName:=Ip.ReadString;
         FileName:=NewStr(OSFileName(GetStr(FName)));
         If Assigned(FName) then
           DisposeStr(FName);
-        S.Read(Line,SizeOf(Line));
+        Ip.ReadBytes(Line,SizeOf(Line));
         Name:=nil;
       end;
   else
     begin
-        Name:=S.ReadStr;
+        Name:=Ip.ReadString;
         Line:=0;
         FileName:=nil;
     end;
   end;
-  S.Read(IgnoreCount,SizeOf(IgnoreCount));
-  Commands:=S.StrRead;
-  Conditions:=S.ReadStr;
+  Ip.ReadBytes(IgnoreCount,SizeOf(IgnoreCount));
+  Commands:=StrRead(Ip);
+  Conditions:=Ip.ReadString;
   OldValue:=nil;
   CurrentValue:=nil;
 end;
 
-procedure TBreakpoint.Store(S: TStream);
+procedure TBreakpoint.Write(Os: opstream);
 var
   St : String;
 begin
-  S.Write(typ,SizeOf(BreakpointType));
-  S.Write(state,SizeOf(BreakpointState));
+  Os.WriteBytes(typ,SizeOf(BreakpointType));
+  Os.WriteBytes(state,SizeOf(BreakpointState));
   case typ of
     bt_file_line :
       begin
         st:=OSFileName(GetStr(FileName));
-        S.WriteStr(@St);
-        S.Write(Line,SizeOf(Line));
+        Os.WriteString(@St);
+        Os.WriteBytes(Line,SizeOf(Line));
       end;
   else
     begin
-        S.WriteStr(Name);
+        Os.WriteString(Name);
     end;
   end;
-  S.Write(IgnoreCount,SizeOf(IgnoreCount));
-  S.StrWrite(Commands);
-  S.WriteStr(Conditions);
+  Os.WriteBytes(IgnoreCount,SizeOf(IgnoreCount));
+  StrWrite(Os, Commands);
+  Os.WriteString(Conditions);
+end;
+
+constructor TBreakpoint.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function TBreakpoint.Build: TStreamable;
+begin
+  Result := TBreakpoint.Create(streamableInit);
+end;
+
+function TBreakpoint.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TBreakpoint';
 end;
 
 procedure TBreakpoint.Insert;
@@ -2247,7 +2276,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEnd :
             FocusItem(List.Count-1);
           kbHome :
@@ -2265,15 +2294,15 @@ begin
           ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Pointer(Self) then
+          if Event.Message.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmEditBreakpoint,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmMsgTrackSource :
             if Range>0 then
               TrackSource;
@@ -2300,7 +2329,7 @@ end;
 procedure TBreakpointsListBox.AddBreakpoint(P: PBreakpointItem);
 var W : integer;
 begin
-  if List=nil then List := TCollection.Create(20,20);
+  if List=nil then Items := TCollection.Create(20,20);
   W:=length(P.GetText(255));
   if W>MaxWidth then
   begin
@@ -2329,10 +2358,10 @@ procedure TBreakpointsListBox.Clear;
 begin
   if assigned(List) then
     List.Free;
-  List:=nil;
+  Items:=nil;
   MaxWidth:=0;
   SetRange(0); DrawView;
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
 end;
 
 procedure TBreakpointsListBox.TrackSource;
@@ -2344,13 +2373,13 @@ begin
   if Range=0 then Exit;*)
   P:=TBreakpointItem(List.At(Focused));
   if P.GetModuleName='' then Exit;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   GetNextEditorBounds(R);
   R.B.Y:=Owner.Origin.Y;
   W:=EditorWindowFile(P.GetModuleName);
   if assigned(W) then
     begin
-      W.GetExtent(R);
+      R := W.GetExtent;
       R.B.Y:=Owner.Origin.Y;
       W.ChangeBounds(R);
       W.Editor.SetCurPtr(1,P.Breakpoint.Line);
@@ -2365,7 +2394,7 @@ begin
     end;
   if Assigned(Owner) then
     Owner.Select;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
 end;
 
 procedure TBreakpointsListBox.ToggleCurrent;
@@ -2390,7 +2419,7 @@ begin
   if Range=0 then Exit;
   P:=TBreakpointItem(List.At(Focused));
   if P=nil then Exit;
-  Application.ExecuteDialog(TBreakpointItemDialog.Create(P.Breakpoint),nil);
+  TProgram.Application.ExecuteDialog(TBreakpointItemDialog.Create(P.Breakpoint),nil);
   P.Breakpoint.UpdateSource;
   BreakpointsCollection.Update;
 end;
@@ -2415,7 +2444,7 @@ var
   P: PBreakpoint;
 begin
   P:=TBreakpoint.Init_Empty;
-  if Application.ExecuteDialog(TBreakpointItemDialog.Create(P),nil)<>cmCancel then
+  if TProgram.Application.ExecuteDialog(TBreakpointItemDialog.Create(P),nil)<>cmCancel then
     begin
       P.UpdateSource;
       BreakpointsCollection.Insert(P);
@@ -2495,29 +2524,40 @@ begin
   end;
 end;
 
-constructor TBreakpointsListBox.Load(S: TStream);
+function TBreakpointsListBox.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 end;
 
-procedure TBreakpointsListBox.Store(S: TStream);
+procedure TBreakpointsListBox.Write(Os: opstream);
 var OL: PCollection;
     OldR : integer;
 begin
   OL:=List;
   OldR:=Range;
   Range:=0;
-  List := TCollection.Create(1,1);
+  Items := TCollection.Create(1,1);
 
-  inherited Store(S);
+  inherited Write(Os);
 
   List.Free;
   Range:=OldR;
-  List:=OL;
+  Items:=OL;
   { ^^^ nasty trick - has anyone a better idea how to avoid storing the
     collection? Pasting here a modified version of TListBox.Store+
     TAdvancedListBox.Store isn't a better solution, since by eventually
     changing the obj-hierarchy you'll always have to modify this, too - BG }
+end;
+
+class function TBreakpointsListBox.Build: TStreamable;
+begin
+  Result := TBreakpointsListBox.Create(streamableInit);
+end;
+
+function TBreakpointsListBox.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TBreakpointsListBox';
 end;
 
 destructor TBreakpointsListBox.Destroy;
@@ -2540,32 +2580,32 @@ var R,R2: TRect;
 const
   NumButtons = 5;
 begin
-  Desktop.GetExtent(R); R.A.Y:=R.B.Y-18;
+  R := TProgram.DeskTop.GetExtent; R.A.Y:=R.B.Y-18;
   inherited Create(R, dialog_breakpointlist, wnNoNumber);
 
   HelpCtx:=hcBreakpointListWindow;
 
-  GetExtent(R); R.Grow(-1,-1); R.B.Y:=R.A.Y+1;
+  R := GetExtent; R.Grow(-1,-1); R.B.Y:=R.A.Y+1;
   S:=label_breakpointpropheader;
   ST := TStaticText.Create(R,S);
   ST.GrowMode:=gfGrowHiX;
   Insert(ST);
-  GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,1); R.B.Y:=R.A.Y+1;
+  R := GetExtent; R.Grow(-1,-1); Inc(R.A.Y,1); R.B.Y:=R.A.Y+1;
   ST := TStaticText.Create(R, CharStr('─', MaxViewWidth));
   ST.GrowMode:=gfGrowHiX;
   Insert(ST);
-  GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,2);Dec(R.B.Y,5);
-  R2.Copy(R); Inc(R2.B.Y); R2.A.Y:=R2.B.Y-1;
+  R := GetExtent; R.Grow(-1,-1); Inc(R.A.Y,2);Dec(R.B.Y,5);
+  R2 := R; Inc(R2.B.Y); R2.A.Y:=R2.B.Y-1;
   HSB := TScrollBar.Create(R2); HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX; Insert(HSB);
   HSB.SetStep(R.B.X-R.A.X-2,1);
-  R2.Copy(R); Inc(R2.B.X); R2.A.X:=R2.B.X-1;
+  R2 := R; Inc(R2.B.X); R2.A.X:=R2.B.X-1;
   VSB := TScrollBar.Create(R2); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
   VSB.SetStep(R.B.Y-R.A.Y-2,1);
   BreakLB := TBreakpointsListBox.Create(R,HSB,VSB);
   BreakLB.GrowMode:=gfGrowHiX+gfGrowHiY;
   BreakLB.Transparent:=true;
   Insert(BreakLB);
-  GetExtent(R);R.Grow(-1,-1);
+  R := GetExtent;R.Grow(-1,-1);
   Dec(R.B.Y);
   R.A.Y:=R.B.Y-2;
   X:=(R.B.X-R.A.X) div NumButtons;
@@ -2599,16 +2639,27 @@ begin
   BreakpointsWindow:=Self;
 end;
 
-constructor TBreakpointsWindow.Load(S: TStream);
+function TBreakpointsWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  GetSubViewPtr(S,BreakLB);
+  Result := Self;
+  inherited Read(Ip);
+  BreakLB := TBreakpointsListBox(Ip.ReadPointer);
 end;
 
-procedure TBreakpointsWindow.Store(S: TStream);
+procedure TBreakpointsWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
-  PutSubViewPtr(S,BreakLB);
+  inherited Write(Os);
+  Os.WritePointer(BreakLB);
+end;
+
+class function TBreakpointsWindow.Build: TStreamable;
+begin
+  Result := TBreakpointsWindow.Create(streamableInit);
+end;
+
+function TBreakpointsWindow.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TBreakpointsWindow';
 end;
 
 procedure TBreakpointsWindow.AddBreakpoint(ABreakpoint : PBreakpoint);
@@ -2651,7 +2702,7 @@ begin
   case Event.What of
     evKeyDown :
       begin
-        if (Event.KeyCode=kbEnter) or (Event.KeyCode=kbEsc) then
+        if (Event.KeyDown.KeyCode=kbEnter) or (Event.KeyDown.KeyCode=kbEsc) then
           begin
             ClearEvent(Event);
             Hide;
@@ -2660,7 +2711,7 @@ begin
     evCommand :
       begin
        DontClear:=False;
-       case Event.Command of
+       case Event.Message.Command of
          cmNewBreakpoint :
            BreakLB.EditNew;
          cmEditBreakpoint :
@@ -2678,7 +2729,7 @@ begin
           ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate :
           Update;
       end;
@@ -2709,47 +2760,47 @@ end;
 
 constructor TBreakpointItemDialog.Create(ABreakpoint: PBreakpoint);
 var R,R2,R3: TRect;
-    Items: PSItem;
+    Items: TSItem;
     I : BreakpointType;
     KeyCount: sw_integer;
 begin
   KeyCount:=longint(high(BreakpointType));
 
-  R.Assign(0,0,60,Max(9+KeyCount,18));
+  R := TRect.Create(0, 0, 60, Max(9+KeyCount,18));
   inherited Create(R,dialog_modifynewbreakpoint);
   Breakpoint:=ABreakpoint;
 
-  GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
+  R := GetExtent; R.Grow(-3,-2); R3 := R;
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.B.X-3;
   NameIL := TEditorInputLine.Create(R, 255); Insert(NameIL);
-  R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
+  R2 := R; R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
   Insert(THistory.Create(R2, NameIL, hidBreakPointDialogName));
-  R.Copy(R3); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
-  R2.Copy(R); R2.Move(-1,-1);
+  R := R3; Inc(R.A.Y); R.B.Y:=R.A.Y+1;
+  R2 := R; R2.Move(-1,-1);
   Insert(TLabel.Create(R2, label_breakpoint_name, NameIL));
   R.Move(0,3);
   R.B.X:=R.B.X-3;
   ConditionsIL := TEditorInputLine.Create(R, 255); Insert(ConditionsIL);
-  R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
+  R2 := R; R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
   Insert(THistory.Create(R2, ConditionsIL, hidBreakPointDialogCond));
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_conditions, ConditionsIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_conditions, ConditionsIL));
   R.Move(0,3); R.B.X:=R.A.X+36;
   LineIL := TEditorInputLine.Create(R, 128); Insert(LineIL);
   LineIL.SetValidator(TRangeValidator.Create(0,MaxInt));
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_line, LineIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_line, LineIL));
   R.Move(0,3);
   IgnoreIL := TEditorInputLine.Create(R, 128); Insert(IgnoreIL);
   IgnoreIL.SetValidator(TRangeValidator.Create(0,MaxInt));
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_ignorecount, IgnoreIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_ignorecount, IgnoreIL));
 
-  R.Copy(R3); Inc(R.A.X,38); Inc(R.A.Y,7); R.B.Y:=R.A.Y+KeyCount;
+  R := R3; Inc(R.A.X,38); Inc(R.A.Y,7); R.B.Y:=R.A.Y+KeyCount;
   Items:=nil;
   { don't use invalid type }
   for I:=pred(high(BreakpointType)) downto low(BreakpointType) do
-    Items:=NewSItem(BreakpointTypeStr[I], Items);
+    Items:=TSItem.Create(BreakpointTypeStr[I], Items);
   TypeRB := TRadioButtons.Create(R, Items);
 
-  R2.Copy(R); R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
+  R2 := R; R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
   Insert(TLabel.Create(R2, label_breakpoint_type, TypeRB));
 
   Insert(TypeRB);
@@ -2841,19 +2892,34 @@ constructor TWatch.Create(s : string);
     GDBRunCount:=-1;
   end;
 
-constructor TWatch.Load(S: TStream);
+function TWatch.Read(Ip: ipstream): Pointer;
   begin
-    expr:=S.ReadStr;
+    Result := Self;
+    expr:=Ip.ReadString;
     last_value:=nil;
     current_value:=nil;
     Get_new_value;
     GDBRunCount:=-1;
   end;
 
-procedure TWatch.Store(S: TStream);
+procedure TWatch.Write(Os: opstream);
   begin
-    S.WriteStr(expr);
+    Os.WriteString(expr);
   end;
+
+constructor TWatch.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function TWatch.Build: TStreamable;
+begin
+  Result := TWatch.Create(streamableInit);
+end;
+
+function TWatch.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TWatch';
+end;
 
 procedure TWatch.rename(s : string);
   begin
@@ -3060,13 +3126,13 @@ constructor TWatchesListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: 
     inherited Create(Bounds,1,AHScrollBar,AVScrollBar);
     If assigned(List) then
       list.Free;
-    List:=WatchesCollection;
+    Items:=WatchesCollection;
   end;
 
 procedure TWatchesListBox.Update(AMaxWidth : integer);
 var R : TRect;
 begin
-  GetExtent(R);
+  R := GetExtent;
   MaxWidth:=AMaxWidth;
   if (HScrollBar<>nil) and (R.B.X-R.A.X<MaxWidth) then
     HScrollBar.SetRange(0,MaxWidth-(R.B.X-R.A.X))
@@ -3142,7 +3208,7 @@ begin
     P:=WatchesCollection.At(Focused)
   else
     P := TWatch.Create('');
-  Application.ExecuteDialog(TWatchItemDialog.Create(P),nil);
+  TProgram.Application.ExecuteDialog(TWatchItemDialog.Create(P),nil);
   WatchesCollection.Update;
 end;
 
@@ -3178,7 +3244,7 @@ begin
   else
     S:='';
   P := TWatch.Create(S);
-  if Application.ExecuteDialog(TWatchItemDialog.Create(P),nil)<>cmCancel then
+  if TProgram.Application.ExecuteDialog(TWatchItemDialog.Create(P),nil)<>cmCancel then
     begin
       WatchesCollection.AtInsert(Focused,P);
       WatchesCollection.Update;
@@ -3287,7 +3353,7 @@ var DontClear: boolean;
 begin
   case Event.What of
     evMouseDown : begin
-                   if ((Event.EventFlags and meDoubleClick) <> 0) then
+                   if ((Event.Mouse.EventFlags and meDoubleClick) <> 0) then
                       Message(Self,evCommand,cmEdit,nil)
                    else
                      ClearEvent(Event);
@@ -3295,7 +3361,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEnter :
             Message(Self,evCommand,cmEdit,nil);
           kbIns :
@@ -3309,15 +3375,15 @@ begin
           ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Pointer(Self) then
+          if Event.Message.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmEdit,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmEdit :
               EditCurrent;
           cmDelete :
@@ -3334,27 +3400,28 @@ begin
   inherited HandleEvent(Event);
 end;
 
-      constructor TWatchesListBox.Load(S: TStream);
+      function TWatchesListBox.Read(Ip: ipstream): Pointer;
         begin
-          inherited Load(S);
+          Result := Self;
+          inherited Read(Ip);
           If assigned(List) then
             list.Free;
-          List:=WatchesCollection;
+          Items:=WatchesCollection;
           { we must set Range PM }
           SetRange(List.count+1);
         end;
 
-      procedure   TWatchesListBox.Store(S: TStream);
+      procedure TWatchesListBox.Write(Os: opstream);
         var OL: PCollection;
             OldRange : Sw_integer;
         begin
           OL:=List;
           OldRange:=Range;
           Range:=0;
-          List := TCollection.Create(1,1);
-          inherited Store(S);
+          Items := TCollection.Create(1,1);
+          inherited Write(Os);
           List.Free;
-          List:=OL;
+          Items:=OL;
           { ^^^ nasty trick - has anyone a better idea how to avoid storing the
             collection? Pasting here a modified version of TListBox.Store+
             TAdvancedListBox.Store isn't a better solution, since by eventually
@@ -3362,9 +3429,19 @@ end;
           SetRange(OldRange);
         end;
 
+class function TWatchesListBox.Build: TStreamable;
+begin
+  Result := TWatchesListBox.Create(streamableInit);
+end;
+
+function TWatchesListBox.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TWatchesListBox';
+end;
+
       destructor  TWatchesListBox.Destroy;
         begin
-          List:=nil;
+          Items:=nil;
           inherited Destroy;
         end;
 
@@ -3377,21 +3454,21 @@ end;
       HSB,VSB: PScrollBar;
       R,R2 : trect;
     begin
-      Desktop.GetExtent(R);
+      R := TProgram.DeskTop.GetExtent;
       R.A.Y:=R.B.Y-7;
       inherited Create(R, dialog_watches,SearchFreeWindowNo);
       Palette:=wpCyanWindow;
-      GetExtent(R);
+      R := GetExtent;
       HelpCtx:=hcWatchesWindow;
       R.Grow(-1,-1);
-      R2.Copy(R);
+      R2 := R;
       Inc(R2.B.Y);
       R2.A.Y:=R2.B.Y-1;
       HSB := TScrollBar.Create(R2);
       HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX;
       HSB.SetStep(R.B.X-R.A.X,1);
       Insert(HSB);
-      R2.Copy(R);
+      R2 := R;
       Inc(R2.B.X);
       R2.A.X:=R2.B.X-1;
       VSB := TScrollBar.Create(R2);
@@ -3413,20 +3490,31 @@ end;
       Draw;
     end;
 
-  constructor TWatchesWindow.Load(S: TStream);
+  function TWatchesWindow.Read(Ip: ipstream): Pointer;
     begin
-      inherited Load(S);
-      GetSubViewPtr(S,WLB);
+      Result := Self;
+      inherited Read(Ip);
+      WLB := TWatchesListBox(Ip.ReadPointer);
       If assigned(WatchesWindow) then
         WatchesWindow.Free;
       WatchesWindow:=Self;
     end;
 
-  procedure TWatchesWindow.Store(S: TStream);
+  procedure TWatchesWindow.Write(Os: opstream);
     begin
-      inherited Store(S);
-      PutSubViewPtr(S,WLB);
+      inherited Write(Os);
+      Os.WritePointer(WLB);
     end;
+
+class function TWatchesWindow.Build: TStreamable;
+begin
+  Result := TWatchesWindow.Create(streamableInit);
+end;
+
+function TWatchesWindow.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TWatchesWindow';
+end;
 
   Destructor TWatchesWindow.Destroy;
     begin
@@ -3443,18 +3531,18 @@ end;
 constructor TWatchItemDialog.Create(AWatch: PWatch);
 var R,R2: TRect;
 begin
-  R.Assign(0,0,50,10);
+  R := TRect.Create(0, 0, 50, 10);
   inherited Create(R,'Edit Watch');
   Watch:=AWatch;
 
-  GetExtent(R); R.Grow(-3,-2);
+  R := GetExtent; R.Grow(-3,-2);
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.A.X+36;
   NameIL := TEditorInputLine.Create(R, 255); Insert(NameIL);
-  R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
+  R2 := R; R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
   Insert(THistory.Create(R2, NameIL, hidWatchDialog));
-  R2.Copy(R); R2.Move(-1,-1);
+  R2 := R; R2.Move(-1,-1);
   Insert(TLabel.Create(R2, label_watch_expressiontowatch, NameIL));
-  GetExtent(R);
+  R := GetExtent;
   R.Grow(-3,-1);
   R.A.Y:=R.A.Y+3;
   TextST := TAdvancedStaticText.Create(R, label_watch_values);
@@ -3526,7 +3614,7 @@ end;
 {$ifndef NODEBUG}
       if Assigned(ForeignFrameCount) then
         begin
-          DeskTop.Lock;
+          TProgram.DeskTop.Lock;
           Clear;
           for i:=0 to ForeignFrameCount()-1 do
             begin
@@ -3535,13 +3623,13 @@ end;
             end;
           if Assigned(list) and (List.Count > 0) then
             FocusItem(0);
-          DeskTop.Unlock;
+          TProgram.DeskTop.Unlock;
           exit;
         end;
       { call backtrace command }
       If not assigned(Debugger) then
         exit;
-      DeskTop.Lock;
+      TProgram.DeskTop.Lock;
       Clear;
 
       Debugger.Backtrace;
@@ -3584,7 +3672,7 @@ end;
         end;
       if Assigned(list) and (List.Count > 0) then
         FocusItem(0);
-      DeskTop.Unlock;
+      TProgram.DeskTop.Unlock;
 {$endif NODEBUG}
     end;
 
@@ -3637,8 +3725,8 @@ end;
 
   procedure   TFramesListBox.HandleEvent(var Event: TEvent);
     begin
-      if ((Event.What=EvKeyDown) and (Event.CharCode=Ord('i'))) or
-         ((Event.What=EvCommand) and (Event.Command=cmDisassemble)) then
+      if ((Event.What=EvKeyDown) and (Event.KeyDown.CharScan.CharCode=Ord('i'))) or
+         ((Event.What=EvCommand) and (Event.Message.Command=cmDisassemble)) then
         GotoAssembly;
       inherited HandleEvent(Event);
     end;
@@ -3653,20 +3741,20 @@ end;
       HSB,VSB: PScrollBar;
       R,R2 : trect;
     begin
-      Desktop.GetExtent(R);
+      R := TProgram.DeskTop.GetExtent;
       R.A.Y:=R.B.Y-5;
       inherited Create(R, dialog_callstack, wnNoNumber);
       Palette:=wpCyanWindow;
-      GetExtent(R);
+      R := GetExtent;
       HelpCtx:=hcStackWindow;
       R.Grow(-1,-1);
-      R2.Copy(R);
+      R2 := R;
       Inc(R2.B.Y);
       R2.A.Y:=R2.B.Y-1;
       HSB := TScrollBar.Create(R2);
       HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX;
       Insert(HSB);
-      R2.Copy(R);
+      R2 := R;
       Inc(R2.B.X);
       R2.A.X:=R2.B.X-1;
       VSB := TScrollBar.Create(R2);
@@ -3687,20 +3775,31 @@ end;
       DrawView;
     end;
 
-  constructor TStackWindow.Load(S: TStream);
+  function TStackWindow.Read(Ip: ipstream): Pointer;
     begin
-      inherited Load(S);
-      GetSubViewPtr(S,FLB);
+      Result := Self;
+      inherited Read(Ip);
+      FLB := TFramesListBox(Ip.ReadPointer);
       If assigned(StackWindow) then
         StackWindow.Free;
       StackWindow:=Self;
     end;
 
-  procedure TStackWindow.Store(S: TStream);
+  procedure TStackWindow.Write(Os: opstream);
     begin
-      inherited Store(S);
-      PutSubViewPtr(S,FLB);
+      inherited Write(Os);
+      Os.WritePointer(FLB);
     end;
+
+class function TStackWindow.Build: TStreamable;
+begin
+  Result := TStackWindow.Create(streamableInit);
+end;
+
+function TStackWindow.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TStackWindow';
+end;
 
   Destructor TStackWindow.Destroy;
     begin
@@ -3924,9 +4023,9 @@ var
 begin
   if GDBWindow=nil then
     begin
-      DeskTop.GetExtent(R);
+      R := TProgram.DeskTop.GetExtent;
       GDBWindow := TGDBWindow.Create(R);
-      DeskTop.Insert(GDBWindow);
+      TProgram.DeskTop.Insert(GDBWindow);
     end;
 end;
 
@@ -3935,7 +4034,7 @@ begin
   If IDEApp.IsRunning and
      assigned(GDBWindow) then
     begin
-      DeskTop.Delete(GDBWindow);
+      TProgram.DeskTop.Delete(GDBWindow);
     end;
   GDBWindow:=nil;
 end;
@@ -3946,9 +4045,9 @@ var
 begin
   if DisassemblyWindow=nil then
     begin
-      DeskTop.GetExtent(R);
+      R := TProgram.DeskTop.GetExtent;
       DisassemblyWindow := TDisassemblyWindow.Create(R);
-      DeskTop.Insert(DisassemblyWindow);
+      TProgram.DeskTop.Insert(DisassemblyWindow);
     end;
 end;
 
@@ -3956,7 +4055,7 @@ procedure DoneDisassemblyWindow;
 begin
   if assigned(DisassemblyWindow) then
     begin
-      DeskTop.Delete(DisassemblyWindow);
+      TProgram.DeskTop.Delete(DisassemblyWindow);
       DisassemblyWindow.Free;
       DisassemblyWindow:=nil;
     end;
@@ -3967,7 +4066,7 @@ begin
   if StackWindow=nil then
     begin
       StackWindow := TStackWindow.Create;
-      DeskTop.Insert(StackWindow);
+      TProgram.DeskTop.Insert(StackWindow);
     end;
 end;
 
@@ -3975,7 +4074,7 @@ procedure DoneStackWindow;
 begin
   if assigned(StackWindow) then
     begin
-      DeskTop.Delete(StackWindow);
+      TProgram.DeskTop.Delete(StackWindow);
       StackWindow:=nil;
     end;
 end;
@@ -4003,176 +4102,77 @@ begin
 end;
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RBreakpointsWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TBreakpointsWindow.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RBreakpointsWindow(P: TStreamable; S: TStream);
-begin
-  TBreakpointsWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RBreakpointsListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TBreakpointsListBox.Load(S)));
-end;
 
-procedure Store_RBreakpointsListBox(P: TStreamable; S: TStream);
-begin
-  TBreakpointsListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RWatchesWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TWatchesWindow.Load(S)));
-end;
 
-procedure Store_RWatchesWindow(P: TStreamable; S: TStream);
-begin
-  TWatchesWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RWatchesListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TWatchesListBox.Load(S)));
-end;
 
-procedure Store_RWatchesListBox(P: TStreamable; S: TStream);
-begin
-  TWatchesListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RStackWindow(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TStackWindow.Load(S)));
-end;
 
-procedure Store_RStackWindow(P: TStreamable; S: TStream);
-begin
-  TStackWindow(Pointer(P)).Store(S);
-end;
 
-function Build_RFramesListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TFramesListBox.Load(S)));
-end;
 
-procedure Store_RFramesListBox(P: TStreamable; S: TStream);
-begin
-  TFramesListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RBreakpoint(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TBreakpoint.Load(S)));
-end;
 
-procedure Store_RBreakpoint(P: TStreamable; S: TStream);
-begin
-  TBreakpoint(Pointer(P)).Store(S);
-end;
 
-function Build_RWatch(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TWatch.Load(S)));
-end;
 
-procedure Store_RWatch(P: TStreamable; S: TStream);
-begin
-  TWatch(Pointer(P)).Store(S);
-end;
 
-function Build_RBreakpointCollection(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TBreakpointCollection.Load(S)));
-end;
 
-procedure Store_RBreakpointCollection(P: TStreamable; S: TStream);
-begin
-  TBreakpointCollection(Pointer(P)).Store(S);
-end;
 
-function Build_RWatchesCollection(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TWatchesCollection.Load(S)));
-end;
 
-procedure Store_RWatchesCollection(P: TStreamable; S: TStream);
-begin
-  TWatchesCollection(Pointer(P)).Store(S);
-end;
 
-procedure FillStreamRecs_fpdebug;
+procedure RegisterStreamables_fpdebug;
 begin
-  RBreakpointsWindow.ObjType := 1701;
-  RBreakpointsWindow.VmtLink := PtrUInt(System.TClass(TBreakpointsWindow));
-  RBreakpointsWindow.Load := @Build_RBreakpointsWindow;
-  RBreakpointsWindow.Store := @Store_RBreakpointsWindow;
-  RBreakpointsWindow.Next := nil;
-  RBreakpointsListBox.ObjType := 1702;
-  RBreakpointsListBox.VmtLink := PtrUInt(System.TClass(TBreakpointsListBox));
-  RBreakpointsListBox.Load := @Build_RBreakpointsListBox;
-  RBreakpointsListBox.Store := @Store_RBreakpointsListBox;
-  RBreakpointsListBox.Next := nil;
-  RWatchesWindow.ObjType := 1703;
-  RWatchesWindow.VmtLink := PtrUInt(System.TClass(TWatchesWindow));
-  RWatchesWindow.Load := @Build_RWatchesWindow;
-  RWatchesWindow.Store := @Store_RWatchesWindow;
-  RWatchesWindow.Next := nil;
-  RWatchesListBox.ObjType := 1704;
-  RWatchesListBox.VmtLink := PtrUInt(System.TClass(TWatchesListBox));
-  RWatchesListBox.Load := @Build_RWatchesListBox;
-  RWatchesListBox.Store := @Store_RWatchesListBox;
-  RWatchesListBox.Next := nil;
-  RStackWindow.ObjType := 1705;
-  RStackWindow.VmtLink := PtrUInt(System.TClass(TStackWindow));
-  RStackWindow.Load := @Build_RStackWindow;
-  RStackWindow.Store := @Store_RStackWindow;
-  RStackWindow.Next := nil;
-  RFramesListBox.ObjType := 1706;
-  RFramesListBox.VmtLink := PtrUInt(System.TClass(TFramesListBox));
-  RFramesListBox.Load := @Build_RFramesListBox;
-  RFramesListBox.Store := @Store_RFramesListBox;
-  RFramesListBox.Next := nil;
-  RBreakpoint.ObjType := 1707;
-  RBreakpoint.VmtLink := PtrUInt(System.TClass(TBreakpoint));
-  RBreakpoint.Load := @Build_RBreakpoint;
-  RBreakpoint.Store := @Store_RBreakpoint;
-  RBreakpoint.Next := nil;
-  RWatch.ObjType := 1708;
-  RWatch.VmtLink := PtrUInt(System.TClass(TWatch));
-  RWatch.Load := @Build_RWatch;
-  RWatch.Store := @Store_RWatch;
-  RWatch.Next := nil;
-  RBreakpointCollection.ObjType := 1709;
-  RBreakpointCollection.VmtLink := PtrUInt(System.TClass(TBreakpointCollection));
-  RBreakpointCollection.Load := @Build_RBreakpointCollection;
-  RBreakpointCollection.Store := @Store_RBreakpointCollection;
-  RBreakpointCollection.Next := nil;
-  RWatchesCollection.ObjType := 1710;
-  RWatchesCollection.VmtLink := PtrUInt(System.TClass(TWatchesCollection));
-  RWatchesCollection.Load := @Build_RWatchesCollection;
-  RWatchesCollection.Store := @Store_RWatchesCollection;
-  RWatchesCollection.Next := nil;
+  TStreamableClass.Create('fpdebug.TBreakpointsWindow', @TBreakpointsWindow.Build);
+  TStreamableClass.Create('fpdebug.TBreakpointsListBox', @TBreakpointsListBox.Build);
+  TStreamableClass.Create('fpdebug.TWatchesWindow', @TWatchesWindow.Build);
+  TStreamableClass.Create('fpdebug.TWatchesListBox', @TWatchesListBox.Build);
+  TStreamableClass.Create('fpdebug.TStackWindow', @TStackWindow.Build);
+  TStreamableClass.Create('fpdebug.TFramesListBox', @TFramesListBox.Build);
+  TStreamableClass.Create('fpdebug.TBreakpoint', @TBreakpoint.Build);
+  TStreamableClass.Create('fpdebug.TWatch', @TWatch.Build);
+  TStreamableClass.Create('fpdebug.TBreakpointCollection', @TBreakpointCollection.Build);
+  TStreamableClass.Create('fpdebug.TWatchesCollection', @TWatchesCollection.Build);
 end;
 
 {$endif}
 
 procedure RegisterFPDebugViews;
 begin
-  FillStreamRecs_fpdebug;
-  RegisterType(RWatchesWindow);
-  RegisterType(RBreakpointsWindow);
-  RegisterType(RWatchesListBox);
-  RegisterType(RBreakpointsListBox);
-  RegisterType(RStackWindow);
-  RegisterType(RFramesListBox);
-  RegisterType(RBreakpoint);
-  RegisterType(RWatch);
-  RegisterType(RBreakpointCollection);
-  RegisterType(RWatchesCollection);
+  RegisterStreamables_fpdebug;
+end;
+
+
+class function TBreakpointCollection.Build: TStreamable;
+begin
+  Result := TBreakpointCollection.Create(streamableInit);
+end;
+
+function TBreakpointCollection.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TBreakpointCollection';
+end;
+
+class function TFramesListBox.Build: TStreamable;
+begin
+  Result := TFramesListBox.Create(streamableInit);
+end;
+
+function TFramesListBox.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TFramesListBox';
+end;
+
+class function TWatchesCollection.Build: TStreamable;
+begin
+  Result := TWatchesCollection.Create(streamableInit);
+end;
+
+function TWatchesCollection.StreamableName: ShortString;
+begin
+  Result := 'fpdebug.TWatchesCollection';
 end;
 
 end.

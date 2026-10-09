@@ -164,11 +164,11 @@ constructor TKeyDialog.Create(Const ATitle : String);
       i,hight,key : longint;
 begin
   Hight:=(NumWantedKeys + 2) div 3;
-  R.Assign(0,0,63 + 4,Hight + 4);
+  R := TRect.Create(0, 0, 63 + 4, Hight + 4);
   inherited Create(R,ATitle);
   for i:=1 to NumWantedKeys do
     begin
-      GetExtent(R);
+      R := GetExtent;
       R.Grow(-1,-1);
       R.A.Y:=R.A.Y + ((i-1) mod Hight);
       R.A.X:=R.A.X + 21 * ((i-1) div Hight);
@@ -186,13 +186,13 @@ begin
       Insert(PL[i]);
       PSTL[i].Link:=PL[i];
     end;
-  GetExtent(R);
+  R := GetExtent;
   R.Grow(-1,-1);
   Dec(R.B.Y);
   R.A.Y:=R.B.Y-1;
   PST := TAdvancedStaticText.Create(R,'Press all listed keys');
   Insert(PST);
-  GetExtent(R);
+  R := GetExtent;
   R.Grow(-1,-1);
   R.A.Y:=R.B.Y-1;
   PST2 := TAdvancedStaticText.Create(R,'Alt prefix "'+NiceEscape(chr(AltPrefix))+'" Shift prefix = "'+
@@ -227,7 +227,7 @@ begin
     else
       begin
         St:='';
-        Application.GetEvent(E);
+        TProgram.Application.GetEvent(E);
       end;
     if E.What= evNothing then
       begin
@@ -236,22 +236,22 @@ begin
             if GetKey(St)<>0 then
               begin
                 E.What:=evKeyDown;
-                E.KeyCode:=GetKey(St);
+                E.KeyDown.KeyCode:=GetKey(St);
               end
             else if St=#9 then
               begin
                 E.What:=evKeyDown;
-                E.KeyCode:=kbTab;
+                E.KeyDown.KeyCode:=kbTab;
               end
             else if St=#27 then
               begin
                 E.What:=evKeyDown;
-                E.KeyCode:=kbEsc;
+                E.KeyDown.KeyCode:=kbEsc;
               end
             else if St=#13 then
               begin
                 E.What:=evKeyDown;
-                E.KeyCode:=kbEnter;
+                E.KeyDown.KeyCode:=kbEnter;
               end;
           end;
       end;
@@ -259,7 +259,7 @@ begin
     if (E.What=evKeyDown) and not assigned(APL) then
       begin
         for i:=1 to NumWantedKeys do
-          if E.Keycode=WantedKeys[i] then
+          if E.KeyDown.KeyCode=WantedKeys[i] then
             begin
               DisposeStr(PSTL[i].Text);
               PSTL[i].Text:=NewStr(WantedKeysLabels[i]+' OK ');
@@ -274,7 +274,7 @@ begin
       end;
     if (St<>'') and not keyfound and
        ((E.What<>evKeyDown) or
-       ((E.KeyCode<>kbTab) and (E.Keycode<>kbEnter) and (E.Keycode<>kbEsc))) then
+       ((E.KeyDown.KeyCode<>kbTab) and (E.KeyDown.KeyCode<>kbEnter) and (E.KeyDown.KeyCode<>kbEsc))) then
       begin
         PST.SetText('"'+NiceEscape(St)+'"');
         if Assigned(APL) then
@@ -336,7 +336,7 @@ begin
   NotImplemented;
 {$else not NotUseTree}
   D := TKeyDialog.Create('Learn keys');
-  Application.ExecuteDialog(D,nil);
+  TProgram.Application.ExecuteDialog(D,nil);
 {$endif not NotUseTree}
 end;
 

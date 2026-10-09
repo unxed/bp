@@ -1001,7 +1001,7 @@ begin
   end;
   RenderTopic(Lines,T);
   Lines.Free;
-  Keywords.DeleteAll; Keywords.Free;
+  Keywords.RemoveAll; Keywords.Free;
   BuildIndexTopic:=T;
 end;
 

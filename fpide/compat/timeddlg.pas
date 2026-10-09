@@ -14,9 +14,9 @@ type
   TTimedDialog = class(TDialog)
     Secs: LongInt;
     constructor Create(var Bounds: TRect; ATitle: TTitleStr; ASecs: Word); reintroduce;
-    constructor Load(S: TStream);
+    function Read(Ip: ipstream): Pointer; override;
     procedure GetEvent(var Event: TEvent); override;
-    procedure Store(S: TStream); override;
+    procedure Write(Os: opstream); override;
   private
     Secs0: LongInt;
     Secs2: LongInt;
@@ -86,36 +86,37 @@ begin
     if (Secs = 0) and (What = evNothing) then
     begin
       What := evCommand;
-      Command := cmCancel;
+      Message.Command := cmCancel;
     end;
 end;
 
-constructor TTimedDialog.Load(S: TStream);
+function TTimedDialog.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
-  S.Read(Secs, SizeOf(Secs));
-  S.Read(Secs0, SizeOf(Secs0));
-  S.Read(Secs2, SizeOf(Secs2));
-  S.Read(DayWrap, SizeOf(DayWrap));
+  Result := Self;
+  inherited Read(Ip);
+  Ip.ReadBytes(Secs, SizeOf(Secs));
+  Ip.ReadBytes(Secs0, SizeOf(Secs0));
+  Ip.ReadBytes(Secs2, SizeOf(Secs2));
+  Ip.ReadBytes(DayWrap, SizeOf(DayWrap));
 end;
 
-procedure TTimedDialog.Store(S: TStream);
+procedure TTimedDialog.Write(Os: opstream);
 begin
-  inherited Store(S);
-  S.Write(Secs, SizeOf(Secs));
-  S.Write(Secs0, SizeOf(Secs0));
-  S.Write(Secs2, SizeOf(Secs2));
-  S.Write(DayWrap, SizeOf(DayWrap));
+  inherited Write(Os);
+  Os.WriteBytes(Secs, SizeOf(Secs));
+  Os.WriteBytes(Secs0, SizeOf(Secs0));
+  Os.WriteBytes(Secs2, SizeOf(Secs2));
+  Os.WriteBytes(DayWrap, SizeOf(DayWrap));
 end;
 
 function BoxTitle(AOptions: Word): ShortString;
 begin
   case AOptions and 3 of
-    mfError: BoxTitle := MsgErrorText;
-    mfInformation: BoxTitle := MsgInformationText;
-    mfConfirmation: BoxTitle := MsgConfirmText;
+    mfError: BoxTitle := MsgBoxText.ErrorText;
+    mfInformation: BoxTitle := MsgBoxText.InformationText;
+    mfConfirmation: BoxTitle := MsgBoxText.ConfirmText;
   else
-    BoxTitle := MsgWarningText;
+    BoxTitle := MsgBoxText.WarningText;
   end;
 end;
 
@@ -124,11 +125,11 @@ function TimedMessageBox(const Msg: string; Params: Pointer;
 var
   R: TRect;
 begin
-  R.Assign(0, 0, 40, 10);
+  R := TRect.Create(0, 0, 40, 10);
   if (AOptions and mfInsertInApp) = 0 then
-    R.Move((Desktop.Size.X - R.B.X) div 2, (Desktop.Size.Y - R.B.Y) div 2)
+    R.Move((TProgram.DeskTop.Size.X - R.B.X) div 2, (TProgram.DeskTop.Size.Y - R.B.Y) div 2)
   else
-    R.Move((Application.Size.X - R.B.X) div 2, (Application.Size.Y - R.B.Y) div 2);
+    R.Move((TProgram.Application.Size.X - R.B.X) div 2, (TProgram.Application.Size.Y - R.B.Y) div 2);
   TimedMessageBox := TimedMessageBoxRect(R, Msg, Params, AOptions, ASecs);
 end;
 
@@ -145,22 +146,22 @@ var
   Names: array[0..3] of PShortString;
   Btn: TButton;
 begin
-  Names[0] := @MsgYesText;
-  Names[1] := @MsgNoText;
-  Names[2] := @MsgOKText;
-  Names[3] := @MsgCancelText;
+  Names[0] := @MsgBoxText.YesText;
+  Names[1] := @MsgBoxText.NoText;
+  Names[2] := @MsgBoxText.OkText;
+  Names[3] := @MsgBoxText.CancelText;
   Dlg := TTimedDialog.Create(R, BoxTitle(AOptions), ASecs);
-  R2.Assign(3, Dlg.Size.Y - 5, Dlg.Size.X - 2, Dlg.Size.Y - 4);
+  R2 := TRect.Create(3, Dlg.Size.Y - 5, Dlg.Size.X - 2, Dlg.Size.Y - 4);
   TimedText := TTimedDialogText.Create(R2);
   Dlg.Insert(TimedText);
-  R2.Assign(3, 2, Dlg.Size.X - 2, Dlg.Size.Y - 5);
+  R2 := TRect.Create(3, 2, Dlg.Size.X - 2, Dlg.Size.Y - 5);
   Dlg.Insert(TStaticText.Create(R2, Msg));
   X := -2;
   ButtonCount := 0;
   for I := 0 to 3 do
     if (AOptions and ($0100 shl I)) <> 0 then
     begin
-      R2.Assign(0, 0, 10, 2);
+      R2 := TRect.Create(0, 0, 10, 2);
       Btn := TButton.Create(R2, Names[I]^, Commands[I], bfNormal);
       ButtonList[ButtonCount] := Btn;
       Inc(X, Btn.Size.X + 2);
@@ -174,7 +175,7 @@ begin
     Inc(X, ButtonList[I].Size.X + 2);
   end;
   Dlg.SelectNext(False);
-  TimedMessageBoxRect := Application.ExecView(Dlg);
+  TimedMessageBoxRect := TProgram.Application.ExecView(Dlg);
   Dlg.Free;
 end;
 

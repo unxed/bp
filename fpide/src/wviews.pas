@@ -54,7 +54,7 @@ type
     TCenterDialog = class;
     PCenterDialog = TCenterDialog;
     TCenterDialog = class(TDialog)
-      constructor Create(const Bounds: TRect; ATitle: TTitleStr);
+      constructor Create(const Bounds: TRect; ATitle: TTitleStr); overload;
     end;
 
     TAdvancedMenuBox = class;
@@ -96,8 +96,10 @@ type
       Default: boolean;
       procedure   FocusItem(Item: sw_integer); override;
       procedure   HandleEvent(var Event: TEvent); override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     end;
 
     TNoUpdateButton = class;
@@ -123,27 +125,33 @@ type
       Color: word;
       DontWrap: boolean;
       Delta: TPoint;
-      constructor Create(const Bounds: TRect; AText: String; AColor: word; AWrap: boolean);
+      constructor Create(const Bounds: TRect; AText: String; AColor: word; AWrap: boolean); overload;
       function    GetPalette: TPalette; override;
       procedure   Draw; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
     end;
 
     THSListBox = class;
     PHSListBox = THSListBox;
     THSListBox = class(TLocalMenuListBox)
-      constructor Create(const Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar);
+      constructor Create(const Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar); overload;
       function    SaveToFile(const AFileName: string): boolean; virtual;
       function    SaveAs: Boolean; virtual;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TDlgWindow = class;
     PDlgWindow = TDlgWindow;
     TDlgWindow = class(TDialog)
-      constructor Create(const Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer);
+      constructor Create(const Bounds: TRect; ATitle: TTitleStr; ANumber: Sw_Integer); overload;
       procedure   HandleEvent(var Event: TEvent); override;
       procedure Update; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TAdvancedStatusLine = class;
@@ -294,40 +302,6 @@ uses Mouse,
      WConsts,WUtils;
 
 {$ifndef NOOBJREG}
-function BuildAdvancedListBox(S: TStream): TStreamable;
-begin
-  Result := TAdvancedListBox.Load(S);
-end;
-procedure StoreAdvancedListBox(P: TStreamable; S: TStream);
-begin
-  TAdvancedListBox(P).Store(S);
-end;
-function BuildColorStaticText(S: TStream): TStreamable;
-begin
-  Result := TColorStaticText.Load(S);
-end;
-procedure StoreColorStaticText(P: TStreamable; S: TStream);
-begin
-  TColorStaticText(P).Store(S);
-end;
-function BuildHSListBox(S: TStream): TStreamable;
-begin
-  Result := THSListBox.Load(S);
-end;
-procedure StoreHSListBox(P: TStreamable; S: TStream);
-begin
-  THSListBox(P).Store(S);
-end;
-function BuildDlgWindow(S: TStream): TStreamable;
-begin
-  Result := TDlgWindow.Load(S);
-end;
-procedure StoreDlgWindow(P: TStreamable; S: TStream);
-begin
-  TDlgWindow(P).Store(S);
-end;
-var
-  RAdvancedListBox, RColorStaticText, RHSListBox, RDlgWindow: TStreamRec;
 {$endif}
 
 {$ifdef USERESSTRINGS}
@@ -381,9 +355,9 @@ var
 function IsDisabled(Item: PMenuItem): boolean;
 var Found: boolean;
 begin
-  Found:=Item^.Disabled or IsSeparator(Item);
+  Found:=Item.Disabled or IsSeparator(Item);
   if (Found=false) and (IsSubMenu(Item)=false) then
-     Found:=CommandEnabled(Item^.Command)=false;
+     Found:=CommandEnabled(Item.Command)=false;
   IsDisabled:=Found;
 end;
 
@@ -392,8 +366,8 @@ var
   Mouse: TPoint;
   R: TRect;
 begin
-  MakeLocal(E.Where, Mouse);
-  Current := Menu^.Items;
+  Mouse := MakeLocal(E.Mouse.Where);
+  Current := Menu.Items;
   while Current <> nil do
   begin
     R := GetItemRect(Current);
@@ -402,7 +376,7 @@ begin
       MouseActive := True;
       Break;
     end;
-    Current := Current^.Next;
+    Current := Current.Next;
   end;
   if (Current<>nil) and IsDisabled(Current) then
   begin
@@ -415,8 +389,8 @@ procedure TrackKey(FindNext: Boolean);
 
 procedure NextItem;
 begin
-  Current := Current^.Next;
-  if Current = nil then Current := Menu^.Items;
+  Current := Current.Next;
+  if Current = nil then Current := Menu.Items;
 end;
 
 procedure PrevItem;
@@ -424,15 +398,15 @@ var
   P: PMenuItem;
 begin
   P := Current;
-  if P = Menu^.Items then P := nil;
-  repeat NextItem until Current^.Next = P;
+  if P = Menu.Items then P := nil;
+  repeat NextItem until Current.Next = P;
 end;
 
 begin
   if Current <> nil then
     repeat
       if FindNext then NextItem else PrevItem;
-    until (Current^.Name <> nil) and (IsDisabled(Current)=false);
+    until (Current.Name <> nil) and (IsDisabled(Current)=false);
 end;
 
 function MouseInOwner: Boolean;
@@ -443,7 +417,7 @@ begin
   MouseInOwner := False;
   if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu.MakeLocal(E.Where, Mouse);
+    Mouse := ParentMenu.MakeLocal(E.Mouse.Where);
     R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
@@ -454,7 +428,7 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and (P.MouseInView(E.Where)=false) do
+  while (P <> nil) and (P.MouseInView(E.Mouse.Where)=false) do
         P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
@@ -472,19 +446,19 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Default;
+  Current := Menu.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
   if Current<>nil then
-    if Current^.Disabled then
+    if Current.Disabled then
        TrackKey(true);
   repeat
     Action := DoNothing;
     GetEvent(E);
     case E.What of
       evMouseDown:
-        if MouseInView(E.Where) or MouseInOwner then
+        if MouseInView(E.Mouse.Where) or MouseInOwner then
         begin
           TrackMouse;
           if Size.Y = 1 then AutoSelect := True;
@@ -493,36 +467,36 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Default
+            Current := Menu.Deflt
           else
-            if (Current <> nil) and (Current^.Name <> nil) then
+            if (Current <> nil) and (Current.Name <> nil) then
               Action := DoSelect
             else
-              if MouseActive or MouseInView(E.Where) then Action := DoReturn
+              if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Default;
-                if Current = nil then Current := Menu^.Items;
+                Current := Menu.Deflt;
+                if Current = nil then Current := Menu.Items;
                 Action := DoNothing;
               end;
         end;
       evMouseMove:
-        if E.Buttons <> 0 then
+        if E.Mouse.Buttons <> 0 then
         begin
           TrackMouse;
-          if not (MouseInView(E.Where) or MouseInOwner) and
+          if not (MouseInView(E.Mouse.Where) or MouseInOwner) and
             MouseInMenus then Action := DoReturn;
         end;
       evKeyDown:
-        case CtrlToArrow(E.KeyCode) of
+        case CtrlToArrow(E.KeyDown.KeyCode) of
           kbUp, kbDown:
             if Size.Y <> 1 then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbDown) else
-              if E.KeyCode = kbDown then AutoSelect := True;
+              TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbDown) else
+              if E.KeyDown.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
               begin
-                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+                TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbRight);
 {$IF DECLARED(UxMenuAutoOpen)}
                 if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
 {$ENDIF}
@@ -531,8 +505,8 @@ begin
           kbHome, kbEnd:
             if Size.Y <> 1 then
             begin
-              Current := Menu^.Items;
-              if E.KeyCode = kbEnd then TrackKey(False);
+              Current := Menu.Items;
+              if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
             begin
@@ -555,15 +529,15 @@ begin
             end;
         else
           Target := Self;
-          Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          Ch := GetAltChar(E.KeyDown.KeyCode);
+          if Ch = #0 then Ch := Char(E.KeyDown.CharScan.CharCode) else Target := TopMenu;
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
             P := TopMenu.HotKey(EventKey(E));
-            if (P <> nil) and CommandEnabled(P^.Command) then
+            if (P <> nil) and CommandEnabled(P.Command) then
             begin
-              Res := P^.Command;
+              Res := P.Command;
               Action := DoReturn;
             end
           end else
@@ -577,7 +551,7 @@ begin
                 Action := DoReturn;
         end;
       evCommand:
-        if E.Command = cmMenu then
+        if E.Message.Command = cmMenu then
         begin
           AutoSelect := False;
           if ParentMenu <> nil then Action := DoReturn;
@@ -589,7 +563,7 @@ begin
       DrawView;
     end;
     if (Action = DoSelect) or ((Action = DoNothing) and AutoSelect) then
-      if Current <> nil then with Current^ do if Name <> nil then
+      if Current <> nil then with Current do if Name <> nil then
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
@@ -622,7 +596,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Default := Current;
+    Menu.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -651,9 +625,9 @@ var
 function IsDisabled(Item: PMenuItem): boolean;
 var Found: boolean;
 begin
-  Found:=Item^.Disabled or IsSeparator(Item);
+  Found:=Item.Disabled or IsSeparator(Item);
   if (Found=false) and (IsSubMenu(Item)=false) then
-     Found:=CommandEnabled(Item^.Command)=false;
+     Found:=CommandEnabled(Item.Command)=false;
   IsDisabled:=Found;
 end;
 
@@ -662,8 +636,8 @@ var
   Mouse: TPoint;
   R: TRect;
 begin
-  MakeLocal(E.Where, Mouse);
-  Current := Menu^.Items;
+  Mouse := MakeLocal(E.Mouse.Where);
+  Current := Menu.Items;
   while Current <> nil do
   begin
     R := GetItemRect(Current);
@@ -672,7 +646,7 @@ begin
       MouseActive := True;
       Break;
     end;
-    Current := Current^.Next;
+    Current := Current.Next;
   end;
   if (Current<>nil) and IsDisabled(Current) then
   begin
@@ -685,8 +659,8 @@ procedure TrackKey(FindNext: Boolean);
 
 procedure NextItem;
 begin
-  Current := Current^.Next;
-  if Current = nil then Current := Menu^.Items;
+  Current := Current.Next;
+  if Current = nil then Current := Menu.Items;
 end;
 
 procedure PrevItem;
@@ -694,15 +668,15 @@ var
   P: PMenuItem;
 begin
   P := Current;
-  if P = Menu^.Items then P := nil;
-  repeat NextItem until Current^.Next = P;
+  if P = Menu.Items then P := nil;
+  repeat NextItem until Current.Next = P;
 end;
 
 begin
   if Current <> nil then
     repeat
       if FindNext then NextItem else PrevItem;
-    until (Current^.Name <> nil) and (IsDisabled(Current)=false);
+    until (Current.Name <> nil) and (IsDisabled(Current)=false);
 end;
 
 function MouseInOwner: Boolean;
@@ -713,7 +687,7 @@ begin
   MouseInOwner := False;
   if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu.MakeLocal(E.Where, Mouse);
+    Mouse := ParentMenu.MakeLocal(E.Mouse.Where);
     R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
@@ -724,7 +698,7 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and (P.MouseInView(E.Where)=false) do
+  while (P <> nil) and (P.MouseInView(E.Mouse.Where)=false) do
         P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
@@ -742,19 +716,19 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Default;
+  Current := Menu.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
   if Current<>nil then
-    if Current^.Disabled then
+    if Current.Disabled then
        TrackKey(true);
   repeat
     Action := DoNothing;
     GetEvent(E);
     case E.What of
       evMouseDown:
-        if MouseInView(E.Where) or MouseInOwner then
+        if MouseInView(E.Mouse.Where) or MouseInOwner then
         begin
           TrackMouse;
           if Size.Y = 1 then AutoSelect := True;
@@ -763,36 +737,36 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Default
+            Current := Menu.Deflt
           else
-            if (Current <> nil) and (Current^.Name <> nil) then
+            if (Current <> nil) and (Current.Name <> nil) then
               Action := DoSelect
             else
-              if MouseActive or MouseInView(E.Where) then Action := DoReturn
+              if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Default;
-                if Current = nil then Current := Menu^.Items;
+                Current := Menu.Deflt;
+                if Current = nil then Current := Menu.Items;
                 Action := DoNothing;
               end;
         end;
       evMouseMove:
-        if E.Buttons <> 0 then
+        if E.Mouse.Buttons <> 0 then
         begin
           TrackMouse;
-          if not (MouseInView(E.Where) or MouseInOwner) and
+          if not (MouseInView(E.Mouse.Where) or MouseInOwner) and
             MouseInMenus then Action := DoReturn;
         end;
       evKeyDown:
-        case CtrlToArrow(E.KeyCode) of
+        case CtrlToArrow(E.KeyDown.KeyCode) of
           kbUp, kbDown:
             if Size.Y <> 1 then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbDown) else
-              if E.KeyCode = kbDown then AutoSelect := True;
+              TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbDown) else
+              if E.KeyDown.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
               begin
-                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+                TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbRight);
 {$IF DECLARED(UxMenuAutoOpen)}
                 if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
 {$ENDIF}
@@ -801,8 +775,8 @@ begin
           kbHome, kbEnd:
             if Size.Y <> 1 then
             begin
-              Current := Menu^.Items;
-              if E.KeyCode = kbEnd then TrackKey(False);
+              Current := Menu.Items;
+              if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
             begin
@@ -825,15 +799,15 @@ begin
             end;
         else
           Target := Self;
-          Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          Ch := GetAltChar(E.KeyDown.KeyCode);
+          if Ch = #0 then Ch := Char(E.KeyDown.CharScan.CharCode) else Target := TopMenu;
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
             P := TopMenu.HotKey(EventKey(E));
-            if (P <> nil) and CommandEnabled(P^.Command) then
+            if (P <> nil) and CommandEnabled(P.Command) then
             begin
-              Res := P^.Command;
+              Res := P.Command;
               Action := DoReturn;
             end
           end else
@@ -847,7 +821,7 @@ begin
                 Action := DoReturn;
         end;
       evCommand:
-        if E.Command = cmMenu then
+        if E.Message.Command = cmMenu then
         begin
           AutoSelect := False;
           if ParentMenu <> nil then Action := DoReturn;
@@ -859,7 +833,7 @@ begin
       DrawView;
     end;
     if (Action = DoSelect) or ((Action = DoNothing) and AutoSelect) then
-      if Current <> nil then with Current^ do if Name <> nil then
+      if Current <> nil then with Current do if Name <> nil then
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
@@ -892,7 +866,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Default := Current;
+    Menu.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -928,34 +902,34 @@ type
 var Cur : PMenuItem;
     Up,NUp  : PItemChain;
 begin
-  Cur:=Menu^.Items;
+  Cur:=Menu.Items;
   Up:=nil;
   if cm=0 then
     begin
       GetMenuItem:=nil;
       exit;
     end;
-  while assigned(Cur) and (Cur^.Command<>cm) do
+  while assigned(Cur) and (Cur.Command<>cm) do
     begin
-      if (Cur^.Command=0) and assigned(Cur^.SubMenu) and
-         assigned(Cur^.Name) and
-         assigned(Cur^.SubMenu^.Items) then
+      if (Cur.Command=0) and assigned(Cur.SubMenu) and
+         assigned(Cur.Name) and
+         assigned(Cur.SubMenu.Items) then
         {subMenu}
         begin
-          If assigned(Cur^.Next) then
+          If assigned(Cur.Next) then
             begin
               New(Nup);
               Nup^.Up:=Up;
-              Nup^.next:=Cur^.Next;
+              Nup^.next:=Cur.Next;
               Up:=Nup;
             end;
-          Cur:=Cur^.SubMenu^.Items;
+          Cur:=Cur.SubMenu.Items;
         end
       else
         { normal item }
         begin
-          if assigned(Cur^.Next) then
-            Cur:=Cur^.Next
+          if assigned(Cur.Next) then
+            Cur:=Cur.Next
           else if assigned(Up) then
             begin
               Cur:=Up^.next;
@@ -980,7 +954,7 @@ procedure TAdvancedMenuBar.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmCommandSetChanged : Update;
         cmUpdate            : Update;
       end;
@@ -1004,9 +978,9 @@ var
 function IsDisabled(Item: PMenuItem): boolean;
 var Dis : boolean;
 begin
-  Dis:=Item^.Disabled or IsSeparator(Item);
+  Dis:=Item.Disabled or IsSeparator(Item);
   if (Dis=false) and (IsSubMenu(Item)=false) then
-     Dis:=CommandEnabled(Item^.Command)=false;
+     Dis:=CommandEnabled(Item.Command)=false;
   IsDisabled:=Dis;
 end;
 
@@ -1015,8 +989,8 @@ var
   Mouse: TPoint;
   R: TRect;
 begin
-  MakeLocal(E.Where, Mouse);
-  Current := Menu^.Items;
+  Mouse := MakeLocal(E.Mouse.Where);
+  Current := Menu.Items;
   while Current <> nil do
   begin
     R := GetItemRect(Current);
@@ -1025,7 +999,7 @@ begin
       MouseActive := True;
       Break;
     end;
-    Current := Current^.Next;
+    Current := Current.Next;
   end;
   if (Current<>nil) and IsDisabled(Current) then
     Current:=nil;
@@ -1035,8 +1009,8 @@ procedure TrackKey(FindNext: Boolean);
 
 procedure NextItem;
 begin
-  Current := Current^.Next;
-  if Current = nil then Current := Menu^.Items;
+  Current := Current.Next;
+  if Current = nil then Current := Menu.Items;
 end;
 
 procedure PrevItem;
@@ -1044,15 +1018,15 @@ var
   P: PMenuItem;
 begin
   P := Current;
-  if P = Menu^.Items then P := nil;
-  repeat NextItem until Current^.Next = P;
+  if P = Menu.Items then P := nil;
+  repeat NextItem until Current.Next = P;
 end;
 
 begin
   if Current <> nil then
     repeat
       if FindNext then NextItem else PrevItem;
-    until (Current^.Name <> nil) and (IsDisabled(Current)=false);
+    until (Current.Name <> nil) and (IsDisabled(Current)=false);
 end;
 
 function MouseInOwner: Boolean;
@@ -1063,7 +1037,7 @@ begin
   MouseInOwner := False;
   if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu.MakeLocal(E.Where, Mouse);
+    Mouse := ParentMenu.MakeLocal(E.Mouse.Where);
     R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
@@ -1074,7 +1048,7 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and not P.MouseInView(E.Where) do P := P.ParentMenu;
+  while (P <> nil) and not P.MouseInView(E.Mouse.Where) do P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
 
@@ -1091,19 +1065,19 @@ begin
   AutoSelect := False; E.What:=evNothing;
   Res := 0;
   ItemShown := nil;
-  Current := Menu^.Default;
+  Current := Menu.Deflt;
   MouseActive := False;
   if UpdateMenu(Menu) then
  begin
   if Current<>nil then
-    if Current^.Disabled then
+    if Current.Disabled then
        TrackKey(true);
   repeat
     Action := DoNothing;
     GetEvent(E);
     case E.What of
       evMouseDown:
-        if MouseInView(E.Where) or MouseInOwner then
+        if MouseInView(E.Mouse.Where) or MouseInOwner then
         begin
           TrackMouse;
           if Size.Y = 1 then AutoSelect := True;
@@ -1112,36 +1086,36 @@ begin
         begin
           TrackMouse;
           if MouseInOwner then
-            Current := Menu^.Default
+            Current := Menu.Deflt
           else
-            if (Current <> nil) and (Current^.Name <> nil) then
+            if (Current <> nil) and (Current.Name <> nil) then
               Action := DoSelect
             else
-              if MouseActive or MouseInView(E.Where) then Action := DoReturn
+              if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
-                Current := Menu^.Default;
-                if Current = nil then Current := Menu^.Items;
+                Current := Menu.Deflt;
+                if Current = nil then Current := Menu.Items;
                 Action := DoNothing;
               end;
         end;
       evMouseMove:
-        if E.Buttons <> 0 then
+        if E.Mouse.Buttons <> 0 then
         begin
           TrackMouse;
-          if not (MouseInView(E.Where) or MouseInOwner) and
+          if not (MouseInView(E.Mouse.Where) or MouseInOwner) and
             MouseInMenus then Action := DoReturn;
         end;
       evKeyDown:
-        case CtrlToArrow(E.KeyCode) of
+        case CtrlToArrow(E.KeyDown.KeyCode) of
           kbUp, kbDown:
             if Size.Y <> 1 then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbDown) else
-              if E.KeyCode = kbDown then AutoSelect := True;
+              TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbDown) else
+              if E.KeyDown.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
               begin
-                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+                TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbRight);
 {$IF DECLARED(UxMenuAutoOpen)}
                 if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
 {$ENDIF}
@@ -1150,8 +1124,8 @@ begin
           kbHome, kbEnd:
             if Size.Y <> 1 then
             begin
-              Current := Menu^.Items;
-              if E.KeyCode = kbEnd then TrackKey(False);
+              Current := Menu.Items;
+              if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
             begin
@@ -1174,15 +1148,15 @@ begin
             end;
         else
           Target := Self;
-          Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          Ch := GetAltChar(E.KeyDown.KeyCode);
+          if Ch = #0 then Ch := Char(E.KeyDown.CharScan.CharCode) else Target := TopMenu;
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
             P := TopMenu.HotKey(EventKey(E));
-            if (P <> nil) and CommandEnabled(P^.Command) then
+            if (P <> nil) and CommandEnabled(P.Command) then
             begin
-              Res := P^.Command;
+              Res := P.Command;
               Action := DoReturn;
             end
           end else
@@ -1196,7 +1170,7 @@ begin
                 Action := DoReturn;
         end;
       evCommand:
-        if E.Command = cmMenu then
+        if E.Message.Command = cmMenu then
         begin
           AutoSelect := False;
           if ParentMenu <> nil then Action := DoReturn;
@@ -1208,7 +1182,7 @@ begin
       DrawView;
     end;
     if (Action = DoSelect) or ((Action = DoNothing) and AutoSelect) then
-      if Current <> nil then with Current^ do if Name <> nil then
+      if Current <> nil then with Current do if Name <> nil then
         if Command = 0 then
         begin
           if E.What and (evMouseDown + evMouseMove) <> 0 then PutEvent(E);
@@ -1241,7 +1215,7 @@ begin
     if (ParentMenu <> nil) or (E.What = evCommand) then PutEvent(E);
   if Current <> nil then
   begin
-    Menu^.Default := Current;
+    Menu.Deflt := Current;
     Current := nil;
     DrawView;
   end;
@@ -1268,15 +1242,15 @@ procedure TAdvancedListBox.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where) {and (((Event.EventFlags and meDoubleClick) <> 0))} then
+      if MouseInView(Event.Mouse.Where) {and (((Event.Mouse.EventFlags and meDoubleClick) <> 0))} then
       begin
         inherited HandleEvent(Event);
-        if ((Event.EventFlags and meDoubleClick) <> 0) then
+        if ((Event.Mouse.EventFlags and meDoubleClick) <> 0) then
           if Range>Focused then
             SelectItem(Focused);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
           Message(Owner,evBroadcast,cmDefault,nil);
       end;
@@ -1297,7 +1271,7 @@ end;
 
 function TColorStaticText.GetPalette: TPalette;
 begin
-  Result := nil;
+  Result := Default(TPalette);
 end;
 
 procedure TColorStaticText.Draw;
@@ -1427,22 +1401,33 @@ begin
  end;
 end;
 
-constructor TColorStaticText.Load(S: TStream);
+function TColorStaticText.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 
-  S.Read(Color,SizeOf(Color));
-  S.Read(DontWrap,SizeOf(DontWrap));
-  S.Read(Delta,SizeOf(Delta));
+  Ip.ReadBytes(Color,SizeOf(Color));
+  Ip.ReadBytes(DontWrap,SizeOf(DontWrap));
+  Ip.ReadBytes(Delta,SizeOf(Delta));
 end;
 
-procedure TColorStaticText.Store(S: TStream);
+procedure TColorStaticText.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 
-  S.Write(Color,SizeOf(Color));
-  S.Write(DontWrap,SizeOf(DontWrap));
-  S.Write(Delta,SizeOf(Delta));
+  Os.WriteBytes(Color,SizeOf(Color));
+  Os.WriteBytes(DontWrap,SizeOf(DontWrap));
+  Os.WriteBytes(Delta,SizeOf(Delta));
+end;
+
+class function TColorStaticText.Build: TStreamable;
+begin
+  Result := TColorStaticText.Create(streamableInit);
+end;
+
+function TColorStaticText.StreamableName: ShortString;
+begin
+  Result := 'wviews.TColorStaticText';
 end;
 
 constructor THSListBox.Create(const Bounds: TRect; ANumCols: Word; AHScrollBar, AVScrollBar: PScrollBar);
@@ -1493,7 +1478,7 @@ begin
   Filename:='listbox.txt';
   DefExt:='*.txt';
   Title:='Save list box content';
-  Re:=Application.ExecuteDialog(TFileDialog.Create(DefExt,
+  Re:=TProgram.Application.ExecuteDialog(TFileDialog.Create(DefExt,
           Title, label_name, fdOkButton, FileId), @FileName);
   if Re <> cmCancel then
     SaveAs := SaveToFile(FileName);
@@ -1518,7 +1503,7 @@ procedure TDlgWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate : Update;
       end;
   end;
@@ -1534,13 +1519,13 @@ begin
   M:=GetLocalMenu;
   if M=nil then Exit;
   if LastLocalCmd<>0 then
-     M^.Default:=SearchMenuItem(M,LastLocalCmd);
-  Desktop.GetExtent(R);
-  MakeGlobal(P,R.A); {Desktop.MakeLocal(R.A,R.A);}
+     M.Deflt:=SearchMenuItem(M,LastLocalCmd);
+  R := TProgram.DeskTop.GetExtent;
+  R.A := MakeGlobal(P); {R.A := Desktop.MakeLocal(R.A);}
   MV := TAdvancedMenuPopUp.Create(R, M, nil);
-  Re:=Application.ExecView(MV);
-  if M^.Default=nil then LastLocalCmd:=0
-     else LastLocalCmd:=M^.Default^.Command;
+  Re:=TProgram.Application.ExecView(MV);
+  if M.Deflt=nil then LastLocalCmd:=0
+     else LastLocalCmd:=M.Deflt.Command;
   MV.Free;
   if Re<>0 then
     Message(GetCommandTarget,evCommand,Re, Pointer(Self));
@@ -1563,16 +1548,16 @@ var DontClear: boolean;
 begin
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where) and (Event.Buttons=mbRightButton) then
+      if MouseInView(Event.Mouse.Where) and (Event.Mouse.Buttons=mbRightButton) then
         begin
-          MakeLocal(Event.Where,P); Inc(P.X); Inc(P.Y);
+          P := MakeLocal(Event.Mouse.Where); Inc(P.X); Inc(P.Y);
           LocalMenu(P);
           ClearEvent(Event);
         end;
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbAltF10 : Message(Self,evCommand,cmLocalMenu, Pointer(Self));
         else DontClear:=true;
         end;
@@ -1581,7 +1566,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmLocalMenu :
             begin
               P:=Cursor; Inc(P.X); Inc(P.Y);
@@ -1682,26 +1667,26 @@ end;
 
 function IsSeparator(P: PMenuItem): boolean;
 begin
-  IsSeparator:=(P<>nil) and (P^.Name=nil) and (P^.HelpCtx=hcNoContext);
+  IsSeparator:=(P<>nil) and (P.Name=nil) and (P.HelpCtx=hcNoContext);
 end;
 
 function IsSubMenu(P: PMenuItem): boolean;
 begin
-  IsSubMenu:=(P<>nil) and (P^.Name<>nil) and (P^.Command=0) and (P^.SubMenu<>nil);
+  IsSubMenu:=(P<>nil) and (P.Name<>nil) and (P.Command=0) and (P.SubMenu<>nil);
 end;
 
 function SearchMenuItem(Menu: PMenu; Cmd: word): PMenuItem;
 var P,I: PMenuItem;
 begin
   I:=nil;
-  if Menu=nil then P:=nil else P:=Menu^.Items;
+  if Menu=nil then P:=nil else P:=Menu.Items;
   while (P<>nil) and (I=nil) do
   begin
     if IsSubMenu(P) then
-       I:=SearchMenuItem(P^.SubMenu,Cmd);
+       I:=SearchMenuItem(P.SubMenu,Cmd);
     if I=nil then
-    if P^.Command=Cmd then I:=P else
-    P:=P^.Next;
+    if P.Command=Cmd then I:=P else
+    P:=P.Next;
   end;
   SearchMenuItem:=I;
 end;
@@ -1709,8 +1694,8 @@ end;
 procedure SetMenuItemParam(Menu: PMenuItem; Param: string);
 begin
   if Menu=nil then Exit;
-  if Menu^.Param<>nil then DisposeStr(Menu^.Param);
-  Menu^.Param:=NewStr(Param);
+  if Menu.Param<>nil then DisposeStr(Menu.Param);
+  Menu.Param:=NewStr(Param);
 end;
 
 function UpdateMenu(M: PMenu): boolean;
@@ -1718,25 +1703,25 @@ var P: PMenuItem;
     IsEnabled: boolean;
 begin
   if M=nil then begin UpdateMenu:=false; Exit; end;
-  P:=M^.Items; IsEnabled:=false;
+  P:=M.Items; IsEnabled:=false;
   while (P<>nil) do
   begin
     if IsSubMenu(P) then
        begin
-         P^.Disabled:=not UpdateMenu(P^.SubMenu);
-         if not P^.Disabled then
+         P.Disabled:=not UpdateMenu(P.SubMenu);
+         if not P.Disabled then
            IsEnabled:=true;
        end
     else
       begin
         if not IsSeparator(P) and
-           CommandEnabled(P^.Command) then
+           TView.CommandEnabled(P.Command) then
           begin
-            p^.disabled:=false;
+            p.disabled:=false;
             IsEnabled:=true;
           end;
        end;
-    P:=P^.Next;
+    P:=P.Next;
   end;
   UpdateMenu:=IsEnabled;
 end;
@@ -1746,7 +1731,7 @@ var P,C: PMenuItem;
     Count: Sw_integer;
 begin
   P:=nil; Count:=-1;
-  if M<>nil then C:=M^.Items else C:=nil;
+  if M<>nil then C:=M.Items else C:=nil;
   while (C<>nil) and (P=nil) do
   begin
     if IsSubMenu(C) then
@@ -1754,7 +1739,7 @@ begin
        Inc(Count);
        if Count=Index then P:=C;
      end;
-    C:=C^.Next;
+    C:=C.Next;
   end;
   SearchSubMenu:=P;
 end;
@@ -1763,42 +1748,36 @@ procedure AppendMenuItem(M: PMenu; I: PMenuItem);
 var P: PMenuItem;
 begin
   if (M=nil) or (I=nil) then Exit;
-  I^.Next:=nil;
-  if M^.Items=nil then M^.Items:=I else
+  I.Next:=nil;
+  if M.Items=nil then M.Items:=I else
   begin
-    P:=M^.Items;
-    while (P^.Next<>nil) do P:=P^.Next;
-    P^.Next:=I;
+    P:=M.Items;
+    while (P.Next<>nil) do P:=P.Next;
+    P.Next:=I;
   end;
 end;
 
 procedure DisposeMenuItem(P: PMenuItem);
 begin
   if P<>nil then
-  begin
-    if IsSubMenu(P) then DisposeMenu(P^.SubMenu) else
-      if IsSeparator(P)=false then
-       if P^.Param<>nil then DisposeStr(P^.Param);
-    if P^.Name<>nil then DisposeStr(P^.Name);
-    Dispose(P);
-  end;
+    P.Free;  { the name, and the parameter or the submenu, go with it }
 end;
 
 procedure RemoveMenuItem(Menu: PMenu; I: PMenuItem);
 var P,PrevP: PMenuItem;
 begin
   if (Menu=nil) or (I=nil) then Exit;
-  P:=Menu^.Items; PrevP:=nil;
+  P:=Menu.Items; PrevP:=nil;
   while (P<>nil) do
   begin
     if P=I then
       begin
-        if Menu^.Items<>I then PrevP^.Next:=P^.Next
-                          else Menu^.Items:=P^.Next;
+        if Menu.Items<>I then PrevP.Next:=P.Next
+                          else Menu.Items:=P.Next;
         DisposeMenuItem(P);
         Break;
       end;
-    PrevP:=P; P:=P^.Next;
+    PrevP:=P; P:=P.Next;
   end;
 end;
 
@@ -1806,11 +1785,11 @@ function GetMenuItemBefore(Menu: PMenu; BeforeOf: PMenuItem): PMenuItem;
 var P,C: PMenuItem;
 begin
   P:=nil;
-  if Menu<>nil then C:=Menu^.Items else C:=nil;
+  if Menu<>nil then C:=Menu.Items else C:=nil;
   while (C<>nil) do
     begin
-      if C^.Next=BeforeOf then begin P:=C; Break; end;
-      C:=C^.Next;
+      if C.Next=BeforeOf then begin P:=C; Break; end;
+      C:=C.Next;
     end;
   GetMenuItemBefore:=P;
 end;
@@ -1828,13 +1807,13 @@ var R   : TRect;
 begin
   with ADialog do
   begin
-    GetExtent(R);
+    R := GetExtent;
     W:=R.B.X-R.A.X; H:=(R.B.Y-R.A.Y);
-    R.Assign(0,0,W,H+3); ChangeBounds(R);
+    R := TRect.Create(0, 0, W, H+3); ChangeBounds(R);
     X:=W div 2; X1:=X div 2+1; X2:=X+X1-1;
-    R.Assign(X1-3,H,X1+7,H+2);
+    R := TRect.Create(X1-3, H, X1+7, H+2);
     Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
-    R.Assign(X2-7,H,X2+3,H+2);
+    R := TRect.Create(X2-7, H, X2+3, H+2);
     Insert(TButton.Create(R, btn_Cancel, cmCancel, bfNormal));
     SelectNext(false); { tv3: false = the first inserted control gets the focus }
   end;
@@ -1846,7 +1825,7 @@ var BW: Sw_integer;
 begin
   with ADialog do
   begin
-    GetBounds(R); R.Grow(0,1); Inc(R.B.Y);
+    R := GetBounds; R.Grow(0,1); Inc(R.B.Y);
     ChangeBounds(R);
     BW:=10;
     R.A.Y:=R.B.Y-2; R.B.Y:=R.A.Y+2;
@@ -1861,24 +1840,24 @@ var R: TRect;
     Width: Sw_integer;
 begin
   Width:=length(Msg)+4*2;
-  if Width<(Desktop.Size.X div 2) then Width:=(Desktop.Size.X div 2);
-  R.Assign(0,0,Width,5);
+  if Width<(TProgram.DeskTop.Size.X div 2) then Width:=(TProgram.DeskTop.Size.X div 2);
+  R := TRect.Create(0, 0, Width, 5);
   MessageDialog := TCenterDialog.Create(R, '');
   with MessageDialog do
   begin
     Flags:=0;
-    GetExtent(R); R.Grow(-4,-2);
+    R := GetExtent; R.Grow(-4,-2);
     if copy(Msg,1,1)<>^C then Msg:=^C+Msg;
     Insert(TStaticText.Create(R, Msg));
   end;
-  Application.Insert(MessageDialog);
+  TProgram.Application.Insert(MessageDialog);
 end;
 
 procedure HideMessage;
 begin
   if MessageDialog<>nil then
     begin
-      Application.Delete(MessageDialog);
+      TProgram.Application.Delete(MessageDialog);
       MessageDialog.Free;
       MessageDialog:=nil;
     end;
@@ -1941,14 +1920,14 @@ begin
         ClearEvent(Event);
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where)=false then
+      if MouseInView(Event.Mouse.Where)=false then
         GoSelectItem:=-2
       else
       begin
         ColWidth := Size.X div NumCols + 1;
         OldItem := Focused;
-        MakeLocal(Event.Where, Mouse);
-        if MouseInView(Event.Where) then
+        Mouse := MakeLocal(Event.Mouse.Where);
+        if MouseInView(Event.Mouse.Where) then
           NewItem := Mouse.Y + (Size.Y * (Mouse.X div ColWidth)) + TopItem
         else
           NewItem := OldItem;
@@ -1960,8 +1939,8 @@ begin
              DrawView;
            end;
           OldItem := NewItem;
-          MakeLocal(Event.Where, Mouse);
-          if MouseInView(Event.Where) then
+          Mouse := MakeLocal(Event.Mouse.Where);
+          if MouseInView(Event.Mouse.Where) then
             NewItem := Mouse.Y + (Size.Y * (Mouse.X div ColWidth)) + TopItem
           else
           begin
@@ -1993,33 +1972,33 @@ begin
         until not MouseEvent(Event, evMouseMove + evMouseAuto);
         FocusItemNum(NewItem);
         DrawView;
-        if ((Event.EventFlags and meDoubleClick) <> 0) and (Range > Focused) then SelectItem(Focused);
+        if ((Event.Mouse.EventFlags and meDoubleClick) <> 0) and (Range > Focused) then SelectItem(Focused);
         ClearEvent(Event);
         GoSelectItem:=Focused;
       end;
     evMouseMove,evMouseAuto:
      if GetState(sfFocused) then
-      if MouseInView(Event.Where) then
+      if MouseInView(Event.Mouse.Where) then
         begin
-          MakeLocal(Event.Where,Mouse);
+          Mouse := MakeLocal(Event.Mouse.Where);
           FocusItemNum(TopItem+Mouse.Y);
           ClearEvent(Event);
         end;
     evKeyDown :
       begin
-        if (Event.KeyCode=kbEsc) then
+        if (Event.KeyDown.KeyCode=kbEsc) then
           begin
             GoSelectItem:=-2;
             ClearEvent(Event);
           end else
-        if ((Event.KeyCode=kbEnter) or (Event.CharCode = Ord(' '))) and
+        if ((Event.KeyDown.KeyCode=kbEnter) or (Event.KeyDown.CharScan.CharCode = Ord(' '))) and
            (Focused < Range) then
           begin
             GoSelectItem:=Focused;
             NewItem := Focused;
           end
         else
-          case CtrlToArrow(Event.KeyCode) of
+          case CtrlToArrow(Event.KeyDown.KeyCode) of
             kbUp   : NewItem := Focused - 1;
             kbDown : NewItem := Focused + 1;
             kbRight: if NumCols > 1 then NewItem := Focused + Size.Y else Exit;
@@ -2038,27 +2017,27 @@ begin
         ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmReceivedFocus :
-          if (Event.InfoPtr <> Pointer(Self)) and (InClose=false) then
+          if (Event.Message.InfoPtr <> Pointer(Self)) and (InClose=false) then
             begin
               GoSelectItem:=-2;
             end;
       else
         if Options and ofSelectable <> 0 then
-          if (Event.Command = cmScrollBarClicked) and
-             ((Event.InfoPtr = Pointer(HScrollBar)) or (Event.InfoPtr = Pointer(VScrollBar))) then
+          if (Event.Message.Command = cmScrollBarClicked) and
+             ((Event.Message.InfoPtr = Pointer(HScrollBar)) or (Event.Message.InfoPtr = Pointer(VScrollBar))) then
             Select
           else
-            if (Event.Command = cmScrollBarChanged) then
+            if (Event.Message.Command = cmScrollBarChanged) then
               begin
-                if (Pointer(VScrollBar) = Event.InfoPtr) then
+                if (Pointer(VScrollBar) = Event.Message.InfoPtr) then
                   begin
                     FocusItemNum(VScrollBar.Value);
                     DrawView;
                   end
                 else
-                  if (Pointer(HScrollBar) = Event.InfoPtr) then
+                  if (Pointer(HScrollBar) = Event.Message.InfoPtr) then
                     DrawView;
               end;
       end;
@@ -2069,7 +2048,7 @@ begin
          if abs(GetDosTicks-LastTT)>=1 then
           begin
             LastTT:=GetDosTicks;
-            MakeLocal(MouseWhere,Mouse);
+            Mouse := MakeLocal(MouseWhere);
             if ((Mouse.Y<-1) or (Mouse.Y>=Size.Y)) and
                ((0<=Mouse.X) and (Mouse.X<Size.X)) then
             if Range>0 then
@@ -2117,7 +2096,7 @@ begin
          DontClear:=false;
          Count:=GetItemCount;
          if Count>0 then
-         case Event.KeyCode of
+         case Event.KeyDown.KeyCode of
            kbUp :
              if Focused>0 then
                FocusItem(Focused-1);
@@ -2136,12 +2115,12 @@ begin
          if DontClear=false then ClearEvent(Event);
        end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmReleasedFocus :
-          if (ListBox<>nil) and (Event.InfoPtr = Pointer(ListBox)) then
+          if (ListBox<>nil) and (Event.Message.InfoPtr = Pointer(ListBox)) then
             DropList(false);
         cmListItemSelected :
-          if (ListBox<>nil) and (Event.InfoPtr = Pointer(ListBox)) then
+          if (ListBox<>nil) and (Event.Message.InfoPtr = Pointer(ListBox)) then
             begin
               FocusItem(ListBox.Focused);
               Text:=GetText(List.At(Focused),High(Text));
@@ -2150,7 +2129,7 @@ begin
             end;
       end;
     evMouseDown :
-      if MouseInView(Event.Where) then
+      if MouseInView(Event.Mouse.Where) then
         begin
           DropList(not ListDropped);
           ClearEvent(Event);
@@ -2175,7 +2154,7 @@ end;
 procedure TDropDownListBox.CreateListBox(var R: TRect);
 var R2: TRect;
 begin
-  R2.Copy(R); R2.A.X:=R2.B.X-1;
+  R2 := R; R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2);
   Dec(R.B.X);
   ListBox := TDDHelperLB.Create(Self, R, 1, SB);
@@ -2189,7 +2168,7 @@ begin
 
   if Drop then
     begin
-      R.Assign(Origin.X+1,Origin.Y+Size.Y,Origin.X+Size.X,Origin.Y+Size.Y+DropLineCount);
+      R := TRect.Create(Origin.X+1, Origin.Y+Size.Y, Origin.X+Size.X, Origin.Y+Size.Y+DropLineCount);
       if Owner<>nil then Owner.Lock;
       CreateListBox(R);
       if SB<>nil then
@@ -2340,23 +2319,34 @@ begin
   Result := MakePalette(CPlainCluster);
 end;
 
-constructor TAdvancedListBox.Load(S: TStream);
+function TAdvancedListBox.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 
-  S.Read(Default,SizeOf(Default));
+  Ip.ReadBytes(Default,SizeOf(Default));
 end;
 
-procedure TAdvancedListBox.Store(S: TStream);
+procedure TAdvancedListBox.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 
-  S.Write(Default,SizeOf(Default));
+  Os.WriteBytes(Default,SizeOf(Default));
+end;
+
+class function TAdvancedListBox.Build: TStreamable;
+begin
+  Result := TAdvancedListBox.Create(streamableInit);
+end;
+
+function TAdvancedListBox.StreamableName: ShortString;
+begin
+  Result := 'wviews.TAdvancedListBox';
 end;
 
 procedure TNoUpdateButton.HandleEvent(var Event: TEvent);
 begin
-  if (Event.What<>evBroadcast) or (Event.Command<>cmCommandSetChanged) then
+  if (Event.What<>evBroadcast) or (Event.Message.Command<>cmCommandSetChanged) then
   inherited HandleEvent(Event);
 end;
 
@@ -2370,17 +2360,17 @@ end;
 procedure TAdvMessageBox.HandleEvent(var Event: TEvent);
 var I: integer;
 begin
-  if (not CanCancel) and (Event.What=evCommand) and (Event.Command=cmCancel) then
+  if (not CanCancel) and (Event.What=evCommand) and (Event.Message.Command=cmCancel) then
     ClearEvent(Event);
   inherited HandleEvent(Event);
   case Event.What of
     evCommand:
       begin
         for I:=Low(UserButtonCmd) to High(UserButtonCmd) do
-         if Event.Command=UserButtonCmd[I] then
+         if Event.Message.Command=UserButtonCmd[I] then
           if State and sfModal <> 0 then
           begin
-            EndModal(Event.Command);
+            EndModal(Event.Message.Command);
             ClearEvent(Event);
           end;
       end;
@@ -2473,7 +2463,7 @@ function AdvMessageBox(const Msg: String; Params: Pointer; AOptions: longint): W
 var
   R: TRect;
 begin
-  R.Assign(0, 0, 0, 0);
+  R := TRect.Create(0, 0, 0, 0);
   AdvMessageBox := AdvMessageBoxRect(R, Msg, Params, AOptions);
 end;
 
@@ -2535,21 +2525,21 @@ var
   Cols,Rows: integer;
 begin
   FormatStr(S, Msg, Params^);
-  if R.Empty then
+  if R.IsEmpty then
   begin
     GetStaticTextDimensions(S,40,Cols,Rows);
     if Cols<32 then Cols:=32; if Rows=0 then Rows:=1;
-    R.Assign(0,0,3+Cols+3,Rows+6);
+    R := TRect.Create(0, 0, 3+Cols+3, Rows+6);
     if (AOptions and mfInsertInApp)= 0 then
-      R.Move((Desktop.Size.X-(R.B.X-R.A.X)) div 2,(Desktop.Size.Y-(R.B.Y-R.A.Y)) div 2)
+      R.Move((TProgram.DeskTop.Size.X-(R.B.X-R.A.X)) div 2,(TProgram.DeskTop.Size.Y-(R.B.Y-R.A.Y)) div 2)
     else
-      R.Move((Application.Size.X-(R.B.X-R.A.X)) div 2,(Application.Size.Y-(R.B.Y-R.A.Y)) div 2);
+      R.Move((TProgram.Application.Size.X-(R.B.X-R.A.X)) div 2,(TProgram.Application.Size.Y-(R.B.Y-R.A.Y)) div 2);
   end;
   Dialog := TAdvMessageBox.Create(R, Titles[AOptions and $3]);
   with Dialog do
    begin
      CanCancel:=(Options and mfCantCancel)=0;
-     R.Assign(3,2, Size.X-2,Size.Y-3);
+     R := TRect.Create(3, 2, Size.X-2, Size.Y-3);
      Control := TStaticText.Create(R, S);
      Insert(Control);
      X := -2;
@@ -2558,7 +2548,7 @@ begin
       if AOptions and ($10000 shl I) <> 0 then
        begin
          BtnName:=UserButtonName[I+1];
-         R.Assign(0, 0, Max(10,length(BtnName)+2), 2);
+         R := TRect.Create(0, 0, Max(10,length(BtnName)+2), 2);
          Control := TButton.Create(R, BtnName, UserButtonCmd[I+1], bfNormal);
          Inc(X, Control.Size.X + 2);
          ButtonList[ButtonCount] := Control;
@@ -2567,7 +2557,7 @@ begin
      for I := 0 to 3 do
       if AOptions and ($0100 shl I) <> 0 then
        begin
-         R.Assign(0, 0, 10, 2);
+         R := TRect.Create(0, 0, 10, 2);
          Control := TButton.Create(R, ButtonName[I], Cmds[i], bfNormal);
          Inc(X, Control.Size.X + 2);
          ButtonList[ButtonCount] := Control;
@@ -2584,18 +2574,18 @@ begin
      SelectNext(False);
    end;
   if AOptions and mfInsertInApp = 0 then
-    AdvMessageBoxRect := DeskTop.ExecView(Dialog)
+    AdvMessageBoxRect := TProgram.DeskTop.ExecView(Dialog)
   else
-    AdvMessageBoxRect := Application.ExecView(Dialog);
+    AdvMessageBoxRect := TProgram.Application.ExecView(Dialog);
   Dialog.Free;
 end;
 
 procedure InitAdvMsgBox;
 begin
-  ButtonName[0] := MsgYesText;
-  ButtonName[1] := MsgNoText;
-  ButtonName[2] := MsgOKText;
-  ButtonName[3] := MsgCancelText;
+  ButtonName[0] := MsgBoxText.YesText;
+  ButtonName[1] := MsgBoxText.NoText;
+  ButtonName[2] := MsgBoxText.OkText;
+  ButtonName[3] := MsgBoxText.CancelText;
   Titles[0] := sWarning;
   Titles[1] := sError;
   Titles[2] := sInformation;
@@ -2610,32 +2600,32 @@ end;
 procedure RegisterWViews;
 begin
 {$ifndef NOOBJREG}
-  RAdvancedListBox.ObjType := 1120;
-  RAdvancedListBox.VmtLink := PtrUInt(System.TClass(TAdvancedListBox));
-  RAdvancedListBox.Load := @BuildAdvancedListBox;
-  RAdvancedListBox.Store := @StoreAdvancedListBox;
-  RAdvancedListBox.Next := nil;
-  RegisterType(RAdvancedListBox);
-  RColorStaticText.ObjType := 1121;
-  RColorStaticText.VmtLink := PtrUInt(System.TClass(TColorStaticText));
-  RColorStaticText.Load := @BuildColorStaticText;
-  RColorStaticText.Store := @StoreColorStaticText;
-  RColorStaticText.Next := nil;
-  RegisterType(RColorStaticText);
-  RHSListBox.ObjType := 1122;
-  RHSListBox.VmtLink := PtrUInt(System.TClass(THSListBox));
-  RHSListBox.Load := @BuildHSListBox;
-  RHSListBox.Store := @StoreHSListBox;
-  RHSListBox.Next := nil;
-  RegisterType(RHSListBox);
-  RDlgWindow.ObjType := 1123;
-  RDlgWindow.VmtLink := PtrUInt(System.TClass(TDlgWindow));
-  RDlgWindow.Load := @BuildDlgWindow;
-  RDlgWindow.Store := @StoreDlgWindow;
-  RDlgWindow.Next := nil;
-  RegisterType(RDlgWindow);
+  TStreamableClass.Create('wviews.TAdvancedListBox', @TAdvancedListBox.Build);
+  TStreamableClass.Create('wviews.TColorStaticText', @TColorStaticText.Build);
+  TStreamableClass.Create('wviews.THSListBox', @THSListBox.Build);
+  TStreamableClass.Create('wviews.TDlgWindow', @TDlgWindow.Build);
 {$endif}
 end;
 
+
+class function TDlgWindow.Build: TStreamable;
+begin
+  Result := TDlgWindow.Create(streamableInit);
+end;
+
+function TDlgWindow.StreamableName: ShortString;
+begin
+  Result := 'wviews.TDlgWindow';
+end;
+
+class function THSListBox.Build: TStreamable;
+begin
+  Result := THSListBox.Create(streamableInit);
+end;
+
+function THSListBox.StreamableName: ShortString;
+begin
+  Result := 'wviews.THSListBox';
+end;
 
 END.

@@ -380,7 +380,7 @@ type
       procedure   PushInfo(Const st : string);virtual;
       procedure   PopInfo;virtual;
     public
-      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar; ACore: PCustomCodeEditorCore);
+      constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar; ACore: PCustomCodeEditorCore); overload;
       destructor Destroy; override;
       property    Core_: TCustomCodeEditorCore read FCore;
       procedure   ConvertEvent(var Event: TEvent); virtual;
@@ -453,8 +453,8 @@ type
       procedure   GetContent(ALines: PUnsortedStringCollection); virtual;
       procedure   SetContent(ALines: PUnsortedStringCollection); virtual;
       function    LoadFromStream(Stream: PFastBufStream): boolean; virtual;
-      function    SaveToStream(Stream: PStream): boolean; virtual;
-      function    SaveAreaToStream(Stream: PStream; StartP,EndP: TPoint): boolean;virtual;
+      function    SaveToStream(Stream: TStream): boolean; virtual;
+      function    SaveAreaToStream(Stream: TStream; StartP,EndP: TPoint): boolean;virtual;
       function    LoadFromFile(const AFileName: string): boolean; virtual;
       function    SaveToFile(const AFileName: string): boolean; virtual;
     public
@@ -597,14 +597,14 @@ const
 
      CodeCompleteMinLen : byte = 4; { minimum length of text to try to complete }
 
-     ToClipCmds         : TCommandSet = ([cmCut,cmCopy,
+     ToClipCmds         : TCommandBytes = ([cmCut,cmCopy,
        { cmUnselect should because like cut, copy, copywin:
          if there is a selection, it is active, else it isn't }
        cmUnselect]);
-     FromClipCmds       : TCommandSet = ([cmPaste]);
-     NulClipCmds        : TCommandSet = ([cmClear]);
-     UndoCmd            : TCommandSet = ([cmUndo]);
-     RedoCmd            : TCommandSet = ([cmRedo]);
+     FromClipCmds       : TCommandBytes = ([cmPaste]);
+     NulClipCmds        : TCommandBytes = ([cmClear]);
+     UndoCmd            : TCommandBytes = ([cmUndo]);
+     RedoCmd            : TCommandBytes = ([cmRedo]);
 
 function ExtractTabs(S: string; TabSize: Sw_integer): string;
 
@@ -1341,37 +1341,37 @@ end;
 { the colours: the 18 entries of the palette of the editor (see CEditor) }
 function TCustomCodeEditor.NormalAttr: TColorAttr;
 begin
-  Result:=GetColor(1).Lo;
+  Result:=GetColor(1)[0];
 end;
 
 function TCustomCodeEditor.SelectedAttr: TColorAttr;
 begin
-  Result:=GetColor(10).Lo;
+  Result:=GetColor(10)[0];
 end;
 
 function TCustomCodeEditor.MessageAttr: TColorAttr;
 begin
-  Result:=GetColor(16).Lo;
+  Result:=GetColor(16)[0];
 end;
 
 function TCustomCodeEditor.HighlightAttr: TColorAttr;
 begin
-  Result:=GetColor(10).Lo;
+  Result:=GetColor(10)[0];
 end;
 
 function TCustomCodeEditor.ClassAttr(C: Integer): TColorAttr;
 begin
   case C of
-    hcComment: Result:=GetColor(3).Lo;
-    hcKeyword,hcType: Result:=GetColor(4).Lo;
-    hcBuiltin: Result:=GetColor(4).Lo;
-    hcString,hcEscape: Result:=GetColor(6).Lo;
-    hcNumber: Result:=GetColor(7).Lo;
-    hcAsm: Result:=GetColor(8).Lo;
-    hcOperator,hcDelimiter: Result:=GetColor(9).Lo;
-    hcPreproc: Result:=GetColor(13).Lo;
+    hcComment: Result:=GetColor(3)[0];
+    hcKeyword,hcType: Result:=GetColor(4)[0];
+    hcBuiltin: Result:=GetColor(4)[0];
+    hcString,hcEscape: Result:=GetColor(6)[0];
+    hcNumber: Result:=GetColor(7)[0];
+    hcAsm: Result:=GetColor(8)[0];
+    hcOperator,hcDelimiter: Result:=GetColor(9)[0];
+    hcPreproc: Result:=GetColor(13)[0];
   else
-    Result:=GetColor(1).Lo;
+    Result:=GetColor(1)[0];
   end;
 end;
 
@@ -1385,17 +1385,17 @@ begin
   if (F and (lfHighlightRow or lfDebuggerRow))<>0 then
     begin
       { the row where the debugger stopped / a highlighted row; on a breakpoint it still differs from the breakpoint colour }
-      Attr:=GetColor(12).Lo;
+      Attr:=GetColor(12)[0];
       Result:=true;
     end
   else if (F and lfBreakpoint)<>0 then
     begin
-      Attr:=GetColor(16).Lo;
+      Attr:=GetColor(16)[0];
       Result:=true;
     end
   else if (F and lfSpecialRow)<>0 then
     begin
-      Attr:=GetColor(3).Lo;
+      Attr:=GetColor(3)[0];
       Result:=true;
     end;
 end;
@@ -1952,7 +1952,7 @@ begin
   LoadFromStream:=Stream.Status=stOK;
 end;
 
-function TCustomCodeEditor.SaveToStream(Stream: PStream): boolean;
+function TCustomCodeEditor.SaveToStream(Stream: TStream): boolean;
 var T: AnsiString;
 begin
   T:=Doc.Buffer.AsString;
@@ -1961,7 +1961,7 @@ begin
   SaveToStream:=Stream.Status=stOK;
 end;
 
-function TCustomCodeEditor.SaveAreaToStream(Stream: PStream; StartP,EndP: TPoint): boolean;
+function TCustomCodeEditor.SaveAreaToStream(Stream: TStream; StartP,EndP: TPoint): boolean;
 var T: AnsiString;
     A,B: int64;
 begin
@@ -2072,13 +2072,13 @@ begin
   if ((State and sfFocused)<>0) then
     begin
       Enable:=Editor.HasSelection and (Clipboard<>nil);
-      SetCmdState(ToClipCmds,Enable and (Clipboard<>TCustomCodeEditor(Self)));
-      SetCmdState(NulClipCmds,Enable);
+      SetCmdState(CommandSetOf(ToClipCmds),Enable and (Clipboard<>TCustomCodeEditor(Self)));
+      SetCmdState(CommandSetOf(NulClipCmds),Enable);
       CanPaste:=Clipboard<>nil;
-      SetCmdState(FromClipCmds,CanPaste and (Clipboard<>TCustomCodeEditor(Self)));
-      SetCmdState(UndoCmd,(GetUndoActionCount>0));
-      SetCmdState(RedoCmd,(GetRedoActionCount>0));
-      Message(Application,evBroadcast,cmCommandSetChanged,nil);
+      SetCmdState(CommandSetOf(FromClipCmds),CanPaste and (Clipboard<>TCustomCodeEditor(Self)));
+      SetCmdState(CommandSetOf(UndoCmd),(GetUndoActionCount>0));
+      SetCmdState(CommandSetOf(RedoCmd),(GetRedoActionCount>0));
+      Message(TProgram.Application,evBroadcast,cmCommandSetChanged,nil);
       FLastUndo:=GetUndoActionCount;
       FLastRedo:=GetRedoActionCount;
       FLastSel:=Editor.HasSelection;
@@ -2294,7 +2294,7 @@ begin
   ShiftInEvent:=false;
   if Assigned(CurEvent) then
     if CurEvent^.What=evKeyDown then
-      ShiftInEvent:=((CurEvent^.ControlKeyState and kbShift)<>0);
+      ShiftInEvent:=((CurEvent^.KeyDown.ControlKeyState and kbShift)<>0);
   ShouldExtend:=ShiftInEvent and not DontConsiderShiftState and not NoSelect;
 end;
 
@@ -2851,7 +2851,7 @@ var
 procedure SendToSystemClipboard(const Text: AnsiString);
 begin
   LastSystemClip:=ToLf(Text);
-  ClipboardSetText(Text);
+  TClipboard.SetText(Text);
 end;
 
 { Something new on the system clipboard becomes the text of the clipboard window (and is selected there). }
@@ -2882,7 +2882,7 @@ begin
       Clipboard.Editor.SelectAll;
       Clipboard.Refresh;
       SendToSystemClipboard(T);
-      SetCmdState(FromClipCmds,true);
+      SetCmdState(CommandSetOf(FromClipCmds),true);
       ClipCopy:=true;
     end;
 end;
@@ -3202,10 +3202,10 @@ var
 begin
   if Event.What = evKeyDown then
   begin
-    if (Event.ControlKeyState and kbShift <> 0) and
-      (Event.ScanCode >= $47) and (Event.ScanCode <= $51) then
-      Event.CharCode := 0;
-    Key := Event.KeyCode;
+    if (Event.KeyDown.ControlKeyState and kbShift <> 0) and
+      (Event.KeyDown.CharScan.ScanCode >= $47) and (Event.KeyDown.CharScan.ScanCode <= $51) then
+      Event.KeyDown.CharScan.CharCode := 0;
+    Key := Event.KeyDown.KeyCode;
     if KeyState <> 0 then
     begin
       if (Lo(Key) >= $01) and (Lo(Key) <= $1A) then Inc(Key, $40);
@@ -3224,7 +3224,7 @@ begin
       else
         begin
           Event.What := evCommand;
-          Event.Command := Key;
+          Event.Message.Command := Key;
         end;
   end;
 end;
@@ -3281,13 +3281,13 @@ begin
   M:=GetLocalMenu;
   if M=nil then Exit;
   if LastLocalCmd<>0 then
-     M^.Default:=SearchMenuItem(M,LastLocalCmd);
-  Desktop.GetExtent(R);
-  MakeGlobal(P,R.A);
+     M.Deflt:=SearchMenuItem(M,LastLocalCmd);
+  R := TProgram.DeskTop.GetExtent;
+  R.A := MakeGlobal(P);
   MV:=CreateLocalMenuView(R,M);
-  Re:=Application.ExecView(MV);
-  if M^.Default=nil then LastLocalCmd:=0
-     else LastLocalCmd:=M^.Default^.Command;
+  Re:=TProgram.Application.ExecView(MV);
+  if M.Deflt=nil then LastLocalCmd:=0
+     else LastLocalCmd:=M.Deflt.Command;
   MV.Free;
   if Re<>0 then
     Message(GetCommandTarget, evCommand, Re, Pointer(Self));
@@ -3309,22 +3309,22 @@ begin
   if (E.What and (evMouse or evKeyboard))<>0 then
     CurEvent:=@E;
   if (InASCIIMode=false) or (Event.What<>evKeyDown) then
-   if (Event.What<>evKeyDown) or (Event.KeyCode<>kbEnter) or (IsReadOnly=false) then
+   if (Event.What<>evKeyDown) or (Event.KeyDown.KeyCode<>kbEnter) or (IsReadOnly=false) then
    if (Event.What<>evKeyDown) or
-      ((Event.KeyCode<>kbEnter) and (Event.KeyCode<>kbEsc)) or
+      ((Event.KeyDown.KeyCode<>kbEnter) and (Event.KeyDown.KeyCode<>kbEsc)) or
       (GetCompleteState<>csOffering) then
     ConvertEvent(Event);
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where) then
-       if (Event.Buttons=mbRightButton) then
+      if MouseInView(Event.Mouse.Where) then
+       if (Event.Mouse.Buttons=mbRightButton) then
          begin
-           MakeLocal(Event.Where,P); Inc(P.X); Inc(P.Y);
+           P := MakeLocal(Event.Mouse.Where); Inc(P.X); Inc(P.Y);
            LocalMenu(P);
            ClearEvent(Event);
          end;
     evKeyDown :
-      if ((Event.ControlKeyState and kbPaste)<>0) and not IsReadOnly and not InASCIIMode and
+      if ((Event.KeyDown.ControlKeyState and kbPaste)<>0) and not IsReadOnly and not InASCIIMode and
          TextEvent(Event,PasteStr) then
         begin
           AddGroupedAction(eaPaste);
@@ -3336,8 +3336,8 @@ begin
       begin
         if InASCIIMode then
           begin
-            AddChar(Char(Event.CharCode));
-            if (GetCompleteState<>csDenied) or (Event.CharCode=32) then
+            AddChar(Char(Event.KeyDown.CharScan.CharCode));
+            if (GetCompleteState<>csDenied) or (Event.KeyDown.CharScan.CharCode=32) then
               CCAction:=ccCheck
             else
               CCAction:=ccClear;
@@ -3345,7 +3345,7 @@ begin
         else
           begin
            DontClear:=false;
-           case Event.KeyCode of
+           case Event.KeyDown.KeyCode of
              kbAltF10 :
                Message(Self, evCommand, cmLocalMenu, Pointer(Self));
              kbEnter  :
@@ -3361,7 +3361,7 @@ begin
                 if IsModal then
                   DontClear:=true;
            else
-            if Utf8Enabled and (Event.TextLength>0) and (Byte(Event.Text[0])>=$80) then
+            if Utf8Enabled and (Event.KeyDown.TextLength>0) and (Byte(Event.KeyDown.Text[0])>=$80) then
               begin
                 NoSelect:=true;
                 AddString(EventText(Event));
@@ -3369,19 +3369,19 @@ begin
                 CCAction:=ccClear;
               end
             else
-            case Event.CharCode of
+            case Event.KeyDown.CharScan.CharCode of
              9,32..255 :
-               if (Event.CharCode=9) and IsModal then
+               if (Event.KeyDown.CharScan.CharCode=9) and IsModal then
                  DontClear:=true
                else
                  begin
                    NoSelect:=true;
-                   if Event.CharCode=9 then
+                   if Event.KeyDown.CharScan.CharCode=9 then
                      Indent
                    else
-                     AddChar(Char(Event.CharCode));
+                     AddChar(Char(Event.KeyDown.CharScan.CharCode));
                    NoSelect:=false;
-                   if (GetCompleteState<>csDenied) or (Event.CharCode=32) then
+                   if (GetCompleteState<>csDenied) or (Event.KeyDown.CharScan.CharCode=32) then
                      CCAction:=ccCheck
                    else
                      CCAction:=ccClear;
@@ -3398,13 +3398,13 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmASCIIChar   : InASCIIMode:=not InASCIIMode;
           cmAddChar     :
-            if Utf8Enabled and (longint(Event.InfoPtr)>=128) then
-              AddCharStr(U8Encode(longint(Event.InfoPtr)))
+            if Utf8Enabled and (longint(Event.Message.InfoPtr)>=128) then
+              AddCharStr(U8Encode(longint(Event.Message.InfoPtr)))
             else
-              AddChar(chr(longint(Event.InfoPtr)));
+              AddChar(chr(longint(Event.Message.InfoPtr)));
           cmCharLeft    : CharLeft;
           cmCharRight   : CharRight;
           cmWordLeft    : WordLeft;
@@ -3456,8 +3456,8 @@ begin
           cmToggleFold    : ToggleFold;
           cmExpandFold    : ExpandFold;
           cmCollapseFold  : CollapseFold;
-          cmJumpMark0..cmJumpMark9 : JumpMark(Event.Command-cmJumpMark0);
-          cmSetMark0..cmSetMark9 : DefineMark(Event.Command-cmSetMark0);
+          cmJumpMark0..cmJumpMark9 : JumpMark(Event.Message.Command-cmJumpMark0);
+          cmSetMark0..cmSetMark9 : DefineMark(Event.Message.Command-cmSetMark0);
           cmSelectWord  : SelectWord;
           cmSelectLine  : SelectLine;
           cmWriteBlock  : WriteBlock;
@@ -3482,7 +3482,7 @@ begin
               LocalMenu(P);
             end;
           cmActivateMenu :
-            Message(Application,evCommand,cmMenu,nil);
+            Message(TProgram.Application,evCommand,cmMenu,nil);
         else
           begin
             DontClear:=true;
@@ -3495,7 +3495,7 @@ begin
     evBroadcast :
       begin
         CCAction:=ccDontCare;
-        case Event.Command of
+        case Event.Message.Command of
           cmUpdate :
             Update;
           cmClearLineHighlights :
@@ -3521,7 +3521,7 @@ var
 begin
      If (Event.What=evKeyDown) then
        begin
-         if (Event.KeyCode=kbRight) and
+         if (Event.KeyDown.KeyCode=kbRight) and
             (CurPos = Length(Data^)) and
             Assigned(FindReplaceEditor) then
            Begin
@@ -3534,14 +3534,14 @@ begin
                  If not assigned(validator) or
                     Validator.IsValidInput(s,False)  then
                    Begin
-                     Event.CharCode:=Ord(s[length(s)]);
-                     Event.Scancode:=0;
+                     Event.KeyDown.CharScan.CharCode:=Ord(s[length(s)]);
+                     Event.KeyDown.CharScan.ScanCode:=0;
                      Inherited HandleEvent(Event);
                    End;
                end;
              ClearEvent(Event);
            End
-         else if (Event.KeyCode=kbShiftIns)  and
+         else if (Event.KeyDown.KeyCode=kbShiftIns)  and
                  Assigned(Clipboard) and (Clipboard.ValidBlock) then
            { paste from clipboard }
            begin
@@ -3562,14 +3562,14 @@ begin
                     Validator.IsValidInput(s2,False)  then
                    Begin
                      Event.What:=evKeyDown;
-                     Event.CharCode := Ord(s[i]);
-                     Event.Scancode:=0;
+                     Event.KeyDown.CharScan.CharCode := Ord(s[i]);
+                     Event.KeyDown.CharScan.ScanCode:=0;
                      Inherited HandleEvent(Event);
                    End;
                end;
              ClearEvent(Event);
            end
-         else if (Event.KeyCode=kbCtrlIns)  and
+         else if (Event.KeyDown.KeyCode=kbCtrlIns)  and
                  Assigned(Clipboard) then
            { Copy to clipboard }
            begin
@@ -3580,7 +3580,7 @@ begin
              Clipboard.SelEnd:=Clipboard.CurPos;
              ClearEvent(Event);
            end
-         else if (Event.KeyCode=kbShiftDel)  and
+         else if (Event.KeyDown.KeyCode=kbShiftDel)  and
                  Assigned(Clipboard) then
            { Cut to clipboard }
            begin
@@ -3591,7 +3591,7 @@ begin
              Clipboard.SelEnd:=Clipboard.CurPos;
              s2:=GetStr(Data);
              { now remove the selected part }
-             Event.keyCode:=kbDel;
+             Event.KeyDown.KeyCode:=kbDel;
              inherited HandleEvent(Event);
              ClearEvent(Event);
            end
@@ -3608,12 +3608,12 @@ procedure TSearchHelperDialog.HandleEvent(var Event : TEvent);
 begin
  case Event.What of
      evBroadcast :
-           case Event.Command of
+           case Event.Message.Command of
                    cminputlinelen : begin
-                                      if PtrInt(Event.InfoPtr)=0 then
-                                        okbutton.DisableCommands([cmok])
+                                      if PtrInt(Event.Message.InfoPtr)=0 then
+                                        okbutton.DisableCommands(CommandSetOf([cmok]))
                                       else
-                                        okbutton.EnableCommands([cmok]);
+                                        okbutton.EnableCommands(CommandSetOf([cmok]));
                                       clearevent(event);
                                     end;
              end;
@@ -3631,63 +3631,63 @@ var R,R1,R2: TRect;
     RB1,RB2,RB3: PRadioButtons;
     but : PButton;
 begin
-  R.Assign(0,0,56,15);
+  R := TRect.Create(0, 0, 56, 15);
   D := TSearchHelperDialog.Create(R, dialog_find);
   with D do
   begin
     Options:=Options or ofCentered;
-    GetExtent(R); R.Grow(-3,-2);
-    R1.Copy(R); R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
-    R2.Copy(R); R2.B.X:=R2.B.X-3;R2.A.X:=17; R2.B.Y:=R2.A.Y+1;
+    R := GetExtent; R.Grow(-3,-2);
+    R1 := R; R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
+    R2 := R; R2.B.X:=R2.B.X-3;R2.A.X:=17; R2.B.Y:=R2.A.Y+1;
     IL1 := TEditorInputLine.Create(R2, FindStrSize);
     IL1.Data^:=FindStr;
     Insert(IL1);
     Insert(TLabel.Create(R1, label_find_texttofind, IL1));
-    R1.Assign(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
+    R1 := TRect.Create(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
     Control := THistory.Create(R1, IL1, TextFindId);
     Insert(Control);
 
-    R1.Copy(R); Inc(R1.A.Y,2); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
-    R2.Copy(R1); R2.Move(0,1);
+    R1 := R; Inc(R1.A.Y,2); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
+    R2 := R1; R2.Move(0,1);
     R2.B.Y:=R2.A.Y+{$ifdef TEST_REGEXP}3{$else}2{$endif};
     CB1 := TCheckBoxes.Create(R2,
-      NewSItem(label_find_casesensitive,
-      NewSItem(label_find_wholewordsonly,
+      TSItem.Create(label_find_casesensitive,
+      TSItem.Create(label_find_wholewordsonly,
 {$ifdef TEST_REGEXP}
-      NewSItem(label_find_useregexp,
+      TSItem.Create(label_find_useregexp,
 {$endif TEST_REGEXP}
       nil))){$ifdef TEST_REGEXP}){$endif TEST_REGEXP};
     Insert(CB1);
     Insert(TLabel.Create(R1, label_find_options, CB1));
 
-    R1.Copy(R); Inc(R1.A.Y,2); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
-    R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
+    R1 := R; Inc(R1.A.Y,2); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
+    R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB1 := TRadioButtons.Create(R2,
-      NewSItem(label_find_forward,
-      NewSItem(label_find_backward,
+      TSItem.Create(label_find_forward,
+      TSItem.Create(label_find_backward,
       nil)));
     Insert(RB1);
     Insert(TLabel.Create(R1, label_find_direction, RB1));
 
-    R1.Copy(R); Inc(R1.A.Y,6); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
-    R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
+    R1 := R; Inc(R1.A.Y,6); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
+    R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB2 := TRadioButtons.Create(R2,
-      NewSItem(label_find_global,
-      NewSItem(label_find_selectedtext,
+      TSItem.Create(label_find_global,
+      TSItem.Create(label_find_selectedtext,
       nil)));
     Insert(RB2);
     Insert(TLabel.Create(R1, label_find_scope, RB2));
 
-    R1.Copy(R); Inc(R1.A.Y,6); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
-    R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
+    R1 := R; Inc(R1.A.Y,6); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
+    R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB3 := TRadioButtons.Create(R2,
-      NewSItem(label_find_fromcursor,
-      NewSItem(label_find_entirescope,
+      TSItem.Create(label_find_fromcursor,
+      TSItem.Create(label_find_entirescope,
       nil)));
     Insert(RB3);
     Insert(TLabel.Create(R1, label_find_origin, RB3));
 
-    GetExtent(R); R.Grow(-13,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
+    R := GetExtent; R.Grow(-13,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
     Okbutton := TButton.Create(R, btn_OK, cmOK, bfDefault);
     Insert(OkButton);
     R.Move(19,0);
@@ -3706,75 +3706,75 @@ var R,R1,R2: TRect;
     CB1: PCheckBoxes;
     RB1,RB2,RB3: PRadioButtons;
 begin
-  R.Assign(0,0,56,18);
+  R := TRect.Create(0, 0, 56, 18);
   D := TSearchHelperDialog.Create(R, dialog_replace);
   with D do
   begin
     Options:=Options or ofCentered;
-    GetExtent(R); R.Grow(-3,-2);
-    R1.Copy(R); R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
-    R2.Copy(R); R2.B.X:=R2.B.X-3;R2.A.X:=17; R2.B.Y:=R2.A.Y+1;
+    R := GetExtent; R.Grow(-3,-2);
+    R1 := R; R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
+    R2 := R; R2.B.X:=R2.B.X-3;R2.A.X:=17; R2.B.Y:=R2.A.Y+1;
     IL1 := TEditorInputLine.Create(R2, FindStrSize);
     IL1.Data^:=FindStr;
     Insert(IL1);
     Insert(TLabel.Create(R1, label_replace_texttofind, IL1));
-    R1.Assign(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
+    R1 := TRect.Create(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
     Control := THistory.Create(R1, IL1, TextFindId);
     Insert(Control);
 
-    R1.Copy(R); R1.Move(0,2); R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
-    R2.Copy(R); R2.Move(0,2);R2.B.X:=R2.B.X-3;
+    R1 := R; R1.Move(0,2); R1.B.X:=17; R1.B.Y:=R1.A.Y+1;
+    R2 := R; R2.Move(0,2);R2.B.X:=R2.B.X-3;
     R2.A.X:=17; R2.B.Y:=R2.A.Y+1;
     IL2 := TEditorInputLine.Create(R2, FindStrSize);
     IL2.Data^:=ReplaceStr;
     Insert(IL2);
     Insert(TLabel.Create(R1, label_replace_newtext, IL2));
-    R1.Assign(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
+    R1 := TRect.Create(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
     Control := THistory.Create(R1, IL2, TextReplaceId);
     Insert(Control);
 
-    R1.Copy(R); Inc(R1.A.Y,4); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
-    R2.Copy(R1); R2.Move(0,1);
+    R1 := R; Inc(R1.A.Y,4); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
+    R2 := R1; R2.Move(0,1);
     R2.B.Y:=R2.A.Y+{$ifdef TEST_REGEXP}4{$else}3{$endif};
     CB1 := TCheckBoxes.Create(R2,
-      NewSItem(label_replace_casesensitive,
-      NewSItem(label_replace_wholewordsonly,
-      NewSItem(label_replace_promptonreplace,
+      TSItem.Create(label_replace_casesensitive,
+      TSItem.Create(label_replace_wholewordsonly,
+      TSItem.Create(label_replace_promptonreplace,
 {$ifdef TEST_REGEXP}
-      NewSItem(label_find_useregexp,
+      TSItem.Create(label_find_useregexp,
 {$endif TEST_REGEXP}
       nil)))){$ifdef TEST_REGEXP}){$endif TEST_REGEXP};
     Insert(CB1);
     Insert(TLabel.Create(R1, label_replace_options, CB1));
 
-    R1.Copy(R); Inc(R1.A.Y,4); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
-    R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
+    R1 := R; Inc(R1.A.Y,4); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
+    R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB1 := TRadioButtons.Create(R2,
-      NewSItem(label_replace_forward,
-      NewSItem(label_replace_backward,
+      TSItem.Create(label_replace_forward,
+      TSItem.Create(label_replace_backward,
       nil)));
     Insert(RB1);
     Insert(TLabel.Create(R1, label_replace_direction, RB1));
 
-    R1.Copy(R); Inc(R1.A.Y,9); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
-    R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
+    R1 := R; Inc(R1.A.Y,9); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
+    R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB2 := TRadioButtons.Create(R2,
-      NewSItem(label_replace_global,
-      NewSItem(label_replace_selectedtext,
+      TSItem.Create(label_replace_global,
+      TSItem.Create(label_replace_selectedtext,
       nil)));
     Insert(RB2);
     Insert(TLabel.Create(R1, label_replace_scope, RB2));
 
-    R1.Copy(R); Inc(R1.A.Y,9); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
-    R2.Copy(R1); R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
+    R1 := R; Inc(R1.A.Y,9); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
+    R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB3 := TRadioButtons.Create(R2,
-      NewSItem(label_replace_fromcursor,
-      NewSItem(label_replace_entirescope,
+      TSItem.Create(label_replace_fromcursor,
+      TSItem.Create(label_replace_entirescope,
       nil)));
     Insert(RB3);
     Insert(TLabel.Create(R1, label_replace_origin, RB3));
 
-    GetExtent(R); R.Grow(-13,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10; R.Move(-10,0);
+    R := GetExtent; R.Grow(-13,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10; R.Move(-10,0);
     Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
     R.Move(11,0); R.B.X:=R.A.X+14;
     Insert(TButton.Create(R, btn_replace_changeall, cmYes, bfNormal));
@@ -3791,24 +3791,24 @@ var D: PDialog;
     Control : PView;
     IL: PEditorInputLine;
 begin
-  R.Assign(0,0,40,7);
+  R := TRect.Create(0, 0, 40, 7);
   D := TSearchHelperDialog.Create(R, dialog_gotoline);
   with D do
   begin
     Options:=Options or ofCentered;
-    GetExtent(R); R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
-    R1.Copy(R); R1.B.X:=27; R2.Copy(R);
+    R := GetExtent; R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
+    R1 := R; R1.B.X:=27; R2 := R;
     R2.B.X:=R2.B.X-3;R2.A.X:=27;
     IL := TEditorInputLine.Create(R2,5);
     with TGotoLineDialogRec(Info^) do
     IL.SetValidator(TRangeValidator.Create(1, Lines));
     Insert(IL);
     Insert(TLabel.Create(R1, label_gotoline_linenumber, IL));
-    R1.Assign(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
+    R1 := TRect.Create(R2.B.X, R2.A.Y, R2.B.X+3, R2.B.Y);
     Control := THistory.Create(R1, IL, GotoId);
     Insert(Control);
 
-    GetExtent(R); R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
+    R := GetExtent; R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
     Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
     R.Move(15,0);
     Insert(TButton.Create(R, btn_Cancel, cmCancel, bfNormal));
@@ -3906,7 +3906,7 @@ begin
             end;
         else begin Title:='???'; DefExt:=''; end;
         end;
-        Re:=Application.ExecuteDialog(TFileDialog.Create(DefExt,
+        Re:=TProgram.Application.ExecuteDialog(TFileDialog.Create(DefExt,
           Title, label_name, fdOkButton, FileId), @Name);
         case Dialog of
           edSaveAs     :
@@ -3942,25 +3942,25 @@ begin
       end;
     edGotoLine:
       StdEditorDialog :=
-   Application.ExecuteDialog(CreateGotoLineDialog(Info), Info);
+   TProgram.Application.ExecuteDialog(CreateGotoLineDialog(Info), Info);
     edFind:
       StdEditorDialog :=
-   Application.ExecuteDialog(CreateFindDialog, Info);
+   TProgram.Application.ExecuteDialog(CreateFindDialog, Info);
     edSearchFailed:
       StdEditorDialog := AdvMessageBox(msg_searchstringnotfound,
    nil, mfInsertInApp+ mfError + mfOKButton);
     edReplace:
       StdEditorDialog :=
-   Application.ExecuteDialog(CreateReplaceDialog, Info);
+   TProgram.Application.ExecuteDialog(CreateReplaceDialog, Info);
     edReplacePrompt:
       begin
    { Avoid placing the dialog on the same line as the cursor }
-   R.Assign(0, 1, 40, 8);
-   R.Move((Desktop.Size.X - R.B.X) div 2, 0);
-   Desktop.MakeGlobal(R.B, T);
+   R := TRect.Create(0, 1, 40, 8);
+   R.Move((TProgram.DeskTop.Size.X - R.B.X) div 2, 0);
+   T := TProgram.DeskTop.MakeGlobal(R.B);
    Inc(T.Y);
    if PPoint(Info)^.Y <= T.Y then
-     R.Move(0, Desktop.Size.Y - R.B.Y - 2);
+     R.Move(0, TProgram.DeskTop.Size.Y - R.B.Y - 2);
    StdEditorDialog := AdvMessageBoxRect(R, msg_replacethisoccourence,
      nil, mfInsertInApp+ mfYesNoCancel + mfInformation);
       end;

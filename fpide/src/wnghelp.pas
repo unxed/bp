@@ -112,7 +112,7 @@ type
         function    LoadIndex: boolean; override;
         function    ReadTopic(T: PTopic): boolean; override;
       private
-        F: PStream;
+        F: TStream;
         Header: TNGFileHeader;
         FirstRecordPos: longint;
         IndexLoaded: boolean;

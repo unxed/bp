@@ -196,7 +196,7 @@ type
         function    LoadIndex: boolean; override;
         function    ReadTopic(T: PTopic): boolean; override;
       private
-        F: PStream;
+        F: TStream;
         Header: TWinHelpHeader;
         SysHeader: TWinHelpSystemHeader;
         Title: string;
@@ -256,7 +256,7 @@ begin
   if TPointerMethod(M)(P) then CallPointerMethod:=1 else CallPointerMethod:=0;
 end;
 
-function ReadString(F: PStream): string;
+function ReadString(F: TStream): string;
 var S: string;
     C: char;
 begin

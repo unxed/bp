@@ -75,9 +75,11 @@ type
     procedure   Assign(ALines: TUnsortedStringCollection);
     function    At(Index: Sw_Integer): PString;
     procedure   FreeItem(Item: Pointer); override;
-    function    GetItem(S: TStream): Pointer; override;
-    procedure   PutItem(S: TStream; Item: Pointer); override;
+    function ReadItem(Ip: ipstream): Pointer; override;
+    procedure WriteItem(Item: Pointer; Os: opstream); override;
     procedure   InsertStr(const S: string);
+    function StreamableName: ShortString; override;
+    class function Build: TStreamable; static;
   end;
 
   TNulStream = class;
@@ -242,18 +244,8 @@ const
               '                                                            ' ;
 
 {$ifndef NOOBJREG}
-function BuildUnsortedStringCollection(S: TStream): TStreamable;
-begin
-  Result := TUnsortedStringCollection.Load(S);
-end;
 
-procedure StoreUnsortedStringCollection(P: TStreamable; S: TStream);
-begin
-  TUnsortedStringCollection(P).Store(S);
-end;
 
-var
-  RUnsortedStringCollection: TStreamRec;
 {$endif}
 
 function EofStream(S: TStream): boolean;
@@ -752,14 +744,24 @@ begin
   if Item<>nil then DisposeStr(Item);
 end;
 
-function TUnsortedStringCollection.GetItem(S: TStream): Pointer;
+function TUnsortedStringCollection.ReadItem(Ip: ipstream): Pointer;
 begin
-  GetItem := S.ReadStr;
+  Result := Ip.ReadString;
 end;
 
-procedure TUnsortedStringCollection.PutItem(S: TStream; Item: Pointer);
+procedure TUnsortedStringCollection.WriteItem(Item: Pointer; Os: opstream);
 begin
-  S.WriteStr(PStr(Item));
+  Os.WriteString(PStr(Item));
+end;
+
+class function TUnsortedStringCollection.Build: TStreamable;
+begin
+  Result := TUnsortedStringCollection.Create(streamableInit);
+end;
+
+function TUnsortedStringCollection.StreamableName: ShortString;
+begin
+  Result := 'wutils.TUnsortedStringCollection';
 end;
 
 function TIntCollection.Contains(Item: ptrint): boolean;
@@ -1322,12 +1324,7 @@ end;
 procedure RegisterWUtils;
 begin
 {$ifndef NOOBJREG}
-  RUnsortedStringCollection.ObjType := 22500;
-  RUnsortedStringCollection.VmtLink := PtrUInt(System.TClass(TUnsortedStringCollection));
-  RUnsortedStringCollection.Load := @BuildUnsortedStringCollection;
-  RUnsortedStringCollection.Store := @StoreUnsortedStringCollection;
-  RUnsortedStringCollection.Next := nil;
-  RegisterType(RUnsortedStringCollection);
+  TStreamableClass.Create('wutils.TUnsortedStringCollection', @TUnsortedStringCollection.Build);
 {$endif}
 end;
 

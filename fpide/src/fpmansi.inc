@@ -30,13 +30,13 @@ var
        repeat
          GetEvent(E);
        until (E.What=evMouseDown) or
-         ((E.What=evKeyDown) and ((E.KeyCode=kbEsc) or (E.KeyCode=kbEnter)));
+         ((E.What=evKeyDown) and ((E.KeyDown.KeyCode=kbEsc) or (E.KeyDown.KeyCode=kbEnter)));
        if (E.What=evMouseDown) then
          begin
            GetPoint:=true;
-           P:=E.Where;
+           P:=E.Mouse.Where;
          end
-       else if (E.KeyCode=kbEnter) then
+       else if (E.KeyDown.KeyCode=kbEnter) then
          GetPoint:=true
        else
          GetPoint:=false;

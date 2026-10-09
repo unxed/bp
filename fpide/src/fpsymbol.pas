@@ -313,26 +313,26 @@ procedure CloseAllBrowsers;
   end;
 
 begin
-  Desktop.ForEach(@SendCloseIfBrowser);
+  TProgram.DeskTop.ForEach(@SendCloseIfBrowser);
 end;
 
 procedure RemoveBrowsersCollection;
 begin
   if assigned(GlobalsCollection) then
     begin
-      GlobalsCollection.deleteAll;
+      GlobalsCollection.RemoveAll;
       GlobalsCollection.Free;
       GlobalsCollection:=nil;
     end;
   if assigned(ProcedureCollection) then
     begin
-      ProcedureCollection.deleteAll;
+      ProcedureCollection.RemoveAll;
       ProcedureCollection.Free;
       ProcedureCollection:=nil;
     end;
   if assigned(ModulesCollection) then
     begin
-      ModulesCollection.deleteAll;
+      ModulesCollection.RemoveAll;
       ModulesCollection.Free;
       ModulesCollection:=nil;
     end;
@@ -613,7 +613,7 @@ end;
 
 procedure TSymbolView.ClearHighlights;
 begin
-  Message(Desktop,evBroadcast,cmClearLineHighlights,nil);
+  Message(TProgram.DeskTop,evBroadcast,cmClearLineHighlights,nil);
 end;
 
 procedure TSymbolView.AutoTrackSource;
@@ -645,7 +645,7 @@ begin
           AutoTrackSource;
       end
     else
-      Message(Desktop,evBroadcast,cmClearLineHighlights,nil);
+      Message(TProgram.DeskTop,evBroadcast,cmClearLineHighlights,nil);
 end;
 
 procedure TSymbolView.Browse;
@@ -671,7 +671,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEnter :
             Browse;
           kbCtrlEnter :
@@ -687,7 +687,7 @@ begin
       end;
     evMouseDown :
       begin
-        if ((Event.EventFlags and meDoubleClick)<>0) then
+        if ((Event.Mouse.EventFlags and meDoubleClick)<>0) then
           begin
             Browse;
             ClearEvent(Event);
@@ -696,7 +696,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmSymBrowse :
             Browse;
           cmSymGotoSource :
@@ -710,9 +710,9 @@ begin
         if DontClear=false then ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListFocusChanged :
-         if Event.InfoPtr=Pointer(Self) then
+         if Event.Message.InfoPtr=Pointer(Self) then
           if (MiscOptions and moAutoTrackSource)<>0 then
             if GetState(sfFocused) then
               AutoTrackSource;
@@ -758,7 +758,7 @@ begin
 end;
 begin
   BW:=nil;
-  Desktop.ForEach(@IsBW);
+  TProgram.DeskTop.ForEach(@IsBW);
   LastBrowserWindow:=BW;
 end;
 
@@ -768,7 +768,7 @@ var W: PSourceWindow;
     P: TPoint;
 begin
   ClearHighlights;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   P.X:=R.Position.X-1; P.Y:=R.Position.Y-1;
   if AutoTrack then
     W:=SearchOnDesktop(R.GetFileName,false)
@@ -776,14 +776,14 @@ begin
     W:=TryToOpenFile(nil,R.GetFileName,P.X,P.Y,true);
   if not assigned(W) then
     begin
-      Desktop.Unlock;
+      TProgram.DeskTop.Unlock;
       if IDEApp.OpenSearch(R.GetFileName+'*') then
         begin
           W:=TryToOpenFile(nil,R.GetFileName,R.Position.X-1,R.Position.Y-1,true);
           if Assigned(W) then
             W.Select;
         end;
-      Desktop.Lock;
+      TProgram.DeskTop.Lock;
     end;
   if W<>nil then
   begin
@@ -792,12 +792,12 @@ begin
       W.Select
     else
       begin
-        Desktop.Delete(W);
-        Desktop.InsertBefore(W,BW.NextView);
+        TProgram.DeskTop.Delete(W);
+        TProgram.DeskTop.InsertBefore(W,BW.NextView);
       end;
     W.Editor.SetLineFlagExclusive(lfHighlightRow,P.Y);
   end;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
   if Assigned(W)=false then
     ErrorBox(FormatStrStr(msg_cantfindfile,R.GetFileName),nil);
 
@@ -807,22 +807,22 @@ end;
 function TSymbolView.GotoReference(R: PReference): boolean;
 var W: PSourceWindow;
 begin
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   W:=TryToOpenFile(nil,R.GetFileName,R.Position.X-1,R.Position.Y-1,true);
   if Assigned(W) then
     W.Select
   else
     begin
-      Desktop.Unlock;
+      TProgram.DeskTop.Unlock;
       if IDEApp.OpenSearch(R.GetFileName+'*') then
         begin
           W:=TryToOpenFile(nil,R.GetFileName,R.Position.X-1,R.Position.Y-1,true);
           if Assigned(W) then
             W.Select;
         end;
-      Desktop.Lock;
+      TProgram.DeskTop.Lock;
     end;
-  Desktop.UnLock;
+  TProgram.DeskTop.UnLock;
   if Assigned(W)=false then
     ErrorBox(FormatStrStr(msg_cantfindfile,R.GetFileName),nil);
   GotoReference:=W<>nil;
@@ -862,14 +862,14 @@ var OldFocus: sw_integer;
 begin
   case Event.What of
     evKeyDown :
-      case Event.KeyCode of
+      case Event.KeyDown.KeyCode of
         kbBack :
           begin
             LookUp(copy(LookUpStr,1,length(LookUpStr)-1));
             ClearEvent(Event);
           end;
       else
-        if (Event.TextLength>0) and (Event.Text[0]>=#33) then
+        if (Event.KeyDown.TextLength>0) and (Event.KeyDown.Text[0]>=#33) then
           begin
             LookUp(LookUpStr+EventText(Event));
             ClearEvent(Event);
@@ -1000,7 +1000,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEnter :
             TrackItem(Focused,false);
           kbCtrlEnter :
@@ -1215,7 +1215,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
 {$ifndef HASOUTLINE}
           kbEnter:
             NodeSelected(GetLineNode(Cursor.Y-Origin.Y));
@@ -1233,10 +1233,10 @@ begin
     evMouseDown :
       begin
 {$ifndef HASOUTLINE}
-        MakeLocal(Event.Where,P);
+        P := MakeLocal(Event.Mouse.Where);
         SetCursor(P.X,P.Y);
 {$endif HASOUTLINE}
-        if ((Event.EventFlags and meDoubleClick)<>0) then
+        if ((Event.Mouse.EventFlags and meDoubleClick)<>0) then
           begin
             MakeKeyEvent(KbEvent,kbEnter,0);
             HandleEvent(KbEvent);
@@ -1524,10 +1524,10 @@ end;
 begin
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where) then
+      if MouseInView(Event.Mouse.Where) then
         begin
           repeat
-            MakeLocal(Event.Where,P);
+            P := MakeLocal(Event.Mouse.Where);
             Idx:=GetItemForCoord(P.X);
             if Idx<>-1 then
               SelectItem(Idx);
@@ -1538,8 +1538,8 @@ begin
       begin
         DontClear:=false; Idx:=-1;
         for I:=0 to GetItemCount-1 do
-          if (GetCtrlCode(GetItem(I).Sign)=Event.KeyCode){ or
-             (GetItem(I).Sign=UpCase(Event.CharCode))}  then
+          if (GetCtrlCode(GetItem(I).Sign)=Event.KeyDown.KeyCode){ or
+             (GetItem(I).Sign=UpCase(Event.KeyDown.CharScan.CharCode))}  then
            if (Flags and (1 shl I))<>0 then
             begin
               Idx:=I;
@@ -1568,7 +1568,7 @@ end;
 
 procedure TUnitInfoPanel.HandleEvent(var Event: TEvent);
 begin
-  if (Event.What=evBroadcast) and (Event.Command=cmListItemSelected) and
+  if (Event.What=evBroadcast) and (Event.Message.Command=cmListItemSelected) and
      (InOwnerCall=false) then
     begin
       InOwnerCall:=true;
@@ -1590,7 +1590,7 @@ function CreateVSB(R: TRect): PScrollBar;
 var R2: TRect;
     SB: PScrollBar;
 begin
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); SB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
   CreateVSB:=SB;
 end;
@@ -1598,7 +1598,7 @@ function CreateHSB(R: TRect): PScrollBar;
 var R2: TRect;
     SB: PScrollBar;
 begin
-  R2.Copy(R); R2.Move(0,1); R2.A.Y:=R2.B.Y-1;
+  R2 := R; R2.Move(0,1); R2.A.Y:=R2.B.Y-1;
   SB := TScrollBar.Create(R2); SB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY;
   CreateHSB:=SB;
 end;
@@ -1608,7 +1608,7 @@ begin
   Sym:=ASym;
   Prefix:=NewStr(APrefix);
 
-  GetExtent(R); R.Grow(-1,-1); R.B.Y:=R.A.Y+1;
+  R := GetExtent; R.Grow(-1,-1); R.B.Y:=R.A.Y+1;
 {$ifndef NODEBUG}
   if {assigned(Debugger) and Debugger.IsRunning and}
      assigned(Sym) and (Sym.typ in [fieldvarsym,staticvarsym,localvarsym,paravarsym]) then
@@ -1625,7 +1625,7 @@ begin
   ST.GrowMode:=gfGrowHiX;
   Insert(ST);
 
-  GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,2);
+  R := GetExtent; R.Grow(-1,-1); Inc(R.A.Y,2);
   if assigned(ASymbols) and (ASymbols.Count>0) then
     begin
       HSB:=CreateHSB(R);
@@ -1671,9 +1671,9 @@ begin
   with PModuleSymbol(Sym) do
     begin
       UnitInfo := TUnitInfoPanel.Create(R);
-      UnitInfo.GetExtent(R3);
+      R3 := UnitInfo.GetExtent;
 
-      R2.Copy(R3);
+      R2 := R3;
       R2.B.Y:=R2.A.Y+3;
       if (Assigned(UsedUnits) or Assigned(DependentUnits))=false then
         R2.B.Y:=R3.B.Y;
@@ -1745,7 +1745,7 @@ begin
       Insert(UnitInfo);
     end;
 
-  GetExtent(R); R.Grow(-1,-1); R.Move(0,1); R.B.Y:=R.A.Y+1;
+  R := GetExtent; R.Grow(-1,-1); R.Move(0,1); R.B.Y:=R.A.Y+1;
   PageTab := TBrowserTab.Create(R,
     NewBrowserTabItem(label_browsertab_scope,ScopeView,
     NewBrowserTabItem(label_browsertab_reference,ReferenceView,
@@ -1799,11 +1799,11 @@ var DontClear: boolean;
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmDebuggerStopped :
           begin
             if Assigned(DebuggerValue) and
-               (DebuggerValue.GDBI<>PtrInt(Event.InfoPtr)) then
+               (DebuggerValue.GDBI<>PtrInt(Event.Message.InfoPtr)) then
               begin
                 If Assigned(ST.Text) then
                   DisposeStr(ST.Text);
@@ -1816,25 +1816,25 @@ begin
         cmListItemSelected :
           begin
             S:=nil;
-            if (Event.InfoPtr=Pointer(ScopeView)) then
+            if (Event.Message.InfoPtr=Pointer(ScopeView)) then
               begin
                 S:=ScopeView.Symbols.At(ScopeView.Focused);
-                MakeGlobal(ScopeView.Origin,P);
-                Desktop.MakeLocal(P,P); Inc(P.Y,ScopeView.Focused-ScopeView.TopItem);
+                P := MakeGlobal(ScopeView.Origin);
+                P := TProgram.DeskTop.MakeLocal(P); Inc(P.Y,ScopeView.Focused-ScopeView.TopItem);
                 Inc(P.Y);
               end;
-            if (Event.InfoPtr=Pointer(UnitInfoUsed)) then
+            if (Event.Message.InfoPtr=Pointer(UnitInfoUsed)) then
               begin
                 S:=UnitInfoUsed.Symbols.At(UnitInfoUsed.Focused);
-                MakeGlobal(UnitInfoUsed.Origin,P);
-                Desktop.MakeLocal(P,P); Inc(P.Y,UnitInfoUsed.Focused-UnitInfoUsed.TopItem);
+                P := MakeGlobal(UnitInfoUsed.Origin);
+                P := TProgram.DeskTop.MakeLocal(P); Inc(P.Y,UnitInfoUsed.Focused-UnitInfoUsed.TopItem);
                 Inc(P.Y);
               end;
-            if (Event.InfoPtr=Pointer(UnitInfoDependent)) then
+            if (Event.Message.InfoPtr=Pointer(UnitInfoDependent)) then
               begin
                 S:=UnitInfoDependent.Symbols.At(UnitInfoDependent.Focused);
-                MakeGlobal(UnitInfoDependent.Origin,P);
-                Desktop.MakeLocal(P,P); Inc(P.Y,UnitInfoDependent.Focused-UnitInfoDependent.TopItem);
+                P := MakeGlobal(UnitInfoDependent.Origin);
+                P := TProgram.DeskTop.MakeLocal(P); Inc(P.Y,UnitInfoDependent.Focused-UnitInfoDependent.TopItem);
                 Inc(P.Y);
               end;
             if Assigned(S) then
@@ -1857,14 +1857,14 @@ begin
 {    evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
         cmGotoSymbol :
-          if Event.InfoPtr=ScopeView then
+          if Event.Message.InfoPtr=ScopeView then
            if ReferenceView<>nil then
             if ReferenceView.Range>0 then
               ReferenceView.GotoItem(0);
         cmTrackSymbol :
-          if Event.InfoPtr=ScopeView then
+          if Event.Message.InfoPtr=ScopeView then
             if (ScopeView<>nil) and (ScopeView.Range>0) then
               begin
                 S:=ScopeView.At(ScopeView.Focused);
@@ -1877,7 +1877,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEsc :
             Close;
           kbAltI :
@@ -1965,7 +1965,7 @@ begin
                  begin
                    PB:=BreakpointsCollection.GetType(bt_function,copy(GetStr(PS),1,l-1));
                    If Assigned(PB) then
-                     BreakpointsCollection.Delete(PB);
+                     BreakpointsCollection.Remove(PB);
                    Sym.Name:=NewStr(copy(GetStr(PS),1,l-1));
                    DrawView;
                    DisposeStr(PS);
@@ -1990,7 +1990,7 @@ begin
                  begin
                    PB:=BreakpointsCollection.GetType(bt_awatch,copy(PS^,1,l-1));
                    If Assigned(PB) then
-                     BreakpointsCollection.Delete(PB);
+                     BreakpointsCollection.Remove(PB);
                    Sym.Name:=NewStr(copy(PS^,1,l-1));
                    DrawView;
                    DisposeStr(PS);
@@ -2041,10 +2041,10 @@ var R: TRect;
     PB : PBrowserWindow;
     St,st2 : string;
 begin
-  if X=0 then X:=Desktop.Size.X-35;
+  if X=0 then X:=TProgram.DeskTop.Size.X-35;
   R.A.X:=X; R.A.Y:=Y;
   R.B.X:=R.A.X+35; R.B.Y:=R.A.Y+15;
-  while (R.B.Y>Desktop.Size.Y) do R.Move(0,-1);
+  while (R.B.Y>TProgram.DeskTop.Size.Y) do R.Move(0,-1);
   if assigned(ParentBrowser) and assigned(ParentBrowser.Prefix) and
      assigned(ParentBrowser.sym) and
      (ParentBrowser.sym.typ<>unitsym)
@@ -2072,7 +2072,7 @@ begin
      (assigned(ParentBrowser) and ParentBrowser.IsValid) then
     PB.IsValid:=true;
 
-  Desktop.Insert(PB);
+  TProgram.DeskTop.Insert(PB);
 end;
 
 END.

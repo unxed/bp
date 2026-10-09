@@ -136,7 +136,7 @@ type
        function    FindResource(const ResName: string): PResource;
        function    FindResourceEntry(const ResName: string; ALangID: longint): PResourceEntry;
      private
-       S         : PStream;
+       S         : TStream;
        MyStream  : boolean;
        Resources : PResourceCollection;
        Entries   : PGlobalResourceEntryCollection;
@@ -751,8 +751,8 @@ end;
 procedure TResourceFile.RemoveResEntryPtr(P: PResource; E: PResourceEntry);
 begin
   if (P=nil) or (E=nil) then Exit;
-  Entries.Delete(E);
-  P.Items.Delete(E);
+  Entries.Remove(E);
+  P.Items.Remove(E);
 end;
 
 function TResourceFile.GetNextEntryID: longint;
@@ -770,7 +770,7 @@ begin
 {  if assigned(S) then S.Free; S:=nil;}
   if Resources<>nil then Resources.Free; Resources:=nil;
   if Entries<>nil then
-    begin Entries.DeleteAll; Entries.Free; Entries:=nil; end;
+    begin Entries.RemoveAll; Entries.Free; Entries:=nil; end;
   if MyStream and Assigned(S) then
     S.Free;
 end;

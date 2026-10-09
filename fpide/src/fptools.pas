@@ -108,20 +108,24 @@ type
       procedure   Clear; override;
       procedure   Update; override;
       function    GetPalette: TPalette; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     end;
 
     TMessagesWindow = class;
   PMessagesWindow = TMessagesWindow;
     TMessagesWindow = class(TFPWindow)
-      constructor Create;
+      constructor Create; overload;
       procedure   Update; override;
       procedure   HandleEvent(var Event: TEvent); override;
       function    GetPalette: TPalette; override;
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream); override;
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
       procedure   FocusItem(i : sw_integer);
       procedure   SizeLimits(out Min, Max: TPoint); override;
@@ -177,8 +181,6 @@ uses Dos,
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RToolMessageListBox: TStreamRec;
-var RMessagesWindow: TStreamRec;
 
 {$endif}
 {$endif}
@@ -428,31 +430,31 @@ end;
 
 constructor TToolItemDialog.Create(ATool: PTool);
 var R,R2,R3: TRect;
-    Items: PSItem;
+    Items: TSItem;
     I,KeyCount: sw_integer;
 begin
   KeyCount:=GetHotKeyCount;
 
-  R.Assign(0,0,60,Max(3+KeyCount,12));
+  R := TRect.Create(0, 0, 60, Max(3+KeyCount,12));
   inherited Create(R,dialog_modifynewtool);
   Tool:=ATool;
 
-  GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
+  R := GetExtent; R.Grow(-3,-2); R3 := R;
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.A.X+36;
   TitleIL := TEditorInputLine.Create(R, 128); Insert(TitleIL);
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_title, TitleIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_title, TitleIL));
   R.Move(0,3);
   ProgramIL := TEditorInputLine.Create(R, 128); Insert(ProgramIL);
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_programpath, ProgramIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_programpath, ProgramIL));
   R.Move(0,3);
   ParamIL := TEditorInputLine.Create(R, 128); Insert(ParamIL);
   ParamIL.SetValidator(TToolParamValidator.Create);
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_commandline, ParamIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_commandline, ParamIL));
 
-  R.Copy(R3); Inc(R.A.X,38); R.B.Y:=R.A.Y+KeyCount;
+  R := R3; Inc(R.A.X,38); R.B.Y:=R.A.Y+KeyCount;
   Items:=nil;
   for I:=KeyCount-1 downto 0 do
-    Items:=NewSItem(GetHotKeyNameByIdx(I), Items);
+    Items:=TSItem.Create(GetHotKeyNameByIdx(I), Items);
   HotKeyRB := TRadioButtons.Create(R, Items);
   Insert(HotKeyRB);
 
@@ -485,19 +487,19 @@ constructor TToolsDialog.Create;
 var R,R2,R3: TRect;
     SB: PScrollBar;
 begin
-  R.Assign(0,0,46,16);
+  R := TRect.Create(0, 0, 46, 16);
   inherited Create(R,dialog_tools);
 
   HelpCtx:=hcTools;
-  GetExtent(R); R.Grow(-3,-2); Inc(R.A.Y); R3.Copy(R); Dec(R.B.X,12);
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R := GetExtent; R.Grow(-3,-2); Inc(R.A.Y); R3 := R; Dec(R.B.X,12);
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); Insert(SB);
   ToolsLB := TToolListBox.Create(R,1,SB);
   Insert(ToolsLB);
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
   Insert(TLabel.Create(R2, label_tools_programtitles, ToolsLB));
 
-  R.Copy(R3); R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
+  R := R3; R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
   Insert(TButton.Create(R, button_OK, cmOK, bfNormal));
   R.Move(0,2);
   Insert(TButton.Create(R, button_Edit, cmEditItem, bfDefault));
@@ -517,7 +519,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbIns  :
             Message(Self,evCommand,cmAddItem,nil);
           kbDel  :
@@ -527,15 +529,15 @@ begin
         if DontClear=false then ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=pointer(ToolsLB) then
+          if Event.Message.InfoPtr=pointer(ToolsLB) then
             Message(Self,evCommand,cmEditItem,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmAddItem    : Add;
           cmDeleteItem : Delete;
           cmEditItem   : Edit;
@@ -567,7 +569,7 @@ begin
     begin
       if Tools<>nil then Tools.Free;
       Tools:=C;
-      Message(Application,evBroadcast,cmUpdateTools,nil);
+      Message(TProgram.Application,evBroadcast,cmUpdateTools,nil);
     end
   else
     C.Free;
@@ -593,7 +595,7 @@ begin
       S1:=''; S2:=''; S3:=''; W:=0;
     end;
   P := TTool.Create(S1,S2,S3,W);
-  if Application.ExecuteDialog(TToolItemDialog.Create(P), nil)=cmOK then
+  if TProgram.Application.ExecuteDialog(TToolItemDialog.Create(P), nil)=cmOK then
     begin
       ToolsLB.List.Insert(P);
       ToolsLB.SetRange(ToolsLB.List.Count);
@@ -608,7 +610,7 @@ var P: PTool;
 begin
   if ToolsLB.Range=0 then Exit;
   P:=PTool(ToolsLB.List.At(ToolsLB.Focused));
-  Application.ExecuteDialog(TToolItemDialog.Create(P), nil);
+  TProgram.Application.ExecuteDialog(TToolItemDialog.Create(P), nil);
   ReDraw;
 end;
 
@@ -757,7 +759,7 @@ var
     ViewNames[ViewCount]:=Sec.GetName;
     GetCoordEntry(F,Sec.GetName,tieOrigin,P1);
     GetCoordEntry(F,Sec.GetName,tieSize,P2);
-    ViewBounds[ViewCount].Assign(P1.X,P1.Y,P1.X+P2.X,P1.Y+P2.Y);
+    ViewBounds[ViewCount] := TRect.Create(P1.X, P1.Y, P1.X+P2.X, P1.Y+P2.Y);
     { allow conversion of $EDNAME for instance in
       default values PM }
     Typ:=F.GetEntry(Sec.GetName,tieValue,'');
@@ -936,12 +938,12 @@ var R: TRect;
     CB: PCheckBoxes;
     RB: PRadioButtons;
     LV: PLabel;
-    SI: PSItem;
+    SI: TSItem;
     S: string;
     P: PView;
 begin
   OK:=true;
-  R.Assign(0,0,DSize.X,DSize.Y);
+  R := TRect.Create(0, 0, DSize.X, DSize.Y);
   PromptDialog := TCenterDialog.Create(R, Title);
   with PromptDialog do
   begin
@@ -979,7 +981,7 @@ begin
           vtCheckBox :
             begin
               CB := TCheckBoxes.Create(ViewBounds[I],
-               NewSItem(
+               TSItem.Create(
                 F.GetEntry(ViewNames[I],tieName,''),
                 nil));
               if StrToInt(ViewValues[I])=1 then
@@ -990,7 +992,7 @@ begin
             begin
               SI:=nil;
               for J:=ViewItemCount[I] downto 1 do
-                SI:=NewSItem(F.GetEntry(ViewNames[I],tieItem+IntToStr(J),''),SI);
+                SI:=TSItem.Create(F.GetEntry(ViewNames[I],tieItem+IntToStr(J),''),SI);
               RB := TRadioButtons.Create(ViewBounds[I], SI);
               RB.Press(StrToInt(ViewValues[I]));
               ViewPtrs[I]:=RB;
@@ -1010,7 +1012,7 @@ begin
       if UpcaseStr(ViewNames[I])=S then
         ViewPtrs[I].Select;
     end;
-  Re:=Desktop.ExecView(PromptDialog);
+  Re:=TProgram.DeskTop.ExecView(PromptDialog);
   OK:=OK and (Re=cmOK);
   AbortTool:=(Re<>cmOK);
   if OK then OK:=ExtractPromptDialogParams(F,Params);
@@ -1301,7 +1303,7 @@ begin
             if (Pass=2) then
               begin
                 I:=I+ReplacePart(LastWordStart,I-1,'')-1;
-                Message(Application,evCommand,cmSaveAll,nil);
+                Message(TProgram.Application,evCommand,cmSaveAll,nil);
               end;
           end else
         if (WordS='$SAVE_CUR') then
@@ -1535,7 +1537,7 @@ end;
 procedure TToolMessageListBox.NewList(AList: PCollection);
 begin
   if (List=ToolMessages) or (ToolMessages=nil) then
-    begin List:=nil; SetRange(0); end;
+    begin Items:=nil; SetRange(0); end;
   inherited NewList(AList);
 end;
 
@@ -1543,7 +1545,7 @@ procedure TToolMessageListBox.Clear;
 begin
   ClearToolMessages;
   Update;
-  Message(Application,evBroadcast,cmClearLineHighlights,Self);
+  Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
 end;
 
 function TToolMessageListBox.GetPalette: TPalette;
@@ -1553,27 +1555,38 @@ begin
   Result := MakePalette(P);
 end;
 
-constructor TToolMessageListBox.Load(S: TStream);
+function TToolMessageListBox.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 end;
 
-procedure TToolMessageListBox.Store(S: TStream);
+procedure TToolMessageListBox.Write(Os: opstream);
 var OL: PCollection;
 begin
   OL:=List;
-  List := TCollection.Create(1,1);
+  Items := TCollection.Create(1,1);
 
-  inherited Store(S);
+  inherited Write(Os);
 
   List.Free;
-  List:=OL;
+  Items:=OL;
+end;
+
+class function TToolMessageListBox.Build: TStreamable;
+begin
+  Result := TToolMessageListBox.Create(streamableInit);
+end;
+
+function TToolMessageListBox.StreamableName: ShortString;
+begin
+  Result := 'fptools.TToolMessageListBox';
 end;
 
 destructor TToolMessageListBox.Destroy;
 begin
   HScrollBar:=nil; VScrollBar:=nil;
-  if List=ToolMessages then begin List:=nil; SetRange(0); end;
+  if List=ToolMessages then begin Items:=nil; SetRange(0); end;
   inherited Destroy;
 end;
 
@@ -1581,7 +1594,7 @@ constructor TMessagesWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  Desktop.GetExtent(R); R.A.Y:=R.B.Y-7;
+  R := TProgram.DeskTop.GetExtent; R.A.Y:=R.B.Y-7;
   inherited Create(R,dialog_messages,SearchFreeWindowNo);
   HelpCtx:=hcMessagesWindow;
 
@@ -1590,7 +1603,7 @@ begin
 
   VSB.SetStep(R.B.Y-R.A.Y-2,1);
   HSB.SetStep(R.B.X-R.A.X-2,1);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   MsgLB := TToolMessageListBox.Create(R, HSB, VSB);
   Insert(MsgLB);
 
@@ -1613,12 +1626,12 @@ procedure TMessagesWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListFocusChanged :
-          if Event.InfoPtr=Pointer(MsgLB) then
+          if Event.Message.InfoPtr=Pointer(MsgLB) then
             begin
               LastToolMessageFocused:=PToolMessage(MsgLB.List.At(MsgLB.Focused));
-              Message(Application,evBroadcast,cmClearLineHighlights,Self);
+              Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
             end;
       end;
   end;
@@ -1637,21 +1650,32 @@ begin
   GetPalette:=MakePalette(CBrowserWindow);
 end;
 
-constructor TMessagesWindow.Load(S: TStream);
+function TMessagesWindow.Read(Ip: ipstream): Pointer;
 begin
-  inherited Load(S);
+  Result := Self;
+  inherited Read(Ip);
 
-  GetSubViewPtr(S,MsgLB);
+  MsgLB := TToolMessageListBox(Ip.ReadPointer);
 
   Update;
   MessagesWindow:=Self;
 end;
 
-procedure TMessagesWindow.Store(S: TStream);
+procedure TMessagesWindow.Write(Os: opstream);
 begin
-  inherited Store(S);
+  inherited Write(Os);
 
-  PutSubViewPtr(S,MsgLB);
+  Os.WritePointer(MsgLB);
+end;
+
+class function TMessagesWindow.Build: TStreamable;
+begin
+  Result := TMessagesWindow.Create(streamableInit);
+end;
+
+function TMessagesWindow.StreamableName: ShortString;
+begin
+  Result := 'fptools.TMessagesWindow';
 end;
 
 destructor TMessagesWindow.Destroy;
@@ -1661,39 +1685,13 @@ begin
 end;
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RToolMessageListBox(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TToolMessageListBox.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RToolMessageListBox(P: TStreamable; S: TStream);
-begin
-  TToolMessageListBox(Pointer(P)).Store(S);
-end;
 
-function Build_RMessagesWindow(S: TStream): TStreamable;
+procedure RegisterStreamables_fptools;
 begin
-  Result := TStreamable(Pointer(TMessagesWindow.Load(S)));
-end;
-
-procedure Store_RMessagesWindow(P: TStreamable; S: TStream);
-begin
-  TMessagesWindow(Pointer(P)).Store(S);
-end;
-
-procedure FillStreamRecs_fptools;
-begin
-  RToolMessageListBox.ObjType := 1600;
-  RToolMessageListBox.VmtLink := PtrUInt(System.TClass(TToolMessageListBox));
-  RToolMessageListBox.Load := @Build_RToolMessageListBox;
-  RToolMessageListBox.Store := @Store_RToolMessageListBox;
-  RToolMessageListBox.Next := nil;
-  RMessagesWindow.ObjType := 1601;
-  RMessagesWindow.VmtLink := PtrUInt(System.TClass(TMessagesWindow));
-  RMessagesWindow.Load := @Build_RMessagesWindow;
-  RMessagesWindow.Store := @Store_RMessagesWindow;
-  RMessagesWindow.Next := nil;
+  TStreamableClass.Create('fptools.TToolMessageListBox', @TToolMessageListBox.Build);
+  TStreamableClass.Create('fptools.TMessagesWindow', @TMessagesWindow.Build);
 end;
 
 {$endif}
@@ -1701,9 +1699,7 @@ end;
 procedure RegisterFPTools;
 begin
 {$ifndef NOOBJREG}
-  FillStreamRecs_fptools;
-  RegisterType(RToolMessageListBox);
-  RegisterType(RMessagesWindow);
+  RegisterStreamables_fptools;
 {$endif}
 end;
 

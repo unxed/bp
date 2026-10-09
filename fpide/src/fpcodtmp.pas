@@ -32,19 +32,23 @@ type
     TCodeTemplate = class;
   PCodeTemplate = TCodeTemplate;
     TCodeTemplate = class(TObject)
-      constructor Create(const AShortCut: string; AText: PUnsortedStringCollection);
+      constructor Create(const AShortCut: string; AText: PUnsortedStringCollection); overload;
       function    GetShortCut: string;
       procedure   GetText(AList: PUnsortedStringCollection);
       procedure   SetShortCut(const AShortCut: string);
       procedure   SetText(AList: PUnsortedStringCollection);
       procedure   GetParams(var AShortCut: string; Lines: PUnsortedStringCollection);
       procedure   SetParams(const AShortCut: string; Lines: PUnsortedStringCollection);
-      constructor Load(S: TStream);
-      procedure   Store(S: TStream);
+      function Read(Ip: ipstream): Pointer; override;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
+      procedure Write(Os: opstream); override;
       destructor Destroy; override;
     private
       ShortCut: PString;
       Text: PUnsortedStringCollection;
+    public
+      constructor Create(AInit: TStreamableInit); overload;
     end;
 
     TCodeTemplateCollection = class;
@@ -53,6 +57,8 @@ type
       function Compare(Key1, Key2: Pointer): sw_Integer; override;
       function SearchByShortCut(const ShortCut: string): PCodeTemplate; virtual;
       function LookUp(const S: string; AcceptMulti: boolean; var Idx: sw_integer): string; virtual;
+      function StreamableName: ShortString; override;
+      class function Build: TStreamable; static;
     end;
 
     TCodeTemplateListBox = class;
@@ -124,8 +130,6 @@ resourcestring  label_codetemplate_shortcut = '~S~hortcut';
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
 {$ifndef NOOBJREG}
-var RCodeTemplate: TStreamRec;
-var RCodeTemplateCollection: TStreamRec;
 
 {$endif}
 {$endif}
@@ -181,16 +185,31 @@ begin
   SetText(Lines);
 end;
 
-constructor TCodeTemplate.Load(S: TStream);
+function TCodeTemplate.Read(Ip: ipstream): Pointer;
 begin
-  ShortCut:=S.ReadStr;
-  Text := TUnsortedStringCollection.Load(S);
+  Result := Self;
+  ShortCut:=Ip.ReadString;
+  Text := TUnsortedStringCollection(Ip.ReadPointer);
 end;
 
-procedure TCodeTemplate.Store(S: TStream);
+procedure TCodeTemplate.Write(Os: opstream);
 begin
-  S.WriteStr(ShortCut);
-  Text.Store(S);
+  Os.WriteString(ShortCut);
+  Os.WritePointer(Text);
+end;
+
+constructor TCodeTemplate.Create(AInit: TStreamableInit);
+begin
+end;
+
+class function TCodeTemplate.Build: TStreamable;
+begin
+  Result := TCodeTemplate.Create(streamableInit);
+end;
+
+function TCodeTemplate.StreamableName: ShortString;
+begin
+  Result := 'fpcodtmp.TCodeTemplate';
 end;
 
 destructor TCodeTemplate.Destroy;
@@ -322,7 +341,7 @@ function LoadCodeTemplates(S: TStream): boolean;
 var C: PCodeTemplateCollection;
     OK: boolean;
 begin
-  C := TCodeTemplateCollection.Load(S);
+  C := TCodeTemplateCollection(GetObject(S));
   OK:=Assigned(C) and (S.Status=stOk);
   if OK then
     begin
@@ -341,7 +360,7 @@ begin
   OK:=Assigned(CodeTemplates);
   if OK then
   begin
-    CodeTemplates.Store(S);
+    PutObject(S, CodeTemplates);
     OK:=OK and (S.Status=stOK);
   end;
   StoreCodeTemplates:=OK;
@@ -363,20 +382,20 @@ end;
 constructor TCodeTemplateDialog.Create(const ATitle: string; ATemplate: PCodeTemplate);
 var R,R2,R3: TRect;
 begin
-  R.Assign(0,0,52,15);
+  R := TRect.Create(0, 0, 52, 15);
   inherited Create(R,ATitle);
   Template:=ATemplate;
 
-  GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
+  R := GetExtent; R.Grow(-3,-2); R3 := R;
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.A.X+46;
   ShortCutIL := TInputLine.Create(R, 128); Insert(ShortcutIL);
   ShortCutIL.SetValidator(TFilterValidator.Create(NumberChars+AlphaChars));
-  R2.Copy(R); R2.Move(-1,-1);
+  R2 := R; R2.Move(-1,-1);
   Insert(TLabel.Create(R2, label_codetemplate_shortcut, ShortcutIL));
   R.Move(0,3); R.B.Y:=R.A.Y+8;
   CodeMemo := TFPCodeMemo.Create(R, nil,nil,nil{,4096 does not compile !! });
   Insert(CodeMemo);
-  R2.Copy(R); R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
+  R2 := R; R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
   Insert(TLabel.Create(R2, label_codetemplate_content, CodeMemo));
 
   InsertButtons(Self);
@@ -414,13 +433,13 @@ end;
 var R,R2,R3: TRect;
     SB: PScrollBar;
 begin
-  R.Assign(0,0,46,20);
+  R := TRect.Create(0, 0, 46, 20);
   inherited Create(R,'Code Templates');
   HelpCtx:=hcCodeTemplateOptions;
   SelMode:=ASelMode;
-  GetExtent(R); R.Grow(-3,-2); Inc(R.A.Y); R.B.Y:=R.A.Y+10;
-  R3.Copy(R); Dec(R.B.X,12);
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R := GetExtent; R.Grow(-3,-2); Inc(R.A.Y); R.B.Y:=R.A.Y+10;
+  R3 := R; Dec(R.B.X,12);
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); Insert(SB);
   CodeTemplatesLB := TCodeTemplateListBox.Create(R,1,SB);
   Insert(CodeTemplatesLB);
@@ -433,11 +452,11 @@ begin
     end
   else
     StartIdx:=-1;
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
   Insert(TLabel.Create(R2, label_codetemplate_templates, CodeTemplatesLB));
 
-  GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y,12);
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R := GetExtent; R.Grow(-2,-2); Inc(R.A.Y,12);
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); Insert(SB);
   TemplateViewer := TFPCodeMemo.Create(R,nil,SB,nil{,4096 does not compile });
   with TemplateViewer do
@@ -447,7 +466,7 @@ begin
   end;
   Insert(TemplateViewer);
 
-  R.Copy(R3); R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
+  R := R3; R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
   Insert(TButton.Create(R, button_OK, cmOK, B2I(SelMode,bfDefault,bfNormal)));
   R.Move(0,2);
   Insert(TButton.Create(R, button_Edit, cmEditItem, B2I(SelMode,bfNormal,bfDefault)));
@@ -484,7 +503,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbIns  :
             Message(Self,evCommand,cmAddItem,nil);
           kbDel  :
@@ -494,12 +513,12 @@ begin
         if DontClear=false then ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=pointer(CodeTemplatesLB) then
+          if Event.Message.InfoPtr=pointer(CodeTemplatesLB) then
             Message(Self,evCommand,cmEditItem,nil);
         cmListFocusChanged :
-          if Event.InfoPtr=pointer(CodeTemplatesLB) then
+          if Event.Message.InfoPtr=pointer(CodeTemplatesLB) then
             Message(Self,evBroadcast,cmUpdate,nil);
         cmUpdate :
           Update;
@@ -507,7 +526,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmAddItem    : Add;
           cmDeleteItem : Delete;
           cmEditItem   : Edit;
@@ -572,7 +591,7 @@ begin
     end;
   P := TCodeTemplate.Create(S,L);
   repeat
-    Cmd:=Application.ExecuteDialog(TCodeTemplateDialog.Create(dialog_newtemplate,P), nil);
+    Cmd:=TProgram.Application.ExecuteDialog(TCodeTemplateDialog.Create(dialog_newtemplate,P), nil);
     CanExit:=(Cmd<>cmOK);
     if CanExit=false then
       begin
@@ -612,7 +631,7 @@ begin
   O.GetParams(S,L);
   P := TCodeTemplate.Create(S, L);
   repeat
-    Cmd:=Application.ExecuteDialog(TCodeTemplateDialog.Create(dialog_modifytemplate,P), nil);
+    Cmd:=TProgram.Application.ExecuteDialog(TCodeTemplateDialog.Create(dialog_modifytemplate,P), nil);
     CanExit:=(Cmd<>cmOK);
     if CanExit=false then
       begin
@@ -648,39 +667,13 @@ end;
 
 
 {$ifndef NOOBJREG}
-{ tv3 stream registration: factories + run-time record fill (see tools/fpide-streamrec-migrate.py) }
-function Build_RCodeTemplate(S: TStream): TStreamable;
-begin
-  Result := TStreamable(Pointer(TCodeTemplate.Load(S)));
-end;
+{ the classes of the unit in the streams of tv3 (opstream, ipstream), registered by their names }
 
-procedure Store_RCodeTemplate(P: TStreamable; S: TStream);
-begin
-  TCodeTemplate(Pointer(P)).Store(S);
-end;
 
-function Build_RCodeTemplateCollection(S: TStream): TStreamable;
+procedure RegisterStreamables_fpcodtmp;
 begin
-  Result := TStreamable(Pointer(TCodeTemplateCollection.Load(S)));
-end;
-
-procedure Store_RCodeTemplateCollection(P: TStreamable; S: TStream);
-begin
-  TCodeTemplateCollection(Pointer(P)).Store(S);
-end;
-
-procedure FillStreamRecs_fpcodtmp;
-begin
-  RCodeTemplate.ObjType := 14501;
-  RCodeTemplate.VmtLink := PtrUInt(System.TClass(TCodeTemplate));
-  RCodeTemplate.Load := @Build_RCodeTemplate;
-  RCodeTemplate.Store := @Store_RCodeTemplate;
-  RCodeTemplate.Next := nil;
-  RCodeTemplateCollection.ObjType := 14502;
-  RCodeTemplateCollection.VmtLink := PtrUInt(System.TClass(TCodeTemplateCollection));
-  RCodeTemplateCollection.Load := @Build_RCodeTemplateCollection;
-  RCodeTemplateCollection.Store := @Store_RCodeTemplateCollection;
-  RCodeTemplateCollection.Next := nil;
+  TStreamableClass.Create('fpcodtmp.TCodeTemplate', @TCodeTemplate.Build);
+  TStreamableClass.Create('fpcodtmp.TCodeTemplateCollection', @TCodeTemplateCollection.Build);
 end;
 
 {$endif}
@@ -688,10 +681,19 @@ end;
 procedure RegisterCodeTemplates;
 begin
 {$ifndef NOOBJREG}
-  FillStreamRecs_fpcodtmp;
-  RegisterType(RCodeTemplate);
-  RegisterType(RCodeTemplateCollection);
+  RegisterStreamables_fpcodtmp;
 {$endif}
+end;
+
+
+class function TCodeTemplateCollection.Build: TStreamable;
+begin
+  Result := TCodeTemplateCollection.Create(streamableInit);
+end;
+
+function TCodeTemplateCollection.StreamableName: ShortString;
+begin
+  Result := 'fpcodtmp.TCodeTemplateCollection';
 end;
 
 END.

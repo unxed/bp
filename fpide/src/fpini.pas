@@ -532,8 +532,8 @@ begin
   { SourcePath }
   SourceDirs:=INIFile.GetEntry(secSourcePath,ieSourceList,SourceDirs);
   { Mouse }
-  DoubleDelay:=INIFile.GetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
-  MouseReverse:=boolean(INIFile.GetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse)));
+  TEventQueue.DoubleDelay:=INIFile.GetIntEntry(secMouse,ieDoubleClickDelay,TEventQueue.DoubleDelay);
+  TEventQueue.MouseReverse:=boolean(INIFile.GetIntEntry(secMouse,ieReverseButtons,byte(TEventQueue.MouseReverse)));
   AltMouseAction:=INIFile.GetIntEntry(secMouse,ieAltClickAction,AltMouseAction);
   CtrlMouseAction:=INIFile.GetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
   {Keyboard}
@@ -675,7 +675,7 @@ begin
           begin
             With PW.editor^ do
               S:=FileName+','+IntToStr(CurPos.X)+','+IntToStr(CurPos.Y);
-            PW.GetBounds(R);
+            R := PW.GetBounds;
             S:=S+','+IntToStr(R.A.X)+','+IntToStr(R.A.Y)+','+
               IntToStr(R.B.X)+','+IntToStr(R.B.Y);
             INIFile.SetEntry(secFiles,ieOpenFile+IntToStr(I),S);
@@ -741,8 +741,8 @@ begin
   { SourcePath }
   INIFile.SetEntry(secSourcePath,ieSourceList,SourceDirs);
   { Mouse }
-  INIFile.SetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
-  INIFile.SetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse));
+  INIFile.SetIntEntry(secMouse,ieDoubleClickDelay,TEventQueue.DoubleDelay);
+  INIFile.SetIntEntry(secMouse,ieReverseButtons,byte(TEventQueue.MouseReverse));
   INIFile.SetIntEntry(secMouse,ieAltClickAction,AltMouseAction);
   INIFile.SetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
   { Keyboard }

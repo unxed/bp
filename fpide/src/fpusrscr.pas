@@ -885,7 +885,7 @@ var
   NewSize : longint;
 begin
   if IsXTerm then
-    write(#27'7'#27'[?47h')
+    System.write(#27'7'#27'[?47h')
   else if (TTYfd<>-1) then
     begin
      fpLSeek(TTYFd, 0, Seek_Set);
@@ -921,8 +921,8 @@ procedure TLinuxScreen.SwitchToConsoleScreen;
 begin
   if IsXterm then
     begin
-      write(#27'[0m');
-      write(#27'[?47l'#27'8'#27'[m');
+      System.write(#27'[0m');
+      System.write(#27'[?47l'#27'8'#27'[m');
     end
   else if (TTyfd<>-1) then
     begin

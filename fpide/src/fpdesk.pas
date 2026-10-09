@@ -153,6 +153,7 @@ end;
 
 function ReadHistory(F: PResourceFile): boolean;
 var S: PMemoryStream;
+    Ip: ipstream;
     OK: boolean;
 begin
   PushStatus(msg_readinghistory);
@@ -160,7 +161,11 @@ begin
   OK:=F.ReadResourceEntryToStream(resHistory,langDefault,S);
   S.Seek(0);
   if OK then
-    HistoryLoad(S);
+  begin
+    Ip := ipstream.Create(S);
+    HistoryLoad(Ip);
+    Ip.Free;
+  end;
   S.Free;
   if OK=false then
     ErrorBox(msg_errorloadinghistory,nil);
@@ -170,12 +175,15 @@ end;
 
 function WriteHistory(F: PResourceFile): boolean;
 var S: PMemoryStream;
+    Os: opstream;
     OK: boolean;
 begin
   PushStatus(msg_storinghistory);
 
   S := TMemoryStream.Create(10*1024,4096);
-  HistoryStore(S);
+  Os := opstream.Create(S);
+  HistoryStore(Os);
+  Os.Free;
   S.Seek(0);
   F.CreateResource(resHistory,rcBinary,0);
   OK:=F.AddResourceEntryFromStream(resHistory,langDefault,0,S,S.GetSize);
@@ -256,7 +264,7 @@ begin
   if OK then
     begin
       OWC:=WatchesCollection;
-      WatchesCollection:=PWatchesCollection(S.Get);
+      WatchesCollection:=PWatchesCollection(GetObject(S));
       OK:=(S.Status=stOK);
       if OK and assigned(OWC) and assigned(WatchesCollection) then
         OWC.Free
@@ -287,7 +295,7 @@ begin
     begin
       PushStatus(msg_storingwatches);
       S := TMemoryStream.Create(30*1024,4096);
-      S.Put(WatchesCollection);
+      PutObject(S, WatchesCollection);
       S.Seek(0);
       F.CreateResource(resWatches,rcBinary,0);
       OK:=F.AddResourceEntryFromStream(resWatches,langDefault,0,S,S.GetSize);
@@ -315,7 +323,7 @@ begin
   if OK then
     begin
       OBC:=BreakpointsCollection;
-      BreakpointsCollection:=PBreakpointCollection(S.get);
+      BreakpointsCollection:=PBreakpointCollection(GetObject(S));
       OK:=(S.Status=stOK);
 
       If OK and assigned(OBC) and assigned(BreakpointsCollection) then
@@ -350,7 +358,7 @@ begin
     begin
       PushStatus(msg_storingbreakpoints);
       S := TMemoryStream.Create(30*1024,4096);
-      S.Put(BreakpointsCollection);
+      PutObject(S, BreakpointsCollection);
       S.Seek(0);
       F.CreateResource(resBreakpoints,rcBinary,0);
       OK:=F.AddResourceEntryFromStream(resBreakpoints,langDefault,0,S,S.GetSize);
@@ -402,7 +410,7 @@ var W: PWindow;
     Len : Byte;
 begin
   XDataOfs:=0;
-  Desktop.Lock;
+  TProgram.DeskTop.Lock;
   W:=SearchWindow(Title);
   case WI.HelpCtx of
     hcSourceWindow :
@@ -415,9 +423,9 @@ begin
           begin
             ClearFormatParams;
             AddFormatParamStr(St);
-            Desktop.Unlock;
+            TProgram.DeskTop.Unlock;
             ErrorBox(msg_cantopenfile,@FormatParams);
-            Desktop.Lock;
+            TProgram.DeskTop.Lock;
           end
         else
         begin
@@ -440,7 +448,7 @@ begin
      hcMessagesWindow:
        begin
          if MessagesWindow=nil then
-           Desktop.Insert(TMessagesWindow.Create);
+           TProgram.DeskTop.Insert(TMessagesWindow.Create);
          W:=MessagesWindow;
        end;
      hcCompilerMessagesWindow:
@@ -461,7 +469,7 @@ begin
          if WatchesWindow=nil then
            begin
              WatchesWindow := TWatchesWindow.Create;
-             Desktop.Insert(WatchesWindow);
+             TProgram.DeskTop.Insert(WatchesWindow);
            end;
          W:=WatchesWindow;
        end;
@@ -470,7 +478,7 @@ begin
          if StackWindow=nil then
            begin
              StackWindow := TStackWindow.Create;
-             Desktop.Insert(StackWindow);
+             TProgram.DeskTop.Insert(StackWindow);
            end;
          W:=StackWindow;
        end;
@@ -479,7 +487,7 @@ begin
          if FPUWindow=nil then
            begin
              FPUWindow := TFPUWindow.Create;
-             Desktop.Insert(FPUWindow);
+             TProgram.DeskTop.Insert(FPUWindow);
            end;
          W:=FPUWindow;
        end;
@@ -488,7 +496,7 @@ begin
          if VectorWindow=nil then
            begin
              VectorWindow := TVectorWindow.Create;
-             Desktop.Insert(VectorWindow);
+             TProgram.DeskTop.Insert(VectorWindow);
            end;
          W:=VectorWindow;
        end;
@@ -497,7 +505,7 @@ begin
          if RegistersWindow=nil then
            begin
              RegistersWindow := TRegistersWindow.Create;
-             Desktop.Insert(RegistersWindow);
+             TProgram.DeskTop.Insert(RegistersWindow);
            end;
          W:=RegistersWindow;
        end;
@@ -506,7 +514,7 @@ begin
          if BreakpointsWindow=nil then
            begin
              BreakpointsWindow := TBreakpointsWindow.Create;
-             Desktop.Insert(BreakpointsWindow);
+             TProgram.DeskTop.Insert(BreakpointsWindow);
            end;
          W:=BreakpointsWindow;
        end;
@@ -516,7 +524,7 @@ begin
          if ASCIIChart=nil then
            begin
              ASCIIChart := TFPASCIIChart.Create;
-             Desktop.Insert(ASCIIChart);
+             TProgram.DeskTop.Insert(ASCIIChart);
            end;
          W:=ASCIIChart;
          if DV>=$A then
@@ -528,10 +536,10 @@ begin
   end;
   if W=nil then
     begin
-      Desktop.Unlock;
+      TProgram.DeskTop.Unlock;
       Exit;
     end;
-  W.GetBounds(R);
+  R := W.GetBounds;
   if (R.A.X<>WI.Bounds.A.X) or (R.A.Y<>WI.Bounds.A.Y) then
     R.Move(WI.Bounds.A.X-R.A.X,WI.Bounds.A.Y-R.A.Y);
   if (W.Flags and wfGrow)<>0 then
@@ -549,7 +557,7 @@ begin
     else
       W.Hide;
   ZZ:=0;
-  Desktop.GetExtent(Z);
+  Z := TProgram.DeskTop.GetExtent;
   if R.A.Y>Z.B.Y-7 then
     begin
       R.A.Y:=Z.B.Y-7;
@@ -572,7 +580,7 @@ begin
     end;
   if ZZ<>0 then W.MoveTo(R.A.X,R.A.Y);
   W.Number:=WI.WinNb;
-  Desktop.Unlock;
+  TProgram.DeskTop.Unlock;
 end;
 begin
   PushStatus(msg_readingdesktopcontents);
@@ -621,7 +629,7 @@ begin
             GetSubViewPtr(S^,ASCIIChart);
             GetSubViewPtr(S^,MessagesWindow); LastToolMessageFocused:=nil;
           end;
-          Application.GetExtent(R);
+          R := Application.GetExtent;
           Inc(R.A.Y);Dec(R.B.Y);
           DeskTop.Locate(R);
           Application.Insert(Desktop);
@@ -685,7 +693,7 @@ begin
   FillChar(WI,sizeof(WI),0);
   Title:=W.GetTitle(255);
   WI.HelpCtx:=W.HelpCtx;
-  W.GetBounds(WI.Bounds);
+  WI.Bounds := W.GetBounds;
   WI.Visible:=W.GetState(sfVisible);
   WI.WinNb:=W.Number;
   case WI.HelpCtx of
@@ -744,7 +752,7 @@ begin
       CollectInfo(PV);
       PV:=PV.PrevView;
     end;}
-    PV:=Desktop.Last;
+    PV:=TProgram.DeskTop.Last;
     while PV<>nil do
     begin
       CollectInfo(PV);

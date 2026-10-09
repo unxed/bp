@@ -31,13 +31,13 @@ begin
   if GetTemplateCount=0 then
      begin InformationBox(msg_notemplatesavailable,nil); Exit; end;
   C := TUnsortedStringCollection.Create(10,10);
-  R.Assign(0,0,40,14);
+  R := TRect.Create(0, 0, 40, 14);
   D := TCenterDialog.Create(R, dialog_newfromtemplate);
   with D do
   begin
     HelpCtx:=hcNewFromTemplate;
-    GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y); Dec(R.B.X,12);
-    R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+    R := GetExtent; R.Grow(-2,-2); Inc(R.A.Y); Dec(R.B.X,12);
+    R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
     SB := TScrollBar.Create(R2); Insert(SB);
 
     LB := TAdvancedListBox.Create(R,1,SB);
@@ -49,7 +49,7 @@ begin
     Dec(R.A.Y); R.B.Y:=R.A.Y+1;
     Insert(TLabel.Create(R, label_availabletemplates, LB));
 
-    GetExtent(R2); R2.Grow(-2,-3); R2.A.X:=R.B.X+2; R2.B.Y:=R2.A.Y+2;
+    R2 := GetExtent; R2.Grow(-2,-3); R2.A.X:=R.B.X+2; R2.B.Y:=R2.A.Y+2;
     Insert(TButton.Create(R2, button_OK, cmOK, bfDefault));
     R2.Move(0,2);
     Insert(TButton.Create(R2, button_Cancel, cmCancel, bfNormal));
@@ -232,18 +232,18 @@ var R,R2: TRect;
     D: PCenterDialog;
     IL: PEditorInputLine;
 begin
-  R.Assign(0,0,round(Drivers.ScreenWidth*54/80),4);
+  R := TRect.Create(0, 0, round(Drivers.TScreen.ScreenWidth*54/80), 4);
   D := TCenterDialog.Create(R, dialog_setupprinter);
   with D do
   begin
-    GetExtent(R); R.Grow(-2,-1); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
-    R2.Copy(R); R2.A.X:=16; Dec(R2.B.X,4);
+    R := GetExtent; R.Grow(-2,-1); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
+    R2 := R; R2.A.X:=16; Dec(R2.B.X,4);
     IL := TEditorInputLine.Create(R2, 255);
     IL.Data^:=GetPrinterDevice;
     Insert(IL);
-    R2.Copy(R); R2.A.X:=R2.B.X-3; R2.B.X:=R2.A.X+3;
+    R2 := R; R2.A.X:=R2.B.X-3; R2.B.X:=R2.A.X+3;
     Insert(THistory.Create(R2, IL, hidPrinterDevice));
-    R2.Copy(R); R2.B.X:=16;
+    R2 := R; R2.B.X:=16;
     Insert(TLabel.Create(R2, label_setupprinter_device, IL));
   end;
   InsertButtons(D);
@@ -288,7 +288,7 @@ procedure TIDEApp.Print;
                 exit;
               end;
           end;
-        write(f,#12);
+        System.write(f,#12);
         close(f);
       end;
   end;

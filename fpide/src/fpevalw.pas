@@ -50,26 +50,26 @@ begin
   options:=options or ofcentered;
   {watch is auto initialized to nil.}
 
-  r.assign(2,3,size.x-20,4);
+  r := TRect.Create(2, 3, size.x-20, 4);
   expr_input := Tinputline.Create(r,255);
   insert(expr_input);
 
-  r.assign(size.x-20,3,size.x-18,4);
+  r := TRect.Create(size.x-20, 3, size.x-18, 4);
   Insert(Thistory.Create(r,expr_input,hidEvaluate));
 
-  r.assign(2,2,size.x-20,3);
+  r := TRect.Create(2, 2, size.x-20, 3);
   l := Tlabel.Create(r,'E~x~pression:',expr_input);
   insert(l);
 
-  r.assign(2,6,size.x-20,7);
+  r := TRect.Create(2, 6, size.x-20, 7);
   expr_output := Tinputline.Create(r,255);
   insert(expr_output);
 
-  r.assign(2,5,size.x-20,6);
+  r := TRect.Create(2, 5, size.x-20, 6);
   l := Tlabel.Create(r,'~R~esult:',expr_output);
   insert(l);
 
-  r.assign(size.x-14,3,size.x-3,5);
+  r := TRect.Create(size.x-14, 3, size.x-3, 5);
   b := Tbutton.Create(r,'~E~valuate',cmEvaluate,bfDefault);
   insert(b);
 
@@ -95,7 +95,7 @@ procedure Tevaluate_dialog.handleevent(var event:Tevent);
 begin
   inherited handleevent(event);
   if event.what=evCommand then
-    case event.command of
+    case event.Message.Command of
       cmEvaluate:
         evaluate;
     end;
