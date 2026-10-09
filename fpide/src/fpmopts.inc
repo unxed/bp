@@ -1420,7 +1420,7 @@ begin
     R.Move(0,(R.B.Y-R.A.Y)+3); R.B.Y:=R.A.Y+3;
     R2 := R; Inc(R2.A.Y,2); R2.B.X:=R2.A.X+(R2.B.X-R2.A.X) div 2 -1;
     SB := TScrollBar.Create(R2); SB.GrowMode:=0; SB.Options:=SB.Options or ofSelectable;
-    SB.SetParams(DoubleDelay,1,20,1,1);
+    SB.SetParams(TEventQueue.DoubleDelay,1,20,1,1);
     Insert(SB);
     R2.Move(0,-1);
     Insert(TStaticText.Create(R2, label_mouse_speedbar));
@@ -1429,7 +1429,7 @@ begin
 
     R2 := R; Inc(R2.A.Y,2); R2.A.X:=R2.B.X-(R2.B.X-R2.A.X) div 2 +1;
     CB := TCheckBoxes.Create(R2, TSItem.Create(label_mouse_reversebuttons, nil));
-    if MouseReverse then CB.Press(0);
+    if TEventQueue.MouseReverse then CB.Press(0);
     Insert(CB);
 
     R.Move(0,(R.B.Y-R.A.Y)+1); R.B.Y:=R.A.Y+8;
@@ -1468,8 +1468,8 @@ begin
   RBkb.Select;
   if Desktop.ExecView(D)=cmOK then
   begin
-    MouseReverse:=CB.Mark(0);
-    DoubleDelay:=SB.Value;
+    TEventQueue.MouseReverse:=CB.Mark(0);
+    TEventQueue.DoubleDelay:=SB.Value;
     CtrlMouseAction:=RB1.Value;
     AltMouseAction:=RB2.Value;
     if Tedit_key_modes(RBkb.value)<>EditKeys then

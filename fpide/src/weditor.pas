@@ -2851,7 +2851,7 @@ var
 procedure SendToSystemClipboard(const Text: AnsiString);
 begin
   LastSystemClip:=ToLf(Text);
-  ClipboardSetText(Text);
+  TClipboard.SetText(Text);
 end;
 
 { Something new on the system clipboard becomes the text of the clipboard window (and is selected there). }

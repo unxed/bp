@@ -154,7 +154,7 @@ end;
 function GetDosTicks: LongInt;
 begin
   { 1 DOS tick ≈ 55 ms }
-  Result := LongInt(ClockMs div 55);
+  Result := LongInt(THardwareInfo.GetTickCount);
 end;
 
 { The slots become an array of const for TvFormat.FormatStr: each % item of Format is written again as an item of
@@ -326,7 +326,7 @@ end;
 
 procedure GetKeyEvent(var Event: TEvent);
 begin
-  TvSys.PollKeyEvent(Event);
+  TEventQueue.GetKeyEvent(Event);
 end;
 
 function ShrinkPath(Path: string; MaxLen: Integer): string;

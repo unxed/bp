@@ -60,6 +60,3 @@ var
   MouseWhere: TPoint;
   { Legacy pixel coordinates (FV linux mouse); idle code does shr 3 → cells. }
   MouseWhereX, MouseWhereY: LongInt;
-  { FV mouse prefs (INI / Mouse options dialog). }
-  DoubleDelay: Word = 8;
-  MouseReverse: Boolean = False;

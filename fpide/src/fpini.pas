@@ -502,8 +502,8 @@ begin
   { SourcePath }
   SourceDirs:=INIFile.GetEntry(secSourcePath,ieSourceList,SourceDirs);
   { Mouse }
-  DoubleDelay:=INIFile.GetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
-  MouseReverse:=boolean(INIFile.GetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse)));
+  TEventQueue.DoubleDelay:=INIFile.GetIntEntry(secMouse,ieDoubleClickDelay,TEventQueue.DoubleDelay);
+  TEventQueue.MouseReverse:=boolean(INIFile.GetIntEntry(secMouse,ieReverseButtons,byte(TEventQueue.MouseReverse)));
   AltMouseAction:=INIFile.GetIntEntry(secMouse,ieAltClickAction,AltMouseAction);
   CtrlMouseAction:=INIFile.GetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
   {Keyboard}
@@ -710,8 +710,8 @@ begin
   { SourcePath }
   INIFile.SetEntry(secSourcePath,ieSourceList,SourceDirs);
   { Mouse }
-  INIFile.SetIntEntry(secMouse,ieDoubleClickDelay,DoubleDelay);
-  INIFile.SetIntEntry(secMouse,ieReverseButtons,byte(MouseReverse));
+  INIFile.SetIntEntry(secMouse,ieDoubleClickDelay,TEventQueue.DoubleDelay);
+  INIFile.SetIntEntry(secMouse,ieReverseButtons,byte(TEventQueue.MouseReverse));
   INIFile.SetIntEntry(secMouse,ieAltClickAction,AltMouseAction);
   INIFile.SetIntEntry(secMouse,ieCtrlClickAction,CtrlMouseAction);
   { Keyboard }
