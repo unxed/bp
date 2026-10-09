@@ -2247,7 +2247,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEnd :
             FocusItem(List.Count-1);
           kbHome :
@@ -2265,15 +2265,15 @@ begin
           ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Pointer(Self) then
+          if Event.Message.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmEditBreakpoint,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmMsgTrackSource :
             if Range>0 then
               TrackSource;
@@ -2350,7 +2350,7 @@ begin
   W:=EditorWindowFile(P.GetModuleName);
   if assigned(W) then
     begin
-      W.GetExtent(R);
+      R := W.GetExtent;
       R.B.Y:=Owner.Origin.Y;
       W.ChangeBounds(R);
       W.Editor.SetCurPtr(1,P.Breakpoint.Line);
@@ -2540,32 +2540,32 @@ var R,R2: TRect;
 const
   NumButtons = 5;
 begin
-  TProgram.DeskTop.GetExtent(R); R.A.Y:=R.B.Y-18;
+  R := TProgram.DeskTop.GetExtent; R.A.Y:=R.B.Y-18;
   inherited Create(R, dialog_breakpointlist, wnNoNumber);
 
   HelpCtx:=hcBreakpointListWindow;
 
-  GetExtent(R); R.Grow(-1,-1); R.B.Y:=R.A.Y+1;
+  R := GetExtent; R.Grow(-1,-1); R.B.Y:=R.A.Y+1;
   S:=label_breakpointpropheader;
   ST := TStaticText.Create(R,S);
   ST.GrowMode:=gfGrowHiX;
   Insert(ST);
-  GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,1); R.B.Y:=R.A.Y+1;
+  R := GetExtent; R.Grow(-1,-1); Inc(R.A.Y,1); R.B.Y:=R.A.Y+1;
   ST := TStaticText.Create(R, CharStr('─', MaxViewWidth));
   ST.GrowMode:=gfGrowHiX;
   Insert(ST);
-  GetExtent(R); R.Grow(-1,-1); Inc(R.A.Y,2);Dec(R.B.Y,5);
-  R2.Copy(R); Inc(R2.B.Y); R2.A.Y:=R2.B.Y-1;
+  R := GetExtent; R.Grow(-1,-1); Inc(R.A.Y,2);Dec(R.B.Y,5);
+  R2 := R; Inc(R2.B.Y); R2.A.Y:=R2.B.Y-1;
   HSB := TScrollBar.Create(R2); HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX; Insert(HSB);
   HSB.SetStep(R.B.X-R.A.X-2,1);
-  R2.Copy(R); Inc(R2.B.X); R2.A.X:=R2.B.X-1;
+  R2 := R; Inc(R2.B.X); R2.A.X:=R2.B.X-1;
   VSB := TScrollBar.Create(R2); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
   VSB.SetStep(R.B.Y-R.A.Y-2,1);
   BreakLB := TBreakpointsListBox.Create(R,HSB,VSB);
   BreakLB.GrowMode:=gfGrowHiX+gfGrowHiY;
   BreakLB.Transparent:=true;
   Insert(BreakLB);
-  GetExtent(R);R.Grow(-1,-1);
+  R := GetExtent;R.Grow(-1,-1);
   Dec(R.B.Y);
   R.A.Y:=R.B.Y-2;
   X:=(R.B.X-R.A.X) div NumButtons;
@@ -2651,7 +2651,7 @@ begin
   case Event.What of
     evKeyDown :
       begin
-        if (Event.KeyCode=kbEnter) or (Event.KeyCode=kbEsc) then
+        if (Event.KeyDown.KeyCode=kbEnter) or (Event.KeyDown.KeyCode=kbEsc) then
           begin
             ClearEvent(Event);
             Hide;
@@ -2660,7 +2660,7 @@ begin
     evCommand :
       begin
        DontClear:=False;
-       case Event.Command of
+       case Event.Message.Command of
          cmNewBreakpoint :
            BreakLB.EditNew;
          cmEditBreakpoint :
@@ -2678,7 +2678,7 @@ begin
           ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate :
           Update;
       end;
@@ -2715,41 +2715,41 @@ var R,R2,R3: TRect;
 begin
   KeyCount:=longint(high(BreakpointType));
 
-  R.Assign(0,0,60,Max(9+KeyCount,18));
+  R := TRect.Create(0, 0, 60, Max(9+KeyCount,18));
   inherited Create(R,dialog_modifynewbreakpoint);
   Breakpoint:=ABreakpoint;
 
-  GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
+  R := GetExtent; R.Grow(-3,-2); R3 := R;
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.B.X-3;
   NameIL := TEditorInputLine.Create(R, 255); Insert(NameIL);
-  R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
+  R2 := R; R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
   Insert(THistory.Create(R2, NameIL, hidBreakPointDialogName));
-  R.Copy(R3); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
-  R2.Copy(R); R2.Move(-1,-1);
+  R := R3; Inc(R.A.Y); R.B.Y:=R.A.Y+1;
+  R2 := R; R2.Move(-1,-1);
   Insert(TLabel.Create(R2, label_breakpoint_name, NameIL));
   R.Move(0,3);
   R.B.X:=R.B.X-3;
   ConditionsIL := TEditorInputLine.Create(R, 255); Insert(ConditionsIL);
-  R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
+  R2 := R; R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
   Insert(THistory.Create(R2, ConditionsIL, hidBreakPointDialogCond));
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_conditions, ConditionsIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_conditions, ConditionsIL));
   R.Move(0,3); R.B.X:=R.A.X+36;
   LineIL := TEditorInputLine.Create(R, 128); Insert(LineIL);
   LineIL.SetValidator(TRangeValidator.Create(0,MaxInt));
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_line, LineIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_line, LineIL));
   R.Move(0,3);
   IgnoreIL := TEditorInputLine.Create(R, 128); Insert(IgnoreIL);
   IgnoreIL.SetValidator(TRangeValidator.Create(0,MaxInt));
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_ignorecount, IgnoreIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_breakpoint_ignorecount, IgnoreIL));
 
-  R.Copy(R3); Inc(R.A.X,38); Inc(R.A.Y,7); R.B.Y:=R.A.Y+KeyCount;
+  R := R3; Inc(R.A.X,38); Inc(R.A.Y,7); R.B.Y:=R.A.Y+KeyCount;
   Items:=nil;
   { don't use invalid type }
   for I:=pred(high(BreakpointType)) downto low(BreakpointType) do
     Items:=NewSItem(BreakpointTypeStr[I], Items);
   TypeRB := TRadioButtons.Create(R, Items);
 
-  R2.Copy(R); R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
+  R2 := R; R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
   Insert(TLabel.Create(R2, label_breakpoint_type, TypeRB));
 
   Insert(TypeRB);
@@ -3066,7 +3066,7 @@ constructor TWatchesListBox.Create(var Bounds: TRect; AHScrollBar, AVScrollBar: 
 procedure TWatchesListBox.Update(AMaxWidth : integer);
 var R : TRect;
 begin
-  GetExtent(R);
+  R := GetExtent;
   MaxWidth:=AMaxWidth;
   if (HScrollBar<>nil) and (R.B.X-R.A.X<MaxWidth) then
     HScrollBar.SetRange(0,MaxWidth-(R.B.X-R.A.X))
@@ -3287,7 +3287,7 @@ var DontClear: boolean;
 begin
   case Event.What of
     evMouseDown : begin
-                   if ((Event.EventFlags and meDoubleClick) <> 0) then
+                   if ((Event.Mouse.EventFlags and meDoubleClick) <> 0) then
                       Message(Self,evCommand,cmEdit,nil)
                    else
                      ClearEvent(Event);
@@ -3295,7 +3295,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEnter :
             Message(Self,evCommand,cmEdit,nil);
           kbIns :
@@ -3309,15 +3309,15 @@ begin
           ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Pointer(Self) then
+          if Event.Message.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmEdit,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmEdit :
               EditCurrent;
           cmDelete :
@@ -3377,21 +3377,21 @@ end;
       HSB,VSB: PScrollBar;
       R,R2 : trect;
     begin
-      TProgram.DeskTop.GetExtent(R);
+      R := TProgram.DeskTop.GetExtent;
       R.A.Y:=R.B.Y-7;
       inherited Create(R, dialog_watches,SearchFreeWindowNo);
       Palette:=wpCyanWindow;
-      GetExtent(R);
+      R := GetExtent;
       HelpCtx:=hcWatchesWindow;
       R.Grow(-1,-1);
-      R2.Copy(R);
+      R2 := R;
       Inc(R2.B.Y);
       R2.A.Y:=R2.B.Y-1;
       HSB := TScrollBar.Create(R2);
       HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX;
       HSB.SetStep(R.B.X-R.A.X,1);
       Insert(HSB);
-      R2.Copy(R);
+      R2 := R;
       Inc(R2.B.X);
       R2.A.X:=R2.B.X-1;
       VSB := TScrollBar.Create(R2);
@@ -3443,18 +3443,18 @@ end;
 constructor TWatchItemDialog.Create(AWatch: PWatch);
 var R,R2: TRect;
 begin
-  R.Assign(0,0,50,10);
+  R := TRect.Create(0, 0, 50, 10);
   inherited Create(R,'Edit Watch');
   Watch:=AWatch;
 
-  GetExtent(R); R.Grow(-3,-2);
+  R := GetExtent; R.Grow(-3,-2);
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.A.X+36;
   NameIL := TEditorInputLine.Create(R, 255); Insert(NameIL);
-  R2.Copy(R); R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
+  R2 := R; R2.A.X:=R2.B.X; R2.B.X:=R2.A.X+3;
   Insert(THistory.Create(R2, NameIL, hidWatchDialog));
-  R2.Copy(R); R2.Move(-1,-1);
+  R2 := R; R2.Move(-1,-1);
   Insert(TLabel.Create(R2, label_watch_expressiontowatch, NameIL));
-  GetExtent(R);
+  R := GetExtent;
   R.Grow(-3,-1);
   R.A.Y:=R.A.Y+3;
   TextST := TAdvancedStaticText.Create(R, label_watch_values);
@@ -3637,8 +3637,8 @@ end;
 
   procedure   TFramesListBox.HandleEvent(var Event: TEvent);
     begin
-      if ((Event.What=EvKeyDown) and (Event.CharCode=Ord('i'))) or
-         ((Event.What=EvCommand) and (Event.Command=cmDisassemble)) then
+      if ((Event.What=EvKeyDown) and (Event.KeyDown.CharScan.CharCode=Ord('i'))) or
+         ((Event.What=EvCommand) and (Event.Message.Command=cmDisassemble)) then
         GotoAssembly;
       inherited HandleEvent(Event);
     end;
@@ -3653,20 +3653,20 @@ end;
       HSB,VSB: PScrollBar;
       R,R2 : trect;
     begin
-      TProgram.DeskTop.GetExtent(R);
+      R := TProgram.DeskTop.GetExtent;
       R.A.Y:=R.B.Y-5;
       inherited Create(R, dialog_callstack, wnNoNumber);
       Palette:=wpCyanWindow;
-      GetExtent(R);
+      R := GetExtent;
       HelpCtx:=hcStackWindow;
       R.Grow(-1,-1);
-      R2.Copy(R);
+      R2 := R;
       Inc(R2.B.Y);
       R2.A.Y:=R2.B.Y-1;
       HSB := TScrollBar.Create(R2);
       HSB.GrowMode:=gfGrowLoY+gfGrowHiY+gfGrowHiX;
       Insert(HSB);
-      R2.Copy(R);
+      R2 := R;
       Inc(R2.B.X);
       R2.A.X:=R2.B.X-1;
       VSB := TScrollBar.Create(R2);
@@ -3924,7 +3924,7 @@ var
 begin
   if GDBWindow=nil then
     begin
-      TProgram.DeskTop.GetExtent(R);
+      R := TProgram.DeskTop.GetExtent;
       GDBWindow := TGDBWindow.Create(R);
       TProgram.DeskTop.Insert(GDBWindow);
     end;
@@ -3946,7 +3946,7 @@ var
 begin
   if DisassemblyWindow=nil then
     begin
-      TProgram.DeskTop.GetExtent(R);
+      R := TProgram.DeskTop.GetExtent;
       DisassemblyWindow := TDisassemblyWindow.Create(R);
       TProgram.DeskTop.Insert(DisassemblyWindow);
     end;

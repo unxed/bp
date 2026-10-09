@@ -644,7 +644,7 @@ begin
           begin
             With PW.editor^ do
               S:=FileName+','+IntToStr(CurPos.X)+','+IntToStr(CurPos.Y);
-            PW.GetBounds(R);
+            R := PW.GetBounds;
             S:=S+','+IntToStr(R.A.X)+','+IntToStr(R.A.Y)+','+
               IntToStr(R.B.X)+','+IntToStr(R.B.Y);
             INIFile.SetEntry(secFiles,ieOpenFile+IntToStr(I),S);

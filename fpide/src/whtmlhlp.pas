@@ -502,7 +502,7 @@ var
 begin
   if not assigned(AOwner) then
     fail;
-  R.Assign(0,0,80,25);
+  R := TRect.Create(0, 0, 80, 25);
   inherited Create(R,nil,nil);
   HTMLOwner:=AOwner;
   HTMLConsole := THTMLAnsiConsole.Create(Self);

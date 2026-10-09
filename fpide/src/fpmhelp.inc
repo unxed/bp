@@ -101,13 +101,13 @@ var R,R2: TRect;
     SB: PScrollBar;
     I: integer;
 begin
-  R.Assign(0,0,round(Drivers.ScreenWidth*5/8),Drivers.ScreenHeight-10);
+  R := TRect.Create(0, 0, round(Drivers.TScreen.ScreenWidth*5/8), Drivers.TScreen.ScreenHeight-10);
   inherited Create(R, dialog_helpfiles);
 
   C := TUnsortedStringCollection.Create(20,10);
 
-  GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y); R.B.X:=R.B.X-13;
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R := GetExtent; R.Grow(-2,-2); Inc(R.A.Y); R.B.X:=R.B.X-13;
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); Insert(SB);
   LB := THelpFileListBox.Create(R, 1, SB);
 
@@ -118,10 +118,10 @@ begin
 
   LB.NewList(C);
   Insert(LB);
-  R2.Copy(R); Dec(R2.A.Y); R2.B.Y:=R2.A.Y+1;
+  R2 := R; Dec(R2.A.Y); R2.B.Y:=R2.A.Y+1;
   Insert(TLabel.Create(R2, label_helpfiles_helpfiles, LB));
 
-  GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y); R.A.X:=R.B.X-13+1; R.B.Y:=R.A.Y+2;
+  R := GetExtent; R.Grow(-2,-2); Inc(R.A.Y); R.A.X:=R.B.X-13+1; R.B.Y:=R.A.Y+2;
   Insert(TButton.Create(R, button_OK, cmOK, bfDefault));
   R.Move(0,2);
   Insert(TButton.Create(R, button_New, cmAddItem, bfNormal));
@@ -179,7 +179,7 @@ var I: integer;
 begin
   case Event.What of
     evKeyDown :
-      case Event.KeyCode of
+      case Event.KeyDown.KeyCode of
         kbIns :
           begin
             Message(Self,evCommand,cmAddItem,nil);
@@ -192,7 +192,7 @@ begin
           end;
       end;
     evCommand :
-      case Event.Command of
+      case Event.Message.Command of
         cmAddItem :
           begin
             S:='';

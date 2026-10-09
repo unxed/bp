@@ -275,7 +275,7 @@ begin
     we don't get the line info PM }
   GrepArgs:=' -i "$TEXT" '+s;
 { Dialog }
-  R.Assign(0,0,50,8);
+  R := TRect.Create(0, 0, 50, 8);
   PGrepDialog := TCenterDialog.Create(R,dialog_greparguments);
   with PGrepDialog do
     begin
@@ -288,7 +288,7 @@ begin
       Insert(IL1);
       R2.Move(0,-1);
       Insert(TLabel.Create(R2, label_grep_texttofind, IL1));
-      R1.Assign(R2.B.X, R2.A.Y+1, R2.B.X+3, R2.B.Y+1);
+      R1 := TRect.Create(R2.B.X, R2.A.Y+1, R2.B.X+3, R2.B.Y+1);
       Control := THistory.Create(R1, IL1, TextGrepId);
       Insert(Control);
 
@@ -298,7 +298,7 @@ begin
       Insert(IL2);
       R2.Move(0,-1);
       Insert(TLabel.Create(R2, label_grep_greparguments, IL2));
-      R1.Assign(R2.B.X, R2.A.Y+1, R2.B.X+3, R2.B.Y+1);
+      R1 := TRect.Create(R2.B.X, R2.A.Y+1, R2.B.X+3, R2.B.Y+1);
       Control := THistory.Create(R1, IL2, GrepArgsId);
       Insert(Control);
     end;

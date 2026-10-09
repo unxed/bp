@@ -759,7 +759,7 @@ const
        R : TRect;
 
     begin
-       TProgram.DeskTop.GetExtent(R);
+       R := TProgram.DeskTop.GetExtent;
 {$ifdef i386}
        R.A.X:=R.B.X-28;
        R.B.Y:=R.A.Y+11;
@@ -791,7 +791,7 @@ const
 {$endif cpu_known}
        Palette:=wpCyanWindow;
        HelpCtx:=hcRegistersWindow;
-       R.Assign(1,1,Size.X-2,Size.Y-1);
+       R := TRect.Create(1, 1, Size.X-2, Size.Y-1);
        RV := TRegistersView.Create(R);
        Insert(RV);
        If assigned(RegistersWindow) then
@@ -1195,7 +1195,7 @@ const
        R : TRect;
 
     begin
-       TProgram.DeskTop.GetExtent(R);
+       R := TProgram.DeskTop.GetExtent;
 {$if defined(i386) or defined(x86_64)}
        R.A.X:=R.B.X-44;
        R.B.Y:=R.A.Y+14;
@@ -1220,7 +1220,7 @@ const
        Flags:=wfClose or wfMove or wfgrow;
        Palette:=wpCyanWindow;
        HelpCtx:=hcFPURegisters;
-       R.Assign(1,1,Size.X-2,Size.Y-1);
+       R := TRect.Create(1, 1, Size.X-2, Size.Y-1);
        RV := TFPUView.Create(R);
        Insert(RV);
        If assigned(FPUWindow) then
@@ -1526,7 +1526,7 @@ const
        R : TRect;
 
     begin
-       TProgram.DeskTop.GetExtent(R);
+       R := TProgram.DeskTop.GetExtent;
 {$if defined(i386) or defined(x86_64)}
        R.A.X:=R.B.X-60;
        R.B.Y:=R.A.Y+20;
@@ -1551,7 +1551,7 @@ const
        Flags:=wfClose or wfMove or wfgrow;
        Palette:=wpCyanWindow;
        HelpCtx:=hcVectorRegisters;
-       R.Assign(1,1,Size.X-2,Size.Y-1);
+       R := TRect.Create(1, 1, Size.X-2, Size.Y-1);
        RV := TVectorView.Create(R);
        Insert(RV);
        If assigned(VectorWindow) then

@@ -108,19 +108,19 @@ begin
     GetKeyEvent(Event);
     if Event.What <> evKeyDown then
       Break;
-    if Event.KeyCode = kbEsc then
+    if Event.KeyDown.KeyCode = kbEsc then
     begin
       Result := True;
       Break;
     end
-    else if Event.KeyCode = kbEnter then
+    else if Event.KeyDown.KeyCode = kbEnter then
     begin
       Session.SendInput(StdinLine + #10);
       AddToolMessage('', '> ' + StdinLine, 0, 0);
       UpdateToolMessages;
       StdinLine := '';
     end
-    else if Event.KeyCode = kbBack then
+    else if Event.KeyDown.KeyCode = kbBack then
     begin
       if StdinLine <> '' then
       begin
@@ -130,9 +130,9 @@ begin
         SetLength(StdinLine, I - 1);
       end;
     end
-    else if (Event.TextLength > 0) and (Ord(Event.Text[0]) >= 32) then
+    else if (Event.KeyDown.TextLength > 0) and (Ord(Event.KeyDown.Text[0]) >= 32) then
     begin
-      SetString(S, PChar(@Event.Text[0]), Event.TextLength);
+      SetString(S, PChar(@Event.KeyDown.Text[0]), Event.KeyDown.TextLength);
       StdinLine := StdinLine + S;
     end
     else

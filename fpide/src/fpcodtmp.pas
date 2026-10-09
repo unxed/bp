@@ -363,20 +363,20 @@ end;
 constructor TCodeTemplateDialog.Create(const ATitle: string; ATemplate: PCodeTemplate);
 var R,R2,R3: TRect;
 begin
-  R.Assign(0,0,52,15);
+  R := TRect.Create(0, 0, 52, 15);
   inherited Create(R,ATitle);
   Template:=ATemplate;
 
-  GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
+  R := GetExtent; R.Grow(-3,-2); R3 := R;
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.A.X+46;
   ShortCutIL := TInputLine.Create(R, 128); Insert(ShortcutIL);
   ShortCutIL.SetValidator(TFilterValidator.Create(NumberChars+AlphaChars));
-  R2.Copy(R); R2.Move(-1,-1);
+  R2 := R; R2.Move(-1,-1);
   Insert(TLabel.Create(R2, label_codetemplate_shortcut, ShortcutIL));
   R.Move(0,3); R.B.Y:=R.A.Y+8;
   CodeMemo := TFPCodeMemo.Create(R, nil,nil,nil{,4096 does not compile !! });
   Insert(CodeMemo);
-  R2.Copy(R); R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
+  R2 := R; R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;
   Insert(TLabel.Create(R2, label_codetemplate_content, CodeMemo));
 
   InsertButtons(Self);
@@ -414,13 +414,13 @@ end;
 var R,R2,R3: TRect;
     SB: PScrollBar;
 begin
-  R.Assign(0,0,46,20);
+  R := TRect.Create(0, 0, 46, 20);
   inherited Create(R,'Code Templates');
   HelpCtx:=hcCodeTemplateOptions;
   SelMode:=ASelMode;
-  GetExtent(R); R.Grow(-3,-2); Inc(R.A.Y); R.B.Y:=R.A.Y+10;
-  R3.Copy(R); Dec(R.B.X,12);
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R := GetExtent; R.Grow(-3,-2); Inc(R.A.Y); R.B.Y:=R.A.Y+10;
+  R3 := R; Dec(R.B.X,12);
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); Insert(SB);
   CodeTemplatesLB := TCodeTemplateListBox.Create(R,1,SB);
   Insert(CodeTemplatesLB);
@@ -433,11 +433,11 @@ begin
     end
   else
     StartIdx:=-1;
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
   Insert(TLabel.Create(R2, label_codetemplate_templates, CodeTemplatesLB));
 
-  GetExtent(R); R.Grow(-2,-2); Inc(R.A.Y,12);
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R := GetExtent; R.Grow(-2,-2); Inc(R.A.Y,12);
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); Insert(SB);
   TemplateViewer := TFPCodeMemo.Create(R,nil,SB,nil{,4096 does not compile });
   with TemplateViewer do
@@ -447,7 +447,7 @@ begin
   end;
   Insert(TemplateViewer);
 
-  R.Copy(R3); R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
+  R := R3; R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
   Insert(TButton.Create(R, button_OK, cmOK, B2I(SelMode,bfDefault,bfNormal)));
   R.Move(0,2);
   Insert(TButton.Create(R, button_Edit, cmEditItem, B2I(SelMode,bfNormal,bfDefault)));
@@ -484,7 +484,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbIns  :
             Message(Self,evCommand,cmAddItem,nil);
           kbDel  :
@@ -494,12 +494,12 @@ begin
         if DontClear=false then ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=pointer(CodeTemplatesLB) then
+          if Event.Message.InfoPtr=pointer(CodeTemplatesLB) then
             Message(Self,evCommand,cmEditItem,nil);
         cmListFocusChanged :
-          if Event.InfoPtr=pointer(CodeTemplatesLB) then
+          if Event.Message.InfoPtr=pointer(CodeTemplatesLB) then
             Message(Self,evBroadcast,cmUpdate,nil);
         cmUpdate :
           Update;
@@ -507,7 +507,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmAddItem    : Add;
           cmDeleteItem : Delete;
           cmEditItem   : Edit;

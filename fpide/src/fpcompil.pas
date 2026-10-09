@@ -312,7 +312,7 @@ begin
           CompilerMessageWindow.Lock;
         end;
       GetKeyEvent(LEvent);
-      if (LEvent.What=evKeyDown) and (LEvent.KeyCode=kbEsc) then
+      if (LEvent.What=evKeyDown) and (LEvent.KeyDown.KeyCode=kbEsc) then
         break;
       SearchBackTrace;
       InsertInMessages(' Fatal:',v_Fatal or v_lineinfo,true);
@@ -421,7 +421,7 @@ constructor TCompilerMessageWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  TProgram.DeskTop.GetExtent(R);
+  R := TProgram.DeskTop.GetExtent;
   R.A.Y:=R.B.Y-7;
   inherited Create(R,dialog_compilermessages,{SearchFreeWindowNo}wnNoNumber);
   HelpCtx:=hcCompilerMessagesWindow;
@@ -435,7 +435,7 @@ begin
   VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
   Insert(VSB);
 
-  GetExtent(R);
+  R := GetExtent;
   R.Grow(-1,-1);
   MsgLB := TCompilerMessageListBox.Create(R, HSB, VSB);
 
@@ -490,9 +490,9 @@ procedure TCompilerMessageWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListFocusChanged :
-          if Event.InfoPtr=Pointer(MsgLB) then
+          if Event.Message.InfoPtr=Pointer(MsgLB) then
             Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);
       end;
   end;
@@ -583,15 +583,15 @@ end;
 constructor TCompilerStatusDialog.Create;
 var R: TRect;
 begin
-  R.Assign(0,0,56,11);
+  R := TRect.Create(0, 0, 56, 11);
   ClearFormatParams; AddFormatParamStr(StripTilde(SwitchesModeName[SwitchesMode]));
   inherited Create(R, FormatStrF(dialog_compilingwithmode, FormatParams));
   starttime:=getrealtime;
-  GetExtent(R); R.B.Y:=11;
+  R := GetExtent; R.B.Y:=11;
   R.Grow(-3,-2);
   ST := TAdvancedStaticText.Create(R, '');
   Insert(ST);
-  GetExtent(R); R.B.Y:=11;
+  R := GetExtent; R.B.Y:=11;
   R.Grow(-1,-1); R.A.Y:=R.B.Y-1;
   KeyST := TColorStaticText.Create(R, '', Blue*16+White+longint($80+Blue*16+White)*256,true);
   Insert(KeyST);
@@ -708,7 +708,7 @@ function CompilerStatus: boolean;
 
 begin
   GetKeyEvent(Event);
-  if (Event.What=evKeyDown) and (Event.KeyCode=kbEsc) then
+  if (Event.What=evKeyDown) and (Event.KeyDown.KeyCode=kbEsc) then
     begin
        CompilationPhase:=cpAborted;
        { update info messages }

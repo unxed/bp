@@ -1156,21 +1156,21 @@ procedure THelpViewer.HandleEvent(var Event: TEvent);
 var DontClear: boolean;
 procedure GetMousePos(var P: TPoint);
 begin
-  MakeLocal(Event.Where,P);
+  P := MakeLocal(Event.Mouse.Where);
   Inc(P.X,Delta.X); Inc(P.Y,Delta.Y);
 end;
 begin
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where) then
-      if (Event.Buttons=mbLeftButton) and (((Event.EventFlags and meDoubleClick) <> 0)) then
+      if MouseInView(Event.Mouse.Where) then
+      if (Event.Mouse.Buttons=mbLeftButton) and (((Event.Mouse.EventFlags and meDoubleClick) <> 0)) then
       begin
         inherited HandleEvent(Event);
         if CurLink<>-1 then
            SelectLink(CurLink);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmHelpFilesChanged :
           begin
             if HelpTopic=IndexHelpTopic then HelpTopic:=nil;
@@ -1182,7 +1182,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmPrevTopic :
             PrevTopic;
         else DontClear:=true;
@@ -1192,7 +1192,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbTab :
             SelectNextLink(true);
           kbShiftTab :
@@ -1208,17 +1208,17 @@ begin
             if Length(LookupWord)>0 then
               Lookup(Copy(LookupWord,1,Length(LookupWord)-1));
         else
-          { CharCode is Byte in tv3; UTF-8 text is in Event.Text/TextLength. }
-          if (Event.TextLength > 0) and (Byte(Event.Text[0]) >= 32) then
+          { CharCode is Byte in tv3; UTF-8 text is in Event.KeyDown.Text/TextLength. }
+          if (Event.KeyDown.TextLength > 0) and (Byte(Event.KeyDown.Text[0]) >= 32) then
             begin
               NoSelect:=true;
               Lookup(LookupWord+EventText(Event));
               NoSelect:=false;
             end
-          else if Event.CharCode in [32..255] then
+          else if Event.KeyDown.CharScan.CharCode in [32..255] then
             begin
               NoSelect:=true;
-              Lookup(LookupWord+Chr(Event.CharCode));
+              Lookup(LookupWord+Chr(Event.KeyDown.CharScan.CharCode));
               NoSelect:=false;
             end
           else
@@ -1397,16 +1397,16 @@ end;
 procedure THelpWindow.InitScrollBars;
 var R: TRect;
 begin
-  GetExtent(R); R.Grow(0,-1); R.A.X:=R.B.X-1;
+  R := GetExtent; R.Grow(0,-1); R.A.X:=R.B.X-1;
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY;
-  GetExtent(R); R.Grow(-1,0); R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.Grow(-1,0); R.A.Y:=R.B.Y-1;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY;
 end;
 
 procedure THelpWindow.InitHelpView;
 var R: TRect;
 begin
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   HelpView := THelpViewer.Create(R, HSB, VSB);
   HelpView.GrowMode:=gfGrowHiX+gfGrowHiY;
 end;
@@ -1414,7 +1414,7 @@ end;
 procedure THelpWindow.InitFrame;
 var R: TRect;
 begin
-  GetExtent(R);
+  R := GetExtent;
   Frame := THelpFrame.Create(R);
 end;
 
@@ -1432,10 +1432,10 @@ procedure THelpWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evKeyDown :
-      case Event.KeyCode of
+      case Event.KeyDown.KeyCode of
         kbEsc :
           begin
-            Event.What:=evCommand; Event.Command:=cmClose;
+            Event.What:=evCommand; Event.Message.Command:=cmClose;
           end;
       end;
   end;

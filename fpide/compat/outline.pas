@@ -402,7 +402,7 @@ begin
       begin
         NewFocus := Foc;
         Handled := True;
-        case CtrlToArrow(Event.KeyCode) of
+        case CtrlToArrow(Event.KeyDown.KeyCode) of
           kbUp, kbLeft: Dec(NewFocus);
           kbDown, kbRight: Inc(NewFocus);
           kbPgDn: Inc(NewFocus, Size.Y - 1);
@@ -413,10 +413,10 @@ begin
           kbEnd: NewFocus := Delta.Y + Size.Y - 1;
           kbCtrlEnter, kbEnter: Selected(NewFocus);
         else
-          case Event.CharCode of
+          case Event.KeyDown.CharScan.CharCode of
             Ord('-'), Ord('+'):
               begin
-                Adjust(GetNode(NewFocus), Event.CharCode = Ord('+'));
+                Adjust(GetNode(NewFocus), Event.KeyDown.CharScan.CharCode = Ord('+'));
                 Update;
               end;
             Ord('*'):
@@ -443,8 +443,8 @@ begin
         MouseDrag := False;
         NewFocus := Foc;
         repeat
-          MakeLocal(Event.Where, Mouse);
-          if MouseInView(Event.Where) then
+          Mouse := MakeLocal(Event.Mouse.Where);
+          if MouseInView(Event.Mouse.Where) then
             NewFocus := Delta.Y + Mouse.Y
           else
           begin
@@ -467,7 +467,7 @@ begin
           if M then
             MouseDrag := True;
         until not M;
-        if (Event.EventFlags and meDoubleClick) <> 0 then
+        if (Event.Mouse.EventFlags and meDoubleClick) <> 0 then
           Selected(Foc)
         else if not MouseDrag then
         begin

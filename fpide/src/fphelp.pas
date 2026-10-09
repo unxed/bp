@@ -239,7 +239,7 @@ procedure TIDEStatusLine.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate : Update;
       end;
   end;
@@ -514,7 +514,7 @@ begin
   CheckHelpSystem;
   if HelpWindow=nil then
   begin
-     TProgram.DeskTop.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
+     R := TProgram.DeskTop.GetExtent; R.Grow(-15,-3); Dec(R.A.Y);
      HelpWindow := TFPHelpWindow.Create(R, dialog_help, 0, 0, SearchFreeWindowNo);
      if HelpWindow<>nil then
      begin
@@ -534,7 +534,7 @@ var R: TRect;
     Ctx: THelpCtx;
 begin
   CheckHelpSystem;
-  TProgram.DeskTop.GetExtent(R); R.Grow(-15,-3); Dec(R.A.Y);
+  R := TProgram.DeskTop.GetExtent; R.Grow(-15,-3); Dec(R.A.Y);
   W:=TFPHelpWindow.Create(R, dialog_help, 0, 0, 0);
   W.HideOnClose:=false;
   if (Context<>0) and (HelpFacility.GetTopicInfo(FileID,Context)<>'Not found') then

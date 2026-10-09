@@ -561,9 +561,9 @@ var SH,B: boolean;
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
    cmFileNameChanged :
-     if (Event.InfoPtr=nil) or (Event.InfoPtr = Pointer(Self)) then
+     if (Event.Message.InfoPtr=nil) or (Event.Message.InfoPtr = Pointer(Self)) then
      begin
        B:=IsFlagSet(efSyntaxHighlight);
        SH:=UseSyntaxHighlight(Self);

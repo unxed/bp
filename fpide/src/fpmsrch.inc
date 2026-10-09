@@ -18,19 +18,19 @@ var D: PDialog;
     R,R1,R2: TRect;
     IL: PEditorInputLine;
 begin
-  R.Assign(0,0,40,8);
+  R := TRect.Create(0, 0, 40, 8);
   D := TDialog.Create(R, dialog_proceduredialog);
   with D do
   begin
     Options:=Options or ofCentered;
-    GetExtent(R); R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
-    R1.Copy(R);
-    R2.Copy(R); Inc(R2.A.Y);Inc(R2.B.Y);
+    R := GetExtent; R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
+    R1 := R;
+    R2 := R; Inc(R2.A.Y);Inc(R2.B.Y);
     IL := TEditorInputLine.Create(R2,255);
     Insert(IL);
     IL.SetData(S);
     Insert(TLabel.Create(R1, label_enterproceduretofind, IL));
-    GetExtent(R); R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
+    R := GetExtent; R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
     Insert(TButton.Create(R, button_OK, cmOK, bfDefault));
     R.Move(15,0);
     Insert(TButton.Create(R, button_Cancel, cmCancel, bfNormal));
@@ -102,7 +102,7 @@ begin
   BrowCol.Modules.ForEach(TNestedActionProc(@InsertInS));
   if Overflow then
     WarningBox(msg_toomanysymbolscantdisplayall,nil);
-  Desktop.GetExtent(R); R.A.X:=R.B.X-35;
+  R := Desktop.GetExtent; R.A.X:=R.B.X-35;
   Desktop.Insert(TBrowserWindow.Create(R,
     label_sym_findprocedure,SearchFreeWindowNo,nil,label_sym_findprocedure2+ProcS,'',S,nil,nil,nil));
 end;
@@ -159,7 +159,7 @@ begin
   BrowCol.Modules.ForEach(TNestedActionProc(@InsertInS));
   if Overflow then
     WarningBox(msg_toomanysymbolscantdisplayall,nil);
-  Desktop.GetExtent(R); R.A.X:=R.B.X-35;
+  R := Desktop.GetExtent; R.A.X:=R.B.X-35;
   Desktop.Insert(TBrowserWindow.Create(R,
     label_sym_globals,SearchFreeWindowNo,nil,label_sym_globalscope,'',S,nil,nil,nil));
 end;
@@ -184,7 +184,7 @@ begin
   S := TSortedSymbolCollection.Create(500,500);
   ModulesCollection:=S;
   BrowCol.Modules.ForEach(TNestedActionProc(@InsertInS));
-  Desktop.GetExtent(R); R.A.X:=R.B.X-35;
+  R := Desktop.GetExtent; R.A.X:=R.B.X-35;
   Desktop.Insert(TBrowserWindow.Create(R,
     dialog_units,SearchFreeWindowNo,nil,label_sym_globalscope,'',S,nil,nil,nil));
 end;
@@ -194,19 +194,19 @@ var D: PDialog;
     R,R1,R2: TRect;
     IL: PEditorInputLine;
 begin
-  R.Assign(0,0,40,8);
+  R := TRect.Create(0, 0, 40, 8);
   D := TDialog.Create(R, dialog_browsesymbol);
   with D do
   begin
     Options:=Options or ofCentered;
-    GetExtent(R); R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
-    R1.Copy(R);
-    R2.Copy(R); Inc(R2.A.Y);Inc(R2.B.Y);
+    R := GetExtent; R.Grow(-3,-2); R.B.Y:=R.A.Y+1;
+    R1 := R;
+    R2 := R; Inc(R2.A.Y);Inc(R2.B.Y);
     IL := TEditorInputLine.Create(R2,255);
     Insert(IL);
     IL.SetData(S);
     Insert(TLabel.Create(R1, label_entersymboltobrowse, IL));
-    GetExtent(R); R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
+    R := GetExtent; R.Grow(-8,-1); R.A.Y:=R.B.Y-2; R.B.X:=R.A.X+10;
     Insert(TButton.Create(R, button_OK, cmOK, bfDefault));
     R.Move(15,0);
     Insert(TButton.Create(R, button_Cancel, cmCancel, bfNormal));

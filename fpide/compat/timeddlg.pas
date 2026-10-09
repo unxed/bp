@@ -86,7 +86,7 @@ begin
     if (Secs = 0) and (What = evNothing) then
     begin
       What := evCommand;
-      Command := cmCancel;
+      Message.Command := cmCancel;
     end;
 end;
 
@@ -124,7 +124,7 @@ function TimedMessageBox(const Msg: string; Params: Pointer;
 var
   R: TRect;
 begin
-  R.Assign(0, 0, 40, 10);
+  R := TRect.Create(0, 0, 40, 10);
   if (AOptions and mfInsertInApp) = 0 then
     R.Move((TProgram.DeskTop.Size.X - R.B.X) div 2, (TProgram.DeskTop.Size.Y - R.B.Y) div 2)
   else
@@ -150,17 +150,17 @@ begin
   Names[2] := @MsgBoxText.OkText;
   Names[3] := @MsgBoxText.CancelText;
   Dlg := TTimedDialog.Create(R, BoxTitle(AOptions), ASecs);
-  R2.Assign(3, Dlg.Size.Y - 5, Dlg.Size.X - 2, Dlg.Size.Y - 4);
+  R2 := TRect.Create(3, Dlg.Size.Y - 5, Dlg.Size.X - 2, Dlg.Size.Y - 4);
   TimedText := TTimedDialogText.Create(R2);
   Dlg.Insert(TimedText);
-  R2.Assign(3, 2, Dlg.Size.X - 2, Dlg.Size.Y - 5);
+  R2 := TRect.Create(3, 2, Dlg.Size.X - 2, Dlg.Size.Y - 5);
   Dlg.Insert(TStaticText.Create(R2, Msg));
   X := -2;
   ButtonCount := 0;
   for I := 0 to 3 do
     if (AOptions and ($0100 shl I)) <> 0 then
     begin
-      R2.Assign(0, 0, 10, 2);
+      R2 := TRect.Create(0, 0, 10, 2);
       Btn := TButton.Create(R2, Names[I]^, Commands[I], bfNormal);
       ButtonList[ButtonCount] := Btn;
       Inc(X, Btn.Size.X + 2);

@@ -788,8 +788,8 @@ var E: TEvent;
 begin
   FillChar(E,Sizeof(E),0);
   E.What:=What;
-  E.Command:=Command;
-  E.InfoPtr:=InfoPtr;
+  E.Message.Command:=Command;
+  E.Message.InfoPtr:=InfoPtr;
   PutEvent(TargetView,E);
 end;
 
@@ -831,7 +831,7 @@ begin
   InitAdvMsgBox;
   InsideDone:=false;
   IsRunning:=true;
-  MenuBar.GetBounds(R); R.A.X:=R.B.X-8;
+  R := MenuBar.GetBounds; R.A.X:=R.B.X-8;
   ClockView := TFPClockView.Create(R);
   ClockView.GrowMode:=gfGrowLoX+gfGrowHiX;
   Application.Insert(ClockView);
@@ -845,7 +845,7 @@ begin
   Message(Self,evBroadcast,cmUpdate,nil);
   CurDirChanged;
   { heap viewer }
-  GetExtent(R); Dec(R.B.X); R.A.X:=R.B.X-9; R.A.Y:=R.B.Y-1;
+  R := GetExtent; Dec(R.B.X); R.A.X:=R.B.X-9; R.A.Y:=R.B.Y-1;
   HeapView := TFPHeapView.InitKb(R);
   if (StartupOptions and soHeapMonitor)=0 then HeapView.Hide;
   Insert(HeapView);
@@ -859,7 +859,7 @@ procedure TIDEApp.InitDesktop;
 var
   R: TRect;
 begin
-  GetExtent(R);
+  R := GetExtent;
   Inc(R.A.Y);
   Dec(R.B.Y);
   Desktop := TFPDesktop.Create(R);
@@ -1049,7 +1049,7 @@ var R: TRect;
 
 begin
   RegisterIDEActions;
-  GetExtent(R); R.B.Y:=R.A.Y+1;
+  R := GetExtent; R.B.Y:=R.A.Y+1;
   WinPMI:=nil;
   MenuBar := TAdvancedMenuBar.Create(R, NewMenu(
     NewSubMenu(menu_file,hcFileMenu, NewMenu(
@@ -1275,7 +1275,7 @@ var
   R: TRect;
 begin
   RegisterIDEActions;
-  GetExtent(R);
+  R := GetExtent;
   R.A.Y := R.B.Y - 1;
   StatusLine := TIDEStatusLine.Create(R,
     NewStatusDef(hcDragging, hcDragging,
@@ -1392,15 +1392,15 @@ begin
   inherited GetEvent(Event);
   { F1 in a modal dialog (UX guidelines, D.3): the command would reach the dialog, which ignores it; the help
     window runs modally above the dialog instead, on the topic of the focused element }
-  if ((Event.What=evCommand) and (Event.Command=cmHelp)) or
-     ((Event.What=evKeyDown) and (Event.KeyCode=kbF1)) then
+  if ((Event.What=evCommand) and (Event.Message.Command=cmHelp)) or
+     ((Event.What=evKeyDown) and (Event.KeyDown.KeyCode=kbF1)) then
     if (TopView<>nil) and (TopView<>Self) and (TopView.HelpCtx<>hcHelpWindow) then
       begin
         ClearEvent(Event);
         Help(0,TopView.GetHelpCtx,true);
       end;
 {$ifdef DEBUG}
-  if (Event.What=evKeyDown) and (Event.KeyCode=kbAltF11) then
+  if (Event.What=evKeyDown) and (Event.KeyDown.KeyCode=kbAltF11) then
     begin
 {$ifdef HasSignal}
       Generate_SIGSEGV;
@@ -1408,12 +1408,12 @@ begin
       Halt(1);
 {$endif}
     end;
-  if (Event.What=evKeyDown) and (Event.KeyCode=kbCtrlF11) then
+  if (Event.What=evKeyDown) and (Event.KeyDown.KeyCode=kbCtrlF11) then
     begin
       RunError(250);
     end;
 {$endif DEBUG}
-  if (Event.What=evKeyDown) and (Event.KeyCode=kbAltF12) then
+  if (Event.What=evKeyDown) and (Event.KeyDown.KeyCode=kbAltF12) then
     begin
       CreateAnsiFile;
       ClearEvent(Event);
@@ -1440,7 +1440,7 @@ var DontClear: boolean;
 {$endif HasSignal}
 begin
 {$ifdef HasSignal}
-  if (Event.What=evKeyDown) and (Event.keyCode=kbCtrlC) and
+  if (Event.What=evKeyDown) and (Event.KeyDown.KeyCode=kbCtrlC) and
      (CtrlCPressed) then
     begin
       CtrlCCatched:=true;
@@ -1460,7 +1460,7 @@ begin
        evCommand :
          begin
            DontClear:=false;
-           case Event.Command of
+           case Event.Message.Command of
              cmUpdate        : Message(Application,evBroadcast,cmUpdate,nil);
            { -- File menu -- }
              cmNew           : NewEditor;
@@ -1496,7 +1496,7 @@ begin
              cmDOSShell      : DOSShell;
              cmRecentFileBase..
              cmRecentFileBase+10
-                             : OpenRecentFile(Event.Command-cmRecentFileBase);
+                             : OpenRecentFile(Event.Message.Command-cmRecentFileBase);
            { -- Edit menu -- }
              cmShowClipboard : ShowClipboard;
            { -- Search menu -- }
@@ -1551,11 +1551,11 @@ begin
              cmTools         : Tools;
              cmPreferences   : Preferences;
              cmEditor        : EditorOptions(nil);
-             cmEditorOptions : EditorOptions(TCodeEditor(Event.InfoPtr));
+             cmEditorOptions : EditorOptions(TCodeEditor(Event.Message.InfoPtr));
              cmCodeTemplateOptions: CodeTemplates;
              cmCodeCompleteOptions: CodeComplete;
              cmBrowser       : BrowserOptions(nil);
-             cmBrowserOptions : BrowserOptions(TBrowserWindow(Event.InfoPtr));
+             cmBrowserOptions : BrowserOptions(TBrowserWindow(Event.Message.InfoPtr));
              cmMouse         : Mouse;
              cmStartup       : StartUp;
              cmDesktopOptions: DesktopOptions;
@@ -1574,7 +1574,7 @@ begin
              cmGrep          : DoGrep;
              cmToolsBase+1..
              cmToolsBase+MaxToolCount
-                             : ExecuteTool(Event.Command-cmToolsBase);
+                             : ExecuteTool(Event.Message.Command-cmToolsBase);
            { -- Window menu -- }
              cmCloseAll      : CloseAll;
              cmWindowList    : WindowList;
@@ -1597,7 +1597,7 @@ begin
            if DontClear=false then ClearEvent(Event);
          end;
        evBroadcast :
-         case Event.Command of
+         case Event.Message.Command of
            cmSaveCancelled :
              SaveCancelled:=true;
            cmUpdateTools :
@@ -1608,11 +1608,11 @@ begin
              Update;
            cmSourceWndClosing :
              begin
-               with PSourceWindow(Event.InfoPtr) do
+               with PSourceWindow(Event.Message.InfoPtr) do
                  if Editor.FileName<>'' then
                    AddRecentFile(Editor.FileName,Editor.CurPos.X,Editor.CurPos.Y);
                {$ifndef NODEBUG}
-               if assigned(Debugger) and (PView(Event.InfoPtr)=Debugger.LastSource) then
+               if assigned(Debugger) and (PView(Event.Message.InfoPtr)=Debugger.LastSource) then
                  Debugger.LastSource:=nil;
                {$endif}
              end;
@@ -1636,7 +1636,7 @@ end;
 function TIDEApp.GetTileRect: TRect;
 var R: TRect;
 begin
-  Desktop.GetExtent(R);
+  R := Desktop.GetExtent;
 { Leave the compiler messages window in the bottom }
   if assigned(CompilerMessageWindow) and (CompilerMessageWindow.GetState(sfVisible)) then
    R.B.Y:=Min(CompilerMessageWindow.Origin.Y,R.B.Y);
@@ -1931,7 +1931,7 @@ begin
   if (P<>nil) and IsSeparator(P) then
      RemoveMenuItem(FileMenu.SubMenu,P);
 
-  GetExtent(R);
+  R := GetExtent;
   AdjustRecentCount :=0;
   {calculate how much lines on screen for reacent files can be used }
   if r.b.y-r.a.y -19 > 0 then AdjustRecentCount:=r.b.y-r.a.y -19;
@@ -2033,13 +2033,13 @@ begin
   S := TFastBufStream.Create(ReadmeName, stOpenRead, 4096);
   if S.Status=stOK then
   begin
-    R.Assign(0,0,63,18);
+    R := TRect.Create(0, 0, 63, 18);
     D := TCenterDialog.Create(R, 'Free Pascal IDE');
     with D do
     begin
-      GetExtent(R);
+      R := GetExtent;
       R.Grow(-2,-2); Inc(R.B.Y);
-      R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+      R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
       VSB := TScrollBar.Create(R2); VSB.GrowMode:=0; Insert(VSB);
       M := TFPMemo.Create(R,nil,VSB,nil);
       M.LoadFromStream(S);

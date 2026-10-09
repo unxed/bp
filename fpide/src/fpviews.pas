@@ -1506,7 +1506,7 @@ begin
     end
   else
     begin
-      R.Assign(0,0,20,1);
+      R := TRect.Create(0, 0, 20, 1);
       if Assigned(CodeCompleteTip)=false then
         begin
           CodeCompleteTip := TFPToolTip.Create(R, S, alCenter);
@@ -1534,18 +1534,18 @@ begin
 
   P.X:=P.X-Delta.X;
   P.Y:=P.Y-Delta.Y;
-  MakeGlobal(P,P);
+  P := MakeGlobal(P);
   if Assigned(CodeCompleteTip.Owner) then
-    CodeCompleteTip.Owner.MakeLocal(P,P);
+    P := CodeCompleteTip.Owner.MakeLocal(P);
 
   { ensure that the tooltip stays in screen }
-  P.X:=Min(Max(0,P.X),Drivers.ScreenWidth-length(S)-2-1);
+  P.X:=Min(Max(0,P.X),Drivers.TScreen.ScreenWidth-length(S)-2-1);
   { align it vertically }
-  if P.Y>round(Drivers.ScreenHeight*3/4) then
+  if P.Y>round(Drivers.TScreen.ScreenHeight*3/4) then
     Dec(P.Y)
   else
     Inc(P.Y);
-  R.Assign(P.X,P.Y,P.X+1+length(S)+1,P.Y+1);
+  R := TRect.Create(P.X, P.Y, P.X+1+length(S)+1, P.Y+1);
   CodeCompleteTip.Locate(R);
   if CodeCompleteTip.GetState(sfVisible)=false then
     CodeCompleteTip.Show;
@@ -1908,7 +1908,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbCtrlEnter :
             Message(Self,evCommand,cmOpenAtCursor,nil);
         else DontClear:=true;
@@ -1919,7 +1919,7 @@ begin
   inherited HandleEvent(Event);
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
           cmCalculatorPaste :
             begin
               InsertText(FloatToStr(CalcClipboard,0));
@@ -1929,7 +1929,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
 {$ifdef DebugUndo}
           cmDumpUndo    : DumpUndo;
           cmUndoAll     : UndoAll;
@@ -2068,11 +2068,11 @@ procedure TFPWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate :
           Update;
         cmSearchWindow+1..cmSearchWindow+99 :
-          if (Event.Command-cmSearchWindow=Number) then
+          if (Event.Message.Command-cmSearchWindow=Number) then
               ClearEvent(Event);
       end;
   end;
@@ -2136,7 +2136,7 @@ end;
 procedure TFPHelpWindow.InitHelpView;
 var R: TRect;
 begin
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   HelpView := TFPHelpViewer.Create(R, HSB, VSB);
   HelpView.GrowMode:=gfGrowHiX+gfGrowHiY;
 end;
@@ -2161,7 +2161,7 @@ end;
 procedure TFPHelpWindow.HandleEvent(var Event: TEvent);
 begin
   { run modally above a dialog (HelpModal): a window, unlike a dialog, does not end its own modal state }
-  if (Event.What=evCommand) and ((Event.Command=cmCancel) or (Event.Command=cmClose)) and GetState(sfModal) then
+  if (Event.What=evCommand) and ((Event.Message.Command=cmCancel) or (Event.Message.Command=cmClose)) and GetState(sfModal) then
     begin
       EndModal(cmCancel);
       ClearEvent(Event);
@@ -2169,11 +2169,11 @@ begin
     end;
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate :
           ReDraw;
         cmSearchWindow+1..cmSearchWindow+99 :
-          if (Event.Command-cmSearchWindow=Number) then
+          if (Event.Message.Command-cmSearchWindow=Number) then
               ClearEvent(Event);
       end;
   end;
@@ -2205,15 +2205,15 @@ begin
   inherited Create(Bounds,AFileName,{SearchFreeWindowNo}0);
   AutoNumber:=true;
   Options:=Options or ofTileAble;
-  GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
+  R := GetExtent; R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.A.X:=R.B.X-1; R.Grow(0,-1);
+  R := GetExtent; R.A.X:=R.B.X-1; R.Grow(0,-1);
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
   Indicator := TIndicator.Create(R);
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   LoadFile:=(AFileName<>'') and (AFileName<>'*');
   if (AFileName='') then
     begin
@@ -2284,7 +2284,7 @@ var DontClear: boolean;
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate :
           Update;
         cmUpdateTitle :
@@ -2296,7 +2296,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmHide :
             Hide;
           cmSave :
@@ -2489,15 +2489,15 @@ begin
   Options:=Options or ofTileAble;
   AutoNumber:=true;
   HelpCtx:=hcGDBWindow;
-  GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
+  R := GetExtent; R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.A.X:=R.B.X-1; R.Grow(0,-1);
+  R := GetExtent; R.A.X:=R.B.X-1; R.Grow(0,-1);
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
   Indicator := TIndicator.Create(R);
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   Editor := TGDBSourceEditor.Create(R, HSB, VSB, Indicator, GDBOutputFile);
   Editor.GrowMode:=gfGrowHiX+gfGrowHiY;
   Editor.SetFlags(efInsertMode+efSyntaxHighlight+efNoIndent+efExpandAllTabs);
@@ -2528,7 +2528,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmSaveAs :
               Editor.SaveAs;
         else DontClear:=true;
@@ -2759,15 +2759,15 @@ begin
   Options:=Options or ofTileAble;
   AutoNumber:=true;
   HelpCtx:=hcDisassemblyWindow;
-  GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
+  R := GetExtent; R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.A.X:=R.B.X-1; R.Grow(0,-1);
+  R := GetExtent; R.A.X:=R.B.X-1; R.Grow(0,-1);
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
   Indicator := TIndicator.Create(R);
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   Editor := TDisassemblyEditor.Create(R, HSB, VSB, nil, GDBOutputFile);
   Insert(Editor);
   DisassemblyWindow:=Self;
@@ -2955,22 +2955,22 @@ constructor TClipboardWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  TProgram.DeskTop.GetExtent(R);
+  R := TProgram.DeskTop.GetExtent;
   inherited Create(R, '*');
   SetTitle(dialog_clipboard);
   HelpCtx:=hcClipboardWindow;
   Number:=wnNoNumber;
   AutoNumber:=true;
 
-  GetExtent(R); R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
+  R := GetExtent; R.A.Y:=R.B.Y-1; R.Grow(-1,0); R.A.X:=14;
   HSB := TScrollBar.Create(R); HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.A.X:=R.B.X-1; R.Grow(0,-1);
+  R := GetExtent; R.A.X:=R.B.X-1; R.Grow(0,-1);
   VSB := TScrollBar.Create(R); VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.A.X:=3; R.B.X:=14; R.A.Y:=R.B.Y-1;
   Indicator := TIndicator.Create(R);
   Indicator.GrowMode:=gfGrowLoY+gfGrowHiY;
   Insert(Indicator);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   Editor := TSourceEditor.Create(R, HSB, VSB, Indicator, '');
   Editor.GrowMode:=gfGrowHiX+gfGrowHiY;
   Insert(Editor);
@@ -3047,7 +3047,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEnter :
             begin
               Message(Self,evCommand,cmMsgGotoSource,nil);
@@ -3061,15 +3061,15 @@ begin
           ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=Pointer(Self) then
+          if Event.Message.InfoPtr=Pointer(Self) then
             Message(Self,evCommand,cmMsgTrackSource,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmMsgGotoSource :
             if Range>0 then
               begin
@@ -3162,7 +3162,7 @@ begin
   W:=EditorWindowFile(P.GetModuleName);
   if assigned(W) then
     begin
-      W.GetExtent(R);
+      R := W.GetExtent;
       R.B.Y:=Owner.Origin.Y;
       W.ChangeBounds(R);
       W.Editor.SetCurPtr(Col,Row);
@@ -3207,7 +3207,7 @@ begin
   W:=EditorWindowFile(P.GetModuleName);
   if assigned(W) then
     begin
-      W.GetExtent(R);
+      R := W.GetExtent;
       if Owner.Origin.Y>R.A.Y+4 then
         R.B.Y:=Owner.Origin.Y;
       W.ChangeBounds(R);
@@ -3230,7 +3230,7 @@ begin
         This calls close on StackWindow
         rendering P invalid
         so postpone it PM }
-      W.GetExtent(R);
+      R := W.GetExtent;
       if (P.TClass<>0) then
         W.Editor.SetErrorMessage(P.GetText(R.B.X-R.A.X));
       W.Select;
@@ -3240,8 +3240,8 @@ begin
   if assigned(W) then
     begin
       Event.What:=evCommand;
-      Event.command:=cmClose;
-      Event.InfoPtr:=nil;
+      Event.Message.Command:=cmClose;
+      Event.Message.InfoPtr:=nil;
       fpide.PutEvent(Owner,Event);
     end;
 end;
@@ -3388,9 +3388,9 @@ procedure  TFPDlgWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmSearchWindow+1..cmSearchWindow+99 :
-          if (Event.Command-cmSearchWindow=Number) then
+          if (Event.Message.Command-cmSearchWindow=Number) then
               ClearEvent(Event);
       end;
   end;
@@ -3551,7 +3551,7 @@ end;
 begin
   if (Event.What and evMouseDown)<>0 then
      begin
-       MakeLocal(Event.Where,P);
+       P := MakeLocal(Event.Mouse.Where);
        if P.Y<3 then
           begin
             Index:=-1; X:=1;
@@ -3568,10 +3568,10 @@ begin
   if Event.What=evKeyDown then
      begin
        Index:=-1;
-       case Event.KeyCode of
+       case Event.KeyDown.KeyCode of
             kbCtrlTab :
               begin
-                SelectNextTab((Event.ControlKeyState and kbShift)=0);
+                SelectNextTab((Event.KeyDown.ControlKeyState and kbShift)=0);
                 ClearEvent(Event);
               end;
             kbTab,kbShiftTab  :
@@ -3580,24 +3580,24 @@ begin
                    if Current<>nil then
                    begin
                    LastV:=LastSelectable; FirstV:=FirstSelectable;
-                   if ((Current=LastV) or (Current=PLabel(LastV).Link)) and (Event.KeyCode=kbShiftTab) then
+                   if ((Current=LastV) or (Current=PLabel(LastV).Link)) and (Event.KeyDown.KeyCode=kbShiftTab) then
                       begin
                         if Owner<>nil then Owner.SelectNext(true);
                       end else
-                   if ((Current=FirstV) or (Current=PLabel(FirstV).Link)) and (Event.KeyCode=kbTab) then
+                   if ((Current=FirstV) or (Current=PLabel(FirstV).Link)) and (Event.KeyDown.KeyCode=kbTab) then
                       begin
                         Lock;
                         if Owner<>nil then Owner.SelectNext(false);
                         UnLock;
                       end else
-                   SelectNext(Event.KeyCode=kbShiftTab);
+                   SelectNext(Event.KeyDown.KeyCode=kbShiftTab);
                    ClearEvent(Event);
                    end;
                  end;
        else
        for I:=0 to DefCount-1 do
            begin
-             if Upcase(GetAltChar(Event.KeyCode))=AtTab(I).ShortCut
+             if Upcase(GetAltChar(Event.KeyDown.KeyCode))=AtTab(I).ShortCut
                 then begin
                        Index:=I;
                        ClearEvent(Event);
@@ -3616,7 +3616,7 @@ begin
   CallOrig:=true;
   if Event.What=evKeyDown then
      begin
-     if ((Owner<>nil) and (Owner.Phase=phPostProcess) and (GetAltChar(Event.KeyCode)<>#0)) or GetState(sfFocused)
+     if ((Owner<>nil) and (Owner.Phase=phPostProcess) and (GetAltChar(Event.KeyDown.KeyCode)<>#0)) or GetState(sfFocused)
         then
         else CallOrig:=false;
      end;
@@ -3733,9 +3733,9 @@ begin
   end;
   if Buffer <> nil then WriteBufC(0, 0, Size.X, Size.Y, Buffer^) else
   begin
-    GetClipRect(ClipR);
+    ClipR := GetClipRect;
     Redraw;
-    GetExtent(ClipR);
+    ClipR := GetExtent;
   end;
   { - End of TGroup.Draw - }
   InDraw:=false;
@@ -3808,7 +3808,7 @@ procedure TScreenView.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate  : Update;
       end;
   end;
@@ -3841,16 +3841,16 @@ constructor TScreenWindow.Create(AScreen: PScreen; ANumber: integer);
 var R: TRect;
     VSB,HSB: PScrollBar;
 begin
-  TProgram.DeskTop.GetExtent(R);
+  R := TProgram.DeskTop.GetExtent;
   inherited Create(R, dialog_userscreen, ANumber);
   Options:=Options or ofTileAble;
-  GetExtent(R); R.Grow(-1,-1); R.Move(1,0); R.A.X:=R.B.X-1;
+  R := GetExtent; R.Grow(-1,-1); R.Move(1,0); R.A.X:=R.B.X-1;
   VSB := TScrollBar.Create(R); VSB.Options:=VSB.Options or ofPostProcess;
   VSB.GrowMode:=gfGrowLoX+gfGrowHiX+gfGrowHiY; Insert(VSB);
-  GetExtent(R); R.Grow(-1,-1); R.Move(0,1); R.A.Y:=R.B.Y-1;
+  R := GetExtent; R.Grow(-1,-1); R.Move(0,1); R.A.Y:=R.B.Y-1;
   HSB := TScrollBar.Create(R); HSB.Options:=HSB.Options or ofPostProcess;
   HSB.GrowMode:=gfGrowLoY+gfGrowHiX+gfGrowHiY; Insert(HSB);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   ScreenView := TScreenView.Create(R, HSB, VSB, AScreen);
   ScreenView.GrowMode:=gfGrowHiX+gfGrowHiY;
   Insert(ScreenView);
@@ -3872,10 +3872,10 @@ begin
   if Action<>acNone then
   begin
     E:=Event;
-    E.What:=evMouseDown; E.Buttons:=mbLeftButton;
+    E.What:=evMouseDown; E.Mouse.Buttons:=mbLeftButton;
     View.HandleEvent(E);
     Event.What:=evCommand;
-    Event.Command:=ActionCommands[Action];
+    Event.Message.Command:=ActionCommands[Action];
   end;
 end;
 begin
@@ -3883,9 +3883,9 @@ begin
   InTranslate:=true;
   case Event.What of
     evMouseDown :
-      if (Event.ControlKeyState and kbAltShift)<>0 then
+      if (Event.KeyDown.ControlKeyState and kbAltShift)<>0 then
         TranslateAction(AltMouseAction) else
-      if (Event.ControlKeyState and kbCtrlShift)<>0 then
+      if (Event.KeyDown.ControlKeyState and kbCtrlShift)<>0 then
         TranslateAction(CtrlMouseAction);
   end;
   InTranslate:=false;
@@ -3905,9 +3905,9 @@ begin
         break;
       end;
   end;
-  if P=nil then TProgram.DeskTop.GetExtent(Bounds) else
+  if P=nil then Bounds := TProgram.DeskTop.GetExtent else
      begin
-       P.GetBounds(Bounds);
+       Bounds := P.GetBounds;
        Inc(Bounds.A.X); Inc(Bounds.A.Y);
      end;
   GetNextEditorBounds:=P<>nil;
@@ -3917,7 +3917,7 @@ function IOpenEditorWindow(Bounds: PRect; FileName: string; CurX,CurY: sw_intege
 var R: TRect;
     W: PSourceWindow;
 begin
-  if Assigned(Bounds) then R.Copy(Bounds^) else
+  if Assigned(Bounds) then R := Bounds^ else
     GetNextEditorBounds(R);
   PushStatus(FormatStrStr(msg_openingsourcefile,SmartPath(FileName)));
   W := TSourceWindow.Create(R, FileName);
@@ -4150,7 +4150,7 @@ var OK: boolean;
     E: PFileEditor;
     R: TRect;
 begin
-  R.Assign(0,0,0,0);
+  R := TRect.Create(0, 0, 0, 0);
   E := TFileEditor.Create(R,nil,nil,nil,nil,FileName);
   OK:=E<>nil;
   if OK then
@@ -4274,11 +4274,11 @@ begin
   C.Insert(NewStr(S));
 end;
 begin
-  R.Assign(0,0,58,14{$ifdef USE_GRAPH_SWITCH}+1{$endif});
+  R := TRect.Create(0, 0, 58, 14{$ifdef USE_GRAPH_SWITCH}+1{$endif});
   inherited Create(R, dialog_about);
   HelpCtx:=hcAbout;
-  GetExtent(R); R.Grow(-3,-2);
-  R2.Copy(R); R2.B.Y:=R2.A.Y+1;
+  R := GetExtent; R.Grow(-3,-2);
+  R2 := R; R2.B.Y:=R2.A.Y+1;
   Insert(TStaticText.Create(R2, ^C'Free Pascal IDE for '+source_info.name));
   R2.Move(0,1);
   Insert(TStaticText.Create(R2, ^C'Target CPU: '+target_cpu_string));
@@ -4348,7 +4348,7 @@ begin
   AddLine(^C'Nikolay Nikolov');
   AddLine('');
 
-  GetExtent(R);
+  R := GetExtent;
   R.Grow(-1,-1); Inc(R.A.Y,3);
   Scroller := TTextScroller.Create(R, 10, C);
   Scroller.Hide;
@@ -4381,7 +4381,7 @@ procedure TFPAboutDialog.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evKeyDown :
-      case Event.KeyCode of
+      case Event.KeyDown.KeyCode of
         kbAltI : { just like in BP }
           begin
             ToggleInfo;
@@ -4417,7 +4417,7 @@ begin
   {writeln(stderr,'all what=',event.what,' cmd=', event.command);}
   case Event.What of
     evKeyDown :
-      case Event.KeyCode of
+      case Event.KeyDown.KeyCode of
         kbEsc :
           begin
             Close;
@@ -4427,15 +4427,15 @@ begin
     evCommand :
       begin
       {writeln(stderr,'fpascii what=',event.what, ' cmd=', event.command, ' ',cmtransfer,' ',cmsearchwindow);}
-      if Event.Command=AsciiCommandBase+acPicked then
+      if Event.Message.Command=AsciiCommandBase+acPicked then
           begin
             W:=FirstEditorWindow;
             if Assigned(W) and Assigned(Report) then
-              Message(W,evCommand,cmAddChar,Event.InfoPtr);
+              Message(W,evCommand,cmAddChar,Event.Message.InfoPtr);
             ClearEvent(Event);
           end
       else
-      case Event.Command of
+      case Event.Message.Command of
         cmTransfer :
           begin
             W:=FirstEditorWindow;
@@ -4445,7 +4445,7 @@ begin
           end;
 
         cmSearchWindow+1..cmSearchWindow+99 :
-          if (Event.Command-cmSearchWindow=Number) then
+          if (Event.Message.Command-cmSearchWindow=Number) then
               ClearEvent(Event);
       end;
       end;
@@ -4578,11 +4578,11 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbEsc:
             begin
               Event.What:=evCommand;
-              Event.Command:=cmCancel;
+              Event.Message.Command:=cmCancel;
               PutEvent(Event);
             end;
         else DontClear:=true;

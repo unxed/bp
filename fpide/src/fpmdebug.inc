@@ -84,7 +84,7 @@ begin
     if not UserScreen.CanScroll then
       Clear:=false
     else
-      case Event.keycode of
+      case Event.KeyDown.KeyCode of
         kbPgUp : UserScreen.Scroll(-20);
         kbPgDn : UserScreen.Scroll(20);
         kbUp : UserScreen.Scroll(-1);
@@ -252,7 +252,7 @@ var d:Pevaluate_dialog;
     r:Trect;
 
 begin
-  desktop.getextent(r);
+  r := desktop.getextent;
   r.b.x:=r.b.x*3 div 4;
   r.b.y:=12;
   d := Tevaluate_dialog.Create(r);

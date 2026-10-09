@@ -531,7 +531,7 @@ begin
       TProgram.DeskTop.Unlock;
       Exit;
     end;
-  W.GetBounds(R);
+  R := W.GetBounds;
   if (R.A.X<>WI.Bounds.A.X) or (R.A.Y<>WI.Bounds.A.Y) then
     R.Move(WI.Bounds.A.X-R.A.X,WI.Bounds.A.Y-R.A.Y);
   if (W.Flags and wfGrow)<>0 then
@@ -549,7 +549,7 @@ begin
     else
       W.Hide;
   ZZ:=0;
-  TProgram.DeskTop.GetExtent(Z);
+  Z := TProgram.DeskTop.GetExtent;
   if R.A.Y>Z.B.Y-7 then
     begin
       R.A.Y:=Z.B.Y-7;
@@ -621,7 +621,7 @@ begin
             GetSubViewPtr(S^,ASCIIChart);
             GetSubViewPtr(S^,MessagesWindow); LastToolMessageFocused:=nil;
           end;
-          Application.GetExtent(R);
+          R := Application.GetExtent;
           Inc(R.A.Y);Dec(R.B.Y);
           DeskTop.Locate(R);
           Application.Insert(Desktop);
@@ -685,7 +685,7 @@ begin
   FillChar(WI,sizeof(WI),0);
   Title:=W.GetTitle(255);
   WI.HelpCtx:=W.HelpCtx;
-  W.GetBounds(WI.Bounds);
+  WI.Bounds := W.GetBounds;
   WI.Visible:=W.GetState(sfVisible);
   WI.WinNb:=W.Number;
   case WI.HelpCtx of

@@ -392,7 +392,7 @@ var
   Mouse: TPoint;
   R: TRect;
 begin
-  MakeLocal(E.Where, Mouse);
+  Mouse := MakeLocal(E.Mouse.Where);
   Current := Menu^.Items;
   while Current <> nil do
   begin
@@ -443,7 +443,7 @@ begin
   MouseInOwner := False;
   if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu.MakeLocal(E.Where, Mouse);
+    Mouse := ParentMenu.MakeLocal(E.Mouse.Where);
     R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
@@ -454,7 +454,7 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and (P.MouseInView(E.Where)=false) do
+  while (P <> nil) and (P.MouseInView(E.Mouse.Where)=false) do
         P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
@@ -484,7 +484,7 @@ begin
     GetEvent(E);
     case E.What of
       evMouseDown:
-        if MouseInView(E.Where) or MouseInOwner then
+        if MouseInView(E.Mouse.Where) or MouseInOwner then
         begin
           TrackMouse;
           if Size.Y = 1 then AutoSelect := True;
@@ -498,7 +498,7 @@ begin
             if (Current <> nil) and (Current^.Name <> nil) then
               Action := DoSelect
             else
-              if MouseActive or MouseInView(E.Where) then Action := DoReturn
+              if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
                 Current := Menu^.Deflt;
@@ -507,22 +507,22 @@ begin
               end;
         end;
       evMouseMove:
-        if E.Buttons <> 0 then
+        if E.Mouse.Buttons <> 0 then
         begin
           TrackMouse;
-          if not (MouseInView(E.Where) or MouseInOwner) and
+          if not (MouseInView(E.Mouse.Where) or MouseInOwner) and
             MouseInMenus then Action := DoReturn;
         end;
       evKeyDown:
-        case CtrlToArrow(E.KeyCode) of
+        case CtrlToArrow(E.KeyDown.KeyCode) of
           kbUp, kbDown:
             if Size.Y <> 1 then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbDown) else
-              if E.KeyCode = kbDown then AutoSelect := True;
+              TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbDown) else
+              if E.KeyDown.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
               begin
-                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+                TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbRight);
 {$IF DECLARED(UxMenuAutoOpen)}
                 if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
 {$ENDIF}
@@ -532,7 +532,7 @@ begin
             if Size.Y <> 1 then
             begin
               Current := Menu^.Items;
-              if E.KeyCode = kbEnd then TrackKey(False);
+              if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
             begin
@@ -555,8 +555,8 @@ begin
             end;
         else
           Target := Self;
-          Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          Ch := GetAltChar(E.KeyDown.KeyCode);
+          if Ch = #0 then Ch := Char(E.KeyDown.CharScan.CharCode) else Target := TopMenu;
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
@@ -577,7 +577,7 @@ begin
                 Action := DoReturn;
         end;
       evCommand:
-        if E.Command = cmMenu then
+        if E.Message.Command = cmMenu then
         begin
           AutoSelect := False;
           if ParentMenu <> nil then Action := DoReturn;
@@ -662,7 +662,7 @@ var
   Mouse: TPoint;
   R: TRect;
 begin
-  MakeLocal(E.Where, Mouse);
+  Mouse := MakeLocal(E.Mouse.Where);
   Current := Menu^.Items;
   while Current <> nil do
   begin
@@ -713,7 +713,7 @@ begin
   MouseInOwner := False;
   if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu.MakeLocal(E.Where, Mouse);
+    Mouse := ParentMenu.MakeLocal(E.Mouse.Where);
     R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
@@ -724,7 +724,7 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and (P.MouseInView(E.Where)=false) do
+  while (P <> nil) and (P.MouseInView(E.Mouse.Where)=false) do
         P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
@@ -754,7 +754,7 @@ begin
     GetEvent(E);
     case E.What of
       evMouseDown:
-        if MouseInView(E.Where) or MouseInOwner then
+        if MouseInView(E.Mouse.Where) or MouseInOwner then
         begin
           TrackMouse;
           if Size.Y = 1 then AutoSelect := True;
@@ -768,7 +768,7 @@ begin
             if (Current <> nil) and (Current^.Name <> nil) then
               Action := DoSelect
             else
-              if MouseActive or MouseInView(E.Where) then Action := DoReturn
+              if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
                 Current := Menu^.Deflt;
@@ -777,22 +777,22 @@ begin
               end;
         end;
       evMouseMove:
-        if E.Buttons <> 0 then
+        if E.Mouse.Buttons <> 0 then
         begin
           TrackMouse;
-          if not (MouseInView(E.Where) or MouseInOwner) and
+          if not (MouseInView(E.Mouse.Where) or MouseInOwner) and
             MouseInMenus then Action := DoReturn;
         end;
       evKeyDown:
-        case CtrlToArrow(E.KeyCode) of
+        case CtrlToArrow(E.KeyDown.KeyCode) of
           kbUp, kbDown:
             if Size.Y <> 1 then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbDown) else
-              if E.KeyCode = kbDown then AutoSelect := True;
+              TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbDown) else
+              if E.KeyDown.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
               begin
-                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+                TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbRight);
 {$IF DECLARED(UxMenuAutoOpen)}
                 if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
 {$ENDIF}
@@ -802,7 +802,7 @@ begin
             if Size.Y <> 1 then
             begin
               Current := Menu^.Items;
-              if E.KeyCode = kbEnd then TrackKey(False);
+              if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
             begin
@@ -825,8 +825,8 @@ begin
             end;
         else
           Target := Self;
-          Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          Ch := GetAltChar(E.KeyDown.KeyCode);
+          if Ch = #0 then Ch := Char(E.KeyDown.CharScan.CharCode) else Target := TopMenu;
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
@@ -847,7 +847,7 @@ begin
                 Action := DoReturn;
         end;
       evCommand:
-        if E.Command = cmMenu then
+        if E.Message.Command = cmMenu then
         begin
           AutoSelect := False;
           if ParentMenu <> nil then Action := DoReturn;
@@ -980,7 +980,7 @@ procedure TAdvancedMenuBar.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmCommandSetChanged : Update;
         cmUpdate            : Update;
       end;
@@ -1015,7 +1015,7 @@ var
   Mouse: TPoint;
   R: TRect;
 begin
-  MakeLocal(E.Where, Mouse);
+  Mouse := MakeLocal(E.Mouse.Where);
   Current := Menu^.Items;
   while Current <> nil do
   begin
@@ -1063,7 +1063,7 @@ begin
   MouseInOwner := False;
   if (ParentMenu <> nil) and (ParentMenu.Size.Y = 1) then
   begin
-    ParentMenu.MakeLocal(E.Where, Mouse);
+    Mouse := ParentMenu.MakeLocal(E.Mouse.Where);
     R := ParentMenu.GetItemRect(ParentMenu.Current);
     MouseInOwner := R.Contains(Mouse);
   end;
@@ -1074,7 +1074,7 @@ var
   P: PMenuView;
 begin
   P := ParentMenu;
-  while (P <> nil) and not P.MouseInView(E.Where) do P := P.ParentMenu;
+  while (P <> nil) and not P.MouseInView(E.Mouse.Where) do P := P.ParentMenu;
   MouseInMenus := P <> nil;
 end;
 
@@ -1103,7 +1103,7 @@ begin
     GetEvent(E);
     case E.What of
       evMouseDown:
-        if MouseInView(E.Where) or MouseInOwner then
+        if MouseInView(E.Mouse.Where) or MouseInOwner then
         begin
           TrackMouse;
           if Size.Y = 1 then AutoSelect := True;
@@ -1117,7 +1117,7 @@ begin
             if (Current <> nil) and (Current^.Name <> nil) then
               Action := DoSelect
             else
-              if MouseActive or MouseInView(E.Where) then Action := DoReturn
+              if MouseActive or MouseInView(E.Mouse.Where) then Action := DoReturn
               else
               begin
                 Current := Menu^.Deflt;
@@ -1126,22 +1126,22 @@ begin
               end;
         end;
       evMouseMove:
-        if E.Buttons <> 0 then
+        if E.Mouse.Buttons <> 0 then
         begin
           TrackMouse;
-          if not (MouseInView(E.Where) or MouseInOwner) and
+          if not (MouseInView(E.Mouse.Where) or MouseInOwner) and
             MouseInMenus then Action := DoReturn;
         end;
       evKeyDown:
-        case CtrlToArrow(E.KeyCode) of
+        case CtrlToArrow(E.KeyDown.KeyCode) of
           kbUp, kbDown:
             if Size.Y <> 1 then
-              TrackKey(CtrlToArrow(E.KeyCode) = kbDown) else
-              if E.KeyCode = kbDown then AutoSelect := True;
+              TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbDown) else
+              if E.KeyDown.KeyCode = kbDown then AutoSelect := True;
           kbLeft, kbRight:
             if ParentMenu = nil then
               begin
-                TrackKey(CtrlToArrow(E.KeyCode) = kbRight);
+                TrackKey(CtrlToArrow(E.KeyDown.KeyCode) = kbRight);
 {$IF DECLARED(UxMenuAutoOpen)}
                 if UxMenuAutoOpen and (Size.Y = 1) then AutoSelect := True;
 {$ENDIF}
@@ -1151,7 +1151,7 @@ begin
             if Size.Y <> 1 then
             begin
               Current := Menu^.Items;
-              if E.KeyCode = kbEnd then TrackKey(False);
+              if E.KeyDown.KeyCode = kbEnd then TrackKey(False);
             end;
           kbEnter:
             begin
@@ -1174,8 +1174,8 @@ begin
             end;
         else
           Target := Self;
-          Ch := GetAltChar(E.KeyCode);
-          if Ch = #0 then Ch := Char(E.CharCode) else Target := TopMenu;
+          Ch := GetAltChar(E.KeyDown.KeyCode);
+          if Ch = #0 then Ch := Char(E.KeyDown.CharScan.CharCode) else Target := TopMenu;
           P := Target.FindItem(ShortString(Ch));
           if P = nil then
           begin
@@ -1196,7 +1196,7 @@ begin
                 Action := DoReturn;
         end;
       evCommand:
-        if E.Command = cmMenu then
+        if E.Message.Command = cmMenu then
         begin
           AutoSelect := False;
           if ParentMenu <> nil then Action := DoReturn;
@@ -1268,15 +1268,15 @@ procedure TAdvancedListBox.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where) {and (((Event.EventFlags and meDoubleClick) <> 0))} then
+      if MouseInView(Event.Mouse.Where) {and (((Event.Mouse.EventFlags and meDoubleClick) <> 0))} then
       begin
         inherited HandleEvent(Event);
-        if ((Event.EventFlags and meDoubleClick) <> 0) then
+        if ((Event.Mouse.EventFlags and meDoubleClick) <> 0) then
           if Range>Focused then
             SelectItem(Focused);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
           Message(Owner,evBroadcast,cmDefault,nil);
       end;
@@ -1518,7 +1518,7 @@ procedure TDlgWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmUpdate : Update;
       end;
   end;
@@ -1535,8 +1535,8 @@ begin
   if M=nil then Exit;
   if LastLocalCmd<>0 then
      M^.Deflt:=SearchMenuItem(M,LastLocalCmd);
-  TProgram.DeskTop.GetExtent(R);
-  MakeGlobal(P,R.A); {Desktop.MakeLocal(R.A,R.A);}
+  R := TProgram.DeskTop.GetExtent;
+  R.A := MakeGlobal(P); {R.A := Desktop.MakeLocal(R.A);}
   MV := TAdvancedMenuPopUp.Create(R, M, nil);
   Re:=TProgram.Application.ExecView(MV);
   if M^.Deflt=nil then LastLocalCmd:=0
@@ -1563,16 +1563,16 @@ var DontClear: boolean;
 begin
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where) and (Event.Buttons=mbRightButton) then
+      if MouseInView(Event.Mouse.Where) and (Event.Mouse.Buttons=mbRightButton) then
         begin
-          MakeLocal(Event.Where,P); Inc(P.X); Inc(P.Y);
+          P := MakeLocal(Event.Mouse.Where); Inc(P.X); Inc(P.Y);
           LocalMenu(P);
           ClearEvent(Event);
         end;
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbAltF10 : Message(Self,evCommand,cmLocalMenu, Pointer(Self));
         else DontClear:=true;
         end;
@@ -1581,7 +1581,7 @@ begin
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmLocalMenu :
             begin
               P:=Cursor; Inc(P.X); Inc(P.Y);
@@ -1828,13 +1828,13 @@ var R   : TRect;
 begin
   with ADialog do
   begin
-    GetExtent(R);
+    R := GetExtent;
     W:=R.B.X-R.A.X; H:=(R.B.Y-R.A.Y);
-    R.Assign(0,0,W,H+3); ChangeBounds(R);
+    R := TRect.Create(0, 0, W, H+3); ChangeBounds(R);
     X:=W div 2; X1:=X div 2+1; X2:=X+X1-1;
-    R.Assign(X1-3,H,X1+7,H+2);
+    R := TRect.Create(X1-3, H, X1+7, H+2);
     Insert(TButton.Create(R, btn_OK, cmOK, bfDefault));
-    R.Assign(X2-7,H,X2+3,H+2);
+    R := TRect.Create(X2-7, H, X2+3, H+2);
     Insert(TButton.Create(R, btn_Cancel, cmCancel, bfNormal));
     SelectNext(false); { tv3: false = the first inserted control gets the focus }
   end;
@@ -1846,7 +1846,7 @@ var BW: Sw_integer;
 begin
   with ADialog do
   begin
-    GetBounds(R); R.Grow(0,1); Inc(R.B.Y);
+    R := GetBounds; R.Grow(0,1); Inc(R.B.Y);
     ChangeBounds(R);
     BW:=10;
     R.A.Y:=R.B.Y-2; R.B.Y:=R.A.Y+2;
@@ -1862,12 +1862,12 @@ var R: TRect;
 begin
   Width:=length(Msg)+4*2;
   if Width<(TProgram.DeskTop.Size.X div 2) then Width:=(TProgram.DeskTop.Size.X div 2);
-  R.Assign(0,0,Width,5);
+  R := TRect.Create(0, 0, Width, 5);
   MessageDialog := TCenterDialog.Create(R, '');
   with MessageDialog do
   begin
     Flags:=0;
-    GetExtent(R); R.Grow(-4,-2);
+    R := GetExtent; R.Grow(-4,-2);
     if copy(Msg,1,1)<>^C then Msg:=^C+Msg;
     Insert(TStaticText.Create(R, Msg));
   end;
@@ -1941,14 +1941,14 @@ begin
         ClearEvent(Event);
   case Event.What of
     evMouseDown :
-      if MouseInView(Event.Where)=false then
+      if MouseInView(Event.Mouse.Where)=false then
         GoSelectItem:=-2
       else
       begin
         ColWidth := Size.X div NumCols + 1;
         OldItem := Focused;
-        MakeLocal(Event.Where, Mouse);
-        if MouseInView(Event.Where) then
+        Mouse := MakeLocal(Event.Mouse.Where);
+        if MouseInView(Event.Mouse.Where) then
           NewItem := Mouse.Y + (Size.Y * (Mouse.X div ColWidth)) + TopItem
         else
           NewItem := OldItem;
@@ -1960,8 +1960,8 @@ begin
              DrawView;
            end;
           OldItem := NewItem;
-          MakeLocal(Event.Where, Mouse);
-          if MouseInView(Event.Where) then
+          Mouse := MakeLocal(Event.Mouse.Where);
+          if MouseInView(Event.Mouse.Where) then
             NewItem := Mouse.Y + (Size.Y * (Mouse.X div ColWidth)) + TopItem
           else
           begin
@@ -1993,33 +1993,33 @@ begin
         until not MouseEvent(Event, evMouseMove + evMouseAuto);
         FocusItemNum(NewItem);
         DrawView;
-        if ((Event.EventFlags and meDoubleClick) <> 0) and (Range > Focused) then SelectItem(Focused);
+        if ((Event.Mouse.EventFlags and meDoubleClick) <> 0) and (Range > Focused) then SelectItem(Focused);
         ClearEvent(Event);
         GoSelectItem:=Focused;
       end;
     evMouseMove,evMouseAuto:
      if GetState(sfFocused) then
-      if MouseInView(Event.Where) then
+      if MouseInView(Event.Mouse.Where) then
         begin
-          MakeLocal(Event.Where,Mouse);
+          Mouse := MakeLocal(Event.Mouse.Where);
           FocusItemNum(TopItem+Mouse.Y);
           ClearEvent(Event);
         end;
     evKeyDown :
       begin
-        if (Event.KeyCode=kbEsc) then
+        if (Event.KeyDown.KeyCode=kbEsc) then
           begin
             GoSelectItem:=-2;
             ClearEvent(Event);
           end else
-        if ((Event.KeyCode=kbEnter) or (Event.CharCode = Ord(' '))) and
+        if ((Event.KeyDown.KeyCode=kbEnter) or (Event.KeyDown.CharScan.CharCode = Ord(' '))) and
            (Focused < Range) then
           begin
             GoSelectItem:=Focused;
             NewItem := Focused;
           end
         else
-          case CtrlToArrow(Event.KeyCode) of
+          case CtrlToArrow(Event.KeyDown.KeyCode) of
             kbUp   : NewItem := Focused - 1;
             kbDown : NewItem := Focused + 1;
             kbRight: if NumCols > 1 then NewItem := Focused + Size.Y else Exit;
@@ -2038,27 +2038,27 @@ begin
         ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmReceivedFocus :
-          if (Event.InfoPtr <> Pointer(Self)) and (InClose=false) then
+          if (Event.Message.InfoPtr <> Pointer(Self)) and (InClose=false) then
             begin
               GoSelectItem:=-2;
             end;
       else
         if Options and ofSelectable <> 0 then
-          if (Event.Command = cmScrollBarClicked) and
-             ((Event.InfoPtr = Pointer(HScrollBar)) or (Event.InfoPtr = Pointer(VScrollBar))) then
+          if (Event.Message.Command = cmScrollBarClicked) and
+             ((Event.Message.InfoPtr = Pointer(HScrollBar)) or (Event.Message.InfoPtr = Pointer(VScrollBar))) then
             Select
           else
-            if (Event.Command = cmScrollBarChanged) then
+            if (Event.Message.Command = cmScrollBarChanged) then
               begin
-                if (Pointer(VScrollBar) = Event.InfoPtr) then
+                if (Pointer(VScrollBar) = Event.Message.InfoPtr) then
                   begin
                     FocusItemNum(VScrollBar.Value);
                     DrawView;
                   end
                 else
-                  if (Pointer(HScrollBar) = Event.InfoPtr) then
+                  if (Pointer(HScrollBar) = Event.Message.InfoPtr) then
                     DrawView;
               end;
       end;
@@ -2069,7 +2069,7 @@ begin
          if abs(GetDosTicks-LastTT)>=1 then
           begin
             LastTT:=GetDosTicks;
-            MakeLocal(MouseWhere,Mouse);
+            Mouse := MakeLocal(MouseWhere);
             if ((Mouse.Y<-1) or (Mouse.Y>=Size.Y)) and
                ((0<=Mouse.X) and (Mouse.X<Size.X)) then
             if Range>0 then
@@ -2117,7 +2117,7 @@ begin
          DontClear:=false;
          Count:=GetItemCount;
          if Count>0 then
-         case Event.KeyCode of
+         case Event.KeyDown.KeyCode of
            kbUp :
              if Focused>0 then
                FocusItem(Focused-1);
@@ -2136,12 +2136,12 @@ begin
          if DontClear=false then ClearEvent(Event);
        end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmReleasedFocus :
-          if (ListBox<>nil) and (Event.InfoPtr = Pointer(ListBox)) then
+          if (ListBox<>nil) and (Event.Message.InfoPtr = Pointer(ListBox)) then
             DropList(false);
         cmListItemSelected :
-          if (ListBox<>nil) and (Event.InfoPtr = Pointer(ListBox)) then
+          if (ListBox<>nil) and (Event.Message.InfoPtr = Pointer(ListBox)) then
             begin
               FocusItem(ListBox.Focused);
               Text:=GetText(List.At(Focused),High(Text));
@@ -2150,7 +2150,7 @@ begin
             end;
       end;
     evMouseDown :
-      if MouseInView(Event.Where) then
+      if MouseInView(Event.Mouse.Where) then
         begin
           DropList(not ListDropped);
           ClearEvent(Event);
@@ -2175,7 +2175,7 @@ end;
 procedure TDropDownListBox.CreateListBox(var R: TRect);
 var R2: TRect;
 begin
-  R2.Copy(R); R2.A.X:=R2.B.X-1;
+  R2 := R; R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2);
   Dec(R.B.X);
   ListBox := TDDHelperLB.Create(Self, R, 1, SB);
@@ -2189,7 +2189,7 @@ begin
 
   if Drop then
     begin
-      R.Assign(Origin.X+1,Origin.Y+Size.Y,Origin.X+Size.X,Origin.Y+Size.Y+DropLineCount);
+      R := TRect.Create(Origin.X+1, Origin.Y+Size.Y, Origin.X+Size.X, Origin.Y+Size.Y+DropLineCount);
       if Owner<>nil then Owner.Lock;
       CreateListBox(R);
       if SB<>nil then
@@ -2356,7 +2356,7 @@ end;
 
 procedure TNoUpdateButton.HandleEvent(var Event: TEvent);
 begin
-  if (Event.What<>evBroadcast) or (Event.Command<>cmCommandSetChanged) then
+  if (Event.What<>evBroadcast) or (Event.Message.Command<>cmCommandSetChanged) then
   inherited HandleEvent(Event);
 end;
 
@@ -2370,17 +2370,17 @@ end;
 procedure TAdvMessageBox.HandleEvent(var Event: TEvent);
 var I: integer;
 begin
-  if (not CanCancel) and (Event.What=evCommand) and (Event.Command=cmCancel) then
+  if (not CanCancel) and (Event.What=evCommand) and (Event.Message.Command=cmCancel) then
     ClearEvent(Event);
   inherited HandleEvent(Event);
   case Event.What of
     evCommand:
       begin
         for I:=Low(UserButtonCmd) to High(UserButtonCmd) do
-         if Event.Command=UserButtonCmd[I] then
+         if Event.Message.Command=UserButtonCmd[I] then
           if State and sfModal <> 0 then
           begin
-            EndModal(Event.Command);
+            EndModal(Event.Message.Command);
             ClearEvent(Event);
           end;
       end;
@@ -2473,7 +2473,7 @@ function AdvMessageBox(const Msg: String; Params: Pointer; AOptions: longint): W
 var
   R: TRect;
 begin
-  R.Assign(0, 0, 0, 0);
+  R := TRect.Create(0, 0, 0, 0);
   AdvMessageBox := AdvMessageBoxRect(R, Msg, Params, AOptions);
 end;
 
@@ -2539,7 +2539,7 @@ begin
   begin
     GetStaticTextDimensions(S,40,Cols,Rows);
     if Cols<32 then Cols:=32; if Rows=0 then Rows:=1;
-    R.Assign(0,0,3+Cols+3,Rows+6);
+    R := TRect.Create(0, 0, 3+Cols+3, Rows+6);
     if (AOptions and mfInsertInApp)= 0 then
       R.Move((TProgram.DeskTop.Size.X-(R.B.X-R.A.X)) div 2,(TProgram.DeskTop.Size.Y-(R.B.Y-R.A.Y)) div 2)
     else
@@ -2549,7 +2549,7 @@ begin
   with Dialog do
    begin
      CanCancel:=(Options and mfCantCancel)=0;
-     R.Assign(3,2, Size.X-2,Size.Y-3);
+     R := TRect.Create(3, 2, Size.X-2, Size.Y-3);
      Control := TStaticText.Create(R, S);
      Insert(Control);
      X := -2;
@@ -2558,7 +2558,7 @@ begin
       if AOptions and ($10000 shl I) <> 0 then
        begin
          BtnName:=UserButtonName[I+1];
-         R.Assign(0, 0, Max(10,length(BtnName)+2), 2);
+         R := TRect.Create(0, 0, Max(10,length(BtnName)+2), 2);
          Control := TButton.Create(R, BtnName, UserButtonCmd[I+1], bfNormal);
          Inc(X, Control.Size.X + 2);
          ButtonList[ButtonCount] := Control;
@@ -2567,7 +2567,7 @@ begin
      for I := 0 to 3 do
       if AOptions and ($0100 shl I) <> 0 then
        begin
-         R.Assign(0, 0, 10, 2);
+         R := TRect.Create(0, 0, 10, 2);
          Control := TButton.Create(R, ButtonName[I], Cmds[i], bfNormal);
          Inc(X, Control.Size.X + 2);
          ButtonList[ButtonCount] := Control;

@@ -433,23 +433,23 @@ var R,R2,R3: TRect;
 begin
   KeyCount:=GetHotKeyCount;
 
-  R.Assign(0,0,60,Max(3+KeyCount,12));
+  R := TRect.Create(0, 0, 60, Max(3+KeyCount,12));
   inherited Create(R,dialog_modifynewtool);
   Tool:=ATool;
 
-  GetExtent(R); R.Grow(-3,-2); R3.Copy(R);
+  R := GetExtent; R.Grow(-3,-2); R3 := R;
   Inc(R.A.Y); R.B.Y:=R.A.Y+1; R.B.X:=R.A.X+36;
   TitleIL := TEditorInputLine.Create(R, 128); Insert(TitleIL);
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_title, TitleIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_title, TitleIL));
   R.Move(0,3);
   ProgramIL := TEditorInputLine.Create(R, 128); Insert(ProgramIL);
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_programpath, ProgramIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_programpath, ProgramIL));
   R.Move(0,3);
   ParamIL := TEditorInputLine.Create(R, 128); Insert(ParamIL);
   ParamIL.SetValidator(TToolParamValidator.Create);
-  R2.Copy(R); R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_commandline, ParamIL));
+  R2 := R; R2.Move(-1,-1); Insert(TLabel.Create(R2, label_toolprop_commandline, ParamIL));
 
-  R.Copy(R3); Inc(R.A.X,38); R.B.Y:=R.A.Y+KeyCount;
+  R := R3; Inc(R.A.X,38); R.B.Y:=R.A.Y+KeyCount;
   Items:=nil;
   for I:=KeyCount-1 downto 0 do
     Items:=NewSItem(GetHotKeyNameByIdx(I), Items);
@@ -485,19 +485,19 @@ constructor TToolsDialog.Create;
 var R,R2,R3: TRect;
     SB: PScrollBar;
 begin
-  R.Assign(0,0,46,16);
+  R := TRect.Create(0, 0, 46, 16);
   inherited Create(R,dialog_tools);
 
   HelpCtx:=hcTools;
-  GetExtent(R); R.Grow(-3,-2); Inc(R.A.Y); R3.Copy(R); Dec(R.B.X,12);
-  R2.Copy(R); R2.Move(1,0); R2.A.X:=R2.B.X-1;
+  R := GetExtent; R.Grow(-3,-2); Inc(R.A.Y); R3 := R; Dec(R.B.X,12);
+  R2 := R; R2.Move(1,0); R2.A.X:=R2.B.X-1;
   SB := TScrollBar.Create(R2); Insert(SB);
   ToolsLB := TToolListBox.Create(R,1,SB);
   Insert(ToolsLB);
-  R2.Copy(R); R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
+  R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
   Insert(TLabel.Create(R2, label_tools_programtitles, ToolsLB));
 
-  R.Copy(R3); R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
+  R := R3; R.A.X:=R.B.X-10; R.B.Y:=R.A.Y+2;
   Insert(TButton.Create(R, button_OK, cmOK, bfNormal));
   R.Move(0,2);
   Insert(TButton.Create(R, button_Edit, cmEditItem, bfDefault));
@@ -517,7 +517,7 @@ begin
     evKeyDown :
       begin
         DontClear:=false;
-        case Event.KeyCode of
+        case Event.KeyDown.KeyCode of
           kbIns  :
             Message(Self,evCommand,cmAddItem,nil);
           kbDel  :
@@ -527,15 +527,15 @@ begin
         if DontClear=false then ClearEvent(Event);
       end;
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListItemSelected :
-          if Event.InfoPtr=pointer(ToolsLB) then
+          if Event.Message.InfoPtr=pointer(ToolsLB) then
             Message(Self,evCommand,cmEditItem,nil);
       end;
     evCommand :
       begin
         DontClear:=false;
-        case Event.Command of
+        case Event.Message.Command of
           cmAddItem    : Add;
           cmDeleteItem : Delete;
           cmEditItem   : Edit;
@@ -757,7 +757,7 @@ var
     ViewNames[ViewCount]:=Sec.GetName;
     GetCoordEntry(F,Sec.GetName,tieOrigin,P1);
     GetCoordEntry(F,Sec.GetName,tieSize,P2);
-    ViewBounds[ViewCount].Assign(P1.X,P1.Y,P1.X+P2.X,P1.Y+P2.Y);
+    ViewBounds[ViewCount] := TRect.Create(P1.X, P1.Y, P1.X+P2.X, P1.Y+P2.Y);
     { allow conversion of $EDNAME for instance in
       default values PM }
     Typ:=F.GetEntry(Sec.GetName,tieValue,'');
@@ -941,7 +941,7 @@ var R: TRect;
     P: PView;
 begin
   OK:=true;
-  R.Assign(0,0,DSize.X,DSize.Y);
+  R := TRect.Create(0, 0, DSize.X, DSize.Y);
   PromptDialog := TCenterDialog.Create(R, Title);
   with PromptDialog do
   begin
@@ -1581,7 +1581,7 @@ constructor TMessagesWindow.Create;
 var R: TRect;
     HSB,VSB: PScrollBar;
 begin
-  TProgram.DeskTop.GetExtent(R); R.A.Y:=R.B.Y-7;
+  R := TProgram.DeskTop.GetExtent; R.A.Y:=R.B.Y-7;
   inherited Create(R,dialog_messages,SearchFreeWindowNo);
   HelpCtx:=hcMessagesWindow;
 
@@ -1590,7 +1590,7 @@ begin
 
   VSB.SetStep(R.B.Y-R.A.Y-2,1);
   HSB.SetStep(R.B.X-R.A.X-2,1);
-  GetExtent(R); R.Grow(-1,-1);
+  R := GetExtent; R.Grow(-1,-1);
   MsgLB := TToolMessageListBox.Create(R, HSB, VSB);
   Insert(MsgLB);
 
@@ -1613,9 +1613,9 @@ procedure TMessagesWindow.HandleEvent(var Event: TEvent);
 begin
   case Event.What of
     evBroadcast :
-      case Event.Command of
+      case Event.Message.Command of
         cmListFocusChanged :
-          if Event.InfoPtr=Pointer(MsgLB) then
+          if Event.Message.InfoPtr=Pointer(MsgLB) then
             begin
               LastToolMessageFocused:=PToolMessage(MsgLB.List.At(MsgLB.Focused));
               Message(TProgram.Application,evBroadcast,cmClearLineHighlights,Self);

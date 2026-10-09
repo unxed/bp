@@ -127,16 +127,16 @@ begin
   Call:=true;
   case Event.What of
     evKeyDown :
-     case Event.KeyCode of
+     case Event.KeyDown.KeyCode of
        kbEnter   : Call:=false;
      end;
     evBroadcast :
-     case Event.Command of
+     case Event.Message.Command of
        cmDefault     : Call:=false;
        cmPressButton :
          begin
-           if (PString(Event.InfoPtr)^=Title^) or
-              ((PString(Event.InfoPtr)^='^') and (Title^='x^y')) then
+           if (PString(Event.Message.InfoPtr)^=Title^) or
+              ((PString(Event.Message.InfoPtr)^='^') and (Title^='x^y')) then
               begin
                 Select;
                 DrawState(true);
@@ -449,15 +449,15 @@ begin
       if Owner<>nil then
       if (Owner.State and sfSelected)<>0 then
       begin
-        S:=Chr(Event.CharCode);
+        S:=Chr(Event.KeyDown.CharScan.CharCode);
         Message(Owner,evBroadcast,cmPressButton,@S);
-        if CalcKey(Chr(Event.CharCode)) then
+        if CalcKey(Chr(Event.KeyDown.CharScan.CharCode)) then
         ClearEvent(Event);
       end;
     evBroadcast:
-      if Event.Command = cmCalcButton then
+      if Event.Message.Command = cmCalcButton then
       begin
-        CalcKey(PButton(Event.InfoPtr).Title^);
+        CalcKey(PButton(Event.Message.InfoPtr).Title^);
         ClearEvent(Event);
       end;
   end;
@@ -485,7 +485,7 @@ var
   P: PView;
   R: TRect;
 begin
-  R.Assign(5, 3, 43, 18);
+  R := TRect.Create(5, 3, 43, 18);
   inherited Create(R, dialog_Calculator);
   Options := Options or ofFirstClick or ofTopSelect;
   HelpCtx:=hcCalcWindow;
@@ -504,7 +504,7 @@ begin
     P.Options := P.Options {and not ofSelectable};
     Insert(P);
   end;
-  R.Assign(3, 2, 35, 3);
+  R := TRect.Create(3, 2, 35, 3);
   CD := TCalcDisplay.Create(R);
   CD.Options:=CD.Options or ofSelectable;
   Insert(CD);
@@ -518,7 +518,7 @@ begin
   if (State and sfSelected)<>0 then
   case Event.What of
     evCommand :
-     case Event.Command of
+     case Event.Message.Command of
        cmCalculatorPaste :
          begin
            MakeKeyEvent(CDEvent,kbCtrlEnter,0);
@@ -526,11 +526,11 @@ begin
          end;
      end;
     evKeyDown :
-     case Event.KeyCode of
+     case Event.KeyDown.KeyCode of
        kbEnter :
          begin
-           Event.KeyCode:=0;
-           Event.CharCode:=Ord('=');
+           Event.KeyDown.KeyCode:=0;
+           Event.KeyDown.CharScan.CharCode:=Ord('=');
          end;
        kbCtrlEnter :
          begin

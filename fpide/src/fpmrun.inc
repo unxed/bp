@@ -338,18 +338,18 @@ var R,R2: TRect;
     D: PCenterDialog;
     IL: PEditorInputLine;
 begin
-  R.Assign(0,0,round(Drivers.ScreenWidth*54/80),4);
+  R := TRect.Create(0, 0, round(Drivers.TScreen.ScreenWidth*54/80), 4);
   D := TCenterDialog.Create(R, dialog_programparameters);
   with D do
   begin
-    GetExtent(R); R.Grow(-2,-1); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
-    R2.Copy(R); R2.A.X:=16; Dec(R2.B.X,4);
+    R := GetExtent; R.Grow(-2,-1); Inc(R.A.Y); R.B.Y:=R.A.Y+1;
+    R2 := R; R2.A.X:=16; Dec(R2.B.X,4);
     IL := TEditorInputLine.Create(R2, 255);
     IL.Data^:=GetRunParameters;
     Insert(IL);
-    R2.Copy(R); R2.A.X:=R2.B.X-3; R2.B.X:=R2.A.X+3;
+    R2 := R; R2.A.X:=R2.B.X-3; R2.B.X:=R2.A.X+3;
     Insert(THistory.Create(R2, IL, hidRunParameters));
-    R2.Copy(R); R2.B.X:=16;
+    R2 := R; R2.B.X:=16;
     Insert(TLabel.Create(R2, label_parameters_parameter, IL));
   end;
   InsertButtons(D);
