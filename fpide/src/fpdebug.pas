@@ -2709,7 +2709,7 @@ end;
 
 constructor TBreakpointItemDialog.Create(ABreakpoint: PBreakpoint);
 var R,R2,R3: TRect;
-    Items: PSItem;
+    Items: TSItem;
     I : BreakpointType;
     KeyCount: sw_integer;
 begin
@@ -2746,7 +2746,7 @@ begin
   Items:=nil;
   { don't use invalid type }
   for I:=pred(high(BreakpointType)) downto low(BreakpointType) do
-    Items:=NewSItem(BreakpointTypeStr[I], Items);
+    Items:=TSItem.Create(BreakpointTypeStr[I], Items);
   TypeRB := TRadioButtons.Create(R, Items);
 
   R2 := R; R2.Move(-1,-1); R2.B.Y:=R2.A.Y+1;

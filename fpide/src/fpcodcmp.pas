@@ -412,7 +412,7 @@ end;
 
 constructor TCodeCompleteDialog.Create;
 var R,R2,R3: TRect;
-    Items: PSItem;
+    Items: TSItem;
     SB: PScrollBar;
 begin
   R := TRect.Create(0, 0, 50, 22);
@@ -431,10 +431,10 @@ begin
 
   { Case choice }
   R := R3; Dec(R.B.Y,2); R.A.Y:=R.B.Y-4; Inc(R.A.X); R.B.X:=R.A.X+15;
-  Items:=NewSItem('Unc~h~anged',
-           NewSItem('~L~ower',
-           NewSItem('~U~pper',
-           NewSItem('~M~ixed',nil))));
+  Items:=TSItem.Create('Unc~h~anged',
+           TSItem.Create('~L~ower',
+           TSItem.Create('~U~pper',
+           TSItem.Create('~M~ixed',nil))));
   RB := TRadioButtons.Create(R,Items);
   RB.SetData(ord(CodeCompleteCase));
   R2 := R; R2.Move(0,-1); R2.B.Y:=R2.A.Y+1; Dec(R2.A.X);
@@ -451,9 +451,9 @@ begin
 
   { Standard/all units booleans }
   Items:=nil;
-  Items:=NewSItem('Add standard units', Items);
-  Items:=NewSItem('Add all units', Items);
-  Items:=NewSItem('Show only unique', Items);
+  Items:=TSItem.Create('Add standard units', Items);
+  Items:=TSItem.Create('Add all units', Items);
+  Items:=TSItem.Create('Show only unique', Items);
   R := R3; R.A.Y:=R.B.Y-5;R.B.Y:=R.A.Y+3; Inc(R.A.X,18); Dec(R.B.X);
   CB := TCheckBoxes.Create(R, Items);
   Insert(CB);

@@ -428,7 +428,7 @@ end;
 
 constructor TToolItemDialog.Create(ATool: PTool);
 var R,R2,R3: TRect;
-    Items: PSItem;
+    Items: TSItem;
     I,KeyCount: sw_integer;
 begin
   KeyCount:=GetHotKeyCount;
@@ -452,7 +452,7 @@ begin
   R := R3; Inc(R.A.X,38); R.B.Y:=R.A.Y+KeyCount;
   Items:=nil;
   for I:=KeyCount-1 downto 0 do
-    Items:=NewSItem(GetHotKeyNameByIdx(I), Items);
+    Items:=TSItem.Create(GetHotKeyNameByIdx(I), Items);
   HotKeyRB := TRadioButtons.Create(R, Items);
   Insert(HotKeyRB);
 
@@ -936,7 +936,7 @@ var R: TRect;
     CB: PCheckBoxes;
     RB: PRadioButtons;
     LV: PLabel;
-    SI: PSItem;
+    SI: TSItem;
     S: string;
     P: PView;
 begin
@@ -979,7 +979,7 @@ begin
           vtCheckBox :
             begin
               CB := TCheckBoxes.Create(ViewBounds[I],
-               NewSItem(
+               TSItem.Create(
                 F.GetEntry(ViewNames[I],tieName,''),
                 nil));
               if StrToInt(ViewValues[I])=1 then
@@ -990,7 +990,7 @@ begin
             begin
               SI:=nil;
               for J:=ViewItemCount[I] downto 1 do
-                SI:=NewSItem(F.GetEntry(ViewNames[I],tieItem+IntToStr(J),''),SI);
+                SI:=TSItem.Create(F.GetEntry(ViewNames[I],tieItem+IntToStr(J),''),SI);
               RB := TRadioButtons.Create(ViewBounds[I], SI);
               RB.Press(StrToInt(ViewValues[I]));
               ViewPtrs[I]:=RB;

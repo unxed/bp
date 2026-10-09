@@ -3651,10 +3651,10 @@ begin
     R2 := R1; R2.Move(0,1);
     R2.B.Y:=R2.A.Y+{$ifdef TEST_REGEXP}3{$else}2{$endif};
     CB1 := TCheckBoxes.Create(R2,
-      NewSItem(label_find_casesensitive,
-      NewSItem(label_find_wholewordsonly,
+      TSItem.Create(label_find_casesensitive,
+      TSItem.Create(label_find_wholewordsonly,
 {$ifdef TEST_REGEXP}
-      NewSItem(label_find_useregexp,
+      TSItem.Create(label_find_useregexp,
 {$endif TEST_REGEXP}
       nil))){$ifdef TEST_REGEXP}){$endif TEST_REGEXP};
     Insert(CB1);
@@ -3663,8 +3663,8 @@ begin
     R1 := R; Inc(R1.A.Y,2); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
     R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB1 := TRadioButtons.Create(R2,
-      NewSItem(label_find_forward,
-      NewSItem(label_find_backward,
+      TSItem.Create(label_find_forward,
+      TSItem.Create(label_find_backward,
       nil)));
     Insert(RB1);
     Insert(TLabel.Create(R1, label_find_direction, RB1));
@@ -3672,8 +3672,8 @@ begin
     R1 := R; Inc(R1.A.Y,6); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
     R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB2 := TRadioButtons.Create(R2,
-      NewSItem(label_find_global,
-      NewSItem(label_find_selectedtext,
+      TSItem.Create(label_find_global,
+      TSItem.Create(label_find_selectedtext,
       nil)));
     Insert(RB2);
     Insert(TLabel.Create(R1, label_find_scope, RB2));
@@ -3681,8 +3681,8 @@ begin
     R1 := R; Inc(R1.A.Y,6); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
     R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB3 := TRadioButtons.Create(R2,
-      NewSItem(label_find_fromcursor,
-      NewSItem(label_find_entirescope,
+      TSItem.Create(label_find_fromcursor,
+      TSItem.Create(label_find_entirescope,
       nil)));
     Insert(RB3);
     Insert(TLabel.Create(R1, label_find_origin, RB3));
@@ -3737,11 +3737,11 @@ begin
     R2 := R1; R2.Move(0,1);
     R2.B.Y:=R2.A.Y+{$ifdef TEST_REGEXP}4{$else}3{$endif};
     CB1 := TCheckBoxes.Create(R2,
-      NewSItem(label_replace_casesensitive,
-      NewSItem(label_replace_wholewordsonly,
-      NewSItem(label_replace_promptonreplace,
+      TSItem.Create(label_replace_casesensitive,
+      TSItem.Create(label_replace_wholewordsonly,
+      TSItem.Create(label_replace_promptonreplace,
 {$ifdef TEST_REGEXP}
-      NewSItem(label_find_useregexp,
+      TSItem.Create(label_find_useregexp,
 {$endif TEST_REGEXP}
       nil)))){$ifdef TEST_REGEXP}){$endif TEST_REGEXP};
     Insert(CB1);
@@ -3750,8 +3750,8 @@ begin
     R1 := R; Inc(R1.A.Y,4); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
     R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB1 := TRadioButtons.Create(R2,
-      NewSItem(label_replace_forward,
-      NewSItem(label_replace_backward,
+      TSItem.Create(label_replace_forward,
+      TSItem.Create(label_replace_backward,
       nil)));
     Insert(RB1);
     Insert(TLabel.Create(R1, label_replace_direction, RB1));
@@ -3759,8 +3759,8 @@ begin
     R1 := R; Inc(R1.A.Y,9); R1.B.Y:=R1.A.Y+1; R1.B.X:=R1.A.X+(R1.B.X-R1.A.X) div 2-1;
     R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB2 := TRadioButtons.Create(R2,
-      NewSItem(label_replace_global,
-      NewSItem(label_replace_selectedtext,
+      TSItem.Create(label_replace_global,
+      TSItem.Create(label_replace_selectedtext,
       nil)));
     Insert(RB2);
     Insert(TLabel.Create(R1, label_replace_scope, RB2));
@@ -3768,8 +3768,8 @@ begin
     R1 := R; Inc(R1.A.Y,9); R1.B.Y:=R1.A.Y+1; R1.A.X:=R1.B.X-(R1.B.X-R1.A.X) div 2+1;
     R2 := R1; R2.Move(0,1); R2.B.Y:=R2.A.Y+2;
     RB3 := TRadioButtons.Create(R2,
-      NewSItem(label_replace_fromcursor,
-      NewSItem(label_replace_entirescope,
+      TSItem.Create(label_replace_fromcursor,
+      TSItem.Create(label_replace_entirescope,
       nil)));
     Insert(RB3);
     Insert(TLabel.Create(R1, label_replace_origin, RB3));
