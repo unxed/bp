@@ -94,7 +94,7 @@ type
        procedure   FillScreen(B: byte); virtual;
        procedure   ClrEol; virtual;
        procedure   GotoXY(X,Y: integer); virtual;
-       procedure   Write(Const S: string); virtual;
+       procedure   Write(Const S: string); virtual; overload;
        procedure   WriteLn(Const S: string); virtual;
        procedure   WriteChar(C: char); virtual;
        procedure   WriteCharRaw(C: char); virtual;
@@ -193,7 +193,7 @@ type
        function    LoadFile(const FileName: string): boolean;
        procedure   Draw; override;
        destructor Destroy; override;
-       procedure   Write(Const S: string); virtual;
+       procedure   Write(Const S: string); virtual; overload;
        procedure   WriteLn(Const S: string); virtual;
        procedure   Lock; virtual;
        procedure   UnLock; virtual;
@@ -229,7 +229,7 @@ type
        function    LoadFile(const FileName: string): boolean;
        procedure   Draw; override;
        destructor Destroy; override;
-       procedure   Write(Const S: string); virtual;
+       procedure   Write(Const S: string); virtual; overload;
        procedure   WriteLn(Const S: string); virtual;
        procedure   Lock; virtual;
        procedure   UnLock; virtual;

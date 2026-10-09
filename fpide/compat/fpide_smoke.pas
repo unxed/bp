@@ -3,10 +3,10 @@
 program fpide_smoke;
 
 uses
-  Objects, Drivers, Views, App, Menus, Dialogs, MsgBox;
+  Objects, Drivers, Views, App, Menus, Dialogs, MsgBox, TvScreen;
 
 begin
-  if ScreenWidth < 0 then
+  if TScreen.ScreenWidth < 0 then
     Halt(1);
   WriteLn('fpide-smoke: shims+tv3 OK');
 end.

@@ -404,6 +404,8 @@ def section_golang(t):
     t.key('Enter')
     t.key('C-F9')
     check(t.wait_for('hi from go', 15), 'Ctrl+F9 runs it', t)
+    # the key is sent when the IDE asks for it: sent while the program still runs, it is read by the program
+    check(t.wait_for('Press any key to return to IDE', 15), 'the user screen waits for a key', t)
     t.key('Enter')
     check(t.wait_for('F9 Make', 10) and t.alive(), 'the IDE comes back after the key', t)
     # go test through Compile > Test
