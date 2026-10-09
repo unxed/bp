@@ -4,7 +4,7 @@
 # kb* exported (IDE needs them; DN map excluded them via -kb*).
 
 Objects:  TvGeom TvObjs
-Drivers:  TvSys TvEvents TvScreen TvCell TvColors TvDrawBuf TvText TvUtf8 TvCodePg TvUtil TvViews TvKeys TvFormat
+Drivers:  TvSys TvEvents TvScreen TvCell TvColors TvDrawBuf TvText TvUtf8 TvCodePg TvUtil TvViews TvKeys TvFormat +SysUtils -FormatStr
 Views:    TvGeom TvColors TvCell TvKeys TvEvents TvDrawBuf TvText TvUtil TvObjs TvViews TvWindow -TDrawBuffer +SysUtils -TCollection -PCollection -TSortedCollection -PSortedCollection -TStringCollection -PStringCollection -TItemList -PItemList
 Dialogs:  TvDialog TvInput TvCluster TvList TvHist TvValid
 Menus:    TvMenus
