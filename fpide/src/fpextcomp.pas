@@ -48,15 +48,27 @@ procedure InitHostInfo;
 var
   Name: string;
 begin
-  if (HostOS = 'linux') then Name := 'Linux'
-  else if HostOS = 'win64' then Name := 'Win64'
-  else if HostOS = 'win32' then Name := 'Win32'
-  else if HostOS = 'darwin' then Name := 'Darwin'
-  else Name := HostOS;
-  if HostCPU = 'x86_64' then Name := Name + ' for x86-64'
-  else if HostCPU = 'i386' then Name := Name + ' for i386'
-  else if HostCPU = 'aarch64' then Name := Name + ' for AArch64'
-  else Name := Name + ' for ' + HostCPU;
+  { the host is known when compiling: the choice is made by the compiler }
+{$if defined(linux)}
+  Name := 'Linux';
+{$elseif defined(win64)}
+  Name := 'Win64';
+{$elseif defined(win32)}
+  Name := 'Win32';
+{$elseif defined(darwin)}
+  Name := 'Darwin';
+{$else}
+  Name := HostOS;
+{$endif}
+{$if defined(cpux86_64)}
+  Name := Name + ' for x86-64';
+{$elseif defined(cpui386)}
+  Name := Name + ' for i386';
+{$elseif defined(cpuaarch64)}
+  Name := Name + ' for AArch64';
+{$else}
+  Name := Name + ' for ' + HostCPU;
+{$endif}
   source_info.name := Name;
   source_info.shortname := HostOS;
 {$ifdef Windows}

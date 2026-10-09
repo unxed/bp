@@ -59,6 +59,9 @@ type
       function LookUp(const S: string; AcceptMulti: boolean; var Idx: sw_integer): string; virtual;
       function StreamableName: ShortString; override;
       class function Build: TStreamable; static;
+      protected
+        function ReadItem(Ip: ipstream): Pointer; override;
+        procedure WriteItem(Item: Pointer; Os: opstream); override;
     end;
 
     TCodeTemplateListBox = class;
@@ -217,6 +220,17 @@ begin
   if Assigned(ShortCut) then DisposeStr(ShortCut); ShortCut:=nil;
   if Assigned(Text) then Text.Free; Text:=nil;
   inherited Destroy;
+end;
+
+{ the items are streamable objects }
+function TCodeTemplateCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := Ip.ReadPointer;
+end;
+
+procedure TCodeTemplateCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  Os.WritePointer(TStreamable(Item));
 end;
 
 function TCodeTemplateCollection.Compare(Key1, Key2: Pointer): sw_Integer;

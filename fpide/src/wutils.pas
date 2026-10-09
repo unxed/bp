@@ -59,9 +59,24 @@ type
   PWordArray = ^TWordArray;
   TWordArray = array[0..MaxBytes] of Word;
 
+  { A TCollection (the type of the list of a list box) whose items are not written to streams: the views
+    that own one write no list. Reading or writing an item is the error peNotRegistered. }
+  TUnstoredCollection = class(TCollection)
+  protected
+    function ReadItem(Ip: ipstream): Pointer; override;
+    procedure WriteItem(Item: Pointer; Os: opstream); override;
+  end;
+
+  { The same for a sorted list. }
+  TUnstoredSortedCollection = class(TSortedCollection)
+  protected
+    function ReadItem(Ip: ipstream): Pointer; override;
+    procedure WriteItem(Item: Pointer; Os: opstream); override;
+  end;
+
   TNoDisposeCollection = class;
   PNoDisposeCollection = TNoDisposeCollection;
-  TNoDisposeCollection = class(TCollection)
+  TNoDisposeCollection = class(TNSCollection)
     procedure FreeItem(Item: Pointer); override;
   end;
 
@@ -132,7 +147,7 @@ type
 
   TIntCollection = class;
   PIntCollection = TIntCollection;
-  TIntCollection = class(TSortedCollection)
+  TIntCollection = class(TNSSortedCollection)
     function  Compare(Key1, Key2: Pointer): Sw_Integer; override;
     procedure FreeItem(Item: Pointer); override;
     procedure Add(Item: PtrInt);
@@ -705,6 +720,28 @@ begin
   if B then BoolToStr:=TrueS else BoolToStr:=FalseS;
 end;
 
+function TUnstoredCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := nil;
+  raise EStreamableError.Create(pstream.StreamableError.peNotRegistered, StreamableName);
+end;
+
+procedure TUnstoredCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  raise EStreamableError.Create(pstream.StreamableError.peNotRegistered, StreamableName);
+end;
+
+function TUnstoredSortedCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := nil;
+  raise EStreamableError.Create(pstream.StreamableError.peNotRegistered, StreamableName);
+end;
+
+procedure TUnstoredSortedCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  raise EStreamableError.Create(pstream.StreamableError.peNotRegistered, StreamableName);
+end;
+
 procedure TNoDisposeCollection.FreeItem(Item: Pointer);
 begin
   { don't do anything here }
@@ -772,7 +809,7 @@ end;
 
 function TIntCollection.AtInt(Index: sw_integer): ptrint;
 begin
-  AtInt:=longint(At(Index));
+  AtInt:=PtrInt(At(Index));
 end;
 
 procedure TIntCollection.Add(Item: ptrint);
@@ -781,8 +818,8 @@ begin
 end;
 
 function TIntCollection.Compare(Key1, Key2: Pointer): sw_Integer;
-var K1: longint absolute Key1;
-    K2: longint absolute Key2;
+var K1: PtrInt absolute Key1;
+    K2: PtrInt absolute Key2;
     R: integer;
 begin
   if K1<K2 then R:=-1 else

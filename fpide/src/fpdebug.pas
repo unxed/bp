@@ -159,11 +159,14 @@ type
       procedure ShowAllBreakpoints;
       function StreamableName: ShortString; override;
       class function Build: TStreamable; static;
+    protected
+      function ReadItem(Ip: ipstream): Pointer; override;
+      procedure WriteItem(Item: Pointer; Os: opstream); override;
     end;
 
     TBreakpointItem = class;
   PBreakpointItem = TBreakpointItem;
-    TBreakpointItem = class(TObject)
+    TBreakpointItem = class(System.TObject)
       Breakpoint : PBreakpoint;
       constructor Create(ABreakpoint : PBreakpoint);
       function    GetText(MaxLen: Sw_integer): string; virtual;
@@ -262,6 +265,9 @@ type
       MaxW : integer;
       function StreamableName: ShortString; override;
       class function Build: TStreamable; static;
+      protected
+        function ReadItem(Ip: ipstream): Pointer; override;
+        procedure WriteItem(Item: Pointer; Os: opstream); override;
     end;
 
     TWatchesListBox = class;
@@ -271,7 +277,7 @@ type
       MaxWidth    : Sw_integer;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar); overload;
       (* procedure   AddWatch(P: PWatch); virtual; *)
-      procedure   Update(AMaxWidth : integer);
+      procedure   Update(AMaxWidth : integer); overload;
       function    GetText (Item: Sw_Integer; MaxLen: Sw_Integer): String; override;
       function    GetIndentedText(Item,Indent,MaxLen: Sw_Integer;var Modified : boolean): String; virtual;
       function    GetLocalMenu: PMenu;override;
@@ -1976,6 +1982,17 @@ end;
                         TBreakpointCollection
 ****************************************************************************}
 
+{ the items are streamable objects }
+function TBreakpointCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := Ip.ReadPointer;
+end;
+
+procedure TBreakpointCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  Os.WritePointer(TStreamable(Item));
+end;
+
 function TBreakpointCollection.At(Index: Integer): PBreakpoint;
 begin
   At := PBreakpoint(inherited At(Index));
@@ -2329,7 +2346,7 @@ end;
 procedure TBreakpointsListBox.AddBreakpoint(P: PBreakpointItem);
 var W : integer;
 begin
-  if List=nil then Items := TCollection.Create(20,20);
+  if List=nil then Items := TUnstoredCollection.Create(20,20);
   W:=length(P.GetText(255));
   if W>MaxWidth then
   begin
@@ -2537,17 +2554,13 @@ begin
   OL:=List;
   OldR:=Range;
   Range:=0;
-  Items := TCollection.Create(1,1);
+  { the breakpoints are stored on their own: the list is written as nil }
+  Items := nil;
 
   inherited Write(Os);
 
-  List.Free;
   Range:=OldR;
   Items:=OL;
-  { ^^^ nasty trick - has anyone a better idea how to avoid storing the
-    collection? Pasting here a modified version of TListBox.Store+
-    TAdvancedListBox.Store isn't a better solution, since by eventually
-    changing the obj-hierarchy you'll always have to modify this, too - BG }
 end;
 
 class function TBreakpointsListBox.Build: TStreamable;
@@ -3078,6 +3091,17 @@ destructor TWatch.Destroy;
                          TWatchesCollection
 ****************************************************************************}
 
+{ the items are streamable objects }
+function TWatchesCollection.ReadItem(Ip: ipstream): Pointer;
+begin
+  Result := Ip.ReadPointer;
+end;
+
+procedure TWatchesCollection.WriteItem(Item: Pointer; Os: opstream);
+begin
+  Os.WritePointer(TStreamable(Item));
+end;
+
       constructor TWatchesCollection.Create;
         begin
           inherited Create(10,10);
@@ -3418,14 +3442,10 @@ end;
           OL:=List;
           OldRange:=Range;
           Range:=0;
-          Items := TCollection.Create(1,1);
+          { the watches are stored on their own: the list is written as nil }
+          Items := nil;
           inherited Write(Os);
-          List.Free;
           Items:=OL;
-          { ^^^ nasty trick - has anyone a better idea how to avoid storing the
-            collection? Pasting here a modified version of TListBox.Store+
-            TAdvancedListBox.Store isn't a better solution, since by eventually
-            changing the obj-hierarchy you'll always have to modify this, too - BG }
           SetRange(OldRange);
         end;
 

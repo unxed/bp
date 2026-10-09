@@ -426,7 +426,7 @@ begin
     InTempMargin:=false;
     CharsInLine:=0; TextStyle:=0; TextColor:=0; Align:=alLeft;
     CurLinkCtx:=-1; InMonospace:=false;
-    DictSize:=H.NumLocalDict*sizeof(Dict^[0]);
+    DictSize:=H.NumLocalDict*sizeof(Word);
     GetMem(Text,H.TextSize);
     GetMem(Dict,DictSize);
     F.Read(Text^,H.TextSize);

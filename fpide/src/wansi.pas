@@ -77,7 +77,7 @@ type
 
      TConsoleObject = class;
      PConsoleObject = TConsoleObject;
-     TConsoleObject = class(TObject)
+     TConsoleObject = class(System.TObject)
        CurPos   : TPoint;
        Size     : TPoint;
        TextAttr : byte;

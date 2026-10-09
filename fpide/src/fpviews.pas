@@ -329,7 +329,7 @@ type
 
     TMessageItem = class;
     PMessageItem = TMessageItem;
-    TMessageItem = class(TObject)
+    TMessageItem = class(System.TObject)
       TClass    : longint;
       Text      : PString;
       Module    : PString;
@@ -552,8 +552,9 @@ const
         ([cmSave,cmSaveAs,cmCompile,cmHide,cmDoReload]);
       EditorCmds  : TCommandBytes =
         ([cmPrint,cmFind,cmReplace,cmSearchAgain,cmJumpLine,cmHelpTopicSearch,cmSelectAll,cmUnselect]);
+      { cmTestLang is above 255: a command set holds the commands 0..255 (the others are always enabled) }
       CompileCmds : TCommandBytes =
-        ([cmMake,cmBuild,cmRun,cmTestLang]);
+        ([cmMake,cmBuild,cmRun]);
 
       CalcClipboard   : extended = 0;
 
@@ -2260,7 +2261,7 @@ begin
       else if Editor.GetModified and (Editor.Core.GetBindingCount=1) then
         begin
           PA[1]:=@AFileName;
-          Ptrint(PA[2]):={Editor.ChangedLine}-1;
+          PA[2]:=Pointer(PtrInt({Editor.ChangedLine}-1));
           EditorDialog(edChangedOnloading,@PA);
         end;
    end;
@@ -3155,7 +3156,7 @@ end;
 procedure TMessageListBox.AddItem(P: PMessageItem);
 var W : integer;
 begin
-  if List=nil then Items := TCollection.Create(500,500);
+  if List=nil then Items := TUnstoredCollection.Create(500,500);
   W:=length(P.GetText(255));
   if W>MaxWidth then
   begin
@@ -3388,16 +3389,12 @@ var OL: PCollection;
 begin
   OL:=List; ORV:=Range;
 
-  Items := TCollection.Create(1,1); Range:=0;
+  { the messages are not stored: the list is written as nil }
+  Items := nil; Range:=0;
 
   inherited Write(Os);
 
-  List.Free;
   Items:=OL; Range:=ORV;
-  { ^^^ nasty trick - has anyone a better idea how to avoid storing the
-    collection? Pasting here a modified version of TListBox.Store+
-    TAdvancedListBox.Store isn't a better solution, since by eventually
-    changing the obj-hierarchy you'll always have to modify this, too - BG }
 end;
 
 class function TMessageListBox.Build: TStreamable;
@@ -4090,13 +4087,18 @@ end;
 function TryToOpenFileMulti(Bounds: PRect; FileName: string; CurX,CurY: sw_integer;tryexts:boolean): PSourceWindow;
 var srec:SearchRec;
     dir,name,ext : string;
+    W: PSourceWindow;
 begin
+ { the result is the window of the last file opened (nil if none) }
+ TryToOpenFileMulti:=nil;
  SplitPath(filename,dir,name,ext);
  dir:=completedir(dir);
  FindFirst(filename,anyfile,Srec);
  while (DosError=0) do
    begin
-     ITryToOpenFile(Bounds,dir+srec.name,CurX,CurY,tryexts,true,false);
+     W:=ITryToOpenFile(Bounds,dir+srec.name,CurX,CurY,tryexts,true,false);
+     if W<>nil then
+       TryToOpenFileMulti:=W;
      FindNext(srec);
    end;
   FindClose(srec);

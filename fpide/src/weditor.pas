@@ -227,7 +227,7 @@ type
       is a view of one line of it, valid until the text changes above it, so keep the number of the line instead of the object. }
     TCustomLine = class;
     PCustomLine = TCustomLine;
-    TCustomLine = class(TObject)
+    TCustomLine = class(System.TObject)
     private
       FCore: TCustomCodeEditorCore;
       FIndex: sw_integer;
@@ -258,7 +258,7 @@ type
     TCaseAction = (caToLowerCase,caToUpperCase,caToggleCase);
 
     { The text of a file that several editors show: the document, the flags of the lines, the editors that are bound to it. }
-    TCustomCodeEditorCore = class(TObject)
+    TCustomCodeEditorCore = class(System.TObject)
     private
       FDoc: TTveDoc;
       FEditors: array of PCustomCodeEditor;
@@ -3401,10 +3401,11 @@ begin
         case Event.Message.Command of
           cmASCIIChar   : InASCIIMode:=not InASCIIMode;
           cmAddChar     :
-            if Utf8Enabled and (longint(Event.Message.InfoPtr)>=128) then
-              AddCharStr(U8Encode(longint(Event.Message.InfoPtr)))
+            { InfoPtr is the code of the character }
+            if Utf8Enabled and (PtrUInt(Event.Message.InfoPtr)>=128) then
+              AddCharStr(U8Encode(longint(PtrUInt(Event.Message.InfoPtr))))
             else
-              AddChar(chr(longint(Event.Message.InfoPtr)));
+              AddChar(chr(PtrUInt(Event.Message.InfoPtr)));
           cmCharLeft    : CharLeft;
           cmCharRight   : CharRight;
           cmWordLeft    : WordLeft;
@@ -3601,7 +3602,7 @@ begin
      else
        Inherited HandleEvent(Event);
   s:=getstr(data);
-  Message(Owner,evBroadCast,cminputlinelen,pointer(length(s)));
+  Message(Owner,evBroadCast,cminputlinelen,pointer(PtrUInt(length(s))));
 end;
 
 procedure TSearchHelperDialog.HandleEvent(var Event : TEvent);
@@ -3610,7 +3611,7 @@ begin
      evBroadcast :
            case Event.Message.Command of
                    cminputlinelen : begin
-                                      if PtrInt(Event.Message.InfoPtr)=0 then
+                                      if PtrUInt(Event.Message.InfoPtr)=0 then
                                         okbutton.DisableCommands(CommandSetOf([cmok]))
                                       else
                                         okbutton.EnableCommands(CommandSetOf([cmok]));
