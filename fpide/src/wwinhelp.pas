@@ -1659,7 +1659,7 @@ begin
   OK:=(TopicFileStart<>0) and (T<>nil);
   if OK then
   begin
-    ExtractTopicOffset(T^.FileOfs,BlockNo,BlockOfs);
+    ExtractTopicOffset(T.FileOfs,BlockNo,BlockOfs);
     TopicStartPos:=-1; GotIt:=false;
     OK:=ProcessTopicBlock(BlockNo,@SearchTopicStart);
     OK:=OK and GotIt and (TopicStartPos<>-1);

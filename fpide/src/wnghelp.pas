@@ -478,19 +478,19 @@ var OK: boolean;
 begin
   LinkCount:=0;
   Lines := TUnsortedStringCollection.Create(100,100);
-  F.Seek(T^.FileOfs); OK:=F.Status=stOK;
+  F.Seek(T.FileOfs); OK:=F.Status=stOK;
   if OK then OK:=ReadRecord(R,false);
   case R.SClass of
       ng_rtContainer :
         begin
-          F.Seek(T^.FileOfs);
+          F.Seek(T.FileOfs);
           AddLine('');
           OK:=ReadContainer(@AddToTopic);
           RenderTopic(Lines,T);
         end;
       ng_rtTopic     :
         begin
-          F.Seek(T^.FileOfs);
+          F.Seek(T.FileOfs);
           AddLine('');
           OK:=ReadTopicRec(@AddTopicLine,@AddLink);
           TranslateLines(Lines);

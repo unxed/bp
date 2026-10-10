@@ -561,28 +561,28 @@ var OK: boolean;
     Title: string;
 begin
   OK:=false;
-  NumSlots:=T^.ExtDataSize div 2; { extdata is array of word }
+  NumSlots:=T.ExtDataSize div 2; { extdata is array of word }
   L := TUnsortedStringCollection.Create(100,100);
-  Title:=GetStr(T^.Param);
+  Title:=GetStr(T.Param);
   if Title<>'' then
   begin
     L.InsertStr('  '+Title+' ▄'+hscLineBreak);
     L.InsertStr(' '+CharStr('▀',length(Title)+3)+hscLineBreak);
   end;
-  if 0<T^.HelpCtx then
+  if 0<T.HelpCtx then
   begin
     L.InsertStr(hscLink+'[previous topic]'+hscLink+'  ');
-    AddLinkToTopic(T,ID,T^.HelpCtx-1);
+    AddLinkToTopic(T,ID,T.HelpCtx-1);
   end;
-  if T^.HelpCtx<Header.NumTOC then
+  if T.HelpCtx<Header.NumTOC then
   begin
     L.InsertStr(hscLink+'[next topic]'+hscLink);
-    AddLinkToTopic(T,ID,T^.HelpCtx+1);
+    AddLinkToTopic(T,ID,T.HelpCtx+1);
   end;
   L.InsertStr(hscLineBreak);
   for I:=0 to NumSlots-1 do
   begin
-    Idx:=PWordArray(T^.ExtData)^[I];
+    Idx:=PWordArray(T.ExtData)^[I];
     TopicOfs:=Slots^[Idx];
     OK:=ReadTopicRec(TopicOfs,T,L);
     if not OK then
