@@ -5,6 +5,16 @@ UTF-8 inside, a model of **classes** instead of `object`/`New`/`Dispose`, the sa
 
 The parts: the submodule `fpide/tv/` → tv3, shims, CI, acceptance tests that click through the UI.
 
+## Stable snapshot
+
+The `stable-fpide-20261015` release marks the `fpide/` snapshot in this repository. It includes the IDE sources, compatibility shims,
+the tv3 submodule pinned at `9f153cb0e4060ba57c43c3b1299963997ed923d1`, and the `tve` submodule pinned at
+`dac0a8205d7a940d3dd54b165d71b3b503ff8ca0`. The release is created only after the `ci`, `fpide`, and `fpide-accept`
+workflows pass on the exact tagged commit; those workflows build and run acceptance tests on Ubuntu 24.04 x86_64.
+
+The platform-specific configuration paths below describe intended file locations, not tested builds. This stable snapshot does not
+claim verification on BSD, macOS, Windows, DOS, OS/2, i386, or aarch64.
+
 | Directory | Purpose |
 |---|---|
 | [`fpide/src/`](src/) | the IDE sources (base: FPC `packages/ide` @ 3.2.2) |
@@ -70,4 +80,4 @@ program, else in the directory of the program; `fp.ini` is never written there.
 
 The screen must match the vanilla IDE after the same actions: **text, colour, background** (and the other screen attributes), bit
 for bit, except for the difference of encodings (vanilla CP866/OEM vs UTF-8 here). The workflow `.github/workflows/fpide-accept.yml`
-(still in progress).
+runs the click-through acceptance suite on Ubuntu 24.04 x86_64.

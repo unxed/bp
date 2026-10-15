@@ -1,10 +1,15 @@
 # Migration status: Free Vision → tv3, objects → classes
 
-Updated: 2026-10-06 (fp runs, edits UTF-8, compiles and debugs through external fpc/gdb; acceptance tests in fpide/tests/accept)
+Updated: 2026-10-15 (fp runs, edits UTF-8, compiles and debugs through external fpc/gdb; acceptance tests in fpide/tests/accept)
 
 **Owner rule:** complete transfer without breaking functionality. See `.cursor/rules/fpide-full-port.mdc`.
 
 ## Current state
+
+- **Stable snapshot:** `stable-fpide-20261015` identifies this `fpide/` snapshot after the `ci`, `fpide`, and `fpide-accept`
+  workflows pass on the tagged commit. Verified build and acceptance coverage is Ubuntu 24.04 x86_64 only; platform-specific
+  configuration paths elsewhere in the README are not platform-test evidence. The pinned submodules are tv3
+  `9f153cb0e4060ba57c43c3b1299963997ed923d1` and tve `dac0a8205d7a940d3dd54b165d71b3b503ff8ca0`.
 
 - **Build:** `tools/fpide-setup-build.sh [test]` — one command on Ubuntu (apt packages, `tv/` submodule, ~15 s build, tests). The compiler and
   the debugger are the system `fpc` and `gdb` (external programs); the FPC compiler sources are not needed (a handful of compiler units
