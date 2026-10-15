@@ -26,7 +26,7 @@ given to the step that can verify it in CI.
 | D6 | Modules that use `{$H-}` or no mode switch (56 of 64 units) are **not** flipped to `{$H+}` wholesale. They are migrated one at a time, or marked `// UNSAFE-UNIT:` with a safe facade. | Section 5. |
 | D7 | The help-viewer family, `fpusrscr.pas`, `wresourc.pas`, the Windows debugger glue and `fpredir.pas` are unsafe units; they get a marker and a facade, not a rewrite. | Section 4. |
 | D8 | Code under `{$ifdef EMBED_COMPILER}` (40 places in 8 files) is not touched until the `FPIDE_EMBED=1` build is covered by a CI job. | Section 7: no workflow builds it. |
-| D9 | The unit tests in `fpide/tests/unit` (`t_fplang.pas`, `t_fpdlv.pas`) are not run by any workflow or script. They are wired into CI before step 3 relies on them. | Section 10. |
+| D9 | The unit tests in `fpide/tests/unit` (`t_fplang.pas`, `t_fpdlv.pas`) were run by no workflow or script. They are wired into CI (job `unit` of `fpide.yml`, step 3a) before step 3 relies on them. | Section 10. |
 
 ## 2. What fpide is made of
 
@@ -183,7 +183,7 @@ state stay on the UI thread, a blocking `Read` must be replaced by polling plus 
 |---|---|---|
 | `fpide/tests/accept/test_accept.py` (35), `test_functions.py` (147), `test_menu_sweep.py`, `test_esc_sweep.py`, `test_config.py` | whole IDE through tmux: menus, editor, compile, run, debug, UTF-8 | `fpide-accept.yml` |
 | tv3 unit and pty tests | tv3 | `fpide.yml` |
-| `fpide/tests/unit/t_fplang.pas`, `t_fpdlv.pas` | the language backend, the dlv session (skips without dlv/go) | **no workflow or script runs them** (`grep t_fp` outside the files and `PLAN.md` is empty) |
+| `fpide/tests/unit/t_fplang.pas`, `t_fpdlv.pas` | the language backend, the dlv session (skips without dlv/go) | run by the job `unit` of `fpide.yml` (`fpide/tools/unit-test.sh`; step 3a) |
 | `tests/safe`, `tests/ext` | the Safe/BP layers themselves | `ci.yml` |
 
 Gaps that decide the plan: no leak test exists for any fpide module (`SafeCheckNoLeaks`, SPEC R5, needs the unit under test to use `Safe`); the unit tests
