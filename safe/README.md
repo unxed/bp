@@ -11,6 +11,7 @@ of dangerous primitives (`GetMem`, `New`, `Move`, `FillChar`, `FreeAndNil`, `Obj
 | `poison.intf.inc`, `poison.impl.inc` | poisoned primitives and the `Free` helper; included last |
 | `SPEC.md` | the specification of Better Pascal (both layers); §0 is the rules card, §13 FFI, §14 goroutines, §15–16 plan |
 | `DN-ADOPTION.md` | plan for migrating DOS Navigator (`unxed/dn`) to Safe Pascal: stages S0–S10 |
+| `FPIDE-ADOPTION.md` | compatibility inventory of `fpide/` and the decisions for migrating it to Safe Pascal and Better Pascal (`unxed/bp#3`) |
 
 The layer does not depend on `ext/` or `fpide/`. If you also need UTF-8 by default and goroutines, do not use `Safe`;
 use `BP` instead (see the [root README](../README.md)): it contains the same code.
