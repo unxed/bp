@@ -1,8 +1,12 @@
 program t_fpdlv;
 { Tests of src/fpdlv.pas: a session with the real dlv when it is installed (a breakpoint, steps, a value, the end of the program with its
-  output, the end of a session that is stopped) and the failure of a start (no such tool, a program that does not build). }
+  output, the end of a session that is stopped) and the failure of a start (no such tool, a program that does not build).
+  Every session and every object of the unit is released by its owner: the test ends with SafeCheckNoLeaks (step 4.2a of safe/FPIDE-ADOPTION.md). }
 {$mode objfpc}{$H+}
-uses SysUtils, Classes, FpDlv;
+uses SysUtils, Classes, FpDlv, Safe;
+
+type
+  TSessionBox = specialize TOwned<TDlvSession>;
 
 var
   Bad: Integer = 0;
@@ -20,13 +24,14 @@ end;
 
 function Write(const Name, Text: string): string;
 var
-  L: TStringList;
+  LBox: TStringListBox;
+  L: TStringList;                         { borrow: LBox }
 begin
   ForceDirectories(ExtractFilePath(Name));
-  L := TStringList.Create;
+  LBox := TStringListBox.Own(TStringList.Create);
+  L := LBox.Get;
   L.Text := Text;
   L.SaveToFile(Name);
-  L.Free;
   Result := Name;
 end;
 
@@ -63,27 +68,32 @@ const
     #9 + 'fmt.Println("read", sc.Text())' + LineEnding +       { 15 }
     '}' + LineEnding;
 
+{ the checks live in a procedure: the owners are its locals and are gone, with every temporary of the calls, when it returns (in the main block they would be kept until the end of the program and SafeCheckNoLeaks would see them) }
+procedure RunChecks;
 var
   Dir, Src, Dlv, V: string;
   Bp: array[0..0] of TDlvBreakpoint;
-  S: TDlvSession;
+  Box: TSessionBox;
+  S: TDlvSession;                         { borrow: Box }
   R: Boolean;
 begin
   Dir := GetTempDir + 't_fpdlv_' + IntToStr(GetProcessID) + '/';
   Src := Write(Dir + 'p.go', Prog);
 
   { a tool that is not there }
-  S := TDlvSession.Create;
+  Box := TSessionBox.Own(TDlvSession.Create);
+  S := Box.Get;
   R := S.Start('/no/such/dlv', 'debug', Src, Dir, ''); Check(not R, 'a missing dlv does not start');
   Check(S.Error <> '', 'the failure has a text');
-  S.Free;
+  Box.Reset;
 
   Dlv := FindDlv;
   if (Dlv = '') or (FileSearch('go', GetEnvironmentVariable('PATH')) = '') then
     WriteLn('(dlv or go is not installed: the checks of a real session are skipped)')
   else
   begin
-    S := TDlvSession.Create;
+    Box := TSessionBox.Own(TDlvSession.Create);
+    S := Box.Get;
     R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'dlv builds and starts the program: ' + S.Error);
     R := S.SetBreakpoints(Src, [11]); Check(R, 'a breakpoint is set: ' + S.Error);
     R := S.Go = drStopped; Check(R, 'the program runs to the breakpoint: ' + S.Error);
@@ -101,28 +111,31 @@ begin
     R := S.Proceed = drExited; Check(R, 'continue runs to the end: ' + S.Error);
     Check(S.ExitCode = 0, 'exit code 0');
     Check(Pos('sum 42', S.TakeOutput) > 0, 'the output of the program is returned');
-    S.Free;
+    Box.Reset;
 
     { a session that starts at main.main }
-    S := TDlvSession.Create;
+    Box := TSessionBox.Own(TDlvSession.Create);
+    S := Box.Get;
     R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'third start: ' + S.Error);
     Check(S.SetFunctionBreakpoint('main.main'), 'a function breakpoint is set');
     R := S.Go = drStopped; Check(R, 'the program stops in main.main: ' + S.Error);
     Check((S.StopFile = Src) and (S.StopLine = 9), 'main.main stops on its line (9): ' + IntToStr(S.StopLine));
-    S.Free;
+    Box.Reset;
 
     { a session ended while the program is stopped }
-    S := TDlvSession.Create;
+    Box := TSessionBox.Own(TDlvSession.Create);
+    S := Box.Get;
     R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'second start: ' + S.Error);
     S.SetBreakpoints(Src, [10]);
     Check((S.Go = drStopped) and (S.StopLine = 10), 'stopped on line 10');
     S.Stop;
     Check(not S.Alive, 'Stop ends the session');
-    S.Free;
+    Box.Reset;
 
     { condition, hit condition, call stack, locals, standard input }
     Src := Write(Dir + 'q.go', Prog2);
-    S := TDlvSession.Create;
+    Box := TSessionBox.Own(TDlvSession.Create);
+    S := Box.Get;
     R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'start of the loop program: ' + S.Error);
     Bp[0].Line := 11; Bp[0].Condition := 'i == 3'; Bp[0].HitCondition := '';
     Check(S.SetBreakpointsEx(Src, Bp), 'a conditional breakpoint is set: ' + S.Error);
@@ -142,26 +155,33 @@ begin
     Check(S.Proceed = drExited, 'the program ends');
     V := S.TakeOutput;
     Check(Pos('read hello', V) > 0, 'the program got its standard input: ' + V);
-    S.Free;
+    Box.Reset;
     { an ignore count: the first two hits do not stop }
-    S := TDlvSession.Create;
+    Box := TSessionBox.Own(TDlvSession.Create);
+    S := Box.Get;
     R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(R, 'start for the ignore count: ' + S.Error);
     Bp[0].Line := 11; Bp[0].Condition := ''; Bp[0].HitCondition := '> 2';
     Check(S.SetBreakpointsEx(Src, Bp), 'a breakpoint with an ignore count is set');
     Check((S.Go = drStopped) and (S.StopLine = 11), 'it stops on line 11: ' + S.Error);
     R := S.Evaluate('i', V); Check(R and (V = '2'), 'two hits were ignored: the stop is at i = 2 (' + V + ')');
-    S.Free;
+    Box.Reset;
     DeleteFile(Dir + 'q.go');
 
     { a program that does not build }
     Src := Write(Dir + 'bad.go', 'package main' + LineEnding + 'func main() { x := nope }' + LineEnding);
-    S := TDlvSession.Create;
+    Box := TSessionBox.Own(TDlvSession.Create);
+    S := Box.Get;
     R := S.Start(Dlv, 'debug', Src, Dir, ''); Check(not R, 'a program that does not build does not start');
     Check(S.Error <> '', 'the build error is reported: ' + S.Error);
-    S.Free;
+    Box.Reset;
   end;
 
   DeleteFile(Dir + 'p.go'); DeleteFile(Dir + 'bad.go'); RemoveDir(Dir);
+end;
+
+begin
+  RunChecks;
+  SafeCheckNoLeaks;
   if Bad = 0 then
     WriteLn('ALL OK (', Total, ' checks)')
   else
