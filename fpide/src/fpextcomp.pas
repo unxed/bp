@@ -21,22 +21,27 @@ procedure DefaultReplacements(var S: AnsiString);
 implementation
 
 uses
-  SysUtils, TvProc, Systems;
+  SysUtils, TvProc, Systems, Safe;
+
+type
+  TStringListBox = specialize TOwned<TStringList>;
 
 function ExternalTargets(const Exe: AnsiString): AnsiString;
 var
-  L: TStringList;
+  LBox: TStringListBox;
+  L: TStringList;                         { borrow: LBox }
   I: Integer;
 begin
   Result := '';
-  L := TStringList.Create;
+  LBox := TStringListBox.Own(TStringList.Create);
+  L := LBox.Get;
   try
     L.Text := RunCapture(Exe, ['-it']);
     for I := 0 to L.Count - 1 do
       if (Trim(L[I]) <> '') and (Pos(' ', Trim(L[I])) = 0) and (Pos(':', L[I]) = 0) then
         Result := Result + Trim(L[I]) + #10;
   finally
-    L.Free;
+    LBox.Reset;
   end;
 end;
 
