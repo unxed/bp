@@ -254,7 +254,8 @@ var
 begin
   SetLength(FNames, 0);
   for I := Low(FValues) to High(FValues) do
-    FreeAndNil(FValues[I]);
+    // UNSAFE: the list owns its values; nil-safe SysUtils destruction until this unit moves to TOwned.
+    SysUtils.FreeAndNil(FValues[I]);
   SetLength(FValues, 0);
 end;
 
@@ -312,7 +313,8 @@ end;
 
 destructor TGDBMI_AsyncOutput.Destroy;
 begin
-  FParameters.Free;
+  // UNSAFE: FParameters belongs to this object; nil-safe SysUtils destruction until this unit moves to TOwned.
+  SysUtils.FreeAndNil(FParameters);
   inherited Destroy;
 end;
 
@@ -493,7 +495,8 @@ begin
   FConsoleStream.Clear;
   ExecAsyncOutput.Clear;
   for I := Low(NotifyAsyncOutput) to High(NotifyAsyncOutput) do
-    FreeAndNil(NotifyAsyncOutput[I]);
+    // UNSAFE: NotifyAsyncOutput owns its elements; nil-safe SysUtils destruction until this unit moves to TOwned.
+    SysUtils.FreeAndNil(NotifyAsyncOutput[I]);
   SetLength(NotifyAsyncOutput, 0);
   if not FProcess.Alive then
     exit;
@@ -527,7 +530,8 @@ begin
               NotifyAsyncOutput[Length(NotifyAsyncOutput) - 1] := NAO;
               NAO := nil;
             finally
-              NAO.Free;
+              // UNSAFE: NAO is nil after a successful hand-over to NotifyAsyncOutput; nil-safe destruction otherwise.
+              SysUtils.FreeAndNil(NAO);
             end;
           end;
       end;
