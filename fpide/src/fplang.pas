@@ -4,14 +4,19 @@
   of the output, it answers with messages that the window of messages shows. Pascal is not here: its compiler keeps its own way (fpintf).
   A language is a class that is registered; the first that takes the file is the backend of the file.
 
-  Go: "go build", "go vet", "go test"; the debugger of Go is Delve (fpdlv, fpgodbg). }
+  Go: "go build", "go vet", "go test"; the debugger of Go is Delve (fpdlv, fpgodbg).
+
+  Ownership (Safe Pascal, step 3c of safe/FPIDE-ADOPTION.md): the registered backends belong to an arena that the unit owns;
+  RegisterBackend takes the ownership of its argument. BackendFor gives out a borrow that lives until ReleaseBackends
+  or the end of the program. }
 {$mode objfpc}{$H+}
+{$WARN SYMBOL_DEPRECATED ERROR}
 unit FpLang;
 
 interface
 
 uses
-  SysUtils, Classes, Process, TvPath;
+  SysUtils, Classes, Process, TvPath, Safe;
 
 type
   { what the user asked: the same four of the Compile menu and the tests }
@@ -67,7 +72,10 @@ type
     function ModuleDir(const FileName: string): string;
   end;
 
+{ takes the ownership of B: the backend lives until ReleaseBackends or the end of the program }
 procedure RegisterBackend(B: TLangBackend);
+{ frees every registered backend (the borrows given out by BackendFor become invalid); the program ends with it in the tests that check for leaks }
+procedure ReleaseBackends;
 { the backend of a file, nil for a file of Pascal (and of any language without a backend) }
 function BackendFor(const FileName: string): TLangBackend;
 { runs the formatter of the backend on the file (the file is rewritten); Output has what the formatter wrote.
@@ -76,8 +84,14 @@ function FormatFile(B: TLangBackend; const FileName: string; out Output: string)
 
 implementation
 
+type
+  TProcessBox = specialize TOwned<TProcess>;
+  TStringListBox = specialize TOwned<TStringList>;
+  TStringStreamBox = specialize TOwned<TStringStream>;
+
 var
-  Backends: TList;
+  Arena: TArena;                         { owns the backends }
+  Backends: array of TLangBackend;       { borrow: Arena }
 
 function TLangBackend.WorkDir(const FileName: string): string;
 begin
@@ -318,7 +332,14 @@ end;
 
 procedure RegisterBackend(B: TLangBackend);
 begin
-  Backends.Add(B);
+  SetLength(Backends, Length(Backends) + 1);
+  Backends[High(Backends)] := Arena.Adopt(B) as TLangBackend;
+end;
+
+procedure ReleaseBackends;
+begin
+  SetLength(Backends, 0);
+  Arena.FreeAll;
 end;
 
 function BackendFor(const FileName: string): TLangBackend;
@@ -326,16 +347,19 @@ var
   I: Integer;
 begin
   Result := nil;
-  for I := 0 to Backends.Count - 1 do
-    if TLangBackend(Backends[I]).Handles(FileName) then
-      Exit(TLangBackend(Backends[I]));
+  for I := 0 to High(Backends) do
+    if Backends[I].Handles(FileName) then
+      Exit(Backends[I]);
 end;
 
 function FormatFile(B: TLangBackend; const FileName: string; out Output: string): Boolean;
 var
-  P: TProcess;
-  Args: TStringList;
-  S: TStringStream;
+  PBox: TProcessBox;
+  ArgsBox: TStringListBox;
+  SBox: TStringStreamBox;
+  P: TProcess;                           { borrow: PBox }
+  Args: TStringList;                     { borrow: ArgsBox }
+  S: TStringStream;                      { borrow: SBox }
   Buf: array[0..4095] of Byte;
   N, I: Integer;
 begin
@@ -343,9 +367,12 @@ begin
   Result := False;
   if (B = nil) or (B.FormatTool = '') then
     Exit;
-  P := TProcess.Create(nil);
-  Args := TStringList.Create;
-  S := TStringStream.Create('');
+  PBox := TProcessBox.Own(TProcess.Create(nil));
+  ArgsBox := TStringListBox.Own(TStringList.Create);
+  SBox := TStringStreamBox.Own(TStringStream.Create(''));
+  P := PBox.Get;
+  Args := ArgsBox.Get;
+  S := SBox.Get;
   try
     P.Executable := B.FormatTool;
     B.FormatArguments(FileName, Args);
@@ -371,19 +398,15 @@ begin
     Output := Trim(S.DataString);
     Result := P.ExitStatus = 0;
   finally
-    S.Free;
-    Args.Free;
-    P.Free;
+    SBox.Reset;
+    ArgsBox.Reset;
+    PBox.Reset;
   end;
 end;
 
-var
-  I: Integer;
 initialization
-  Backends := TList.Create;
+  Arena := TArena.Create;
   RegisterBackend(TGoBackend.Create);
 finalization
-  for I := 0 to Backends.Count - 1 do
-    TLangBackend(Backends[I]).Free;
-  Backends.Free;
+  ReleaseBackends;
 end.
