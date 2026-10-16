@@ -28,7 +28,7 @@ uses
 {$ifndef NODEBUG}
   FPDebug,
 {$endif}
-  FPIntf;
+  FPIntf, Safe;
 
 {$ifdef NODEBUG}
 function GoDebugCommand(Cmd: Word): Boolean;
@@ -46,10 +46,17 @@ begin
 end;
 {$else}
 
+type
+  TDlvSessionBox = specialize TOwned<TDlvSession>;
+  TStringListBox = specialize TOwned<TStringList>;
+  TGoBackendBox = specialize TOwned<TGoBackend>;
+
 var
-  Session: TDlvSession = nil;
+  SessionBox: TDlvSessionBox;
+  Session: TDlvSession = nil;             { borrow: SessionBox }
   LastGoFile: string = '';
   { the files whose breakpoints dlv has (a file that lost its last breakpoint must be cleared) }
+  SyncedFilesBox: TStringListBox;
   SyncedFiles: TStringList = nil;
 
 function GoDebugActive: Boolean;
@@ -64,6 +71,7 @@ var
 { the lines the program wrote so far are added to the Messages window }
 procedure PumpOutput;
 var
+  LBox: TStringListBox;
   L: TStringList;
   I: Integer;
   Text: string;
@@ -84,13 +92,14 @@ begin
     Exit;
   if MessagesWindow = nil then
     Message(TProgram.Application, evCommand, cmToolsMessages, nil);
-  L := TStringList.Create;
+  LBox := TStringListBox.Own(TStringList.Create);
+  L := LBox.Get;
   try
     L.Text := Text;
     for I := 0 to L.Count - 1 do
       AddToolMessage('', L[I], 0, 0);
   finally
-    L.Free;
+    LBox.Reset;
   end;
   UpdateToolMessages;
 end;
@@ -132,7 +141,8 @@ begin
     end
     else if (Event.KeyDown.TextLength > 0) and (Ord(Event.KeyDown.Text[0]) >= 32) then
     begin
-      SetString(S, PChar(@Event.KeyDown.Text[0]), Event.KeyDown.TextLength);
+      // UNSAFE: the event buffer is borrowed and its byte length is supplied by the event.
+      SetString(S, System.PChar(@Event.KeyDown.Text[0]), Event.KeyDown.TextLength);
       StdinLine := StdinLine + S;
     end
     else
@@ -232,10 +242,11 @@ begin
   OutputPending := '';
   if Session <> nil then
   begin
-    Session.Free;
+    SessionBox.Reset;
     Session := nil;
   end;
-  FreeAndNil(SyncedFiles);
+  SyncedFilesBox.Reset;
+  SyncedFiles := nil;
   ClearDebuggerRows;
   if IDEApp <> nil then
     UpdateMenus(False);
@@ -267,16 +278,18 @@ end;
 { what dlv is given as the program: the package directory in a module, the file alone otherwise }
 function ProgramOf(const GoFile: string): string;
 var
+  GBox: TGoBackendBox;
   G: TGoBackend;
 begin
-  G := TGoBackend.Create;
+  GBox := TGoBackendBox.Own(TGoBackend.Create);
+  G := GBox.Get;
   try
     if G.ModuleDir(GoFile) <> '' then
       Result := PathDelSep(PathDir(GoFile))
     else
       Result := GoFile;
   finally
-    G.Free;
+    GBox.Reset;
   end;
 end;
 
@@ -284,6 +297,7 @@ end;
   breakpoint and its ignore count (the first N hits do not stop: dlv's hit condition "> N") go with it }
 procedure SyncBreakpoints(const ExtraFile: string; ExtraLine: LongInt);
 var
+  FilesBox: TStringListBox;
   Files: TStringList;
   Bps: array of TDlvBreakpoint;
   I, J, K: Integer;
@@ -297,7 +311,8 @@ var
   end;
 
 begin
-  Files := TStringList.Create;
+  FilesBox := TStringListBox.Own(TStringList.Create);
+  Files := FilesBox.Get;
   try
     Files.Sorted := True;
     Files.Duplicates := dupIgnore;
@@ -311,7 +326,10 @@ begin
     if ExtraFile <> '' then
       Files.Add(ExtraFile);
     if SyncedFiles = nil then
-      SyncedFiles := TStringList.Create;
+    begin
+      SyncedFilesBox := TStringListBox.Own(TStringList.Create);
+      SyncedFiles := SyncedFilesBox.Get;
+    end;
     for I := 0 to SyncedFiles.Count - 1 do
       Files.Add(SyncedFiles[I]);          { a file that has none now is cleared }
     SyncedFiles.Clear;
@@ -366,19 +384,21 @@ begin
         SyncedFiles.Add(F);
     end;
   finally
-    Files.Free;
+    FilesBox.Reset;
   end;
 end;
 
 procedure ShowOutput(const Header: string);
 var
   Out_: string;
+  LBox: TStringListBox;
   L: TStringList;
   I, First: Integer;
   S: string;
 begin
   Out_ := Session.TakeOutput;
-  L := TStringList.Create;
+  LBox := TStringListBox.Own(TStringList.Create);
+  L := LBox.Get;
   try
     L.Text := Out_;
     First := 0;
@@ -391,7 +411,7 @@ begin
       S := #3'(the program wrote nothing)'#13;
     MessageBox(Copy(#3 + Header + #13 + S, 1, 250), mfInformation or mfOKButton);
   finally
-    L.Free;
+    LBox.Reset;
   end;
 end;
 
@@ -476,7 +496,8 @@ begin
   SaveModifiedSources;
   GoDebugEnd;
   LastGoFile := GoFile;
-  Session := TDlvSession.Create;
+  SessionBox := TDlvSessionBox.Own(TDlvSession.Create);
+  Session := SessionBox.Get;
   Session.OnIdle := @GoIdle;
   ClearToolMessages;
   PushStatus('Starting Delve...');
@@ -580,7 +601,9 @@ end;
 
 finalization
 {$ifndef NODEBUG}
-  FreeAndNil(Session);
-  FreeAndNil(SyncedFiles);
+  SessionBox.Reset;
+  Session := nil;
+  SyncedFilesBox.Reset;
+  SyncedFiles := nil;
 {$endif}
 end.
