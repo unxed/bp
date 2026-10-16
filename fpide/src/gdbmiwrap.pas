@@ -47,6 +47,8 @@ type
     function AsList: TGDBMI_ListValue;
   end;
 
+  TGDBValueBox = specialize TOwned<TGDBMI_Value>;
+
   { "C string\n" }
   TGDBMI_StringValue = class(TGDBMI_Value)
     FStringValue: string;
@@ -59,12 +61,14 @@ type
   TGDBMI_TupleOrListValue = class(TGDBMI_Value)
   private
     FNames: array of string;
-    FValues: array of TGDBMI_Value;
+    { Every value in the tuple or list is owned by its box; the Values/ValueAt getters hand out borrows. }
+    FValues: array of TGDBValueBox;
     function GetValue(const AName: string): TGDBMI_Value;
   public
     destructor Destroy; override;
     procedure Clear;
-    procedure Add(AName: string; AValue: TGDBMI_Value);
+    { Takes ownership of the value held by AValue. }
+    procedure Add(AName: string; AValue: TGDBValueBox);
     function HasNames: Boolean;
     function IsEmpty: Boolean;
     property Values [const AName: string]: TGDBMI_Value read GetValue; default;
@@ -73,6 +77,8 @@ type
   (* {} or {variable=value,variable=value,variable=value} *)
   TGDBMI_TupleValue = class(TGDBMI_TupleOrListValue)
   end;
+
+  TGDBTupleBox = specialize TOwned<TGDBMI_TupleValue>;
 
   { [] or [value,value,value] or [variable=value,variable=value,variable=value] }
   TGDBMI_ListValue = class(TGDBMI_TupleOrListValue)
@@ -86,6 +92,8 @@ type
 
   TGDBMI_AsyncOutput = class
     FAsyncClass: string;
+    { FParametersOwner owns the tuple; FParameters is a borrow of the same object. }
+    FParametersOwner: TGDBTupleBox;
     FParameters: TGDBMI_TupleValue;
   public
     constructor Create;
@@ -100,11 +108,12 @@ type
     function Success: Boolean;
   end;
 
-  TGDBMI_AsyncOutput_List = array of TGDBMI_AsyncOutput;
+  TGDBAsyncOutputBox = specialize TOwned<TGDBMI_AsyncOutput>;
+  { The list owns its elements (each box owns one object). }
+  TGDBMI_AsyncOutput_List = array of TGDBAsyncOutputBox;
 
   TGDBProcessBox = specialize TOwned<TGDBProcess>;
   TGDBStringListBox = specialize TOwned<TStringList>;
-  TGDBAsyncOutputBox = specialize TOwned<TGDBMI_AsyncOutput>;
   TGDBResultRecordBox = specialize TOwned<TGDBMI_ResultRecord>;
 
   TGDBWrapper = class
@@ -139,6 +148,8 @@ type
 
 function QuoteString(S: string): string;
 function C2PascalNumberPrefix(const S: string): string;
+{ Parses an async/result record after its first character ('^done,...'; NextCharPos is 2 for a whole line). The values go to AsyncOutput.Parameters, which owns them. }
+procedure ParseAsyncOutput(const S: string; AsyncOutput: TGDBMI_AsyncOutput; var NextCharPos: LongInt);
 
 implementation
 
@@ -254,14 +265,13 @@ var
 begin
   SetLength(FNames, 0);
   for I := Low(FValues) to High(FValues) do
-    // UNSAFE: the list owns its values; nil-safe SysUtils destruction until this unit moves to TOwned.
-    SysUtils.FreeAndNil(FValues[I]);
+    FValues[I].Reset;
   SetLength(FValues, 0);
 end;
 
-procedure TGDBMI_TupleOrListValue.Add(AName: string; AValue: TGDBMI_Value);
+procedure TGDBMI_TupleOrListValue.Add(AName: string; AValue: TGDBValueBox);
 begin
-  Assert(AValue <> nil);
+  Assert(not AValue.IsEmpty);
   Assert(IsEmpty or (HasNames = (AName <> '')));
   if AName <> '' then
   begin
@@ -270,6 +280,7 @@ begin
   end;
   SetLength(FValues, Length(FValues) + 1);
   FValues[Length(FValues) - 1] := AValue;
+  AValue.Reset;
 end;
 
 function TGDBMI_TupleOrListValue.HasNames: Boolean;
@@ -289,7 +300,7 @@ begin
   for I := Low(FNames) to High(FNames) do
     if FNames[I] = AName then
     begin
-      Result := FValues[I];
+      Result := FValues[I].Get; // borrow: owned by this tuple or list
       exit;
     end;
   Result := nil;
@@ -303,18 +314,19 @@ end;
 function TGDBMI_ListValue.GetValueAt(AIndex: LongInt): TGDBMI_Value;
 begin
   Assert((AIndex >= Low(FValues)) and (AIndex <= High(FValues)));
-  Result := FValues[AIndex];
+  Result := FValues[AIndex].Get; // borrow: owned by this list
 end;
 
 constructor TGDBMI_AsyncOutput.Create;
 begin
-  FParameters := TGDBMI_TupleValue.Create;
+  FParametersOwner := TGDBTupleBox.Own(TGDBMI_TupleValue.Create);
+  FParameters := FParametersOwner.Get;
 end;
 
 destructor TGDBMI_AsyncOutput.Destroy;
 begin
-  // UNSAFE: FParameters belongs to this object; nil-safe SysUtils destruction until this unit moves to TOwned.
-  SysUtils.FreeAndNil(FParameters);
+  FParametersOwner.Reset;
+  FParameters := nil;
   inherited Destroy;
 end;
 
@@ -377,36 +389,34 @@ begin
   end;
 end;
 
-function ParseValue(const S: string; var NextCharPos: LongInt): TGDBMI_Value;
+function ParseValue(const S: string; var NextCharPos: LongInt): TGDBValueBox;
 var
   CStr: string;
-  Tuple: TGDBMI_TupleValue;
-  List: TGDBMI_ListValue;
+  Tuple: TGDBMI_TupleValue; // borrow: owned by Result
+  List: TGDBMI_ListValue;   // borrow: owned by Result
 
   Name: string;
-  Value: TGDBMI_Value;
 begin
   Assert(NextCharPos <= Length(S));
   case S[NextCharPos] of
     '"':
       begin
         CStr := ParseCString(S, NextCharPos);
-        Result := TGDBMI_StringValue.Create(CStr);
+        Result := TGDBValueBox.Own(TGDBMI_StringValue.Create(CStr));
       end;
     '{':
       begin
         Inc(NextCharPos);
         Assert(NextCharPos <= Length(S));
         Tuple := TGDBMI_TupleValue.Create;
-        Result := Tuple;
+        Result := TGDBValueBox.Own(Tuple);
         while (NextCharPos <= Length(S)) and (S[NextCharPos] <> '}') do
         begin
           Name := ParseIdentifier(S, NextCharPos);
           Assert(NextCharPos <= Length(S));
           Assert(S[NextCharPos] = '=');
           Inc(NextCharPos);
-          Value := ParseValue(S, NextCharPos);
-          Tuple.Add(Name, Value);
+          Tuple.Add(Name, ParseValue(S, NextCharPos));
           Assert(NextCharPos <= Length(S));
           Assert(S[NextCharPos] in [',', '}']);
           if S[NextCharPos] = ',' then
@@ -420,14 +430,13 @@ begin
         Inc(NextCharPos);
         Assert(NextCharPos <= Length(S));
         List := TGDBMI_ListValue.Create;
-        Result := List;
+        Result := TGDBValueBox.Own(List);
         if S[NextCharPos] in ['"', '{', '['] then
         begin
           { list of values, no names }
           while (NextCharPos <= Length(S)) and (S[NextCharPos] <> ']') do
           begin
-            Value := ParseValue(S, NextCharPos);
-            List.Add('', Value);
+            List.Add('', ParseValue(S, NextCharPos));
             Assert(NextCharPos <= Length(S));
             Assert(S[NextCharPos] in [',', ']']);
             if S[NextCharPos] = ',' then
@@ -443,8 +452,7 @@ begin
             Assert(NextCharPos <= Length(S));
             Assert(S[NextCharPos] = '=');
             Inc(NextCharPos);
-            Value := ParseValue(S, NextCharPos);
-            List.Add(Name, Value);
+            List.Add(Name, ParseValue(S, NextCharPos));
             Assert(NextCharPos <= Length(S));
             Assert(S[NextCharPos] in [',', ']']);
             if S[NextCharPos] = ',' then
@@ -462,7 +470,6 @@ end;
 procedure ParseAsyncOutput(const S: string; AsyncOutput: TGDBMI_AsyncOutput; var NextCharPos: LongInt);
 var
   Name: string;
-  Value: TGDBMI_Value;
 begin
   AsyncOutput.Clear;
   AsyncOutput.AsyncClass := ParseIdentifier(S, NextCharPos);
@@ -474,8 +481,7 @@ begin
     Assert(NextCharPos <= Length(S));
     Assert(S[NextCharPos] = '=');
     Inc(NextCharPos);
-    Value := ParseValue(S, NextCharPos);
-    AsyncOutput.Parameters.Add(Name, Value);
+    AsyncOutput.Parameters.Add(Name, ParseValue(S, NextCharPos));
   end;
 end;
 
@@ -489,14 +495,13 @@ var
   S: string;
   I: LongInt;
   NextCharPos: LongInt;
-  NAO: TGDBMI_AsyncOutput;
+  NAO: TGDBAsyncOutputBox;
 begin
   FRawResponse.Clear;
   FConsoleStream.Clear;
   ExecAsyncOutput.Clear;
   for I := Low(NotifyAsyncOutput) to High(NotifyAsyncOutput) do
-    // UNSAFE: NotifyAsyncOutput owns its elements; nil-safe SysUtils destruction until this unit moves to TOwned.
-    SysUtils.FreeAndNil(NotifyAsyncOutput[I]);
+    NotifyAsyncOutput[I].Reset;
   SetLength(NotifyAsyncOutput, 0);
   if not FProcess.Alive then
     exit;
@@ -523,16 +528,12 @@ begin
         '=':
           begin
             NextCharPos := 2;
-            NAO := TGDBMI_AsyncOutput.Create;
-            try
-              ParseAsyncOutput(S, NAO, NextCharPos);
-              SetLength(NotifyAsyncOutput, Length(NotifyAsyncOutput) + 1);
-              NotifyAsyncOutput[Length(NotifyAsyncOutput) - 1] := NAO;
-              NAO := nil;
-            finally
-              // UNSAFE: NAO is nil after a successful hand-over to NotifyAsyncOutput; nil-safe destruction otherwise.
-              SysUtils.FreeAndNil(NAO);
-            end;
+            { NAO owns the object until the hand-over; an exception in the parser releases it. }
+            NAO := TGDBAsyncOutputBox.Own(TGDBMI_AsyncOutput.Create);
+            ParseAsyncOutput(S, NAO.Get, NextCharPos);
+            SetLength(NotifyAsyncOutput, Length(NotifyAsyncOutput) + 1);
+            NotifyAsyncOutput[Length(NotifyAsyncOutput) - 1] := NAO;
+            NAO.Reset;
           end;
       end;
   until (S = '(gdb) ') or (S = '(gdb)') or not FProcess.Alive;

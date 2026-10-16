@@ -52,7 +52,20 @@ var
 implementation
 
 uses
-  fputils, GdbPty;
+  GdbPty;
+
+const
+  { Same values as ExeExt of fputils. This unit must not use fputils: it drags the views of the IDE
+    (Views, Dialogs, FPVars ...) in, and the unit test t_gdbmiwrap builds without them. }
+{$ifdef Unix}
+  GdbExeExt = '';
+{$else}
+  {$ifdef HASAMIGA}
+  GdbExeExt = '';
+  {$else}
+  GdbExeExt = '.exe';
+  {$endif}
+{$endif}
 
 var
   DebugLogEnabled: Boolean = False;
@@ -102,8 +115,8 @@ begin
   FProcessOwner := TProcessBox.Own(TProcess.Create(nil));
   FProcess := FProcessOwner.Get;
   FProcess.Options := [poUsePipes, poStdErrToOutput];
-  if (ExeExt<>'') and (pos(ExeExt,LowerCaseStr(GdbProgramName))=0) then
-    FProcess.Executable := GdbProgramName+ExeExt
+  if (GdbExeExt<>'') and (pos(GdbExeExt,LowerCase(GdbProgramName))=0) then
+    FProcess.Executable := GdbProgramName+GdbExeExt
   else
     FProcess.Executable := GdbProgramName;
   FProcess.Parameters.Add('--interpreter=mi');
