@@ -8,14 +8,20 @@
   (mode "debug" builds the program with the flags a debugger needs, "exec" runs a built one), wait for the event "initialized",
   "setBreakpoints" for each file, "configurationDone". The program then runs until a "stopped" event (a breakpoint, a step, a
   pause) or until "terminated"; "stackTrace" tells where. The program writes to the output of dlv (a pipe), which
-  the session collects. }
+  the session collects.
+
+  Ownership (Safe Pascal, step 4.2a of safe/FPIDE-ADOPTION.md): the process of dlv, the log and every JSON document that
+  a function holds or returns belong to a TOwned; nothing here is freed by hand. A JSON node that is added to a container
+  belongs to the container (the root of a document is the only thing that is owned). The only raw pointer type in the unit
+  is PChar in the three SetString calls that turn the bytes of a read into a string; each has an // UNSAFE: line. }
 {$mode objfpc}{$H+}
+{$WARN SYMBOL_DEPRECATED ERROR}
 unit FpDlv;
 
 interface
 
 uses
-  SysUtils, Classes, Process, Sockets, BaseUnix, fpjson, jsonparser, TvPath;
+  SysUtils, Classes, Process, Sockets, BaseUnix, fpjson, jsonparser, TvPath, Safe;
 
 type
   { what a command that lets the program run came back with }
@@ -39,9 +45,16 @@ type
     Line: LongInt;
   end;
 
+  TProcessBox = specialize TOwned<TProcess>;
+  TStringListBox = specialize TOwned<TStringList>;
+  TJSONBox = specialize TOwned<TJSONObject>;
+  TJSONDataBox = specialize TOwned<TJSONData>;
+
   TDlvSession = class
   private
-    FProc: TProcess;
+    FProcBox: TProcessBox;
+    FProc: TProcess;            { a borrow of FProcBox.Get; nil when there is no process }
+    FLogBox: TStringListBox;
     FSock: LongInt;
     FSeq: LongInt;
     FInBuf: AnsiString;
@@ -53,14 +66,15 @@ type
     FExitCode: LongInt;
     FOutput: AnsiString;
     FError: string;
-    FLog: TStringList;
+    FLog: TStringList;          { a borrow of FLogBox.Get }
     FFrames: array of TDlvFrame;
     FSelected: LongInt;
     procedure DrainProcess;
-    function ReadMessage(TimeoutMs: LongInt): TJSONObject;
+    function ReadMessage(TimeoutMs: LongInt): TJSONBox;
     procedure Handle(Msg: TJSONObject);
     procedure SendRaw(const Body: AnsiString);
-    function Request(const Command: string; Args: TJSONObject; out Body: TJSONObject; TimeoutMs: LongInt): Boolean;
+    { Args stays with the caller (it is copied into the message; an empty box is "no arguments"); Body is the body of the answer, empty when it has none }
+    function Request(const Command: string; const Args: TJSONBox; out Body: TJSONBox; TimeoutMs: LongInt): Boolean;
     function Wait(TimeoutMs: LongInt): TDlvResult;
     function Resume(const Command: string): TDlvResult;
     procedure ReadStop;
@@ -123,21 +137,19 @@ const
 
 function FileInPath(const Name: string): string;
 var
+  PathsBox: TStringListBox;
   Paths: TStringList;
   I: Integer;
 begin
   Result := '';
-  Paths := TStringList.Create;
-  try
-    Paths.Delimiter := PathSeparator;
-    Paths.StrictDelimiter := True;
-    Paths.DelimitedText := GetEnvironmentVariable('PATH');
-    for I := 0 to Paths.Count - 1 do
-      if (Paths[I] <> '') and FileExists(PathJoin(Paths[I], Name)) then
-        Exit(PathJoin(Paths[I], Name));
-  finally
-    Paths.Free;
-  end;
+  PathsBox := TStringListBox.Own(TStringList.Create);
+  Paths := PathsBox.Get;
+  Paths.Delimiter := PathSeparator;
+  Paths.StrictDelimiter := True;
+  Paths.DelimitedText := GetEnvironmentVariable('PATH');
+  for I := 0 to Paths.Count - 1 do
+    if (Paths[I] <> '') and FileExists(PathJoin(Paths[I], Name)) then
+      Exit(PathJoin(Paths[I], Name));
 end;
 
 function FindDlv: string;
@@ -200,13 +212,15 @@ constructor TDlvSession.Create;
 begin
   inherited Create;
   FSock := -1;
-  FLog := TStringList.Create;
+  FLogBox := TStringListBox.Own(TStringList.Create);
+  FLog := FLogBox.Get;
 end;
 
 destructor TDlvSession.Destroy;
 begin
   Stop;
-  FLog.Free;
+  FLogBox.Reset;
+  FLog := nil;
   inherited Destroy;
 end;
 
@@ -230,7 +244,8 @@ begin
     N := FProc.Output.Read(Buf, SizeOf(Buf));
     if N <= 0 then
       Break;
-    SetString(Chunk, PChar(@Buf), N);
+    // UNSAFE: Buf holds the N bytes that Read has just put there; SetString copies exactly N of them
+    SetString(Chunk, System.PChar(@Buf), N);
     FOutput := FOutput + Chunk;
   end;
 end;
@@ -258,7 +273,7 @@ begin
   end;
 end;
 
-function TDlvSession.ReadMessage(TimeoutMs: LongInt): TJSONObject;
+function TDlvSession.ReadMessage(TimeoutMs: LongInt): TJSONBox;
 var
   Deadline: QWord;
   P, Len: LongInt;
@@ -267,6 +282,7 @@ var
   N: LongInt;
   FDs: TFDSet;
   Data: TJSONData;
+  Junk: TJSONDataBox;
   Slice: LongInt;
 
   function Frame: Boolean;
@@ -298,7 +314,6 @@ var
   end;
 
 begin
-  Result := nil;
   Deadline := GetTickCount64 + QWord(TimeoutMs);
   repeat
     if Frame then
@@ -312,9 +327,11 @@ begin
       begin
         if FLog.Count < 400 then
           FLog.Add(Copy(Head, 1, 300));
-        Exit(TJSONObject(Data));
+        Exit(TJSONBox.Own(TJSONObject(Data)));
       end;
-      Data.Free;
+      { a message that is not an object is dropped }
+      Junk := TJSONDataBox.Own(Data);
+      Junk.Reset;
       Continue;
     end;
     if (FError <> '') or (FSock < 0) then
@@ -335,7 +352,8 @@ begin
         FSock := -1;
         Exit;
       end;
-      SetString(Head, PChar(@Buf), N);
+      // UNSAFE: Buf holds the N bytes that fprecv has just put there; SetString copies exactly N of them
+      SetString(Head, System.PChar(@Buf), N);
       FInBuf := FInBuf + Head;
     end
     else
@@ -382,59 +400,52 @@ begin
   ;                               { the "output" events are dlv's own words (Building ...): not the program's }
 end;
 
-function TDlvSession.Request(const Command: string; Args: TJSONObject; out Body: TJSONObject; TimeoutMs: LongInt): Boolean;
+function TDlvSession.Request(const Command: string; const Args: TJSONBox; out Body: TJSONBox; TimeoutMs: LongInt): Boolean;
 var
-  R: TJSONObject;
-  Msg: TJSONObject;
+  R: TJSONBox;
+  Msg: TJSONBox;
   Seq: LongInt;
   Deadline: QWord;
 begin
   Result := False;
-  Body := nil;
+  Body.Reset;
   Inc(FSeq);
   Seq := FSeq;
-  Msg := TJSONObject.Create;
-  try
-    Msg.Add('seq', Seq);
-    Msg.Add('type', 'request');
-    Msg.Add('command', Command);
-    if Args <> nil then
-      Msg.Add('arguments', Args)      { Msg owns Args now }
-    else
-      Msg.Add('arguments', TJSONObject.Create);
-    SendRaw(Msg.AsJSON);
-  finally
-    Msg.Free;
-  end;
+  Msg := TJSONBox.Own(TJSONObject.Create);
+  Msg.Get.Add('seq', Seq);
+  Msg.Get.Add('type', 'request');
+  Msg.Get.Add('command', Command);
+  if not Args.IsEmpty then
+    Msg.Get.Add('arguments', Args.Get.Clone)      { the copy belongs to Msg }
+  else
+    Msg.Get.Add('arguments', TJSONObject.Create);
+  SendRaw(Msg.Get.AsJSON);
+  Msg.Reset;
   Deadline := GetTickCount64 + QWord(TimeoutMs);
   repeat
     R := ReadMessage(200);
-    if R = nil then
+    if R.IsEmpty then
     begin
       if (FError <> '') or (FSock < 0) then
         Exit;
       Continue;
     end;
-    try
-      if (Str(R, 'type') = 'response') and (Num(R, 'request_seq', -1) = Seq) then
+    if (Str(R.Get, 'type') = 'response') and (Num(R.Get, 'request_seq', -1) = Seq) then
+    begin
+      if R.Get.Find('success') <> nil then
+        Result := R.Get.Booleans['success'];
+      if Result then
       begin
-        if R.Find('success') <> nil then
-          Result := R.Booleans['success'];
-        if Result then
-        begin
-          if Obj(R, 'body') <> nil then
-            Body := TJSONObject(Obj(R, 'body').Clone);
-        end
-        else if Str(Obj(Obj(R, 'body'), 'error'), 'format') <> '' then
-          Fail(Command + ': ' + Str(Obj(Obj(R, 'body'), 'error'), 'format'))     { the build output is in it }
-        else
-          Fail(Command + ': ' + Str(R, 'message'));
-        Exit;
-      end;
-      Handle(R);
-    finally
-      R.Free;
+        if Obj(R.Get, 'body') <> nil then
+          Body := TJSONBox.Own(TJSONObject(Obj(R.Get, 'body').Clone));
+      end
+      else if Str(Obj(Obj(R.Get, 'body'), 'error'), 'format') <> '' then
+        Fail(Command + ': ' + Str(Obj(Obj(R.Get, 'body'), 'error'), 'format'))     { the build output is in it }
+      else
+        Fail(Command + ': ' + Str(R.Get, 'message'));
+      Exit;
     end;
+    Handle(R.Get);
   until GetTickCount64 > Deadline;
   Fail(Command + ': no answer from dlv');
 end;
@@ -446,17 +457,19 @@ var
   Port: LongInt;
   P: LongInt;
   A: TSockAddr;
-  A1, Body: TJSONObject;
+  A1, Body: TJSONBox;
   ArgList: TJSONArray;
+  LBox: TStringListBox;
   L: TStringList;
   I: Integer;
   Buf: array[0..1023] of Byte;
   N: LongInt;
-  R: TJSONObject;
+  R: TJSONBox;
 begin
   Result := False;
   FError := '';
-  FProc := TProcess.Create(nil);
+  FProcBox := TProcessBox.Own(TProcess.Create(nil));
+  FProc := FProcBox.Get;
   FProc.Executable := Tool;
   FProc.Parameters.Add('dap');
   FProc.Parameters.Add('--listen=127.0.0.1:0');
@@ -483,7 +496,8 @@ begin
       N := FProc.Output.Read(Buf, SizeOf(Buf));
       if N > 0 then
       begin
-        SetString(Addr, PChar(@Buf), N);
+        // UNSAFE: Buf holds the N bytes that Read has just put there; SetString copies exactly N of them
+        SetString(Addr, System.PChar(@Buf), N);
         Line := Line + Addr;
         P := Pos('listening at:', Line);
         if P > 0 then
@@ -515,7 +529,7 @@ begin
     Fail('no socket');
     Exit;
   end;
-  FillChar(A, SizeOf(A), 0);
+  A := Default(TSockAddr);
   A.sin_family := AF_INET;
   A.sin_port := htons(Port);
   A.sin_addr.s_addr := htonl($7F000001);
@@ -524,47 +538,39 @@ begin
     Fail('cannot connect to dlv');
     Exit;
   end;
-  A1 := TJSONObject.Create;
-  A1.Add('clientID', 'fpide');
-  A1.Add('adapterID', 'go');
-  A1.Add('linesStartAt1', True);
-  A1.Add('columnsStartAt1', True);
-  A1.Add('pathFormat', 'path');
+  A1 := TJSONBox.Own(TJSONObject.Create);
+  A1.Get.Add('clientID', 'fpide');
+  A1.Get.Add('adapterID', 'go');
+  A1.Get.Add('linesStartAt1', True);
+  A1.Get.Add('columnsStartAt1', True);
+  A1.Get.Add('pathFormat', 'path');
   if not Request('initialize', A1, Body, ReplyTimeout) then
     Exit;
-  Body.Free;
-  A1 := TJSONObject.Create;
-  A1.Add('request', 'launch');
-  A1.Add('mode', Mode);
-  A1.Add('program', Prog);
-  A1.Add('cwd', Cwd);
-  A1.Add('stopOnEntry', False);
-  A1.Add('stackTraceDepth', MaxFrames);
+  A1 := TJSONBox.Own(TJSONObject.Create);
+  A1.Get.Add('request', 'launch');
+  A1.Get.Add('mode', Mode);
+  A1.Get.Add('program', Prog);
+  A1.Get.Add('cwd', Cwd);
+  A1.Get.Add('stopOnEntry', False);
+  A1.Get.Add('stackTraceDepth', MaxFrames);
   ArgList := TJSONArray.Create;
-  L := TStringList.Create;
-  try
-    L.Delimiter := ' ';
-    L.StrictDelimiter := False;
-    L.DelimitedText := Args;
-    for I := 0 to L.Count - 1 do
-      ArgList.Add(L[I]);
-  finally
-    L.Free;
-  end;
-  A1.Add('args', ArgList);
+  A1.Get.Add('args', ArgList);              { A1 owns the list now }
+  LBox := TStringListBox.Own(TStringList.Create);
+  L := LBox.Get;
+  L.Delimiter := ' ';
+  L.StrictDelimiter := False;
+  L.DelimitedText := Args;
+  for I := 0 to L.Count - 1 do
+    ArgList.Add(L[I]);
   { the answer to "launch" comes when the program is built; the server may send "initialized" before or after it }
   if not Request('launch', A1, Body, StartTimeout) then
     Exit;
-  Body.Free;
   Deadline := GetTickCount64 + 20000;
   while not FInitialized and (FError = '') and not FTerminated and (GetTickCount64 < Deadline) do
   begin
     R := ReadMessage(200);
-    if R <> nil then
-    begin
-      Handle(R);
-      R.Free;
-    end;
+    if not R.IsEmpty then
+      Handle(R.Get);
   end;
   if not FInitialized then
   begin
@@ -591,52 +597,52 @@ end;
 
 function TDlvSession.SetBreakpointsEx(const FileName: string; const Bps: array of TDlvBreakpoint): Boolean;
 var
-  A, Src: TJSONObject;
+  A, Resp: TJSONBox;
+  Src, B: TJSONObject;
   Arr, List: TJSONArray;
-  B, Resp: TJSONObject;
   I: Integer;
 begin
-  A := TJSONObject.Create;
+  A := TJSONBox.Own(TJSONObject.Create);
   Src := TJSONObject.Create;
+  A.Get.Add('source', Src);                 { A owns what is added to it }
   Src.Add('path', FileName);
-  A.Add('source', Src);
-  Arr := TJSONArray.Create;
   List := TJSONArray.Create;
+  A.Get.Add('breakpoints', List);
+  Arr := TJSONArray.Create;
+  A.Get.Add('lines', Arr);
   for I := Low(Bps) to High(Bps) do
   begin
     B := TJSONObject.Create;
+    List.Add(B);
     B.Add('line', Bps[I].Line);
     if Bps[I].Condition <> '' then
       B.Add('condition', Bps[I].Condition);
     if Bps[I].HitCondition <> '' then
       B.Add('hitCondition', Bps[I].HitCondition);
-    List.Add(B);
     Arr.Add(Bps[I].Line);
   end;
-  A.Add('breakpoints', List);
-  A.Add('lines', Arr);
   Result := Request('setBreakpoints', A, Resp, ReplyTimeout);
-  Resp.Free;
 end;
 
 function TDlvSession.SetFunctionBreakpoint(const Name: string): Boolean;
 var
-  A, B, Resp: TJSONObject;
+  A, Resp: TJSONBox;
+  B: TJSONObject;
   Bps: TJSONArray;
 begin
-  A := TJSONObject.Create;
+  A := TJSONBox.Own(TJSONObject.Create);
   Bps := TJSONArray.Create;
+  A.Get.Add('breakpoints', Bps);            { A owns what is added to it }
   B := TJSONObject.Create;
-  B.Add('name', Name);
   Bps.Add(B);
-  A.Add('breakpoints', Bps);
+  B.Add('name', Name);
   Result := Request('setFunctionBreakpoints', A, Resp, ReplyTimeout);
-  Resp.Free;
 end;
 
 procedure TDlvSession.ReadStop;
 var
-  A, Resp, F, S: TJSONObject;
+  A, Resp: TJSONBox;
+  F, S: TJSONObject;
   Frames: TJSONArray;
   I: Integer;
 begin
@@ -644,18 +650,18 @@ begin
   FStopLine := 0;
   SetLength(FFrames, 0);
   FSelected := 0;
-  A := TJSONObject.Create;
-  A.Add('threadId', FThread);
-  A.Add('startFrame', 0);
-  A.Add('levels', MaxFrames);
+  A := TJSONBox.Own(TJSONObject.Create);
+  A.Get.Add('threadId', FThread);
+  A.Get.Add('startFrame', 0);
+  A.Get.Add('levels', MaxFrames);
   if not Request('stackTrace', A, Resp, ReplyTimeout) then
   begin
     FError := '';                 { a program that cannot tell where it is stays stopped }
     Exit;
   end;
-  if (Resp <> nil) and (Resp.Find('stackFrames') <> nil) and (Resp.Find('stackFrames').JSONType = jtArray) then
+  if (not Resp.IsEmpty) and (Resp.Get.Find('stackFrames') <> nil) and (Resp.Get.Find('stackFrames').JSONType = jtArray) then
   begin
-    Frames := TJSONArray(Resp.Find('stackFrames'));
+    Frames := TJSONArray(Resp.Get.Find('stackFrames'));
     for I := 0 to Frames.Count - 1 do
       if Frames[I].JSONType = jtObject then
       begin
@@ -676,7 +682,6 @@ begin
       FStopLine := FFrames[0].Line;
     end;
   end;
-  Resp.Free;
 end;
 
 function TDlvSession.FrameCount: LongInt;
@@ -693,7 +698,7 @@ end;
 
 function TDlvSession.Wait(TimeoutMs: LongInt): TDlvResult;
 var
-  R: TJSONObject;
+  R: TJSONBox;
   Deadline: QWord;
 begin
   Deadline := GetTickCount64 + QWord(TimeoutMs);
@@ -701,11 +706,8 @@ begin
   while True do
   begin
     R := ReadMessage(200);
-    if R <> nil then
-    begin
-      Handle(R);
-      R.Free;
-    end;
+    if not R.IsEmpty then
+      Handle(R.Get);
     if FStopped then
     begin
       FPaused := False;
@@ -728,25 +730,23 @@ end;
 
 function TDlvSession.Go: TDlvResult;
 var
-  Body: TJSONObject;
+  NoArgs, Body: TJSONBox;
 begin
-  if not Request('configurationDone', nil, Body, ReplyTimeout) then
+  if not Request('configurationDone', NoArgs, Body, ReplyTimeout) then
     Exit(drFailed);
-  Body.Free;
   Result := Wait(RunTimeout);
 end;
 
 function TDlvSession.Resume(const Command: string): TDlvResult;
 var
-  A, Body: TJSONObject;
+  A, Body: TJSONBox;
 begin
   if (FSock < 0) or FTerminated then
     Exit(drExited);
-  A := TJSONObject.Create;
-  A.Add('threadId', FThread);
+  A := TJSONBox.Own(TJSONObject.Create);
+  A.Get.Add('threadId', FThread);
   if not Request(Command, A, Body, ReplyTimeout) then
     Exit(drFailed);
-  Body.Free;
   Result := Wait(RunTimeout);
 end;
 
@@ -781,20 +781,22 @@ end;
 
 function TDlvSession.Evaluate(const Expr: string; out Value: string): Boolean;
 var
-  A, Resp: TJSONObject;
+  A, Resp: TJSONBox;
 begin
   Result := False;
   Value := '';
   if (FSock < 0) or FTerminated then
     Exit;
-  A := TJSONObject.Create;
-  A.Add('expression', Expr);
-  A.Add('frameId', SelectedFrameId);
-  A.Add('context', 'watch');
-  Resp := nil;
+  A := TJSONBox.Own(TJSONObject.Create);
+  A.Get.Add('expression', Expr);
+  A.Get.Add('frameId', SelectedFrameId);
+  A.Get.Add('context', 'watch');
   Result := Request('evaluate', A, Resp, ReplyTimeout);
   if Result then
-    Value := Str(Resp, 'result')
+  begin
+    if not Resp.IsEmpty then
+      Value := Str(Resp.Get, 'result');
+  end
   else
   begin
     Value := FError;              { "evaluate: could not find symbol value for x": the reason is the value of a watch that has none }
@@ -802,12 +804,12 @@ begin
       Delete(Value, 1, 10);
     FError := '';
   end;
-  Resp.Free;
 end;
 
 function TDlvSession.Locals(out Text: string): Boolean;
 var
-  A, Resp, Sc, V, R2: TJSONObject;
+  A, Resp, R2: TJSONBox;
+  Sc, V: TJSONObject;
   Scopes, Vars: TJSONArray;
   I, J: Integer;
   Ref: Int64;
@@ -816,17 +818,17 @@ begin
   Text := '';
   if (FSock < 0) or FTerminated then
     Exit;
-  A := TJSONObject.Create;
-  A.Add('frameId', SelectedFrameId);
+  A := TJSONBox.Own(TJSONObject.Create);
+  A.Get.Add('frameId', SelectedFrameId);
   if not Request('scopes', A, Resp, ReplyTimeout) then
   begin
     FError := '';
     Exit;
   end;
   Result := True;
-  if (Resp <> nil) and (Resp.Find('scopes') <> nil) and (Resp.Find('scopes').JSONType = jtArray) then
+  if (not Resp.IsEmpty) and (Resp.Get.Find('scopes') <> nil) and (Resp.Get.Find('scopes').JSONType = jtArray) then
   begin
-    Scopes := TJSONArray(Resp.Find('scopes'));
+    Scopes := TJSONArray(Resp.Get.Find('scopes'));
     for I := 0 to Scopes.Count - 1 do
     begin
       if Scopes[I].JSONType <> jtObject then
@@ -837,16 +839,16 @@ begin
       Ref := Num(Sc, 'variablesReference', 0);
       if Ref = 0 then
         Continue;
-      A := TJSONObject.Create;
-      A.Add('variablesReference', Ref);
+      A := TJSONBox.Own(TJSONObject.Create);
+      A.Get.Add('variablesReference', Ref);
       if not Request('variables', A, R2, ReplyTimeout) then
       begin
         FError := '';
         Continue;
       end;
-      if (R2 <> nil) and (R2.Find('variables') <> nil) and (R2.Find('variables').JSONType = jtArray) then
+      if (not R2.IsEmpty) and (R2.Get.Find('variables') <> nil) and (R2.Get.Find('variables').JSONType = jtArray) then
       begin
-        Vars := TJSONArray(R2.Find('variables'));
+        Vars := TJSONArray(R2.Get.Find('variables'));
         for J := 0 to Vars.Count - 1 do
           if Vars[J].JSONType = jtObject then
           begin
@@ -856,10 +858,8 @@ begin
             Text := Text + Str(V, 'name') + ' = ' + Str(V, 'value');
           end;
       end;
-      R2.Free;
     end;
   end;
-  Resp.Free;
 end;
 
 procedure TDlvSession.SendInput(const S: AnsiString);
@@ -873,15 +873,14 @@ end;
 
 procedure TDlvSession.Stop;
 var
-  A, Body: TJSONObject;
+  A, Body: TJSONBox;
   I: Integer;
 begin
   if (FSock >= 0) and not FTerminated and (FError = '') then
   begin
-    A := TJSONObject.Create;
-    A.Add('terminateDebuggee', True);
+    A := TJSONBox.Own(TJSONObject.Create);
+    A.Get.Add('terminateDebuggee', True);
     Request('disconnect', A, Body, 5000);
-    Body.Free;
   end;
   if FSock >= 0 then
   begin
@@ -896,7 +895,8 @@ begin
         Sleep(20);
     if FProc.Running then
       FProc.Terminate(0);
-    FreeAndNil(FProc);
+    FProcBox.Reset;
+    FProc := nil;
   end;
   FTerminated := True;
 end;
