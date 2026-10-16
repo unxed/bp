@@ -1,7 +1,13 @@
 program t_fplang;
 { Tests of src/fplang.pas: the Go backend (the commands, the lines of the output, the module, the real tool when it is installed). }
 {$mode objfpc}{$H+}
-uses SysUtils, Classes, Process, FpLang;
+{$WARN SYMBOL_DEPRECATED ERROR}
+uses SysUtils, Classes, Process, FpLang, Safe;
+
+type
+  TProcessBox = specialize TOwned<TProcess>;
+  TStringListBox = specialize TOwned<TStringList>;
+  TStringStreamBox = specialize TOwned<TStringStream>;
 
 var
   Bad: Integer = 0;
@@ -32,13 +38,17 @@ end;
 
 function Run(const Dir, Exe: string; Args: TStrings; out Output: string): Integer;
 var
-  P: TProcess;
-  S: TStringStream;
+  PBox: TProcessBox;
+  SBox: TStringStreamBox;
+  P: TProcess;                           { borrow: PBox }
+  S: TStringStream;                      { borrow: SBox }
   Buf: array[0..4095] of Byte;
   N: Integer;
 begin
-  P := TProcess.Create(nil);
-  S := TStringStream.Create('');
+  PBox := TProcessBox.Own(TProcess.Create(nil));
+  SBox := TStringStreamBox.Own(TStringStream.Create(''));
+  P := PBox.Get;
+  S := SBox.Get;
   try
     P.Executable := Exe;
     P.Parameters.Assign(Args);
@@ -54,8 +64,8 @@ begin
     Result := P.ExitStatus;
     Output := S.DataString;
   finally
-    S.Free;
-    P.Free;
+    SBox.Reset;
+    PBox.Reset;
   end;
 end;
 
@@ -70,12 +80,14 @@ begin
   CloseFile(F);
 end;
 
+procedure RunChecks;
 var
-  B: TLangBackend;
+  B: TLangBackend;                       { borrow: the registry of FpLang }
   M: TLangMessage;
-  A: TStringList;
+  ABox, LinesBox: TStringListBox;
+  A: TStringList;                        { borrow: ABox }
   Dir, Src, Out_, Exe: string;
-  Lines: TStringList;
+  Lines: TStringList;                    { borrow: LinesBox }
   I, Found: Integer;
 begin
   B := BackendFor('/x/main.go');
@@ -102,7 +114,8 @@ begin
   ForceDirectories(Dir + 'lone');
   ForceDirectories(Dir + 'mod/sub');
   Src := Write(Dir + 'lone/main.go', 'package main'#10'func main() {}'#10);
-  A := TStringList.Create;
+  ABox := TStringListBox.Own(TStringList.Create);
+  A := ABox.Get;
   B.Arguments(lmMake, Src, '/o/main', A);
   Check(Join(A) = 'build -o /o/main main.go', 'a file alone: ' + Join(A));
   A.Clear;
@@ -130,14 +143,15 @@ begin
     Out_ := '';
     B.Arguments(lmCompile, Src, '', A);
     Check(Run(B.WorkDir(Src), 'go', A, Out_) <> 0, 'go vet fails on a bad file');
-    Lines := TStringList.Create;
+    LinesBox := TStringListBox.Own(TStringList.Create);
+    Lines := LinesBox.Get;
     Lines.Text := Out_;
     Found := 0;
     for I := 0 to Lines.Count - 1 do
       if B.ParseLine(Lines[I], M) and (M.FileName = 'bad.go') and (M.Line = 4) then
         Inc(Found);
     Check(Found >= 1, 'the real error is read: ' + Out_);
-    Lines.Free;
+    LinesBox.Reset;
     DeleteFile(Dir + 'lone/bad.go');
     A.Clear;
     Exe := Dir + 'lone/main';
@@ -148,7 +162,7 @@ begin
   end
   else
     WriteLn('(go is not installed: the checks of the real tool are skipped)');
-  A.Free;
+  ABox.Reset;
 
   { the template of a new file and the formatter }
   Check(Pos('func main()', B.NewFileText) > 0, 'a new Go file has a template with main');
@@ -157,10 +171,11 @@ begin
   begin
     Src := Write(Dir + 'lone/ugly.go', 'package main' + LineEnding + 'func  f( ){ }' + LineEnding);
     Check(FormatFile(B, Src, Out_), 'gofmt formats a file: ' + Out_);
-    Lines := TStringList.Create;
+    LinesBox := TStringListBox.Own(TStringList.Create);
+    Lines := LinesBox.Get;
     Lines.LoadFromFile(Src);
     Check(Pos('func f() {', Lines.Text) > 0, 'the file is formatted');
-    Lines.Free;
+    LinesBox.Reset;
     Src := Write(Dir + 'lone/broken.go', 'package main' + LineEnding + 'func (' + LineEnding);
     Check(not FormatFile(B, Src, Out_), 'gofmt fails on a file that does not parse');
     Check(Out_ <> '', 'the message of gofmt is returned');
@@ -170,6 +185,13 @@ begin
   DeleteFile(Dir + 'lone/main'); DeleteFile(Dir + 'lone/main.go');
   DeleteFile(Dir + 'mod/go.mod'); DeleteFile(Dir + 'mod/sub/main.go'); DeleteFile(Dir + 'mod/sub/lib.go');
   RemoveDir(Dir + 'lone'); RemoveDir(Dir + 'mod/sub'); RemoveDir(Dir + 'mod'); RemoveDir(Dir);
+end;
+
+begin
+  RunChecks;
+  { every object of the test and of the unit is released: the registry is the last owner }
+  ReleaseBackends;
+  SafeCheckNoLeaks;
   if Bad = 0 then
     WriteLn('ALL OK (', Total, ' checks)')
   else
