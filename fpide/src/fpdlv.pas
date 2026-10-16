@@ -218,14 +218,10 @@ end;
 
 destructor TDlvSession.Destroy;
 begin
-  WriteLn('DIAG destroy begin ', SafeLiveCount);
   Stop;
-  WriteLn('DIAG after Stop ', SafeLiveCount);
   FLogBox.Reset;
   FLog := nil;
-  WriteLn('DIAG after log ', SafeLiveCount);
   inherited Destroy;
-  WriteLn('DIAG after inherited ', SafeLiveCount);
 end;
 
 procedure TDlvSession.Fail(const Msg: string);
