@@ -24,7 +24,7 @@ unit gdbmiwrap;
 interface
 
 uses
-  SysUtils, Classes, GDBMIProc, GdbPty;
+  SysUtils, Classes, GDBMIProc, GdbPty, Safe;
 
 type
 {$ifdef TARGET_IS_64BIT}
@@ -102,8 +102,19 @@ type
 
   TGDBMI_AsyncOutput_List = array of TGDBMI_AsyncOutput;
 
+  TGDBProcessBox = specialize TOwned<TGDBProcess>;
+  TGDBStringListBox = specialize TOwned<TStringList>;
+  TGDBAsyncOutputBox = specialize TOwned<TGDBMI_AsyncOutput>;
+  TGDBResultRecordBox = specialize TOwned<TGDBMI_ResultRecord>;
+
   TGDBWrapper = class
   private
+    { The *Owner fields own the objects; the F* fields below are borrows of the same objects. }
+    FProcessOwner: TGDBProcessBox;
+    FRawResponseOwner: TGDBStringListBox;
+    FConsoleStreamOwner: TGDBStringListBox;
+    FExecAsyncOutputOwner: TGDBAsyncOutputBox;
+    FResultRecordOwner: TGDBResultRecordBox;
     FProcess: TGDBProcess;
     FRawResponse: TStringList;
     FConsoleStream: TStringList;
@@ -122,7 +133,7 @@ type
     property RawResponse: TStringList read FRawResponse;
     property ConsoleStream: TStringList read FConsoleStream;
     property ExecAsyncOutput: TGDBMI_AsyncOutput read FExecAsyncOutput;
-    property ResultRecord: TGDBMI_ResultRecord read FResultRecord write FResultRecord;
+    property ResultRecord: TGDBMI_ResultRecord read FResultRecord;
     property Alive: Boolean read IsAlive;
   end;
 
@@ -525,11 +536,16 @@ end;
 
 constructor TGDBWrapper.Create;
 begin
-  FRawResponse := TStringList.Create;
-  FConsoleStream := TStringList.Create;
-  FProcess := TGDBProcess.Create;
-  FExecAsyncOutput := TGDBMI_AsyncOutput.Create;
-  FResultRecord := TGDBMI_ResultRecord.Create;
+  FRawResponseOwner := TGDBStringListBox.Own(TStringList.Create);
+  FRawResponse := FRawResponseOwner.Get;
+  FConsoleStreamOwner := TGDBStringListBox.Own(TStringList.Create);
+  FConsoleStream := FConsoleStreamOwner.Get;
+  FProcessOwner := TGDBProcessBox.Own(TGDBProcess.Create);
+  FProcess := FProcessOwner.Get;
+  FExecAsyncOutputOwner := TGDBAsyncOutputBox.Own(TGDBMI_AsyncOutput.Create);
+  FExecAsyncOutput := FExecAsyncOutputOwner.Get;
+  FResultRecordOwner := TGDBResultRecordBox.Own(TGDBMI_ResultRecord.Create);
+  FResultRecord := FResultRecordOwner.Get;
   ReadResponse;
 end;
 
@@ -537,11 +553,16 @@ destructor TGDBWrapper.Destroy;
 begin
   if Alive then
     Command('-gdb-exit');
-  FProcess.Free;
-  FResultRecord.Free;
-  FExecAsyncOutput.Free;
-  FConsoleStream.Free;
-  FRawResponse.Free;
+  FProcessOwner.Reset;
+  FProcess := nil;
+  FResultRecordOwner.Reset;
+  FResultRecord := nil;
+  FExecAsyncOutputOwner.Reset;
+  FExecAsyncOutput := nil;
+  FConsoleStreamOwner.Reset;
+  FConsoleStream := nil;
+  FRawResponseOwner.Reset;
+  FRawResponse := nil;
 end;
 
 procedure TGDBWrapper.Command(S: string);
