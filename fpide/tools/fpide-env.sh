@@ -33,6 +33,8 @@ FPIDE_OPTS="-Mobjfpc -Sh- -Se1 -Sg"
 FPIDE_OPTS="$FPIDE_OPTS -dNOCATCH -dBrowserCol -dGDB -d$FPIDE_CPU"
 FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_GEN -Fu$here/tv/src -Fu$here/tve/src -Fu$FPIDE_COMPAT"
 FPIDE_OPTS="$FPIDE_OPTS -Fu$FPIDE_STAGE -Fu$FPIDE_STAGE/compiler"
+# unit Safe (safe/safe.pas) is only supplied here; no unit of fpide uses it yet (safe/FPIDE-ADOPTION.md, step 3b).
+FPIDE_OPTS="$FPIDE_OPTS -Fu$here/../safe"
 FPIDE_OPTS="$FPIDE_OPTS -Fi$here/tve/src -Fi$here/tv/src -Fi$FPIDE_GEN -Fi$FPIDE_STAGE -Fi$FPIDE_COMPAT -Fi$here/compat/shims"
 if [ "$FPIDE_EMBED" != 0 ]; then
     FPIDE_OPTS="$FPIDE_OPTS -dEMBED_COMPILER"
