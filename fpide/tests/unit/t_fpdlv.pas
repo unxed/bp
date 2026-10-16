@@ -76,16 +76,22 @@ var
   R: Boolean;
 begin
   Dir := GetTempDir + 't_fpdlv_' + IntToStr(GetProcessID) + '/';
+  WriteLn('live 0: ', SafeLiveCount);
   Src := Write(Dir + 'p.go', Prog);
+  WriteLn('live after Write: ', SafeLiveCount);
 
   { a tool that is not there }
   Box := TSessionBox.Own(TDlvSession.Create);
   S := Box.Get;
+  WriteLn('live with session: ', SafeLiveCount);
   R := S.Start('/no/such/dlv', 'debug', Src, Dir, ''); Check(not R, 'a missing dlv does not start');
   Check(S.Error <> '', 'the failure has a text');
+  WriteLn('live before Reset: ', SafeLiveCount);
   Box.Reset;
+  WriteLn('live after Reset: ', SafeLiveCount);
 
   Dlv := FindDlv;
+  WriteLn('live after FindDlv: ', SafeLiveCount);
   if (Dlv = '') or (FileSearch('go', GetEnvironmentVariable('PATH')) = '') then
     WriteLn('(dlv or go is not installed: the checks of a real session are skipped)')
   else
