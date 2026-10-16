@@ -97,8 +97,17 @@ The `{$H-}` units hold the 186 `ShortString` uses and the 255-byte limits that
 is a product change, not a safety change (SPEC §0, rule S9, requires `ShortString` to stay behind an unsafe boundary). So:
 
 - a `{$H-}` unit is migrated only after its own decision (flip it with its tests, or mark it `// UNSAFE-UNIT:`);
-- `uses ..., Safe` in a `{$H-}` unit is **unverified**: the API of `Safe` is compiled in `{$H+}`, so `String` parameters should
-  accept a `ShortString` through an implicit conversion; step 3 shows it on one `{$H-}` unit in CI before step 4 relies on it.
+- `uses ..., Safe` in a `{$H-}` unit works (step 3d, 16-10-2026, probe `unxed/bp` branch `tmp/19d3/bp3d-probe`, `fpide.yml` run 38835162206 on `2caff04`):
+  `Safe` was added last to `wconsole.pas` (`{$H-}` through `-Sh-`, no views), and a `{$H-}` test program used the API. The compiler accepted
+  every use, without options:
+  - a `ShortString` passed to a `const String` parameter of `Safe` (`SafeFail`) and the `ESafety.Message` assigned back to a `ShortString`;
+  - `specialize TOwned<TStringList>` with `Own`, `Get`, `Reset`, `IsEmpty`, and `SafeCheckNoLeaks` passing;
+  - a `ShortString` passed into `TStringList.Add` and read back.
+  The poisoned names still stop the module: `GetMem(P, 10)` gives the `SAFE-S1` deprecation warning and then a syntax error, and `O.Free`
+  gives `Wrong number of parameters specified for call to "Free"` (the S3 helper). So `Safe` does not need `{$H+}` in the unit that uses it.
+  Two things to remember: `String` inside the unit stays a `ShortString` (255 bytes), so a value that came from `Safe` or `Classes` is cut at 255;
+  and in a program, `SafeCheckNoLeaks` must run after the code that owns objects has returned (put that code in a procedure): temporaries of
+  the main block live to its end and the check reports them as alive.
 
 ## 6. Which layer, and how it is supplied
 
