@@ -23,11 +23,14 @@ unit GDBMIProc;
 interface
 
 uses
-  SysUtils, Classes, Process;
+  SysUtils, Classes, Process, Safe;
 
 type
+  TProcessBox = specialize TOwned<TProcess>;
+
   TGDBProcess = class
   private
+    FProcessOwner: TProcessBox;
     FProcess: TProcess;
     FDebugLog: TextFile;
 
@@ -96,7 +99,8 @@ begin
     Rewrite(FDebugLog);
     CloseFile(FDebugLog);
   end;
-  FProcess := TProcess.Create(nil);
+  FProcessOwner := TProcessBox.Own(TProcess.Create(nil));
+  FProcess := FProcessOwner.Get;
   FProcess.Options := [poUsePipes, poStdErrToOutput];
   if (ExeExt<>'') and (pos(ExeExt,LowerCaseStr(GdbProgramName))=0) then
     FProcess.Executable := GdbProgramName+ExeExt
@@ -109,14 +113,16 @@ begin
     on e: Exception do
     begin
       DebugErrorLn('Could not start GDB: ' + e.Message);
-      FreeAndNil(FProcess);
+      FProcessOwner.Reset;
+      FProcess := nil;
     end;
   end;
 end;
 
 destructor TGDBProcess.Destroy;
 begin
-  FProcess.Free;
+  FProcessOwner.Reset;
+  FProcess := nil;
   inherited Destroy;
 end;
 
