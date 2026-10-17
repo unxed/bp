@@ -15,6 +15,8 @@
 {$i globdir.inc}
 unit FPUsrScr;
 
+// UNSAFE-UNIT: User-screen video/graph buffers use raw pointers and manual memory operations.
+
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
