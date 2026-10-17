@@ -37,7 +37,8 @@ begin
     if not SameText(S.GetName, Name) then
       Continue;
     for J := 0 to S.GetReferenceCount - 1 do
-      if SameText(S.GetReference(J).GetFileName, SourceFile) and
+      if SameText(ExtractFileName(S.GetReference(J).GetFileName),
+         ExtractFileName(SourceFile)) and
          (S.GetReference(J).Position.Y = SourceLine) then
         Exit(True);
   end;
