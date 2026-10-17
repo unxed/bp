@@ -14,6 +14,8 @@
  **********************************************************************}
 unit WResourc;
 
+// UNSAFE-UNIT: resource file objects use raw buffers and manual allocation; keep this format-layer unit behind an explicit unsafe marker.
+
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}

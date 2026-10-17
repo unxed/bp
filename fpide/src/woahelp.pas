@@ -15,6 +15,8 @@
 {$R-}
 unit WOAHelp;
 
+// UNSAFE-UNIT: the help format reader uses raw pointer buffers and manual allocation; keep this format-layer unit behind an explicit unsafe marker.
+
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
