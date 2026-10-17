@@ -9,6 +9,7 @@ cd "$here"
 out=${FPIDE_UNIT_OUT:-$here/out/unit}
 mkdir -p "$out"
 . "$here/tools/fpide-env.sh"
+fpide_gen_shims
 
 if [ $# -gt 0 ]; then
     tests=$*
