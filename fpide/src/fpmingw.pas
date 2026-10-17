@@ -1,4 +1,6 @@
 unit fpmingw;
+
+// UNSAFE-UNIT: MinGW runtime glue with external C variables and procedures; Windows only, not verified in CI; an OS boundary kept behind an explicit unsafe marker.
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 {
     This file is part of the Free Pascal Integrated Development Environment

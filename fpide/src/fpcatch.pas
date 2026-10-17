@@ -13,6 +13,8 @@
 
  **********************************************************************}
 Unit fpcatch;
+
+// UNSAFE-UNIT: installs process signal handlers (SIGSEGV, SIGINT, SIGFPE, SIGILL) and unwinds with long jumps; an OS boundary kept behind an explicit unsafe marker.
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 interface
 

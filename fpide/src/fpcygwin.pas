@@ -1,4 +1,6 @@
 unit fpcygwin;
+
+// UNSAFE-UNIT: Cygwin path conversion with GetMem/FreeMem buffers and Windows API calls; Windows only, not verified in CI; an OS boundary kept behind an explicit unsafe marker.
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface
