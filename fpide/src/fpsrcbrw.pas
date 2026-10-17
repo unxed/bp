@@ -75,7 +75,20 @@ begin
       parser.ParseMain(Result);
     except
       on E: Exception do
-        Result := nil;          { a source the parser does not follow: it just has no symbols }
+      begin
+        { a source the parser does not follow: it just has no symbols; the parser
+          keeps the half-built module it already returned through Result, so the
+          caller's reference is dropped here. Sources being edited are often
+          broken, so a failing release must not take the IDE down: it only
+          leaves the partial tree behind, as before }
+        if Result <> nil then
+          try
+            Result.Release{$IFDEF CheckPasTreeRefCount}('CreateElement'){$ENDIF};
+          except
+            on EPasTree do ;
+          end;
+        Result := nil;
+      end;
     end;
   finally
     parser.Free;
