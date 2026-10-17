@@ -15,6 +15,7 @@
 unit FPTemplt;
 
 
+// UNSAFE-UNIT: legacy PTemplate records use New/Dispose/FillChar and pointer strings; retain the {$H-} layout.
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
 {$modeswitch autoderef}
