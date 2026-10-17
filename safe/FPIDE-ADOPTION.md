@@ -218,3 +218,21 @@ D8-job. (before any change to an `EMBED_COMPILER` place) a manual job for `FPIDE
 5b. Only if still needed: the task + channel form; first decide D3.
 6.  The remaining process I/O in small PRs: gdb, format tool, dlv `Stop`, in that order, keeping the synchronous path for DOS.
 7.  The final gate as in the issue: `ci`, `fpide`, `fpide-accept` on the final SHA, the pinned tv3/tve unchanged, and a list of supported targets and of the unsafe boundaries.
+
+## 12. Step 4.4: decisions for the `{$H-}` units with ownership calls but no unit test
+
+Recorded 17-10-2026 on `main` at `5098b62`, by reading the sources (line-level grep, nothing was compiled for this step). Rule from section 5:
+a `{$H-}` unit is migrated only after its own decision. All four units below are `{$mode objfpc}{$H-}` (`fpevalw` line 17, `fptemplt` line 18,
+`fpkeys` line 19; `fpcalc` has no `{$H}` line and so takes `-Sh-` from `fpide-env.sh`). The decision for all four is the same for this step:
+**stay `{$H-}`, do not add `Safe`, and get a `// UNSAFE-UNIT:` marker in step 4.5.** No source file is changed by 4.4.
+
+| unit | evidence (line numbers in `fpide/src/`) | decision and reason |
+| --- | --- | --- |
+| `fptemplt` | raw record `PTemplate` made with `New` and `FillChar` (75-76) and released with `Dispose` (90); a unit-global `Templates: PTemplateCollection` (70) torn down by `Templates.Free` (297); names are `Name^` pointer strings (110-125) | unsafe unit: `New`/`Dispose`/`FillChar` on a record are poisoned by `Safe` (S1), and flipping the name type changes the record layout, which section 5 calls a product change |
+| `fpevalw` | one owned field `watch`, released with `watch.Free` at 87 (before replacing it) and at 108 (in `Destroy`); the owner is a dialog view | do not flip yet: a `TOwned` owner inside a view needs a view test, and there is none (section 10); revisit with 4.6 (borrow markers in the view units). Observation, not verified as a defect: `Tevaluate_dialog.Destroy` (104) does not call `inherited` |
+| `fpkeys` | `FillChar(E,SizeOf(E),#0)` on a record at 224; no `.Free`/`New`/`Dispose` found | unsafe unit because of the `FillChar` (S1); replacing it by a record initialiser is a separate change with its own test |
+| `fpcalc` | no `.Free`, `FreeAndNil`, `New`, `Dispose`, `GetMem` or `FillChar` found; `PString(...)^` read at 141-142 for the cross-view message | nothing to flip for ownership; `Safe` would add nothing, so mark it unsafe-by-pointer (S-pointer use) in 4.5 rather than change it |
+
+Ready when: every one of the four units has a decision with line evidence (above), the decisions are consistent with section 5, and `ci`
+is green on the PR SHA (documentation only; the grep results are reproducible with
+`grep -nE '\.Free\b|FreeAndNil\(|\b(New|Dispose|GetMem|FreeMem|Move|FillChar)\(' fpide/src/<unit>.pas`).
