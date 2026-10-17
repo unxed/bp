@@ -16,6 +16,7 @@
 unit WWinHelp;
 
 
+// UNSAFE-UNIT: WinHelp decoding uses raw pointer buffers and manual allocation; keep this OS-boundary unit behind an explicit unsafe marker.
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
 {$modeswitch autoderef}
