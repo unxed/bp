@@ -15,6 +15,7 @@
 {$R-}
 unit WHelp;
 
+// UNSAFE-UNIT: help topics use raw buffers, packed records, and pointer-backed data.
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
