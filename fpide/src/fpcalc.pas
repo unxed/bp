@@ -14,6 +14,7 @@
  **********************************************************************}
 {$I globdir.inc}
 unit FPCalc;
+// UNSAFE-UNIT: reads a cross-view PString; Safe adds no ownership protection for this borrowed pointer.
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 
 interface

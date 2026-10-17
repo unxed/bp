@@ -14,6 +14,7 @@
 unit fpevalw;
 
 
+// UNSAFE-UNIT: the dialog owns `watch`; migrating that view field needs a lifecycle test (step 4.6).
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
 {$modeswitch autoderef}

@@ -16,6 +16,7 @@
 unit fpkeys;
 
 
+// UNSAFE-UNIT: legacy record initialization uses FillChar; replacing it needs a separate regression test.
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
 {$modeswitch autoderef}
