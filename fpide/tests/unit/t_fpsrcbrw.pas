@@ -1,6 +1,6 @@
 program t_fpsrcbrw;
 {$mode objfpc}{$H+}
-uses SysUtils, BrowCol, FPSrcBrw;
+uses SysUtils, BrowCol, FPSrcBrw, PasTree;
 
 procedure Check(OK: Boolean; const What: string);
 begin
@@ -9,6 +9,26 @@ begin
     WriteLn('FAIL ', What);
     Halt(1);
   end;
+end;
+
+procedure CheckNoPasTreeElements(const What: string);
+{$ifdef CheckPasTreeRefCount}
+var
+  E: TPasElement;
+{$endif}
+begin
+  {$ifdef CheckPasTreeRefCount}
+  E := TPasElement.FirstRefEl;
+  while E <> nil do
+  begin
+    WriteLn('LIVE PasTree element: ', E.ClassName, ' ', E.Name,
+      ' RefCount=', E.RefCount, ' RefIds=', E.RefIds.Text);
+    E := E.NextRefEl;
+  end;
+  Check(TPasElement.FirstRefEl = nil, What);
+  {$else}
+  Check(True, What);
+  {$endif}
 end;
 
 function HasModule(const Name: string): Boolean;
@@ -73,11 +93,14 @@ end;
 var
   MainFile: string;
   FixtureFile: string;
+  InvalidFile: string;
 begin
   MainFile := ExpandFileName('tests/unit/fixtures/browser_main.pas');
   FixtureFile := ExpandFileName('tests/unit/fixtures/browser_fixture.pas');
+  InvalidFile := ExpandFileName('tests/unit/fixtures/browser_invalid.pas');
   Check(FileExists(MainFile), 'the source-browser fixture exists');
   Check(FileExists(FixtureFile), 'the adjacent-unit fixture exists');
+  Check(FileExists(InvalidFile), 'the invalid source fixture exists');
   Check(BuildSourceBrowser(MainFile), 'the source browser builds after parser teardown');
   Check(Modules <> nil, 'the module collection exists');
   Check(Modules.Count = 2, 'the program and its adjacent unit are present');
@@ -85,6 +108,9 @@ begin
   Check(HasModule('browser_fixture'), 'the used unit survives parser teardown');
   Check(HasProcedure(FindModule('browser_fixture'), 'KeepAlive', FixtureFile, 6),
     'the copied procedure and source reference survive parser teardown');
+  CheckNoPasTreeElements('successful parsing releases every tracked parser element');
   DisposeBrowserCol;
+  Check(not BuildSourceBrowser(InvalidFile), 'invalid source is rejected');
+  CheckNoPasTreeElements('failed parsing releases every tracked parser element');
   WriteLn('PASS source-browser module lifetime');
 end.
