@@ -34,7 +34,7 @@ begin
   for I := 0 to Module.Items.Count - 1 do
   begin
     S := Module.Items.At(I);
-    if (S.Typ <> procsym) or not SameText(S.GetName, Name) then
+    if not SameText(S.GetName, Name) then
       Continue;
     for J := 0 to S.GetReferenceCount - 1 do
       if SameText(S.GetReference(J).GetFileName, SourceFile) and
