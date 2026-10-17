@@ -201,8 +201,8 @@ type
     TSourceWindow = class;
     PSourceWindow = TSourceWindow;
     TSourceWindow = class(TFPWindow)
-      Editor    : PSourceEditor;
-      Indicator : PIndicator;
+      Editor    : PSourceEditor; // borrow: tv3 group
+      Indicator : PIndicator; // borrow: tv3 group
       NoNameCount : longint;
       constructor Create(var Bounds: TRect; AFileName: string); overload;
       function    GetTitle(MaxSize: sw_Integer): TTitleStr; override;
@@ -242,8 +242,8 @@ type
     TGDBWindow = class;
     PGDBWindow = TGDBWindow;
     TGDBWindow = class(TFPWindow)
-      Editor    : PGDBSourceEditor;
-      Indicator : PIndicator;
+      Editor    : PGDBSourceEditor; // borrow: tv3 group
+      Indicator : PIndicator; // borrow: tv3 group
       constructor Create(var Bounds: TRect); overload;
       procedure   HandleEvent(var Event: TEvent); override;
       procedure   WriteText(Buf : pchar;IsError : boolean);
