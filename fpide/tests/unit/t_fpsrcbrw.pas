@@ -37,10 +37,15 @@ begin
     if not SameText(S.GetName, Name) then
       Continue;
     for J := 0 to S.GetReferenceCount - 1 do
+    begin
       if SameText(ExtractFileName(S.GetReference(J).GetFileName),
          ExtractFileName(SourceFile)) and
          (S.GetReference(J).Position.Y = SourceLine) then
         Exit(True);
+      WriteLn('reference mismatch: file=', S.GetReference(J).GetFileName,
+        ' line=', S.GetReference(J).Position.Y, ' expected file=', SourceFile,
+        ' line=', SourceLine);
+    end;
   end;
 end;
 
