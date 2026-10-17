@@ -74,6 +74,26 @@ jobs:
       - name: fpide unit tests
         run: fpide/tools/unit-test.sh
 
+  pastree-refcount:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-fcl python3 git
+      - name: FPC 3.2.2 source with reference tracking
+        run: |
+          git clone --depth 1 --branch release_3_2_2 https://github.com/fpc/FPCSource.git "$RUNNER_TEMP/fpc-source"
+          test "$(git -C "$RUNNER_TEMP/fpc-source" rev-parse HEAD)" = 0d122c49534b480be9284c21bd60b53d99904346
+      - name: Check source-browser reference balance
+        run: |
+          test "$(fpc -iV)" = 3.2.2
+          FPIDE_OBJ="$RUNNER_TEMP/pastree-refcount/obj" \
+          FPIDE_UNIT_OUT="$RUNNER_TEMP/pastree-refcount/bin" \
+          FPIDE_EXTRA="-B -dCheckPasTreeRefCount -Fu$RUNNER_TEMP/fpc-source/packages/fcl-passrc/src" \
+            fpide/tools/unit-test.sh t_fpsrcbrw
+
   # Smoke link of the shims on tv3 (beside the tests); the full IDE build is in fpide-accept.yml.
   preflight:
     runs-on: ubuntu-24.04
