@@ -12,6 +12,7 @@
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
  **********************************************************************}
+// UNSAFE-UNIT: Windows debugger helpers use raw API buffers and manual allocation; keep this OS-boundary unit behind an explicit unsafe marker.
 Unit windebug;
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 
