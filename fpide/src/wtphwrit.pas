@@ -14,6 +14,8 @@
  **********************************************************************}
 unit WTPHWriter;
 
+// UNSAFE-UNIT: the help file writer fills raw buffers with GetMem/Move/FillChar; keep this format-layer unit behind an explicit unsafe marker.
+
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}

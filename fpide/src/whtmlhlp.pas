@@ -12,6 +12,8 @@
  **********************************************************************}
 unit WHTMLHlp;
 
+// UNSAFE-UNIT: HTML help support uses raw buffers and manual allocation; keep this format-layer unit behind an explicit unsafe marker.
+
 
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
