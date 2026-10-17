@@ -15,6 +15,8 @@
 
  **********************************************************************}
 Unit FpRedir;
+
+// UNSAFE-UNIT: process redirection through Dos.Exec and SwapVectors with hand-managed New/Dispose of the redirected file records; an OS boundary kept behind an explicit unsafe marker.
 {$modeswitch nestedprocvars}{$modeswitch autoderef}
 Interface
 

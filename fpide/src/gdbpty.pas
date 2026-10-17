@@ -6,6 +6,8 @@
   unit), and while it runs the IDE copies its output to the real terminal and the keys back, like script(1) does. }
 unit GdbPty;
 
+// UNSAFE-UNIT: pty relay over four libc imports (posix_openpt, grantpt, unlockpt, ptsname) and PChar results; an OS boundary kept behind an explicit unsafe marker.
+
 {$mode objfpc}{$H+}
 
 interface
