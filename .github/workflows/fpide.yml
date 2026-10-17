@@ -6,6 +6,7 @@ name: fpide
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - fpide/**
       - fpide/tv/**
@@ -24,6 +25,17 @@ on:
     paths:
       - fpide/**
       - fpide/tv/**
+      - fpide/tools/build-fpide.sh
+      - fpide/tools/tv-test.sh
+      - fpide/tools/tv-pty-test.sh
+      - fpide/tools/unit-test.sh
+      - fpide/tools/fpide-env.sh
+      - fpide/tools/need-tv.sh
+      - fpide/tools/gen-shim.py
+      - fpide/tools/check-fpide-layout.sh
+      - fpide/tools/fpide-preflight.sh
+      - .github/workflows/fpide.yml
+      - .gitmodules
 
 concurrency:
   group: fpide-${{ github.ref }}
