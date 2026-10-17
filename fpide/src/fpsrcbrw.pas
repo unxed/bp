@@ -413,7 +413,7 @@ begin
       DisposeBrowserCol;         { nothing readable: no browser info, as before }
   finally
     for i := 0 to modules_.Count - 1 do
-      TPasModule(modules_[i]).Release;
+      TPasModule(modules_[i]).Release{$IFDEF CheckPasTreeRefCount}('CreateElement'){$ENDIF};
     modules_.Free;
     uses_.Free;
     done.Free;
