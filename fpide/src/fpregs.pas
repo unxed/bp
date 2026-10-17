@@ -14,6 +14,8 @@
  **********************************************************************}
 unit FPRegs;
 
+// UNSAFE-UNIT: register debug views clear raw register buffers, walk pointer-backed text and stream-restore owned windows by hand; keep this unit behind an explicit unsafe marker.
+
 {$mode objfpc}{$H-}
 {$modeswitch nestedprocvars}
 {$modeswitch autoderef}
