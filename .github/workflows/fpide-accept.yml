@@ -9,6 +9,16 @@ name: fpide-accept
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      - fpide/**
+      - fpide/tv/**
+      - fpide/tools/fpide-*.sh
+      - fpide/tools/fpide-*.py
+      - fpide/tools/build-fpide.sh
+      - tools/ci-par.sh
+      - .github/workflows/fpide-accept.yml
+  pull_request:
     paths:
       - fpide/**
       - fpide/tv/**
