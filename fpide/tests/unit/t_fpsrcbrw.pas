@@ -26,7 +26,18 @@ end;
 function HasProcedure(Module: PModuleSymbol; const Name, SourceFile: string; SourceLine: Integer): Boolean;
 var
   I, J: Integer;
-  S: PSymbol;
+  S, Member: PSymbol;
+  function HasSourceReference(Symbol: PSymbol): Boolean;
+  var
+    R: Integer;
+  begin
+    Result := False;
+    for R := 0 to Symbol.GetReferenceCount - 1 do
+      if SameText(ExtractFileName(Symbol.GetReference(R).GetFileName),
+         ExtractFileName(SourceFile)) and
+         (Symbol.GetReference(R).Position.Y = SourceLine) then
+        Exit(True);
+  end;
 begin
   Result := False;
   if (Module = nil) or (Module.Items = nil) then
@@ -34,17 +45,15 @@ begin
   for I := 0 to Module.Items.Count - 1 do
   begin
     S := Module.Items.At(I);
-    if not SameText(S.GetName, Name) then
+    if SameText(S.GetName, Name) and HasSourceReference(S) then
+      Exit(True);
+    if S.Items = nil then
       Continue;
-    for J := 0 to S.GetReferenceCount - 1 do
+    for J := 0 to S.Items.Count - 1 do
     begin
-      if SameText(ExtractFileName(S.GetReference(J).GetFileName),
-         ExtractFileName(SourceFile)) and
-         (S.GetReference(J).Position.Y = SourceLine) then
+      Member := S.Items.At(J);
+      if SameText(Member.GetName, Name) and HasSourceReference(Member) then
         Exit(True);
-      WriteLn('reference mismatch: file=', S.GetReference(J).GetFileName,
-        ' line=', S.GetReference(J).Position.Y, ' expected file=', SourceFile,
-        ' line=', SourceLine);
     end;
   end;
 end;
