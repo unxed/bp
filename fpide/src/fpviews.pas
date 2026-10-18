@@ -442,8 +442,8 @@ PTabItem = ^TTabItem;
       procedure   ToggleInfo;
       procedure   HandleEvent(var Event: TEvent); override;
     private
-      Scroller: PTextScroller;
-      TitleST : PStaticText;
+      Scroller: PTextScroller; // borrow: tv3 group
+      TitleST : PStaticText; // borrow: tv3 group
     end;
 
     TFPASCIIChart = class;
