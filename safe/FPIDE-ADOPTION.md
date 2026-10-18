@@ -216,6 +216,8 @@ Each item is one PR from current `main`; the required `ci`, `fpide`, `fpide-acce
     Done: `python3 fpide/tools/fpide-census.py` prints the columns of section 2 per unit and in total (`--totals`, `--unit <name>`). The ten units of section 4 reproduce its raw-call and pointer counts exactly; on 18-10-2026 the total is 236 raw calls, 37 `New`/`Dispose`, 495 pointer types, so the other rows of section 2 drift as units migrate: re-run the script instead of editing them by hand.
 D8-job. (before any change to an `EMBED_COMPILER` place) a manual job for `FPIDE_EMBED=1`, or an explicit "not verified" line in the final gate.
 5a. Process guard for the compiler run (section 9, decision D5): tests for normal exit, partial output, abort (`Terminate`), a child that ignores the signal, a timeout, an exception while reading, and "no child process remains" (check by pid).
+    5a-1 (done): `fpide/src/fpprocguard.pas` (`TProcGuard`: owns the `TProcess`, `Stop` = ask, grace time, kill, wait; `Destroy` always stops) and `fpide/tests/unit/t_fpprocguard.pas` with the seven cases above (the unix path; the job `unit` runs it). The guard is not used yet.
+    5a-2: use `TProcGuard` in `CompileExternal` (`fpintf.pas`) in place of the bare `TProcess`; Esc keeps its meaning; `fpide-accept` must stay green.
 5b. Only if still needed: the task + channel form; first decide D3.
 6.  The remaining process I/O in small PRs: gdb, format tool, dlv `Stop`, in that order, keeping the synchronous path for DOS.
 7.  The final gate as in the issue: `ci`, `fpide`, `fpide-accept` on the final SHA, the pinned tv3/tve unchanged, and a list of supported targets and of the unsafe boundaries.
