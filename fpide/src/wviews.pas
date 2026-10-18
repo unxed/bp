@@ -178,7 +178,7 @@ type
       function    GetLocalMenu: PMenu; override;
       function    GetCommandTarget: PView; override;
     private
-      Link : TDropDownListBox;
+      Link : TDropDownListBox; // borrow: tv3 group (the drop-down view that created this list box; it frees the box in DropList)
       LastTT: longint;
       InClose: boolean;
     end;

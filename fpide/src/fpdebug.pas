@@ -56,7 +56,7 @@ type
      Disableallinvalidbreakpoints : boolean;
      OrigPwd,  { pwd at startup }
      LastFileName : string;
-     LastSource   : PView; {PsourceWindow !! }
+     LastSource   : PView; {PsourceWindow !! } // borrow: tv3 group (the source window belongs to the desktop; never freed here)
      HiddenStepsCount : longint;
      { no need to switch if using another terminal }
      NoSwitch : boolean;
