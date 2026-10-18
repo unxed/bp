@@ -82,7 +82,7 @@ type
       procedure    TrackSource; virtual;
       procedure    OptionsDlg; virtual;
     private
-      MyBW         : PBrowserWindow;
+      MyBW         : PBrowserWindow; // borrow: tv3 group
       function     TrackReference(R: PReference; AutoTrack: boolean): boolean; virtual;
       function     GotoReference(R: PReference): boolean; virtual;
     end;
@@ -129,7 +129,7 @@ type
       function     GetPalette: TPalette; override;
     private
       MemInfo: PSymbolMemInfo;
-      MyBW   : PBrowserWindow;
+      MyBW   : PBrowserWindow; // borrow: tv3 group
     end;
 
     TSymbolMemoView = class;
@@ -168,13 +168,13 @@ type
       function     GetPalette: TPalette; override;
     private
       Root         : PObjectSymbol;
-      MyBW         : PBrowserWindow;
+      MyBW         : PBrowserWindow; // borrow: tv3 group
     end;
 
     PBrowserTabItem = ^TBrowserTabItem;
     TBrowserTabItem = record
       Sign  : char;
-      Link  : PView;
+      Link  : PView; // borrow: tv3 group
       Next  : PBrowserTabItem;
     end;
 
@@ -215,17 +215,17 @@ type
       function    Disassemble : boolean;
       destructor Destroy;override;
     private
-      PageTab       : PBrowserTab;
-      ST            : PStaticText;
+      PageTab       : PBrowserTab; // borrow: tv3 group
+      ST            : PStaticText; // borrow: tv3 group
       Sym           : PSymbol;
-      ScopeView     : PSymbolScopeView;
-      ReferenceView : PSymbolReferenceView;
-      InheritanceView: PSymbolInheritanceView;
-      MemInfoView   : PSymbolMemInfoView;
+      ScopeView     : PSymbolScopeView; // borrow: tv3 group
+      ReferenceView : PSymbolReferenceView; // borrow: tv3 group
+      InheritanceView: PSymbolInheritanceView; // borrow: tv3 group
+      MemInfoView   : PSymbolMemInfoView; // borrow: tv3 group
       UnitInfoText  : PSymbolMemoView;
-      UnitInfoUsed  : PSymbolScopeView;
-      UnitInfoDependent : PSymbolScopeView;
-      UnitInfo      : PUnitInfoPanel;
+      UnitInfoUsed  : PSymbolScopeView; // borrow: tv3 group
+      UnitInfoDependent : PSymbolScopeView; // borrow: tv3 group
+      UnitInfo      : PUnitInfoPanel; // borrow: tv3 group
       Prefix        : PString;
       IsValid       : boolean;
       DebuggerValue : PGDBValue;
