@@ -297,7 +297,9 @@ type
     TDisassemblyWindow = class;
     PDisassemblyWindow = TDisassemblyWindow;
     TDisassemblyWindow = class(TFPWindow)
+      // borrow: tv3 group
       Editor    : PDisassemblyEditor;
+      // borrow: tv3 group
       Indicator : PIndicator;
       constructor Create(var Bounds: TRect); overload;
       procedure   LoadFunction(Const FuncName : string);
