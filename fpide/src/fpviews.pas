@@ -430,7 +430,7 @@ PTabItem = ^TTabItem;
     TScreenWindow = class;
     PScreenWindow = TScreenWindow;
     TScreenWindow = class(TFPWindow)
-      ScreenView : PScreenView;
+      ScreenView : PScreenView; // borrow: tv3 group
       constructor Create(AScreen: PScreen; ANumber: integer);
       destructor Destroy; override;
     end;
