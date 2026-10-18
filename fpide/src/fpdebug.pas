@@ -203,7 +203,7 @@ type
     TBreakpointsWindow = class;
   PBreakpointsWindow = TBreakpointsWindow;
     TBreakpointsWindow = class(TFPDlgWindow)
-      BreakLB : PBreakpointsListBox;
+      BreakLB : PBreakpointsListBox; // borrow: tv3 group
       constructor Create; overload;
       procedure   AddBreakpoint(ABreakpoint : PBreakpoint);
       procedure   ClearBreakpoints;
