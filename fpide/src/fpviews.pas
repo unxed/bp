@@ -380,7 +380,7 @@ type
 PTabItem = ^TTabItem;
     TTabItem = record
       Next : PTabItem;
-      View : PView;
+      View : PView; // borrow: owned by this item (the tab group holds it only while the tab is active; DisposeTabItem frees it)
       Dis  : boolean;
     end;
 
@@ -389,7 +389,7 @@ PTabItem = ^TTabItem;
       Next     : PTabDef;
       Name     : PString;
       Items    : PTabItem;
-      DefItem  : PView;
+      DefItem  : PView; // borrow: one of the Items views, freed with its item
       ShortCut : char;
     end;
 
