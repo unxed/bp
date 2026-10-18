@@ -68,7 +68,7 @@ begin
   Check(G.WaitFor(5000), 'normal: the child ends by itself');
   Check(Pos('hello', Out_) > 0, 'normal: stdout is read');
   Check(Pos('oops', Out_) > 0, 'normal: stderr goes to the same pipe');
-  Check(G.ExitStatus = 3, 'normal: exit status');
+  Check(G.ExitStatus = 3, 'normal: exit status is 3, got ' + IntToStr(G.ExitStatus));
   G.Stop;
   Check(not G.Stopped, 'normal: Stop after a normal exit does not count as an abort');
   Check(Gone(Pid), 'normal: no child remains');
