@@ -151,7 +151,7 @@ type
     PSourceEditor = TSourceEditor;
     TSourceEditor = class(TFileEditor)
       CompileStamp : longint;
-      CodeCompleteTip: PFPToolTip;
+      CodeCompleteTip: PFPToolTip; // borrow: tv3 group (the tip is inserted into TProgram.Application; Destroy frees it so it never outlives the editor)
       destructor Destroy; override;
       constructor Create(var Bounds: TRect; AHScrollBar, AVScrollBar:
           PScrollBar; AIndicator: PIndicator;const AFileName: string); overload;
@@ -285,7 +285,7 @@ type
       procedure  AddAssemblyLine(const S: string;AAddress : CORE_ADDR); virtual;
       function   GetCurrentLine(address : CORE_ADDR) : PDisasLine;
       private
-        Source : PSourceWindow;
+        Source : PSourceWindow; // borrow: tv3 group (a desktop window; ReleaseSource deletes and frees it only when OwnsSource is set)
         OwnsSource : Boolean;
         DisasLines : PDisasLineCollection;
         MinAddress,MaxAddress : CORE_ADDR;
