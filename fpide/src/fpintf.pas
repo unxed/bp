@@ -49,7 +49,7 @@ uses
   Compiler,
 {$endif}
   Comphook,
-  sysutils,Classes,Process,Version,FPExtComp,TvProc,App,Views,Drivers,WEditor,FPConst,FPViews,
+  sysutils,Classes,Process,FpProcGuard,Version,FPExtComp,TvProc,App,Views,Drivers,WEditor,FPConst,FPViews,
 {$ifndef NODEBUG}
   FPDebug,
 {$endif NODEBUG}
@@ -382,15 +382,18 @@ end;
 procedure CompileExternal(const FileName, ConfigFile: string);
 var
   Backend: TLangBackend;
-  P: TProcess;
+  G: TProcGuard;
   Exe: string;
   CmdLine: AnsiString;
-  Buf: array[0..4095] of char;
   Pending: AnsiString;
   N,NL: LongInt;
   Aborted: boolean;
   Kind: string;
   Args: Classes.TStringList;
+  ParamList: Classes.TStringList;
+  ParamArr: array of AnsiString;
+  Chunk: AnsiString;
+  WasRunning: Boolean;
   procedure Feed(const Data: AnsiString);
   begin
     Pending:=Pending+Data;
@@ -445,15 +448,23 @@ begin
   status.compiledlines:=0;
   Aborted:=false;
   Pending:='';
-  P:=TProcess.Create(nil);
+  { TProcGuard owns the child: every way out of this procedure (also an exception) ends it, see fpprocguard.pas }
+  G:=TProcGuard.Create;
   try
-    P.Executable:=Exe;
-    CommandToList(CmdLine,P.Parameters);
-    if Backend<>nil then
-      P.CurrentDirectory:=Backend.WorkDir(MainFile);
-    P.Options:=[poUsePipes,poStderrToOutput,poNoConsole];
+    ParamList:=Classes.TStringList.Create;
     try
-      P.Execute;
+      CommandToList(CmdLine,ParamList);
+      SetLength(ParamArr,ParamList.Count);
+      for N:=0 to ParamList.Count-1 do
+        ParamArr[N]:=ParamList[N];
+    finally
+      ParamList.Free;
+    end;
+    try
+      if Backend<>nil then
+        G.Start(Exe,ParamArr,Backend.WorkDir(MainFile))
+      else
+        G.Start(Exe,ParamArr);
     except
       on E: Exception do
         begin
@@ -463,29 +474,27 @@ begin
         end;
     end;
     repeat
-      if P.Output.NumBytesAvailable>0 then
-        begin
-          N:=P.Output.Read(Buf,SizeOf(Buf));
-          if N>0 then
-            Feed(Copy(AnsiString(Buf),1,N));
-        end
-      else
+      { the state is read before the output: when the child had ended before the read, an empty read means all is drained }
+      WasRunning:=G.Running;
+      Chunk:=G.ReadAvailable;
+      if Chunk<>'' then
+        Feed(Chunk)
+      else if WasRunning then
         Sleep(10);
       { the status dialog and Esc, as for the built-in compiler }
       if Assigned(do_status) and do_status() and not Aborted then
         begin
           Aborted:=true;
-          P.Terminate(1);
+          G.Stop;
         end;
-    until (not P.Running) and (P.Output.NumBytesAvailable=0);
-    P.WaitOnExit;
+    until (not WasRunning) and (Chunk='');
     if Pending<>'' then
       Feed(Pending+#10);
     if Aborted then
       CompilationPhase:=cpAborted
-    else if (P.ExitStatus<>0) and (status.errorCount=0) then
+    else if (G.ExitCode<>0) and (status.errorCount=0) then
       begin
-        CompilerMessageWindow.AddMessage(V_Error,'The compiler exited with code '+IntToStr(P.ExitStatus),'',0,0);
+        CompilerMessageWindow.AddMessage(V_Error,'The compiler exited with code '+IntToStr(G.ExitCode),'',0,0);
         Inc(status.errorCount);
       end;
     status.IsExe:=false;
@@ -505,7 +514,7 @@ begin
           end;
       end;
   finally
-    P.Free;
+    G.Free;
   end;
 end;
 
