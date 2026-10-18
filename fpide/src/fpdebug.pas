@@ -227,11 +227,11 @@ type
       function    Execute: Word; override;
     private
       Breakpoint : PBreakpoint;
-      TypeRB   : PRadioButtons;
-      NameIL  : PEditorInputLine;
-      ConditionsIL: PEditorInputLine;
-      LineIL    : PEditorInputLine;
-      IgnoreIL  : PEditorInputLine;
+      TypeRB   : PRadioButtons; // borrow: tv3 group
+      NameIL  : PEditorInputLine; // borrow: tv3 group
+      ConditionsIL: PEditorInputLine; // borrow: tv3 group
+      LineIL    : PEditorInputLine; // borrow: tv3 group
+      IgnoreIL  : PEditorInputLine; // borrow: tv3 group
     end;
 
     TWatch = class;
@@ -304,8 +304,8 @@ type
       function    Execute: Word; override;
     private
       Watch : PWatch;
-      NameIL  : PEditorInputLine;
-      TextST : PAdvancedStaticText;
+      NameIL  : PEditorInputLine; // borrow: tv3 group
+      TextST : PAdvancedStaticText; // borrow: tv3 group
     end;
 
     TWatchesWindow = class;
