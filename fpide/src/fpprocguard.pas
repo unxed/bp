@@ -25,7 +25,7 @@ type
     FStarted: Boolean;
     FStopped: Boolean;
     function GetRunning: Boolean;
-    function GetExitStatus: Integer;
+    function GetExitCode: Integer;
     function GetPid: LongInt;
   public
     constructor Create;
@@ -39,7 +39,8 @@ type
     { end the child: ask, wait GraceMs, kill, wait for the exit; nothing is left to wait for afterwards. Safe to call again. }
     procedure Stop(GraceMs: Integer = 1000);
     property Running: Boolean read GetRunning;
-    property ExitStatus: Integer read GetExitStatus;
+    { the exit code of the program (not the raw wait status, which TProcess.ExitStatus gives) }
+    property ExitCode: Integer read GetExitCode;
     property Pid: LongInt read GetPid;
     { True when Stop had to end a child that was still running }
     property Stopped: Boolean read FStopped;
@@ -74,9 +75,9 @@ begin
   Result := FStarted and FProc.Running;
 end;
 
-function TProcGuard.GetExitStatus: Integer;
+function TProcGuard.GetExitCode: Integer;
 begin
-  Result := FProc.ExitStatus;
+  Result := FProc.ExitCode;
 end;
 
 function TProcGuard.GetPid: LongInt;
