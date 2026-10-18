@@ -391,7 +391,7 @@ var
   Kind: string;
   Args: Classes.TStringList;
   ParamList: Classes.TStringList;
-  ParamArr: array of string;
+  ParamArr: array of AnsiString;
   Chunk: AnsiString;
   WasRunning: Boolean;
   procedure Feed(const Data: AnsiString);
