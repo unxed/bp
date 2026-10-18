@@ -81,10 +81,20 @@ def close_dialogs(t, n=3):
         t.pump(0.15)
 
 
+def ready(t):
+    """the IDE has drawn its menu bar. The commands of a CI group run side by side (tools/ci-par.sh) and the first paint can take
+    far longer than the 6 s default wait; keys sent before it land in the tty line discipline and start the section on a wrong screen
+    (unxed/bp#37: templates and browser on 18-10-2026)"""
+    ok = t.wait_for('Window  Help', 40)
+    check(ok, 'the IDE shows its menu bar', None if ok else t)
+    return ok
+
+
 def run(fp, only):
     t = TmuxTerm(fp, env={'TV_FAR2L': '0'})
     try:
-        t.wait_for('Window  Help')
+        if not ready(t):
+            return
         for name, fn in SECTIONS:
             if only and name not in only:
                 continue
@@ -706,11 +716,11 @@ def line_colors(t, n=8):
 def section_templates(t):
     """File > New from template (the .pt files next to the executable) and Tools > Grep (an external grep over the sources)"""
     menu(t, 'M-f', 'New from template')
-    check(t.wait_for('Available templates', 5), 'File > New from template lists the templates', t)
+    check(t.wait_for('Available templates', 15), 'File > New from template lists the templates', t)
     txt = t.text()
     check(all(n in txt for n in ('Gplprog', 'Gplunit', 'Program', 'Unit')), 'all four templates are there', t)
     t.key('Enter')
-    check(t.wait_for('Fill in template parameter', 5), 'a template asks for its parameters', t)
+    check(t.wait_for('Fill in template parameter', 15), 'a template asks for its parameters', t)
     for _ in range(8):
         if not t.wait_for('Fill in template parameter', 1):
             break
@@ -767,13 +777,16 @@ def section_syscb(t):
     os.chmod(os.path.join(d, 'xsel'), 0o755)
     t2 = TmuxTerm(t.binary, env={'TV_FAR2L': '0', 'PATH': d + ':/usr/local/bin:/usr/bin:/bin', 'DISPLAY': ':99'})
     try:
-        t2.wait_for('Window  Help')
+        if not ready(t2):
+            return
         new_file(t2)
         t2.type('Привет')
         t2.key('Home', 'S-End')
         menu(t2, 'M-e', 'Copy', exact=True)
-        t2.pump(0.5)
-        got = open(store, encoding='utf-8').read() if os.path.exists(store) else None
+        def stored():
+            return open(store, encoding='utf-8').read() if os.path.exists(store) else None
+        t2.wait_until(lambda: stored() == 'Привет', 10)    # the fake xsel is a process of its own: on a loaded runner it comes late
+        got = stored()
         check(got == 'Привет', 'Edit > Copy writes the system clipboard through xsel: %r' % got, t2)
         # another program changes the clipboard: Paste takes that
         with open(store, 'w', encoding='utf-8') as f:
@@ -918,10 +931,10 @@ def section_browser(t):
     for name, text in (('shapes.pas', SHAPES), ('useshp.pas', USESHP)):
         with open(os.path.join(t.work, name), 'w') as f:
             f.write(text)
-    t.key('F3'); t.wait_for('Open a file'); t.type('useshp.pas'); t.key('Enter')
-    check(t.wait_for('program useshp'), 'the program is opened', t)
+    t.key('F3'); t.wait_for('Open a file', 15); t.type('useshp.pas'); t.key('Enter')
+    check(t.wait_for('program useshp', 15), 'the program is opened', t)
     menu(t, 'M-s', 'Objects')
-    check(t.wait_for('Browse: Objects', 5), 'Search > Objects opens the class browser', t)
+    check(t.wait_for('Browse: Objects', 15), 'Search > Objects opens the class browser', t)
     txt = t.text()
     check('TShape' in txt and 'TCircle' in txt, 'both classes are listed', t)
     lines = t.lines()
@@ -931,18 +944,18 @@ def section_browser(t):
           'TCircle is a descendant of TShape in the tree', t)
     t.key('Escape'); t.pump(0.3)
     menu(t, 'M-s', 'Modules')
-    check(t.wait_for('Browse: Units', 5) and 'shapes' in t.text() and 'useshp' in t.text(), 'Search > Modules lists the units', t)
+    check(t.wait_for('Browse: Units', 15) and 'shapes' in t.text() and 'useshp' in t.text(), 'Search > Modules lists the units', t)
     t.key('Escape'); t.pump(0.3)
     menu(t, 'M-s', 'Globals')
-    check(t.wait_for('Browse: Globals', 5), 'Search > Globals opens', t)
+    check(t.wait_for('Browse: Globals', 15), 'Search > Globals opens', t)
     txt = t.text()
     check('Pi2 = 6.28' in txt and 'Count: Integer' in txt and 'Reset(var n: Integer' in txt
           and 'clGreen' in txt, 'constants, variables, procedures with their parameters and enumeration items are there', t)
     t.key('Escape'); t.pump(0.3)
     menu(t, 'M-s', 'Symbol')
-    t.wait_for('Enter symbol')
+    t.wait_for('Enter symbol', 15)
     t.key('End'); t.key(*['BSpace'] * 30); t.type('TShape'); t.key('Enter')
-    check(t.wait_for('Browse: TShape', 5) or t.wait_for('TShape', 5), 'Search > Symbol shows a class', t)
+    check(t.wait_for('Browse: TShape', 15) or t.wait_for('TShape', 5), 'Search > Symbol shows a class', t)
     txt = t.text()
     check('Draw' in txt and 'Area' in txt, 'the members of the class are listed', t)
 
@@ -1089,7 +1102,8 @@ def test_exit(fp):
     """File > Exit (Alt+X) on a clean desktop ends the IDE with status 0"""
     t = TmuxTerm(fp, env={'TV_FAR2L': '0'})
     try:
-        t.wait_for('Window  Help')
+        if not ready(t):
+            return
         t.key('M-x')
         check(t.wait_until(lambda: not t.alive(), 6) and 'EXIT=0' in t.stderr(), 'Alt+X leaves the IDE with exit status 0 (%r)' % t.stderr()[-20:], t)
     finally:
