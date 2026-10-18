@@ -16,7 +16,7 @@ unit FpLang;
 interface
 
 uses
-  SysUtils, Classes, Process, TvPath, Safe;
+  SysUtils, Classes, TvPath, FpProcGuard, Safe;
 
 type
   { what the user asked: the same four of the Compile menu and the tests }
@@ -85,7 +85,7 @@ function FormatFile(B: TLangBackend; const FileName: string; out Output: string)
 implementation
 
 type
-  TProcessBox = specialize TOwned<TProcess>;
+  TGuardBox = specialize TOwned<TProcGuard>;
   TStringListBox = specialize TOwned<TStringList>;
   TStringStreamBox = specialize TOwned<TStringStream>;
 
@@ -354,34 +354,35 @@ end;
 
 function FormatFile(B: TLangBackend; const FileName: string; out Output: string): Boolean;
 var
-  PBox: TProcessBox;
+  GBox: TGuardBox;
   ArgsBox: TStringListBox;
   SBox: TStringStreamBox;
-  P: TProcess;                           { borrow: PBox }
+  G: TProcGuard;                         { borrow: GBox }
   Args: TStringList;                     { borrow: ArgsBox }
   S: TStringStream;                      { borrow: SBox }
-  Buf: array[0..4095] of Byte;
-  N, I: Integer;
+  ArgArr: array of string;
+  Chunk: AnsiString;
+  WasRunning: Boolean;
+  I: Integer;
 begin
   Output := '';
   Result := False;
   if (B = nil) or (B.FormatTool = '') then
     Exit;
-  PBox := TProcessBox.Own(TProcess.Create(nil));
+  { the guard owns the child: every way out of this function (also an exception while reading) ends it, see fpprocguard.pas }
+  GBox := TGuardBox.Own(TProcGuard.Create);
   ArgsBox := TStringListBox.Own(TStringList.Create);
   SBox := TStringStreamBox.Own(TStringStream.Create(''));
-  P := PBox.Get;
+  G := GBox.Get;
   Args := ArgsBox.Get;
   S := SBox.Get;
   try
-    P.Executable := B.FormatTool;
     B.FormatArguments(FileName, Args);
+    SetLength(ArgArr, Args.Count);
     for I := 0 to Args.Count - 1 do
-      P.Parameters.Add(Args[I]);
-    P.CurrentDirectory := B.WorkDir(FileName);
-    P.Options := [poUsePipes, poStderrToOutput];
+      ArgArr[I] := Args[I];
     try
-      P.Execute;
+      G.Start(B.FormatTool, ArgArr, B.WorkDir(FileName));
     except
       on E: Exception do
       begin
@@ -390,17 +391,20 @@ begin
       end;
     end;
     repeat
-      N := P.Output.Read(Buf, SizeOf(Buf));
-      if N > 0 then
-        S.Write(Buf, N);
-    until N <= 0;
-    P.WaitOnExit;
+      { the state is read before the output: when the child had ended before the read, an empty read means all is drained }
+      WasRunning := G.Running;
+      Chunk := G.ReadAvailable;
+      if Chunk <> '' then
+        S.WriteString(Chunk)
+      else if WasRunning then
+        Sleep(10);
+    until (not WasRunning) and (Chunk = '');
     Output := Trim(S.DataString);
-    Result := P.ExitStatus = 0;
+    Result := G.ExitCode = 0;
   finally
     SBox.Reset;
     ArgsBox.Reset;
-    PBox.Reset;
+    GBox.Reset;
   end;
 end;
 

@@ -5,13 +5,24 @@ program t_fplang;
 uses SysUtils, Classes, Process, FpLang, Safe;
 
 type
+  { a Go backend whose formatter does not exist: FormatFile must report the failed start, not raise }
+  TNoFormatterBackend = class(TGoBackend)
+  public
+    function FormatTool: string; override;
+  end;
   TProcessBox = specialize TOwned<TProcess>;
+  TNoFormatterBox = specialize TOwned<TNoFormatterBackend>;
   TStringListBox = specialize TOwned<TStringList>;
   TStringStreamBox = specialize TOwned<TStringStream>;
 
 var
   Bad: Integer = 0;
   Total: Integer = 0;
+
+function TNoFormatterBackend.FormatTool: string;
+begin
+  Result := '/nonexistent/fpide-no-such-formatter';
+end;
 
 procedure Check(OK: Boolean; const What: string);
 begin
@@ -85,6 +96,7 @@ var
   B: TLangBackend;                       { borrow: the registry of FpLang }
   M: TLangMessage;
   ABox, LinesBox: TStringListBox;
+  NBox: TNoFormatterBox;
   A: TStringList;                        { borrow: ABox }
   Dir, Src, Out_, Exe: string;
   Lines: TStringList;                    { borrow: LinesBox }
@@ -167,6 +179,12 @@ begin
   { the template of a new file and the formatter }
   Check(Pos('func main()', B.NewFileText) > 0, 'a new Go file has a template with main');
   Check(B.FormatTool = 'gofmt', 'the formatter of Go is gofmt');
+  NBox := TNoFormatterBox.Own(TNoFormatterBackend.Create);
+  Src := Write(Dir + 'lone/nofmt.go', 'package main' + LineEnding);
+  Check(not FormatFile(NBox.Get, Src, Out_), 'a formatter that cannot start is a failure');
+  Check(Out_ <> '', 'the reason of the failed start is returned');
+  NBox.Reset;
+  DeleteFile(Src);
   if FileExists('/usr/local/go/bin/gofmt') or FileExists('/usr/bin/gofmt') then
   begin
     Src := Write(Dir + 'lone/ugly.go', 'package main' + LineEnding + 'func  f( ){ }' + LineEnding);
