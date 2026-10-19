@@ -10,10 +10,12 @@
   pause) or until "terminated"; "stackTrace" tells where. The program writes to the output of dlv (a pipe), which
   the session collects.
 
-  Ownership (Safe Pascal, step 4.2a of safe/FPIDE-ADOPTION.md): the process of dlv, the log and every JSON document that
+  Ownership (Safe Pascal, step 4.2a of safe/FPIDE-ADOPTION.md): the log and every JSON document that
   a function holds or returns belong to a TOwned; nothing here is freed by hand. A JSON node that is added to a container
-  belongs to the container (the root of a document is the only thing that is owned). The only raw pointer type in the unit
-  is PChar in the three SetString calls that turn the bytes of a read into a string; each has an // UNSAFE: line. }
+  belongs to the container (the root of a document is the only thing that is owned). The process of dlv belongs to a
+  TProcGuard (step 5c): Stop gives dlv a second to end after "disconnect", then asks it to end and kills it if it does not, so no
+  dlv is left behind. The only raw pointer type in the unit is PChar in the SetString call that turns the bytes of a socket
+  read into a string; it has an // UNSAFE: line. }
 {$mode objfpc}{$H+}
 {$WARN SYMBOL_DEPRECATED ERROR}
 unit FpDlv;
@@ -21,7 +23,7 @@ unit FpDlv;
 interface
 
 uses
-  SysUtils, Classes, Process, Sockets, BaseUnix, fpjson, jsonparser, TvPath, Safe;
+  SysUtils, Classes, Sockets, BaseUnix, fpjson, jsonparser, TvPath, FpProcGuard, Safe;
 
 type
   { what a command that lets the program run came back with }
@@ -45,15 +47,15 @@ type
     Line: LongInt;
   end;
 
-  TProcessBox = specialize TOwned<TProcess>;
+  TDlvGuardBox = specialize TOwned<TProcGuard>;
   TStringListBox = specialize TOwned<TStringList>;
   TJSONBox = specialize TOwned<TJSONObject>;
   TJSONDataBox = specialize TOwned<TJSONData>;
 
   TDlvSession = class
   private
-    FProcBox: TProcessBox;
-    FProc: TProcess;            { a borrow of FProcBox.Get; nil when there is no process }
+    FGuardBox: TDlvGuardBox;
+    FGuard: TProcGuard;         { a borrow of FGuardBox.Get; nil when there is no process }
     FLogBox: TStringListBox;
     FSock: LongInt;
     FSeq: LongInt;
@@ -232,22 +234,15 @@ end;
 
 procedure TDlvSession.DrainProcess;
 var
-  Buf: array[0..4095] of Byte;
-  N: LongInt;
   Chunk: AnsiString;
 begin
   { the program writes to the output of dlv (the pipe), which is also where dlv writes its own words; an unread pipe would stop it }
-  if (FProc = nil) or (FProc.Output = nil) then
+  if FGuard = nil then
     Exit;
-  while FProc.Output.NumBytesAvailable > 0 do
-  begin
-    N := FProc.Output.Read(Buf, SizeOf(Buf));
-    if N <= 0 then
-      Break;
-    // UNSAFE: Buf holds the N bytes that Read has just put there; SetString copies exactly N of them
-    SetString(Chunk, System.PChar(@Buf), N);
+  repeat
+    Chunk := FGuard.ReadAvailable;
     FOutput := FOutput + Chunk;
-  end;
+  until Chunk = '';
 end;
 
 procedure TDlvSession.SendRaw(const Body: AnsiString);
@@ -359,7 +354,7 @@ begin
     else
     begin
       DrainProcess;
-      if (FProc <> nil) and not FProc.Running and (FInBuf = '') then
+      if (FGuard <> nil) and not FGuard.Running and (FInBuf = '') then
       begin
         FTerminated := True;
         Fail('dlv has ended');
@@ -462,21 +457,14 @@ var
   LBox: TStringListBox;
   L: TStringList;
   I: Integer;
-  Buf: array[0..1023] of Byte;
-  N: LongInt;
   R: TJSONBox;
 begin
   Result := False;
   FError := '';
-  FProcBox := TProcessBox.Own(TProcess.Create(nil));
-  FProc := FProcBox.Get;
-  FProc.Executable := Tool;
-  FProc.Parameters.Add('dap');
-  FProc.Parameters.Add('--listen=127.0.0.1:0');
-  FProc.CurrentDirectory := Cwd;
-  FProc.Options := [poUsePipes, poStderrToOutput, poNoConsole];
+  FGuardBox := TDlvGuardBox.Own(TProcGuard.Create);
+  FGuard := FGuardBox.Get;
   try
-    FProc.Execute;
+    FGuard.Start(Tool, ['dap', '--listen=127.0.0.1:0'], Cwd);
   except
     on E: Exception do
     begin
@@ -491,28 +479,23 @@ begin
   Port := 0;
   while (Port = 0) and (GetTickCount64 < Deadline) do
   begin
-    if FProc.Output.NumBytesAvailable > 0 then
+    Addr := FGuard.ReadAvailable;
+    if Addr <> '' then
     begin
-      N := FProc.Output.Read(Buf, SizeOf(Buf));
-      if N > 0 then
+      Line := Line + Addr;
+      P := Pos('listening at:', Line);
+      if P > 0 then
       begin
-        // UNSAFE: Buf holds the N bytes that Read has just put there; SetString copies exactly N of them
-        SetString(Addr, System.PChar(@Buf), N);
-        Line := Line + Addr;
-        P := Pos('listening at:', Line);
+        Addr := Trim(Copy(Line, P + 13, MaxInt));
+        P := Pos(#10, Addr);
         if P > 0 then
-        begin
-          Addr := Trim(Copy(Line, P + 13, MaxInt));
-          P := Pos(#10, Addr);
-          if P > 0 then
-            Addr := Trim(Copy(Addr, 1, P - 1));
-          P := LastDelimiter(':', Addr);
-          if P > 0 then
-            Port := StrToIntDef(Copy(Addr, P + 1, MaxInt), 0);
-        end;
+          Addr := Trim(Copy(Addr, 1, P - 1));
+        P := LastDelimiter(':', Addr);
+        if P > 0 then
+          Port := StrToIntDef(Copy(Addr, P + 1, MaxInt), 0);
       end;
     end
-    else if not FProc.Running then
+    else if not FGuard.Running then
       Break
     else
       Sleep(10);
@@ -864,17 +847,13 @@ end;
 
 procedure TDlvSession.SendInput(const S: AnsiString);
 begin
-  if (FProc <> nil) and (FProc.Input <> nil) and (S <> '') then
-    try
-      FProc.Input.Write(S[1], Length(S));
-    except
-    end;
+  if FGuard <> nil then
+    FGuard.WriteInput(S);
 end;
 
 procedure TDlvSession.Stop;
 var
   A, Body: TJSONBox;
-  I: Integer;
 begin
   if (FSock >= 0) and not FTerminated and (FError = '') then
   begin
@@ -888,15 +867,13 @@ begin
     CloseSocket(FSock);
     FSock := -1;
   end;
-  if FProc <> nil then
+  if FGuard <> nil then
   begin
-    for I := 1 to 50 do
-      if FProc.Running then
-        Sleep(20);
-    if FProc.Running then
-      FProc.Terminate(0);
-    FProcBox.Reset;
-    FProc := nil;
+    { dlv ends by itself after "disconnect"; when it does not, the guard asks it to end and then kills it }
+    if not FGuard.WaitFor(1000) then
+      FGuard.Stop;
+    FGuardBox.Reset;
+    FGuard := nil;
   end;
   FTerminated := True;
 end;

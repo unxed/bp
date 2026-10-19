@@ -1,6 +1,6 @@
 program t_fpprocguard;
 { Tests of the process guard (src/fpprocguard.pas): normal exit, partial output, abort, a child that ignores the request, a timeout,
-  an exception while the child runs, and "no child remains" (checked by pid). Step 5a of safe/FPIDE-ADOPTION.md.
+  an exception while the child runs, text for the standard input (step 5c), and "no child remains" (checked by pid). Step 5a of safe/FPIDE-ADOPTION.md.
   The children are /bin/sh and sleep, so the tests are skipped where they are missing (Windows). The test ends with SafeCheckNoLeaks. }
 {$mode objfpc}{$H+}
 uses SysUtils, {$ifdef unix}BaseUnix, {$endif}FpProcGuard, Safe;
@@ -142,6 +142,24 @@ begin
   Check(Gone(Pid), 'timeout: no child remains');
 end;
 
+procedure TestWriteInput;
+var
+  Box: TGuardBox;
+  G: TProcGuard;                       { borrow: Box }
+  Out_: AnsiString;
+begin
+  Box := TGuardBox.Own(TProcGuard.Create);
+  G := Box.Get;
+  Check(not G.WriteInput('before'#10), 'input: nothing is written before the child starts');
+  G.Start('/bin/sh', ['-c', 'read a; echo got:$a']);
+  Check(not G.WriteInput(''), 'input: an empty text is not a write');
+  Check(G.WriteInput('hello'#10), 'input: the text is written to the child');
+  Out_ := Drain(G, 5000);
+  Check(Pos('got:hello', Out_) > 0, 'input: the child read the text, got: ' + Out_);
+  Check(G.WaitFor(5000), 'input: the child ends after it has read');
+  Check(G.ExitCode = 0, 'input: exit code is 0');
+end;
+
 procedure RaiseWhileRunning(out Pid: LongInt);
 var
   Box: TGuardBox;
@@ -199,6 +217,7 @@ begin
   TestTimeout;
   TestException;
   TestNotFound;
+  TestWriteInput;
   SafeCheckNoLeaks;
   WriteLn('t_fpprocguard: ', Total - Bad, '/', Total, ' checks');
   if Bad > 0 then

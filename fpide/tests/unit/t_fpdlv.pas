@@ -1,9 +1,10 @@
 program t_fpdlv;
 { Tests of src/fpdlv.pas: a session with the real dlv when it is installed (a breakpoint, steps, a value, the end of the program with its
-  output, the end of a session that is stopped) and the failure of a start (no such tool, a program that does not build).
+  output, the end of a session that is stopped) and the failure of a start (no such tool, a program that does not build); a stub that ignores the request to end
+  shows that Stop of the session ends the process of dlv for good (step 5c).
   Every session and every object of the unit is released by its owner: the test ends with SafeCheckNoLeaks (step 4.2a of safe/FPIDE-ADOPTION.md). }
 {$mode objfpc}{$H+}
-uses SysUtils, Classes, FpDlv, Safe;
+uses SysUtils, Classes, {$ifdef unix}BaseUnix, {$endif}FpDlv, Safe;
 
 type
   TSessionBox = specialize TOwned<TDlvSession>;
@@ -68,6 +69,48 @@ const
     #9 + 'fmt.Println("read", sc.Text())' + LineEnding +       { 15 }
     '}' + LineEnding;
 
+{$ifdef unix}
+{ a "dlv" that ignores the request to end and holds the pipe: Stop of the session must still end it (step 5c; the guard asks, waits and kills),
+  and no process of it may remain. The start fails on purpose: nothing listens on the port that the stub announces. }
+procedure TestStopEndsStubbornDlv(const Dir: string);
+var
+  Tool, PidFile: string;
+  LBox: TStringListBox;
+  L: TStringList;                         { borrow: LBox }
+  Box: TSessionBox;
+  S: TDlvSession;                         { borrow: Box }
+  Pid: LongInt;
+  T0: QWord;
+begin
+  Tool := Dir + 'stubborn-dlv.sh';
+  PidFile := Dir + 'stubborn.pid';
+  Write(Tool, '#!/bin/sh' + LineEnding +
+    'echo $$ > "' + PidFile + '"' + LineEnding +
+    'trap "" TERM' + LineEnding +
+    'echo "DAP server listening at: 127.0.0.1:1"' + LineEnding +
+    'while :; do sleep 1; done' + LineEnding);
+  fpChmod(Tool, &755);
+  Box := TSessionBox.Own(TDlvSession.Create);
+  S := Box.Get;
+  Check(not S.Start(Tool, 'debug', Dir + 'p.go', Dir, ''), 'stubborn: the start fails, nothing listens on the port');
+  LBox := TStringListBox.Own(TStringList.Create);
+  L := LBox.Get;
+  L.LoadFromFile(PidFile);
+  Pid := StrToIntDef(Trim(L.Text), 0);
+  Check(Pid > 0, 'stubborn: the stub wrote its pid');
+  Check(fpKill(Pid, 0) = 0, 'stubborn: the stub runs before Stop');
+  T0 := GetTickCount64;
+  S.Stop;
+  Check(GetTickCount64 - T0 < 8000, 'stubborn: Stop returns within the grace and kill times');
+  Check(not S.Alive, 'stubborn: the session is over');
+  { the child was reaped by the guard, so the pid does not exist (no zombie either) }
+  Check((fpKill(Pid, 0) <> 0) and (fpGetErrno = ESysESRCH), 'stubborn: no process of dlv remains');
+  Box.Reset;
+  DeleteFile(Tool);
+  DeleteFile(PidFile);
+end;
+{$endif}
+
 { the checks live in a procedure: the owners are its locals and are gone, with every temporary of the calls, when it returns (in the main block they would be kept until the end of the program and SafeCheckNoLeaks would see them) }
 procedure RunChecks;
 var
@@ -86,6 +129,9 @@ begin
   R := S.Start('/no/such/dlv', 'debug', Src, Dir, ''); Check(not R, 'a missing dlv does not start');
   Check(S.Error <> '', 'the failure has a text');
   Box.Reset;
+{$ifdef unix}
+  TestStopEndsStubbornDlv(Dir);
+{$endif}
 
   Dlv := FindDlv;
   if (Dlv = '') or (FileSearch('go', GetEnvironmentVariable('PATH')) = '') then

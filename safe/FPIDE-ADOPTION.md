@@ -219,7 +219,8 @@ D8-job. (before any change to an `EMBED_COMPILER` place) a manual job for `FPIDE
     5a-1 (done): `fpide/src/fpprocguard.pas` (`TProcGuard`: owns the `TProcess`, `Stop` = ask, grace time, kill, wait; `Destroy` always stops) and `fpide/tests/unit/t_fpprocguard.pas` with the seven cases above (the unix path; the job `unit` runs it). The guard is not used yet.
     5a-2: use `TProcGuard` in `CompileExternal` (`fpintf.pas`) in place of the bare `TProcess`; Esc keeps its meaning; `fpide-accept` must stay green.
 5b. Only if still needed: the task + channel form; first decide D3.
-6.  The remaining process I/O in small PRs: gdb, format tool, dlv `Stop`, in that order, keeping the synchronous path for DOS.
+5c. The dlv process under the guard (step 6, third item): `TDlvSession` holds a `TProcGuard` instead of a bare `TProcess`; `Stop` waits one second for dlv to end after "disconnect", then the guard asks it to end and kills it. `TProcGuard` gained `WriteInput` (the standard input of dlv is the standard input of the debugged program; gdb will need it too). Tests: `t_fpprocguard` writes to a child, `t_fpdlv` ends a stub "dlv" that ignores the request (unix) and checks by pid that nothing remains. The synchronous path is unchanged; the grandchild (the debugged program) is still left to dlv.
+6.  The remaining process I/O in small PRs: gdb, format tool (done in 5b), dlv `Stop` (done in 5c), in that order, keeping the synchronous path for DOS. Left: gdb (the guard writes to the child since 5c).
 7.  The final gate as in the issue: `ci`, `fpide`, `fpide-accept` on the final SHA, the pinned tv3/tve unchanged, and a list of supported targets and of the unsafe boundaries.
 
 ## 12. Step 4.4: decisions for the `{$H-}` units with ownership calls but no unit test
