@@ -608,8 +608,7 @@ def section_debuggo(t):
         print('status-line diagnostic after Home:', flush=True)
         print(t.text(), flush=True)
     terminal_output = t.stop_output_capture()
-    if not status_line_shown:
-        print('status-line raw terminal output (last 2048 bytes, hex):', terminal_output[-2048:].hex(), flush=True)
+    print('status-line raw terminal output (last 2048 bytes, hex):', terminal_output[-2048:].hex(), flush=True)
     t.key('Enter')
     check(t.wait_until(lambda: t.indicator() == (14, 1), 30), 'the program read the line and stopped at the breakpoint (14): %r' % (t.indicator(),), t)
     t.pump(1)
