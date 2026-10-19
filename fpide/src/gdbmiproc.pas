@@ -23,14 +23,14 @@ unit GDBMIProc;
 interface
 
 uses
-  SysUtils, Classes, Process, Safe;
+  SysUtils, Classes, Process, Safe, FpProcGuard;
 
 type
-  TProcessBox = specialize TOwned<TProcess>;
+  TProcGuardBox = specialize TOwned<TProcGuard>;
 
   TGDBProcess = class
   private
-    FProcessOwner: TProcessBox;
+    FProcessOwner: TProcGuardBox;
     FProcess: TProcess;
     FDebugLog: TextFile;
 
@@ -112,16 +112,14 @@ begin
     Rewrite(FDebugLog);
     CloseFile(FDebugLog);
   end;
-  FProcessOwner := TProcessBox.Own(TProcess.Create(nil));
-  FProcess := FProcessOwner.Get;
-  FProcess.Options := [poUsePipes, poStdErrToOutput];
+  FProcessOwner := TProcGuardBox.Own(TProcGuard.Create);
+  FProcess := FProcessOwner.Get.Process;
   if (GdbExeExt<>'') and (pos(GdbExeExt,LowerCase(GdbProgramName))=0) then
     FProcess.Executable := GdbProgramName+GdbExeExt
   else
     FProcess.Executable := GdbProgramName;
-  FProcess.Parameters.Add('--interpreter=mi');
   try
-    FProcess.Execute;
+    FProcessOwner.Get.Start(FProcess.Executable, ['--interpreter=mi'], '', False);
   except
     on e: Exception do
     begin
@@ -156,7 +154,8 @@ end;
 
 procedure TGDBProcess.GDBWrite(const S: string);
 begin
-  FProcess.Input.Write(S[1], Length(S));
+  if not FProcessOwner.Get.WriteInput(S) then
+    raise EWriteError.Create('Could not write to GDB');
 end;
 
 procedure TGDBProcess.GDBWriteln(const S: string);

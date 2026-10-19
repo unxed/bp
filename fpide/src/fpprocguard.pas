@@ -31,7 +31,7 @@ type
     constructor Create;
     destructor Destroy; override;
     { run Exe with Args (stderr goes to the same pipe as stdout); an exception from the system if the program cannot start }
-    procedure Start(const Exe: string; const Args: array of string; const WorkDir: string = '');
+    procedure Start(const Exe: string; const Args: array of string; const WorkDir: string = ''; NoConsole: Boolean = True);
     { the output that is ready now, '' when there is none; it never blocks }
     function ReadAvailable: AnsiString;
     { text for the standard input of the child (it stays open until the guard ends the child); False when there is nothing to write to or the write fails }
@@ -41,6 +41,8 @@ type
     { end the child: ask, wait GraceMs, kill, wait for the exit; nothing is left to wait for afterwards. Safe to call again. }
     procedure Stop(GraceMs: Integer = 1000);
     property Running: Boolean read GetRunning;
+    { borrowed process access for transports that need the pipe handles directly }
+    property Process: TProcess read FProc;
     { the exit code of the program (not the raw wait status, which TProcess.ExitStatus gives) }
     property ExitCode: Integer read GetExitCode;
     property Pid: LongInt read GetPid;
@@ -87,7 +89,7 @@ begin
   Result := FProc.ProcessID;
 end;
 
-procedure TProcGuard.Start(const Exe: string; const Args: array of string; const WorkDir: string);
+procedure TProcGuard.Start(const Exe: string; const Args: array of string; const WorkDir: string; NoConsole: Boolean);
 var
   I: Integer;
 begin
@@ -98,7 +100,9 @@ begin
     FProc.Parameters.Add(Args[I]);
   if WorkDir <> '' then
     FProc.CurrentDirectory := WorkDir;
-  FProc.Options := [poUsePipes, poStderrToOutput, poNoConsole];
+  FProc.Options := [poUsePipes, poStderrToOutput];
+  if NoConsole then
+    FProc.Options := FProc.Options + [poNoConsole];
   FProc.Execute;
   FStarted := True;
 end;
