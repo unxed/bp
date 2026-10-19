@@ -1,9 +1,10 @@
 program t_gdbmiwrap;
 { Tests of the GDB/MI value classes of src/gdbmiwrap.pas: a result record is parsed into tuples, lists and strings that are owned by
   the record; parsing a second line frees the first one; a malformed line does not leak the half-built values.
-  The test ends with SafeCheckNoLeaks (step 4.1c of safe/FPIDE-ADOPTION.md). It needs no gdb. }
+  A mock GDB also checks the guarded child-stdin command path and the pipe-based MI response read. The test ends with
+  SafeCheckNoLeaks (step 4.1c of safe/FPIDE-ADOPTION.md). It needs no installed gdb. }
 {$mode objfpc}{$H+}
-uses SysUtils, GDBMIWrap, Safe;
+uses SysUtils, {$ifdef unix}BaseUnix,{$endif} GDBMIWrap, GDBMIProc, Safe;
 
 var
   Bad: Integer = 0;
@@ -68,9 +69,51 @@ begin
   { whatever happened, the values built so far belong to Box and are released with it }
 end;
 
+procedure TestGuardedGDBInput;
+var
+  ScriptName: string;
+  Script: TextFile;
+  Wrapper: TGDBWrapper;
+begin
+{$ifdef unix}
+  ScriptName := GetTempDir(False) + 'bp-gdbmi-' + IntToStr(fpGetPid) + '.sh';
+  AssignFile(Script, ScriptName);
+  Rewrite(Script);
+  WriteLn(Script, '#!/bin/sh');
+  WriteLn(Script, 'printf ''(gdb) \n''');
+  WriteLn(Script, 'while IFS= read -r command; do');
+  WriteLn(Script, '  if [ "$command" = "-gdb-exit" ]; then');
+  WriteLn(Script, '    printf ''^exit\n(gdb) \n''');
+  WriteLn(Script, '    exit 0');
+  WriteLn(Script, '  fi');
+  WriteLn(Script, '  printf ''^done,echo="%s"\n(gdb) \n'' "$command"');
+  WriteLn(Script, 'done');
+  CloseFile(Script);
+  try
+    Check(fpChmod(PChar(ScriptName), &700) = 0, 'gdb integration: mock executable is prepared');
+    GdbProgramName := ScriptName;
+    Wrapper := TGDBWrapper.Create;
+    try
+      Check(Wrapper.Alive, 'gdb integration: guarded mock process starts');
+      Wrapper.Command('-test-command');
+      Check(Wrapper.ResultRecord.Success, 'gdb integration: MI result record is read');
+      Check(Wrapper.ResultRecord.Parameters['echo'].AsString = '-test-command',
+        'gdb integration: command reaches the child stdin through the guard');
+    finally
+      Wrapper.Free;
+    end;
+  finally
+    fpUnlink(PChar(ScriptName));
+  end;
+{$else}
+  WriteLn('SKIP GDB process integration: unix only');
+{$endif}
+end;
+
 begin
   TestParse;
   TestMalformed;
+  TestGuardedGDBInput;
   SafeCheckNoLeaks;
   WriteLn(Total - Bad, '/', Total, ' checks passed');
   if Bad > 0 then Halt(1);
