@@ -596,7 +596,16 @@ def section_debuggo(t):
     t.menu('M-r', 'Run', exact=True)
     check(t.wait_for('hello out', 90), 'the output of the running program is listed at once (Messages window)', t)
     t.type('abc')
-    check(t.wait_for('Program input', 5) and 'abc' in t.lines()[-1], 'typing shows the line for the standard input in the status line', t)
+    status_line_shown = t.wait_for('Program input', 5) and 'abc' in t.lines()[-1]
+    check(status_line_shown, 'typing shows the line for the standard input in the status line', t)
+    if not status_line_shown:
+        t.pump(2)
+        print('status-line diagnostic after 2 seconds:', flush=True)
+        print(t.text(), flush=True)
+        t.key('Home')  # Does not change StdinLine; prompts a harmless redraw.
+        t.pump(0.5)
+        print('status-line diagnostic after Home:', flush=True)
+        print(t.text(), flush=True)
     t.key('Enter')
     check(t.wait_until(lambda: t.indicator() == (14, 1), 30), 'the program read the line and stopped at the breakpoint (14): %r' % (t.indicator(),), t)
     t.pump(1)
