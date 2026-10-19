@@ -595,6 +595,7 @@ def section_debuggo(t):
     menu(t, 'M-d', 'Breakpoint', exact=True)
     t.menu('M-r', 'Run', exact=True)
     check(t.wait_for('hello out', 90), 'the output of the running program is listed at once (Messages window)', t)
+    t.start_output_capture()
     t.type('abc')
     status_line_shown = t.wait_for('Program input', 5) and 'abc' in t.lines()[-1]
     check(status_line_shown, 'typing shows the line for the standard input in the status line', t)
@@ -606,6 +607,9 @@ def section_debuggo(t):
         t.pump(0.5)
         print('status-line diagnostic after Home:', flush=True)
         print(t.text(), flush=True)
+    terminal_output = t.stop_output_capture()
+    if not status_line_shown:
+        print('status-line raw terminal output (last 2048 bytes, hex):', terminal_output[-2048:].hex(), flush=True)
     t.key('Enter')
     check(t.wait_until(lambda: t.indicator() == (14, 1), 30), 'the program read the line and stopped at the breakpoint (14): %r' % (t.indicator(),), t)
     t.pump(1)
