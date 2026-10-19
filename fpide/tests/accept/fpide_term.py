@@ -24,6 +24,7 @@ class TmuxTerm:
         self.socket = self.session
         self.work = work or tempfile.mkdtemp(prefix='fpide-acc-')
         self.err = os.path.join(self.work, 'stderr.log')
+        self.output_capture = os.path.join(self.work, 'terminal-output.bin')
         if os.path.exists(self.err):
             os.unlink(self.err)
         # the XDG directories are set so that a value of the tmux server does not lead the IDE out of the temp dir
@@ -40,6 +41,20 @@ class TmuxTerm:
     def _tmux(self, *a):
         """a tmux command on the server of this terminal; its output"""
         return subprocess.run(['tmux', '-L', self.socket] + list(a), capture_output=True, text=True).stdout
+
+    def start_output_capture(self):
+        """capture bytes written by the application to the terminal before tmux renders them"""
+        subprocess.run(['tmux', '-L', self.socket, 'pipe-pane', '-O', '-t', self.session,
+                        'cat >> ' + self.output_capture], check=True)
+
+    def stop_output_capture(self):
+        """stop the terminal tap and return its raw output"""
+        subprocess.run(['tmux', '-L', self.socket, 'pipe-pane', '-t', self.session], check=True)
+        try:
+            with open(self.output_capture, 'rb') as f:
+                return f.read()
+        except FileNotFoundError:
+            return b''
 
     def text(self):
         """the screen as text; the desktop shade is blanked so the tests need not know it"""
