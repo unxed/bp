@@ -6,6 +6,9 @@ program t_gdbmiwrap;
 {$mode objfpc}{$H+}
 uses SysUtils, {$ifdef unix}BaseUnix,{$endif} GDBMIWrap, GDBMIProc, Safe;
 
+type
+  TGDBWrapperBox = specialize TOwned<TGDBWrapper>;
+
 var
   Bad: Integer = 0;
   Total: Integer = 0;
@@ -73,6 +76,7 @@ procedure TestGuardedGDBInput;
 var
   ScriptName: string;
   Script: TextFile;
+  WrapperOwner: TGDBWrapperBox;
   Wrapper: TGDBWrapper;
 begin
 {$ifdef unix}
@@ -92,7 +96,8 @@ begin
   try
     Check(fpChmod(PChar(ScriptName), &700) = 0, 'gdb integration: mock executable is prepared');
     GdbProgramName := ScriptName;
-    Wrapper := TGDBWrapper.Create;
+    WrapperOwner := TGDBWrapperBox.Own(TGDBWrapper.Create);
+    Wrapper := WrapperOwner.Get;
     try
       Check(Wrapper.Alive, 'gdb integration: guarded mock process starts');
       Wrapper.Command('-test-command');
@@ -100,7 +105,8 @@ begin
       Check(Wrapper.ResultRecord.Parameters['echo'].AsString = '-test-command',
         'gdb integration: command reaches the child stdin through the guard');
     finally
-      Wrapper.Free;
+      WrapperOwner.Reset;
+      Wrapper := nil;
     end;
   finally
     fpUnlink(PChar(ScriptName));
