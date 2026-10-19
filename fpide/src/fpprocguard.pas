@@ -34,6 +34,8 @@ type
     procedure Start(const Exe: string; const Args: array of string; const WorkDir: string = '');
     { the output that is ready now, '' when there is none; it never blocks }
     function ReadAvailable: AnsiString;
+    { text for the standard input of the child (it stays open until the guard ends the child); False when there is nothing to write to or the write fails }
+    function WriteInput(const S: AnsiString): Boolean;
     { wait up to TimeoutMs for the exit; True when the child has ended }
     function WaitFor(TimeoutMs: Integer): Boolean;
     { end the child: ask, wait GraceMs, kill, wait for the exit; nothing is left to wait for afterwards. Safe to call again. }
@@ -118,6 +120,19 @@ begin
       for I := 1 to N do
         Result[I] := Buf[I - 1];
     end;
+  end;
+end;
+
+function TProcGuard.WriteInput(const S: AnsiString): Boolean;
+begin
+  Result := False;
+  if (S = '') or not FStarted or (FProc.Input = nil) then
+    Exit;
+  try
+    FProc.Input.Write(S[1], Length(S));
+    Result := True;
+  except
+    { the child has ended and the pipe is broken: the text is lost, the caller learns it from False }
   end;
 end;
 
