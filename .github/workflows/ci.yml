@@ -15,6 +15,23 @@ jobs:
       - name: Text policy
         run: python3 tools/text-policy.py
 
+  # bpvet (tools/bpvet, SPEC §6): the linter for the rules the compiler cannot check. Its lint tests, its own sources
+  # with --strict, and the report over tests/ (a file it cannot parse fails the job).
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Free Pascal
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler fp-units-fcl
+      - name: Build bpvet
+        run: bash tools/bpvet/build.sh out/bpvet
+      - name: Lint tests (tests/lint)
+        run: bash tests/lint.sh out/bpvet
+      - name: bpvet --strict over its own sources
+        run: out/bpvet --strict tools/bpvet
+      - name: bpvet --report over tests/
+        run: out/bpvet --report tests
+
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
   # the "binary is static, no libc" check, and runs on different distributions.
   portable:
