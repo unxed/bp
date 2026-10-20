@@ -347,20 +347,277 @@ System.GetMem(Buf, Len);
 
 ## §8. An honest table of guarantees
 
-| Guarantee | Level |
-|---|---|
-| No `GetMem/FreeMem/New/Dispose/Move/FillChar/FreeAndNil` outside unsafe | compiler |
-| Double free through `TOwned/TShared/TArena` is impossible | runtime construction (counter) |
-| Access to an empty owner, going out of slice bounds | runtime (ESafety) |
-| A dangling `TSlice`, a dangling `TWeak` | impossible by construction |
-| `.Free` outside unsafe | compiler (error) |
-| raw pointers outside unsafe | compiler warning + linter |
-| A borrow (parameter/local) does not outlive the owner | linter (S5) + programmer |
-| No `TShared` cycles | programmer + linter (heuristic) |
-| Arena objects are not used after `FreeAll` | programmer; in debug `-gh` |
+| Guarantee | Level | Register |
+|---|---|---|
+| No `GetMem/FreeMem/New/Dispose/Move/FillChar/FreeAndNil` outside unsafe | compiler | — |
+| Double free through `TOwned/TShared/TArena` is impossible | runtime construction (counter) | — |
+| Access to an empty owner, going out of slice bounds | runtime (ESafety) | — |
+| A dangling `TSlice`, a dangling `TWeak` | impossible by construction | — |
+| `.Free` outside unsafe | compiler (error) | — |
+| raw pointers outside unsafe | compiler warning (named pointer types) + linter (plan) (`^T`, `@`, arithmetic) | H4 |
+| A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1 |
+| No `TShared` cycles | programmer + linter (plan, heuristic) | H2 |
+| Arena objects are not used after `FreeAll` | programmer; in debug `-gh` | H3 |
+| `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter (plan) (S10); the runtime is safe in any case (§4) | H5 |
+| Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter (plan) (S11); the `TryLock` race is open (§11) | H6 |
+| `.Destroy` outside unsafe | linter (plan) (S3) | H7 |
+| Owner-or-nothing for `TFoo.Create`, no legacy string types | linter (plan) (S6, S9); R3 only for `TInterfacedObject` | H8 |
+| `Safe` is last in `uses` | linter (plan) (S7) | H9 |
+| Unsafe code is marked, `external` only in unsafe modules | linter (plan) (S8, S12) | H10 |
+| Exhaustive `case`, `const` parameters | linter (plan) (S13, S14) | H11 |
+| Range and overflow checks are not switched off in safe code | programmer | H12 |
+| Turbo Pascal style `object` code | not covered (§19) | H13 |
 
 We do not claim this is Rust. We claim: in safe code there is no **syntactic**
 way to make the typical memory errors, and the remaining holes are listed above.
+
+### Risk register (plan unxed/bp#56)
+
+Every row of the table above that rests on "programmer" or on "linter (plan)" has an entry
+here: an example of the error, what catches it now, what will catch it, and the step of the
+plan in unxed/bp#56 that closes it. `bpvet` is the planned linter (step 2). A row leaves the
+register when its step is merged; step 16 checks that nothing "programmer" is left without a
+compensating check, and accepted risks are listed with a reason.
+
+| Id | Hole | Now | Target | Step |
+|---|---|---|---|---|
+| H1 | a borrow outlives its owner | nothing | `bpvet` S5 + borrow-escape rule | 7 |
+| H2 | `TShared` cycle | R5 counts live objects, no cycle report | `SAFE_DEBUG` cycle report + lint warning | 9 |
+| H3 | use after `TArena.FreeAll` | `-gh` in debug, sometimes | arena generations, `TArenaRef<T>` → `ESafety` | 8 |
+| H4 | `^T`, `@`, pointer arithmetic | nothing (only named types warn) | `bpvet` S4 | 4 |
+| H5 | a copy of `TOwned` | nothing (the runtime stays safe) | `bpvet` S10 + `SAFE_DEBUG` runtime check | 6 |
+| H6 | shared task fields; `TryLock` race | nothing | `bpvet` S11 + lock in the cell, stress test | 10 |
+| H7 | `.Destroy` | nothing | `bpvet` S3 | 4 |
+| H8 | `TFoo.Create` not owned; `ShortString` | R3 partly | `bpvet` S6, S9 | 5 |
+| H9 | `Safe` not last in `uses` | nothing | `bpvet` S7 | 2 |
+| H10 | unmarked unsafe code, stray `external` | nothing | `bpvet` S8, S12 | 3 |
+| H11 | non-exhaustive `case`, missing `const` | nothing (FPC 3.2.2 is silent) | `bpvet` S13, S14 | 11 |
+| H12 | `{$R-}` in safe code | the debug-build recommendation (§6) | rule `{$R+}{$Q+}` + `bpvet` warning | 12 |
+| H13 | `object`, `New(P, Init)` | nothing: such code stays unsafe | owner over `object` + lint rules | 13 |
+
+**H1. A borrow outlives its owner.**
+
+```pascal
+var Cache: TFoo;                      // a global of a class type without // borrow:
+procedure Load;
+var Box: TFooBox;
+begin
+  Box := TFooBox.Own(TFoo.Create);
+  Cache := Box.Get;                   // the borrow escapes into a global
+end;                                  // Box destroys the object here
+// later: Cache.Run — use after free (UB)
+```
+
+Now: nothing; with `-gh` in a debug build the freed memory is sometimes visible. Target: `bpvet`
+S5 (a field or global of a class type only as `TOwned/TShared/TWeak`/interface or with
+`// borrow: <owner>`) plus the escape rule: the result of `.Get` and a class-type parameter
+cannot be stored into a field, a global, a closure or a task field; `Reset`/`Move` of the owner
+while a borrow from it is alive in the same procedure is an error. Step 7.
+
+**H2. A `TShared` cycle.**
+
+```pascal
+type
+  TNode = class;
+  TNodeRef = specialize TShared<TNode>;
+  TNode = class
+    Next: TNodeRef;                   // a strong reference inside the same graph
+  end;
+var A, B: TNodeRef;
+begin
+  A := TNodeRef.Share(TNode.Create); B := TNodeRef.Share(TNode.Create);
+  A.Get.Next := B; B.Get.Next := A;   // neither counter reaches zero: both leak
+end;
+```
+
+Now: `SafeCheckNoLeaks` raises R5 with the number of live objects, but does not say that they
+form a cycle; the rest is the reviewer. Target: in `SAFE_DEBUG` `SafeCheckNoLeaks` reports live
+`TShared` objects reachable only from each other (type, count, path of the cycle); `bpvet` warns
+on a `TShared<T>` field in a class that is itself held by `TShared` of the same graph, with the
+hint "a back reference is `TWeak`". Step 9.
+
+**H3. Use after `TArena.FreeAll`.**
+
+```pascal
+var
+  Arena: TArena;
+  N: TNode;                           // borrow: arena
+begin
+  Arena := TArena.Create;
+  N := Arena.Adopt(TNode.Create) as TNode;
+  Arena.FreeAll;
+  WriteLn(N.Name);                    // use after free (UB)
+end;
+```
+
+Now: the programmer; `-gh` in a debug build catches it only sometimes. Target: `FreeAll` bumps
+the arena generation; in `SAFE_DEBUG` `// borrow: arena` references go through a checked handle
+`TArenaRef<T>` (arena + generation) and an access after `FreeAll` raises `ESafety`; in a release
+build it is a plain reference with zero cost (measured by a benchmark). Step 8.
+
+**H4. `^T`, `@` and pointer arithmetic.**
+
+```pascal
+type PInt = ^Integer;                 // ^T: no warning today
+procedure Bump;
+var X: Integer; P: PInt;
+begin
+  P := @X;                            // @: no warning today
+  Inc(P, 4);                          // now points outside X
+  P^ := 1;                            // memory corruption
+end;
+```
+
+Now: only the named types `Pointer, PByte, PChar, PAnsiChar, PWideChar` give the `SAFE-S4`
+warning; `^T`, `@` and arithmetic pass silently. Target: `bpvet` S4 error outside code marked
+`// UNSAFE:`. Step 4.
+
+**H5. A copy of `TOwned`.**
+
+```pascal
+procedure Use(Box: TFooBox);          // TOwned by value: a hidden copy
+begin
+  Box.Get.Run;
+end;
+var A, B: TFooBox;
+begin
+  A := TFooBox.Own(TFoo.Create);
+  B := A;                             // a copy instead of A.Move
+  A.Reset;                            // the object lives on in B: the "unique" owner is not unique
+end;
+```
+
+Now: nothing; the counter keeps the runtime safe (no double free, §4), but the lifetime is no
+longer the one the code shows. Target: `bpvet` S10 (copy only through `.Move`, no `TOwned` by
+value) plus a `SAFE_DEBUG` check: destroying an owner while the counter shows a live extra copy
+raises `ESafety` with the type name. Step 6.
+
+**H6. Shared task fields; `TWeak.TryLock` across threads.**
+
+```pascal
+type
+  TWorker = class(TTask)
+    Log: TStringList;                 // a mutable object the caller also uses
+    procedure Run; override;
+  end;
+procedure TWorker.Run;
+begin
+  Log.Add('done');                    // a data race with the caller's thread
+end;
+```
+
+Now: nothing; `TWeak.TryLock` from another thread concurrently with the last `Reset` is a race
+(§11). Target: `bpvet` S11 allows task fields only of value types, `String`, `TArray`, `TChan`,
+`TShared`, or `TOwned` passed through `Move`; `TWeak.TryLock` becomes thread-safe (a lock in the
+cell), with a stress test against destruction in another thread on x86_64 and aarch64. Step 10.
+
+**H7. `.Destroy` outside unsafe.**
+
+```pascal
+var Box: TFooBox; F: TFoo;
+begin
+  Box := TFooBox.Own(TFoo.Create);
+  F := Box.Get;
+  F.Destroy;                          // compiles: .Free is closed off, .Destroy is not
+end;                                  // Box destroys the object again: double free
+```
+
+Now: nothing. Target: `bpvet` S3 error, the hint is `TOwned.Reset` or `// UNSAFE:`. Step 4.
+
+**H8. `TFoo.Create` not passed to an owner; legacy string types.**
+
+```pascal
+procedure Leak;
+var F: TFoo; S: ShortString;
+begin
+  F := TFoo.Create;                   // not into Own/Share/Adopt/an interface/raise
+  F.Run;                              // an exception here leaks F, and .Free is closed off anyway
+  S := StringOfChar('x', 300);       // ShortString: 255 bytes, the rest is cut silently
+end;
+```
+
+Now: R3 catches only `Own/Share/Adopt` of a `TInterfacedObject`; the rest passes. Target:
+`bpvet` S6 and S9. Step 5.
+
+**H9. `Safe` is not last in `uses`.**
+
+```pascal
+uses Safe, Classes, SysUtils;         // SysUtils comes after Safe
+var Obj: TFoo;
+begin
+  Obj := TFoo.Create;
+  FreeAndNil(Obj);                    // SysUtils.FreeAndNil wins: compiles, S3 is bypassed
+end.
+```
+
+Now: nothing. Target: `bpvet` S7, the first rule of the linter. Step 2.
+
+**H10. Unmarked unsafe code, `external` in a safe module.**
+
+```pascal
+unit Fast;                            // neither `uses Safe` nor `// UNSAFE-UNIT:`
+interface
+function CStrLen(S: PChar): SizeInt; cdecl; external 'c' name 'strlen';
+                                      // external outside unsafe/, a pointer in the public API
+implementation
+end.
+```
+
+Now: nothing. Target: `bpvet` S8 (`// UNSAFE:` / `// UNSAFE-UNIT:` marks) and S12 (`external`
+only in a `// UNSAFE-UNIT:` module, no pointers in a binding's public API). Step 3.
+
+**H11. A non-exhaustive `case`, a parameter without `const`.**
+
+```pascal
+type TColor = (Red, Green, Blue);
+function ColorName(C: TColor): String; // no const
+begin
+  case C of
+    Red: Result := 'red';
+    Green: Result := 'green';
+  end;                                // Blue is missing: Result is garbage, FPC 3.2.2 is silent
+end;
+```
+
+Now: nothing. Target: `bpvet` S13 (all values listed, no `else`; a variant field is read only in
+the branch of its tag) and S14. Step 11.
+
+**H12. Range checks switched off in safe code.**
+
+```pascal
+{$R-}                                 // without // UNSAFE:
+var A: array[0..3] of Integer; I: Integer;
+begin
+  for I := 0 to 4 do
+    A[I] := 0;                        // writes past the end of A
+end.
+```
+
+Now: only the recommendation of a debug build with `-Cr -Co` (§6). Target: a module with
+`uses Safe`/`BP` is compiled with `{$R+}{$Q+}` in debug (release may drop them and keeps R1–R4);
+`bpvet` warns on an explicit `{$R-}` without `// UNSAFE:`. Step 12.
+
+**H13. Turbo Pascal style `object` code.**
+
+```pascal
+type
+  PView = ^TView;
+  TView = object
+    constructor Init;
+    destructor Done; virtual;
+  end;
+var V: PView;
+begin
+  New(V, Init);                       // S1 forbids New: such code can only live in unsafe
+  Dispose(V, Done);
+  V^.Done;                            // use after free: nothing checks it
+end.
+```
+
+Now: not covered; such code stays in unsafe modules (§19). Target: an owner over an `object`
+type (pointer + lifetime lock with the `Done` + `Dispose` release procedure) and lint rules for
+such code; the decision "(a) works / does not work, (b) is needed" is recorded in §19 (needed by
+unxed/dn#87). Step 13.
 
 ## §9. Migrating existing code
 
