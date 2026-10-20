@@ -136,3 +136,22 @@ jobs:
         with:
           name: fpide-build-log
           path: out/fpide/linux64/obj/fp.log
+
+  build-embedded:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    needs: [preflight]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fp-compiler fp-units-rtl fp-units-base fp-units-misc fp-units-fcl fp-units-gfx python3
+      - name: Build fp with the embedded compiler
+        run: FPIDE_BOOTSTRAP="$GITHUB_WORKSPACE/build/bootstrap-fpide" FPIDE_EMBED=1 fpide/tools/build-fpide.sh linux64 out/fpide/linux64-embed
+      - name: Upload compiler log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fpide-embedded-build-log
+          path: out/fpide/linux64-embed/obj/fp.log
