@@ -223,6 +223,13 @@ D8-job. A `workflow_dispatch`-only `build-embedded` job in `.github/workflows/fp
 6.  The remaining process I/O in small PRs: gdb, format tool (done in 5b), dlv `Stop` (done in 5c), in that order, keeping the synchronous path for DOS. Left: gdb (the guard writes to the child since 5c).
 7.  The final gate as in the issue: `ci`, `fpide`, `fpide-accept` on the final SHA, the pinned tv3/tve unchanged, and a list of supported targets and of the unsafe boundaries.
 
+    Support statement for this migration (based on the workflows, not compiler capability):
+    - **Verified:** Linux x86_64, external-compiler IDE build and acceptance tests (`fpide-accept`); the `fpide` unit, tv3, PTY, and preflight jobs also run on `ubuntu-24.04`.
+    - **Verified only by manual dispatch:** Linux x86_64 with `FPIDE_EMBED=1` (`build-embedded`); this is not part of the required PR checks.
+    - **Not verified by these workflows:** DOS/go32v2, Windows, BSD, and Darwin. Do not claim support from this migration without target-specific CI evidence.
+
+    Unsafe boundaries are intentional and remain outside the `Safe` migration: `compat/fpc` and the embedded `compiler/` tree; the units and call sites listed as unsafe in sections 4, 5, and 12 (including raw-pointer/record operations and view-owned state without a testable `TOwned` lifetime). Keep the per-unit `// UNSAFE-UNIT:`/`// UNSAFE:` markers and reasons as the source of truth; the final issue report must enumerate the remaining boundaries rather than imply they were migrated.
+
 ## 12. Step 4.4: decisions for the `{$H-}` units with ownership calls but no unit test
 
 Recorded 17-10-2026 on `main` at `5098b62`, by reading the sources (line-level grep, nothing was compiled for this step). Rule from section 5:
