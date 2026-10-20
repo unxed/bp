@@ -4,7 +4,7 @@ program t_gdbmiwrap;
   A mock GDB also checks the guarded child-stdin command path and the pipe-based MI response read. The test ends with
   SafeCheckNoLeaks (step 4.1c of safe/FPIDE-ADOPTION.md). It needs no installed gdb. }
 {$mode objfpc}{$H+}
-uses SysUtils, {$ifdef unix}BaseUnix,{$endif} GDBMIWrap, GDBMIProc, Safe;
+uses SysUtils, {$ifdef unix}BaseUnix,{$endif} GDBMIWrap, GDBMIProc, GDBPty, Safe;
 
 type
   TGDBWrapperBox = specialize TOwned<TGDBWrapper>;
@@ -90,6 +90,7 @@ begin
   WriteLn(Script, '    printf ''^exit\n(gdb) \n''');
   WriteLn(Script, '    exit 0');
   WriteLn(Script, '  fi');
+  WriteLn(Script, '  sleep 0.1');
   WriteLn(Script, '  printf ''^done,echo="%s"\n(gdb) \n'' "$command"');
   WriteLn(Script, 'done');
   CloseFile(Script);
@@ -100,7 +101,14 @@ begin
     Wrapper := WrapperOwner.Get;
     try
       Check(Wrapper.Alive, 'gdb integration: guarded mock process starts');
-      Wrapper.Command('-test-command');
+      Check(PtyOpen <> '', 'gdb integration: test PTY opens');
+      PtyRelayBegin;
+      try
+        Wrapper.Command('-test-command');
+      finally
+        PtyRelayEnd;
+        PtyClose;
+      end;
       Check(Wrapper.ResultRecord.Success, 'gdb integration: MI result record is read');
       Check(Wrapper.ResultRecord.Parameters['echo'].AsString = '-test-command',
         'gdb integration: command reaches the child stdin through the guard');
