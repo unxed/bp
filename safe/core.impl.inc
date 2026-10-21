@@ -7,6 +7,150 @@ var
   GLive: LongInt = 0;         // owned objects (TOwned/TShared/TArena) alive right now
   GDeferFailures: LongInt = 0; // exceptions suppressed in deferred calls
   GGoFailures: LongInt = 0;    // task errors that nobody collected via TGroup.Wait
+  GLives: TSafeLife = nil;     // lives made with debug checks on (H2), a doubly linked list
+  GLivesLock: LongInt = 0;     // a spin lock over GLives
+
+procedure SafeLockLives;
+begin
+  while InterlockedCompareExchange(GLivesLock, 1, 0) <> 0 do
+    ThreadSwitch;
+end;
+
+procedure SafeUnlockLives;
+begin
+  InterlockedExchange(GLivesLock, 0);
+end;
+
+procedure SafeListLife(L: TSafeLife);
+begin
+  SafeLockLives;
+  L.NextLive := GLives;
+  if GLives <> nil then
+    GLives.PrevLive := L;
+  GLives := L;
+  L.Listed := True;
+  SafeUnlockLives;
+end;
+
+procedure SafeUnlistLife(L: TSafeLife);
+begin
+  SafeLockLives;
+  if L.PrevLive <> nil then
+    L.PrevLive.NextLive := L.NextLive
+  else
+    GLives := L.NextLive;
+  if L.NextLive <> nil then
+    L.NextLive.PrevLive := L.PrevLive;
+  L.PrevLive := nil;
+  L.NextLive := nil;
+  L.Listed := False;
+  SafeUnlockLives;
+end;
+
+{ How many words of the instance of A.Obj (the fields, after the VMT pointer) hold the value P. }
+function SafeRefsTo(A: TSafeLife; P: System.Pointer): LongInt;
+var
+  I, N: PtrUInt;
+begin
+  Result := 0;
+  N := A.Obj.InstanceSize div SizeOf(PtrUInt);
+  for I := 1 to N - 1 do
+    if System.PPtrUInt(PtrUInt(A.Obj) + I * SizeOf(PtrUInt))^ = PtrUInt(P) then
+      Inc(Result);
+end;
+
+{ '' or the text about the live listed objects reachable only from each other (a TShared cycle, H2): an object
+  is held from outside when its count is greater than the number of references to it from the fields of the
+  listed objects; everything those reach is held too; the rest is garbage that keeps itself alive. }
+function SafeCycleReport: string;
+var
+  Lives: array of TSafeLife;
+  Inner: array of LongInt;
+  Held, Seen: array of Boolean;
+  L: TSafeLife;
+  N, I, J, Cur, Count: SizeInt;
+  Changed: Boolean;
+  Types, Path: string;
+begin
+  Result := '';
+  SafeLockLives;
+  try
+    N := 0;
+    L := GLives;
+    while L <> nil do
+    begin
+      if (L.Obj <> nil) and (L.IntfPtr <> nil) then
+      begin
+        SetLength(Lives, N + 1);
+        Lives[N] := L;
+        Inc(N);
+      end;
+      L := L.NextLive;
+    end;
+    if N = 0 then
+      Exit;
+    SetLength(Inner, N);
+    SetLength(Held, N);
+    SetLength(Seen, N);
+    for J := 0 to N - 1 do
+    begin
+      Inner[J] := 0;
+      for I := 0 to N - 1 do
+        Inc(Inner[J], SafeRefsTo(Lives[I], Lives[J].IntfPtr));
+      Held[J] := Lives[J].RefCount > Inner[J];
+      Seen[J] := False;
+    end;
+    repeat
+      Changed := False;
+      for I := 0 to N - 1 do
+        if Held[I] then
+          for J := 0 to N - 1 do
+            if not Held[J] and (SafeRefsTo(Lives[I], Lives[J].IntfPtr) > 0) then
+            begin
+              Held[J] := True;
+              Changed := True;
+            end;
+    until not Changed;
+    Count := 0;
+    Types := '';
+    Cur := -1;
+    for J := 0 to N - 1 do
+      if not Held[J] then
+      begin
+        Inc(Count);
+        if Cur < 0 then
+          Cur := J;
+        if Pos(' ' + Lives[J].Obj.ClassName + ' ', ' ' + StringReplace(Types, ',', ' ', [rfReplaceAll]) + ' ') = 0 then
+        begin
+          if Types <> '' then
+            Types := Types + ', ';
+          Types := Types + Lives[J].Obj.ClassName;
+        end;
+      end;
+    if Count = 0 then
+      Exit;
+    Path := Lives[Cur].Obj.ClassName;
+    while not Seen[Cur] do
+    begin
+      Seen[Cur] := True;
+      I := -1;
+      for J := 0 to N - 1 do
+        if not Held[J] and (SafeRefsTo(Lives[Cur], Lives[J].IntfPtr) > 0) then
+        begin
+          I := J;
+          Break;
+        end;
+      if I < 0 then
+        Break;
+      Cur := I;
+      Path := Path + ' -> ' + Lives[Cur].Obj.ClassName;
+    end;
+    Result := Format('; %d of them are reachable only from each other, a TShared cycle (H2): types %s, path %s; '
+      + 'make the back reference a TWeak (Shared.Weak)', [Count, Types, Path]);
+  finally
+    SafeUnlockLives;
+  end;
+end;
 
 function SafeLiveCount: LongInt;
 begin
@@ -21,7 +165,7 @@ end;
 procedure SafeCheckNoLeaks;
 begin
   if GLive <> 0 then
-    SafeFail(Format('SAFE-R5: %d owned object(s) still alive', [GLive]));
+    SafeFail(Format('SAFE-R5: %d owned object(s) still alive', [GLive]) + SafeCycleReport);
   if GDeferFailures <> 0 then
     SafeFail(Format('SAFE-R5: %d exception(s) were suppressed in deferred calls', [GDeferFailures]));
   if GGoFailures <> 0 then
@@ -42,6 +186,8 @@ begin
       '): TInterfacedObject is owned by its interface refcount; hold it through an interface');
   Result := TSafeLife.Create;
   Result.Obj := AObj;
+  if SafeDebugChecks then
+    SafeListLife(Result);
   InterlockedIncrement(GLive);
 end;
 
@@ -49,6 +195,8 @@ destructor TSafeLife.Destroy;
 var
   O: TObject;
 begin
+  if Listed then
+    SafeUnlistLife(Self);
   if CellObj <> nil then
     CellObj.Life := nil; // weak references will no longer lock the object
   O := Obj;
@@ -100,8 +248,13 @@ end;
 { ---------- TOwned ---------- }
 
 class function TOwned.Own(AObj: T): TOwned;
+var
+  L: TSafeLife;
 begin
-  Result.FLife := SafeNewLife(AObj, 'TOwned.Own');
+  L := SafeNewLife(AObj, 'TOwned.Own');
+  Result.FLife := L;
+  if L <> nil then
+    L.IntfPtr := System.Pointer(Result.FLife); // the cycle report of SafeCheckNoLeaks looks for this value (H2)
   Result.FObj := AObj;
 end;
 
@@ -184,6 +337,8 @@ class function TShared.Share(AObj: T): TShared;
 begin
   Result.FLifeObj := SafeNewLife(AObj, 'TShared.Share');
   Result.FLife := Result.FLifeObj;
+  if Result.FLifeObj <> nil then
+    Result.FLifeObj.IntfPtr := System.Pointer(Result.FLife); // the cycle report of SafeCheckNoLeaks looks for it (H2)
   Result.FObj := AObj;
 end;
 

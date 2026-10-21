@@ -19,6 +19,11 @@ type
     Obj: TObject;
     CellObj: TSafeCell;
     CellRef: IInterface;
+    { Debug checks (H2): the value of an IInterface field that holds this life (set by Own/Share), and the list of
+      lives made with SafeDebugChecks on, which the cycle report of SafeCheckNoLeaks walks. }
+    IntfPtr: System.Pointer;
+    PrevLive, NextLive: TSafeLife;
+    Listed: Boolean;
     destructor Destroy; override;
     function Cell: TSafeCell; // created on the first TShared.Weak
   end;
@@ -50,7 +55,10 @@ var
   SafeDebugChecks: Boolean = {$IFDEF SAFE_DEBUG}True{$ELSE}False{$ENDIF};
 
 { Counter of live owned objects (like testing.allocator in Zig): grows on Own/Share/Adopt,
-  decreases on destruction. A test that "freed everything" checks SafeCheckNoLeaks (R5). }
+  decreases on destruction. A test that "freed everything" checks SafeCheckNoLeaks (R5). With debug checks on
+  (when the objects were made) the R5 message also names the live objects that are reachable only from each other,
+  a TShared cycle (H2): their number, their types and the path of the cycle. The report looks for the owners in
+  the fields of the objects themselves (not in dynamic arrays or records on the heap that they point to). }
 function SafeLiveCount: LongInt;
 procedure SafeCheckNoLeaks;
 { Exceptions suppressed in deferred TDefer calls (see below). }
