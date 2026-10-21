@@ -3,6 +3,7 @@ program mf_unsafe_ok;
 {$mode objfpc}{$H+}
 uses SysUtils, Safe;
 var
+  // UNSAFE: P holds the raw block allocated and freed below
   P: System.Pointer;
   O: TObject;
 begin

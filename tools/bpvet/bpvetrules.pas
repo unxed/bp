@@ -31,7 +31,8 @@ procedure VetCheckS12(const Src: TVetSource; const Module: TPasModule; var Repor
     Error    a module uses neither Safe nor BP and is not marked // UNSAFE-UNIT:;
     Error    a full name of a poisoned routine or type (System.GetMem, System.Move, SysUtils.FreeAndNil,
              System.Pointer and the rest of safe/poison.intf.inc) without a // UNSAFE: <why> comment on the line
-             above or at the end of the line. Comments and string literals are skipped. }
+             above (one comment covers a block of such lines right below it) or at the end of the line.
+             Comments and string literals are skipped. }
 procedure VetCheckS8(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 implementation
@@ -465,21 +466,10 @@ begin
   Result := 0;
 end;
 
-{ The line above Row (1-based), skipping blank lines, is a // UNSAFE: comment. }
-function MarkedAbove(const Src: TVetSource; const Row: Integer): Boolean;
-var
-  R: Integer;
-begin
-  R := Row - 1;
-  while (R >= 1) and (Trim(VetLine(Src, R)) = '') do
-    Dec(R);
-  Result := (R >= 1) and IsMarkComment(VetLine(Src, R));
-end;
-
 procedure VetCheckS8(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 var
   I, Col: Integer;
-  InBrace, InParen: Boolean;
+  InBrace, InParen, Covered: Boolean;
   Code, Tail, Name: String;
 begin
   if IsUnsafeUnit(Src) then
@@ -489,13 +479,24 @@ begin
       'the module uses neither Safe nor BP and is not marked unsafe: end its uses with Safe (or BP), '
       + 'or put // UNSAFE-UNIT: <why> before its header if the whole module is unsafe (safe/SPEC.md, section 7)',
       Report);
+  { A // UNSAFE: comment covers the lines with unsafe full names right below it (blank and comment lines
+    between them keep it); any other line of code ends it. }
   InBrace := False;
   InParen := False;
+  Covered := False;
   for I := 0 to High(Src.Lines) do
   begin
     Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
     Col := PoisonFullName(Code, Name);
-    if (Col > 0) and not IsMarkComment(Tail) and not MarkedAbove(Src, I + 1) then
+    if Col = 0 then
+    begin
+      if IsMarkComment(Src.Lines[I]) then
+        Covered := True
+      else if Trim(Code) <> '' then
+        Covered := False;
+      Continue;
+    end;
+    if not Covered and not IsMarkComment(Tail) then
       VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S8',
         'unsafe ' + Name + ' without a mark: put a comment // UNSAFE: <why this is safe> on the line above, '
         + 'or use an owner instead (TOwned, TArray, assignment; safe/SPEC.md, section 7)');
