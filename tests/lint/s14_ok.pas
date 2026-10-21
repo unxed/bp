@@ -18,7 +18,7 @@ type
 
 function Greet(const Name: String; Times: Integer): String;
 function Same(constref A, B: AnsiString): Boolean;
-procedure Append(var S: String; const Tail: UnicodeString);
+procedure Append(var S: String; const Tail: String);
 procedure Fill(out S: String);
 // UNSAFE: the body changes its own copy of the text on purpose
 function Upper(S: String): String;
@@ -44,9 +44,9 @@ begin
   Result := A = B;
 end;
 
-procedure Append(var S: String; const Tail: UnicodeString);
+procedure Append(var S: String; const Tail: String);
 begin
-  S := S + String(Tail);
+  S := S + Tail;
 end;
 
 procedure Fill(out S: String);
