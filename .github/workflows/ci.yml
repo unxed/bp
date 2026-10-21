@@ -29,8 +29,8 @@ jobs:
         run: bash tests/lint.sh out/bpvet
       - name: bpvet --strict over its own sources
         run: out/bpvet --strict tools/bpvet
-      - name: bpvet --report over tests/
-        run: out/bpvet --report tests
+      - name: bpvet --report over tests/ (without tests/lint, whose *_bad.pas have findings by design)
+        run: out/bpvet --report tests/safe tests/ext
       - name: bpvet --report over safe/ and ext/ (findings to mark before --strict; does not gate yet)
         continue-on-error: true
         run: out/bpvet --report safe ext
