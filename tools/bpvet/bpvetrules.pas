@@ -99,7 +99,9 @@ procedure VetCheckS15(const Src: TVetSource; const Module: TPasModule; var Repor
            the module) whose type is a class (as for S5: of the module, of S5ClassTypes or of a used unit), also when
            the field is marked // borrow:. A task runs on another thread and can outlive the caller: a borrow there
            is a data race or a use after free. Pass an owner (TShared, TOwned via Move), a value, String, TArray or
-           TChan instead, or put a comment // UNSAFE: <why> on the line above or at the end of the line. }
+           TChan instead, or put a comment // UNSAFE: <why> on the line above or at the end of the line.
+    Error  a field of a task class whose type is an interface (of the module, or IInterface, IUnknown, IInvokable):
+           the object behind the reference is shared with the caller, and its state is reachable from two threads. }
 procedure VetCheckS11(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
@@ -2098,7 +2100,27 @@ begin
   end;
 end;
 
-procedure S11CheckList(const Src: TVetSource; const L: TFPList; const Tasks, ClassNames: String;
+{ Adds to Names (' name ') the interface types declared in L, also those nested in classes and records. }
+procedure S11CollectInterfaces(const L: TFPList; var Names: String);
+var
+  I: Integer;
+  E: TPasElement;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+  begin
+    E := TPasElement(L[I]);
+    if (E is TPasClassType) and (TPasClassType(E).ObjKind = okInterface) and (E.Name <> '') then
+      Names := Names + LowerCase(E.Name) + ' ';
+    if E is TPasClassType then
+      S11CollectInterfaces(TPasClassType(E).Members, Names)
+    else if E is TPasRecordType then
+      S11CollectInterfaces(TPasRecordType(E).Members, Names);
+  end;
+end;
+
+procedure S11CheckList(const Src: TVetSource; const L: TFPList; const Tasks, ClassNames, Intfs: String;
   var Report: TVetReport);
 var
   I, J: Integer;
@@ -2125,9 +2147,15 @@ begin
             + TPasVariable(M).VarType.Name + ' without an owner: a task runs on another thread and can outlive the '
             + 'caller, so a borrow is a data race or a use after free even with // borrow:; pass TShared, TOwned via '
             + 'Move, a value, String, TArray or TChan, or put a comment // UNSAFE: <why> on the line above '
-            + '(safe/SPEC.md, section 14)', Report);
+            + '(safe/SPEC.md, section 14)', Report)
+        else if (T <> '') and (Pos(' ' + T + ' ', Intfs) > 0) and not S5UnsafeMarked(Src, M.SourceLinenumber) then
+          AddAtElement(Src, M, vsError, 'S11',
+            'the field ' + E.Name + '.' + M.Name + ' of a task holds the interface ' + TPasVariable(M).VarType.Name
+            + ': the object behind it is shared with the caller, so its state is reachable from two threads (a data '
+            + 'race); pass TShared, TOwned via Move, a value, String, TArray or TChan, or put a comment '
+            + '// UNSAFE: <why> on the line above (safe/SPEC.md, section 14)', Report);
       end;
-    S11CheckList(Src, TPasClassType(E).Members, Tasks, ClassNames, Report);
+    S11CheckList(Src, TPasClassType(E).Members, Tasks, ClassNames, Intfs, Report);
   end;
 end;
 
@@ -2135,7 +2163,7 @@ procedure VetCheckS11(const Src: TVetSource; const Module: TPasModule; var Repor
 var
   Sections: array[0..1] of TPasDeclarations;
   I: Integer;
-  Tasks, ClassNames: String;
+  Tasks, ClassNames, Intfs: String;
   Changed: Boolean;
 begin
   if IsUnsafeUnit(Src) then
@@ -2167,9 +2195,13 @@ begin
   for I := 0 to 1 do
     if Sections[I] is TPasSection then
       S5UsedClasses(Src, TPasSection(Sections[I]).UsesClause, ClassNames);
+  Intfs := ' iinterface iunknown iinvokable ';
   for I := 0 to 1 do
     if Sections[I] <> nil then
-      S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Report);
+      S11CollectInterfaces(Sections[I].Declarations, Intfs);
+  for I := 0 to 1 do
+    if Sections[I] <> nil then
+      S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Intfs, Report);
 end;
 
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
