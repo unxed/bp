@@ -8,7 +8,7 @@ unit BpvetCore;
 interface
 
 uses
-  SysUtils, Classes, PasTree, PParser, Safe;
+  SysUtils, Classes, PasTree, PParser, PScanner, Safe;
 
 type
   { vsFatal: the file could not be read or parsed, so no rule was checked in it }
@@ -53,9 +53,6 @@ function VetWordColumn(const Line, Word: String): Integer;
 procedure VetPrint(const Report: TVetReport; const Mode: TVetMode; var Errors, Warnings, Fatals: Integer);
 
 implementation
-
-uses
-  PScanner;
 
 type
   { The tree container of fcl-passrc. bpvet resolves no names: every element is created as it is, and FindElement
