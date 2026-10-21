@@ -479,7 +479,8 @@ end;
 Now: the named types `Pointer, PByte, PChar, PAnsiChar, PWideChar` give the `SAFE-S4`
 compiler warning; `^T`, `@` and pointer arithmetic (`Inc(P)`, `P + N` over a name declared with a pointer type
 in the module) outside code marked `// UNSAFE:` are a `bpvet` S4 error; a dereference `P^` and `Inc(P^)` are
-not. Step 4.
+not, nor is `@Proc` / `@Obj.Method` of a procedure or method declared in the module (a procedural value for
+`TDefer.Call`, `TGroup.Go` or a `TProcedure` parameter; `@` of a routine of another unit is still reported). Step 4.
 
 **H5. A copy of `TOwned`.**
 
