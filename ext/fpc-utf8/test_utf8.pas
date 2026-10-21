@@ -1,5 +1,6 @@
 { The test of UTF8Everywhere. Note that the unit is not in uses:
   -FaUTF8Everywhere from utf8.cfg inserts it. Exit code 0 means all checks passed. }
+// UNSAFE-UNIT: the test of UTF8Everywhere alone, built without Safe or BP (ext/fpc-utf8 is independent of them)
 program test_utf8;
 
 uses

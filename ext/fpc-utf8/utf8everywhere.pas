@@ -11,6 +11,7 @@
   Length(S) and S[i] stay in bytes. This is not a bug but the UTF-8 Everywhere principle:
   byte indexes are cheap and unambiguous, and Pos/Copy/Delete are correct on them
   because UTF-8 is self-synchronizing. Characters are rarely needed; CodePoints is there for them. }
+// UNSAFE-UNIT: inserted first into every program by -FaUTF8Everywhere, before Safe or BP exist; it wraps the string manager
 unit UTF8Everywhere;
 
 {$mode objfpc}{$H+}
