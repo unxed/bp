@@ -28,11 +28,35 @@ type
     procedure Execute; override;
   end;
 
+  { The object behind a TWeak in the stress test: its destructor counts itself and spoils the magic. }
+  TStressObj = class
+  public
+    Magic: LongInt;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+  TStressShared = specialize TShared<TStressObj>;
+  TStressWeak = specialize TWeak<TStressObj>;
+
+  { Locks GWeak again and again while the main thread drops the last strong reference (H6). }
+  TWeakHammer = class(TTask)
+  public
+    procedure Run; override;
+  end;
+
 var
   Failed: Integer = 0;
   Ev: PEventState; // manual reset: SyncObjs.TEvent is built on this
   Shared: LongInt = 0;
   CS: TRTLCriticalSection;
+  GWeak: TStressWeak;            // written by the main thread only while no hammer runs
+  GDestroyed: LongInt = 0;       // destructors of TStressObj
+  GBad: LongInt = 0;             // a locked object that was already destroyed
+  GLocked: LongInt = 0;          // successful TryLock calls
+  GSpin: LongInt = 0;
+
+const
+  StressMagic = $5AFE;
 
 constructor TChurn.Create(AN: Integer; const AOut: TIntChan);
 begin
@@ -74,6 +98,36 @@ procedure TPlainThread.Execute;
 begin
   BasicEventWaitFor(Cardinal($FFFFFFFF), Ev); // no timeout
   Value := 42;
+end;
+
+constructor TStressObj.Create;
+begin
+  inherited Create;
+  Magic := StressMagic;
+end;
+
+destructor TStressObj.Destroy;
+begin
+  Magic := 0;
+  InterlockedIncrement(GDestroyed);
+  inherited Destroy;
+end;
+
+procedure TWeakHammer.Run;
+var
+  L: TStressShared;
+  N: Integer;
+begin
+  N := 0;
+  // once TryLock fails the object is gone for good; the cap only guards against a hang
+  while (N < 1000000) and L.TryLock(GWeak) do
+  begin
+    if L.Get.Magic <> StressMagic then
+      InterlockedIncrement(GBad);
+    InterlockedIncrement(GLocked);
+    L.Reset;
+    Inc(N);
+  end;
 end;
 
 procedure Check(Cond: Boolean; const What: string);
@@ -125,6 +179,41 @@ begin
   BasicEventDestroy(Ev);
 end;
 
+{ TWeak.TryLock in several threads against the last Reset in the main thread (H6): every object is destroyed exactly
+  once, and no TryLock gives an object that is already destroyed or revives it. }
+procedure WeakStress(Rounds, Hammers: Integer);
+var
+  G: TGroup;
+  S: TStressShared;
+  R, I, J: Integer;
+  Before: LongInt;
+  T0: QWord;
+begin
+  GDestroyed := 0;
+  GBad := 0;
+  GLocked := 0;
+  for R := 1 to Rounds do
+  begin
+    S := TStressShared.Share(TStressObj.Create);
+    GWeak := S.Weak;
+    Before := GLocked;
+    G := TGroup.Create;
+    for I := 1 to Hammers do
+      G.Go(TWeakHammer.Create);
+    T0 := GetTickCount64;
+    while (GLocked = Before) and (GetTickCount64 - T0 < 1000) do // a hammer is running: the race is real
+      ThreadSwitch;
+    for J := 1 to (R * 7919) mod 20000 do // a different moment of the last Reset in every round
+      InterlockedIncrement(GSpin);
+    S.Reset; // the last strong reference of the main thread; a hammer may hold the object a little longer
+    G.Wait;
+    GWeak.Reset;
+  end;
+  Check(GDestroyed = Rounds, Format('weak stress: %d objects destroyed exactly once (destroyed %d)', [Rounds, GDestroyed]));
+  Check(GBad = 0, Format('weak stress: no destroyed object locked (%d bad of %d locks)', [GBad, GLocked]));
+  Check(GLocked > 0, 'weak stress: the hammers did lock the objects');
+end;
+
 procedure Timeout;
 var
   E: PRTLEvent;
@@ -151,6 +240,7 @@ begin
   WriteLn('-- TThread'); PlainTThread;
   WriteLn('-- Timeout'); Timeout;
   WriteLn('-- Many'); Churn(40, 25);
+  WriteLn('-- WeakStress'); WeakStress(300, 4);
   {$if declared(SafeRawThreadCount)}
   Sleep(50);
   Check(SafeRawThreadCount = 0, 'raw: all threads finished');

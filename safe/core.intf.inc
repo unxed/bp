@@ -10,6 +10,11 @@ type
   TSafeCell = class(TInterfacedObject)
   public
     Life: TObject; // TSafeLife while the object is alive; nil after it dies
+    Lock: LongInt; // spin lock: guards Life against the destructor of TSafeLife in another thread (H6)
+    { Under the lock: the TSafeLife with one more reference taken for the caller, or nil when the object is gone
+      or is being destroyed (its count already reached zero). The caller drops that reference itself. }
+    function AcquireLife: TObject;
+    procedure ClearLife; // under the lock: Life := nil (the destructor of TSafeLife)
   end;
 
   { Object lifetime. The compiler maintains the count: the interface fields in the TOwned/TShared records
@@ -26,6 +31,7 @@ type
     Listed: Boolean;
     destructor Destroy; override;
     function Cell: TSafeCell; // created on the first TShared.Weak
+    function TryAddRef: Boolean; // +1 to the count only while it is above zero: never revives a dying object
   end;
 
   { Arena generation. FreeAll bumps it; a TArenaRef made in debug mode remembers it. Outlives the arena

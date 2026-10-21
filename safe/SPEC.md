@@ -39,7 +39,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | `bpvet` rule S10, static part (`TOwned` copied only through `.Move`, no `TOwned` by value in a parameter) | **implemented, lint tests, CI**; the `SAFE_DEBUG` runtime check is **plan** | §6 |
 | `bpvet` rule S5, fields and globals (a field/global of a class declared in the module or of a common RTL class only with `// borrow:`) | **implemented, lint tests, CI**; classes of other units and the borrow-escape rule are **plan** | §6 |
 | `bpvet` rule S15 (no `TShared` cycles: a warning on a `TShared` field that leads back to its own class, heuristic over one module) | **implemented, lint tests, CI**; the `SAFE_DEBUG` cycle report of `SafeCheckNoLeaks` is **implemented, test** (`test_safe`, `SharedCycleReported`) | §6, H2 |
-| `bpvet` rule S11 (a field of a task with a class type is an error, also with `// borrow:`; so is a field with an interface type or a named pointer type) | **implemented, lint tests, CI**; a field `^T` is caught by S4; the thread-safe `TWeak.TryLock` is **plan** | §6, §14, H6 |
+| `bpvet` rule S11 (a field of a task with a class type is an error, also with `// borrow:`; so is a field with an interface type or a named pointer type) | **implemented, lint tests, CI**; a field `^T` is caught by S4; the thread-safe `TWeak.TryLock` (a lock in the cell) is **implemented, stress test** (`test_threads`; x86_64, i386, aarch64) | §6, §14, H6 |
 | `bpvet` rules S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
@@ -320,8 +320,11 @@ Runtime checks (always enabled, cost one comparison):
 | R9 | debug checks on (`-dSAFE_DEBUG` or `SafeDebugChecks := True`): `TOwned.Reset` while a copy of the owner is alive (S10); the message names the class |
 | R10 | debug checks on at `TArenaRef.Adopt`: `TArenaRef.Get` after `TArena.FreeAll` of its arena (the arena generation changed, H3); the message names the class. With checks off `TArenaRef` keeps no arena link and `Get` is one comparison |
 
-Thread safety in v0.1: the counters are atomic, so `TShared` can be copied between threads;
-`TWeak.TryLock` from different threads concurrently with the last `Reset` is a race (§11).
+Thread safety: the counters are atomic, so `TShared` can be copied between threads;
+`TWeak.TryLock` from different threads concurrently with the last `Reset` is safe: it reads the life under a spin
+lock in the cell, which the destructor also takes to clear it, and adds a reference only while the count is above
+zero, so a dying object is never revived (H6, the stress test in `test_threads`). `TShared.Weak` itself is called by a
+holder of the strong reference; the first `Weak` of one object from two threads at once is not synchronised.
 
 ## §6. What enforces each rule
 
@@ -386,7 +389,7 @@ System.GetMem(Buf, Len);
 | No `TShared` cycles | programmer + linter `bpvet` (S15, heuristic) | H2 |
 | Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
-| Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter `bpvet` (S11: class, interface and pointer fields of a task); the `TryLock` race is open (§11) | H6 |
+| Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter `bpvet` (S11: class, interface and pointer fields of a task); `TryLock` takes a lock in the cell (stress test in `test_threads`) | H6 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter `bpvet` (S6, S9); R3 only for `TInterfacedObject` | H8 |
 | `Safe` is last in `uses` | linter `bpvet` S7; in a program with `BP` first only a warning (§14) | H9 |
@@ -551,10 +554,9 @@ begin
 end;
 ```
 
-Now: `bpvet` S11 rejects a field of a task whose type is a class (also with `// borrow:`), an interface or a named pointer type; `TWeak.TryLock` from another thread concurrently with the last `Reset` is a race
-(§11). Target: `bpvet` S11 allows task fields only of value types, `String`, `TArray`, `TChan`,
-`TShared`, or `TOwned` passed through `Move`; `TWeak.TryLock` becomes thread-safe (a lock in the
-cell), with a stress test against destruction in another thread on x86_64 and aarch64. Step 10.
+Now: `bpvet` S11 rejects a field of a task whose type is a class (also with `// borrow:`), an interface or a named pointer type; `TWeak.TryLock` from another thread concurrently with the last `Reset` is safe: a lock in the cell and a
+count that never grows back from zero (stress test in `test_threads`, x86_64, i386 and aarch64 in CI). Target: `bpvet` S11 allows task fields only of value types, `String`, `TArray`, `TChan`,
+`TShared`, or `TOwned` passed through `Move`. Step 10.
 
 **H7. `.Destroy` outside unsafe.**
 
@@ -710,7 +712,6 @@ end;                                    // the list is destroyed here, also on a
 - **Lazarus package** `safepascal.lpk` in OPM: one-click installation.
 - **GC heap** as a tracing arena: objects declare `procedure Trace(V: TVisitor)`,
   roots are `TShared` to the heap; `Collect` instead of `FreeAll`. Only for graphs where ownership is unnatural.
-- `TWeak.TryLock` between threads (a lock in the cell).
 - **Modules and dependencies as in Go** (§15) and the **`sp` tool** — one command for building, testing,
   checking, formatting and dependencies (§16).
 - Windows in CI; `ParamStr` in UTF-8 on Windows.
@@ -789,7 +790,7 @@ On Linux `BPThreads` is threads on `clone`/`futex`/`mmap` without libc (§18), w
 Unixes — `cthreads`. On DOS (go32v2) there are no threads: `TGroup.Go` raises R8 immediately.
 
 Limitations of v0.3: `Select` is receive-only; no timers (`time.After`) — there is a `Select` timeout;
-no deadlock detection ("all goroutines are asleep"); `TWeak.TryLock` between threads is a race (§11).
+no deadlock detection ("all goroutines are asleep").
 
 ## §15. Dependencies like Go, without a proxy (plan)
 
