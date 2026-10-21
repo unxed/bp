@@ -41,6 +41,13 @@ procedure VetCheckS8(const Src: TVetSource; const Module: TPasModule; var Report
              (destructor TFoo.Destroy) and inherited Destroy are not calls of it. }
 procedure VetCheckS3(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S4: raw pointers (safe/SPEC.md §6, register H4). A module marked // UNSAFE-UNIT: is not checked.
+    Error    a pointer type ^T or the address operator @ without a // UNSAFE: <why> comment on the line above (one
+             comment covers a block of such lines right below it) or at the end of the line. A dereference P^ is
+             not a finding (the pointer it needs is). Comments and string literals are skipped. Pointer arithmetic
+             (Inc/Dec of a pointer, P + N) needs the types and is not checked yet (unxed/bp#56). }
+procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 implementation
 
 type
@@ -566,9 +573,87 @@ begin
   end;
 end;
 
+{ S4 }
+
+{ The column of the first pointer type ^T or address operator @ in Code (a line without comments and strings), or 0;
+  What gets '^T' or '@'. A ^ right after a name, ) or ] is a dereference (P^, F(X)^, A[I]^), except after the
+  keyword of (array of ^T). }
+function PointerOp(const Code: String; out What: String): Integer;
+var
+  I, J, K: Integer;
+  Prev: String;
+begin
+  What := '';
+  for I := 1 to Length(Code) do
+  begin
+    if Code[I] = '@' then
+    begin
+      What := '@';
+      Exit(I);
+    end;
+    if Code[I] <> '^' then
+      Continue;
+    J := I - 1;
+    while (J >= 1) and (Code[J] = ' ') do
+      Dec(J);
+    if (J >= 1) and (Code[J] in [')', ']', '^']) then
+      Continue;
+    if (J >= 1) and IsWordChar(Code[J]) then
+    begin
+      K := J;
+      while (K > 1) and IsWordChar(Code[K - 1]) do
+        Dec(K);
+      Prev := LowerCase(Copy(Code, K, J - K + 1));
+      if Prev <> 'of' then
+        Continue;
+    end;
+    What := '^T';
+    Exit(I);
+  end;
+  Result := 0;
+end;
+
+procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  I, Col: Integer;
+  InBrace, InParen, Covered: Boolean;
+  Code, Tail, What: String;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  InBrace := False;
+  InParen := False;
+  Covered := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    Col := PointerOp(Code, What);
+    if Col = 0 then
+    begin
+      if IsMarkComment(Src.Lines[I]) then
+        Covered := True
+      else if Trim(Code) <> '' then
+        Covered := False;
+      Continue;
+    end;
+    if Covered or IsMarkComment(Tail) then
+      Continue;
+    if What = '@' then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S4',
+        'raw address @: pass the variable as a var or const parameter, or borrow it through an owner '
+        + '(TOwned.Get, TSlice), or put a comment // UNSAFE: <why the address does not outlive the variable> '
+        + 'on the line above (safe/SPEC.md, section 7)')
+    else
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S4',
+        'raw pointer type ^T: use an owner (TOwned, TShared, TWeak), a class reference, TArray or TSlice, '
+        + 'or put a comment // UNSAFE: <why> on the line above (safe/SPEC.md, section 7)');
+  end;
+end;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 begin
   VetCheckS3(Src, Module, Report);
+  VetCheckS4(Src, Module, Report);
   VetCheckS7(Src, Module, Report);
   VetCheckS8(Src, Module, Report);
   VetCheckS12(Src, Module, Report);
