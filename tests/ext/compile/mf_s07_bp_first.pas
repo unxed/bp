@@ -7,5 +7,5 @@ program mf_s07_bp_first;
 uses BP, SysUtils;
 var O: TObject;
 begin
-  O := TObject.Create; FreeAndNil(O);
+  O := TObject.Create; FreeAndNil(O); // UNSAFE: freed by hand right here
 end.

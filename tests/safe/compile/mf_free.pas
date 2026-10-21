@@ -4,5 +4,5 @@ program mf_free;
 uses SysUtils, Safe;
 var O: TObject;
 begin
-  O := TObject.Create; O.Free;
+  O := TObject.Create; O.Free; // UNSAFE: freed by hand right here
 end.

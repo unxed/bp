@@ -34,7 +34,8 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S4 (`^T`, `@`, pointer arithmetic) | **implemented, lint tests, CI** | §6 |
-| `bpvet` rules S5–S6, S9–S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
+| `bpvet` rule S6 (`TFoo.Create` at once into `Own/Share/Adopt/Go`/`raise`, else `// UNSAFE:`) | **implemented, lint tests, CI** | §6 |
+| `bpvet` rules S5, S9–S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
 | Lazarus package (OPM), Windows in CI | **plan** | §11 |
@@ -330,7 +331,7 @@ Warnings are turned into errors with one directive in a module, `{$WARN SYMBOL_D
 or with the switch `-Sew` for the whole project. Migration modes: **permissive** — warnings;
 **strict** — errors.
 
-`bpvet` checks the rules marked "linter" (S3, S4, S7, S8, S12 so far). It reads the sources with `fcl-passrc`
+`bpvet` checks the rules marked "linter" (S3, S4, S6, S7, S8, S12 so far). It reads the sources with `fcl-passrc`
 (shipped with FPC) and prints FPC messages, one line each with the fix: `file(line,col) Error: SAFE-S7 ...`. Build and
 run: `tools/bpvet/build.sh out/bpvet && out/bpvet [--report|--strict] FILE|DIR...`. By default errors fail (exit code 1)
 and warnings are printed; `--report` prints every finding as a warning and never fails (permissive), `--strict` makes

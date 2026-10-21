@@ -17,7 +17,7 @@ procedure DropTemp;
 var
   O: TObject;
 begin
-  O := TObject.Create;
+  O := TObject.Create; // UNSAFE: freed by hand on the next line
   O.Destroy;
 end;
 
