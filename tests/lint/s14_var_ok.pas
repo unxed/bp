@@ -1,4 +1,5 @@
 // EXPECT: clean
+// UNSAFE-UNIT: fixture for S14 external-call write analysis
 { S14: writes through assignment targets, calls, address-taking, loops, with, and nested routines count; exceptions are skipped. }
 unit s14_var_ok;
 
@@ -33,7 +34,6 @@ procedure ThroughWith(var P: TPoint);
 procedure ThroughNested(var N: Integer);
 procedure ThroughUnsafe(var N: Integer);
 procedure Raw(var Buffer);
-// UNSAFE: fixture for S14 external-call write analysis
 procedure ExternalInput(var N: Integer);
 
 implementation
