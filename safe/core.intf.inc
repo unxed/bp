@@ -23,10 +23,19 @@ type
     function Cell: TSafeCell; // created on the first TShared.Weak
   end;
 
+  { Arena generation. FreeAll bumps it; a TArenaRef made in debug mode remembers it. Outlives the arena
+    while a TArenaRef holds it, so a check after the arena itself is gone is still valid. }
+  TSafeArenaGen = class(TInterfacedObject)
+  public
+    Generation: LongWord;
+  end;
+
   TSafeArenaImpl = class(TInterfacedObject)
   public
     Items: array of TObject;
     Count: SizeInt;
+    GenObj: TSafeArenaGen;
+    GenRef: IInterface;
     procedure FreeAll;
     destructor Destroy; override;
   end;
@@ -113,6 +122,25 @@ type
     function Adopt(AObj: TObject): TObject;
     procedure FreeAll;
     function Count: SizeInt;
+    function Generation: LongWord;  // how many times FreeAll ran (the arena leaving its scope counts too)
+    function GenCell: TSafeArenaGen; // internal
+  end;
+
+  { A checked arena reference (H3): R := TNodeRef.Adopt(TNode.Create, Arena); ... R.Get.Name.
+    With debug checks on (-dSAFE_DEBUG or SafeDebugChecks := True at Adopt) it remembers the arena generation,
+    and Get after TArena.FreeAll raises ESafety (R10) instead of touching a destroyed object.
+    With checks off it keeps no arena link: Get is one comparison and returns the plain reference. }
+  generic TArenaRef<T: class> = record
+  private
+    FObj: T;
+    FGenObj: TSafeArenaGen;
+    FGenRef: IInterface;
+    FGen: LongWord;
+    FCls: TClass;
+  public
+    class function Adopt(AObj: T; var A: TArena): TArenaRef; static; // the object first, as in Own(TFoo.Create)
+    function Get: T;
+    function IsStale: Boolean; // debug checks only: the arena was freed after Adopt; otherwise False
   end;
 
   { ---------- defer (an idea from Zig) ----------
