@@ -2653,6 +2653,17 @@ type
     Procs: array of TPasProcedure;
     { ';name;' of the named records and dynamic array types of the module and used units, in lower case }
     Records: String;
+    { ';name;' of procedures whose address is taken in this module, in lower case }
+    AddressedProcs: String;
+    // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
+    procedure Visit(El: TPasElement; Arg: System.Pointer);
+  end;
+
+  { Collects variable names written by a procedure body. }
+  TS14WriteWalker = class
+  public
+    Writes: String;
+    procedure Mark(const E: TPasExpr);
     // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
     procedure Visit(El: TPasElement; Arg: System.Pointer);
   end;
@@ -2669,6 +2680,68 @@ begin
     Records := Records + LowerCase(El.Name) + ';'
   else if (El is TPasArrayType) and (El.Name <> '') and (Length(TPasArrayType(El).Ranges) = 0) then
     Records := Records + LowerCase(El.Name) + ';';
+  if (El is TUnaryExpr) and (TUnaryExpr(El).OpCode = eopAddress)
+    and (TUnaryExpr(El).Operand is TPrimitiveExpr)
+    and (TPrimitiveExpr(TUnaryExpr(El).Operand).Kind = pekIdent) then
+    AddressedProcs := AddressedProcs + LowerCase(TPrimitiveExpr(TUnaryExpr(El).Operand).Value) + ';';
+end;
+
+function S14RootIdent(E: TPasExpr): String;
+begin
+  while E <> nil do
+  begin
+    if E is TPrimitiveExpr then
+    begin
+      if TPrimitiveExpr(E).Kind = pekIdent then
+        Exit(LowerCase(TPrimitiveExpr(E).Value));
+      Exit('');
+    end;
+    if (E is TBinaryExpr) and (TBinaryExpr(E).OpCode = eopSubIdent) then
+      E := TBinaryExpr(E).left
+    else if E is TParamsExpr then
+      E := TParamsExpr(E).Value
+    else if E is TUnaryExpr then
+      E := TUnaryExpr(E).Operand
+    else
+      Exit('');
+  end;
+  Result := '';
+end;
+
+procedure TS14WriteWalker.Mark(const E: TPasExpr);
+var
+  N: String;
+begin
+  N := S14RootIdent(E);
+  if (N <> '') and (Pos(';' + N + ';', Writes) = 0) then
+    Writes := Writes + N + ';';
+end;
+
+// UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
+procedure TS14WriteWalker.Visit(El: TPasElement; Arg: System.Pointer);
+var
+  I: Integer;
+  P: TParamsExpr;
+  W: TPasImplWithDo;
+begin
+  if El is TPasImplAssign then
+    Mark(TPasImplAssign(El).left)
+  else if (El is TParamsExpr) and (TParamsExpr(El).Kind = pekFuncParams) then
+  begin
+    P := TParamsExpr(El);
+    for I := 0 to High(P.Params) do
+      Mark(P.Params[I]);
+  end
+  else if (El is TUnaryExpr) and (TUnaryExpr(El).OpCode = eopAddress) then
+    Mark(TUnaryExpr(El).Operand)
+  else if El is TPasImplForLoop then
+    Mark(TPasImplForLoop(El).VariableName)
+  else if El is TPasImplWithDo then
+  begin
+    W := TPasImplWithDo(El);
+    for I := 0 to W.Expressions.Count - 1 do
+      Mark(TPasExpr(W.Expressions[I]));
+  end;
 end;
 
 { T is a string type, an open array (not array of const), or a record or a dynamic array type of the module or a used unit
@@ -2705,6 +2778,8 @@ var
   K: Integer;
   P: TPasProcedure;
   A: TPasArgument;
+  WriteWalker: TS14WriteWalker;
+  WriteOwned: specialize TOwned<TS14WriteWalker>;
   Sections: array[0..1] of TPasSection;
   Seen, Key, TypeName: String;
 begin
@@ -2713,6 +2788,7 @@ begin
   W := specialize TOwned<TS14Walker>.Own(TS14Walker.Create);
   V := W.Get;
   V.Records := ';';
+  V.AddressedProcs := ';';
   Module.ForEachCall(@V.Visit, nil);
   Sections[0] := nil;
   Sections[1] := nil;
@@ -2736,14 +2812,34 @@ begin
   if TypeName <> '' then
     V.Records := V.Records + StringReplace(TypeName, ' ', ';', [rfReplaceAll]);
   Seen := ';';
+  WriteOwned := specialize TOwned<TS14WriteWalker>.Own(TS14WriteWalker.Create);
+  WriteWalker := WriteOwned.Get;
   for I := 0 to High(V.Procs) do
   begin
     P := V.Procs[I];
-    if P.ProcType = nil then
+    if (P.ProcType = nil) or (P.Body = nil) or P.IsOverride
+      or (Pos(';' + LowerCase(P.Name) + ';', V.AddressedProcs) > 0) then
       Continue;
+    WriteWalker.Writes := ';';
+    P.Body.ForEachCall(@WriteWalker.Visit, nil);
     for J := 0 to P.ProcType.Args.Count - 1 do
     begin
       A := TPasArgument(P.ProcType.Args[J]);
+      if A.Access = argVar then
+      begin
+        if (A.ArgType = nil) or (Pos(';' + LowerCase(A.Name) + ';', WriteWalker.Writes) > 0) then
+          Continue;
+        Key := S14RoutineName(P) + '.' + LowerCase(A.Name) + ';';
+        if Pos(';' + Key, Seen) > 0 then
+          Continue;
+        Seen := Seen + Key;
+        Row := A.SourceLinenumber;
+        if (Row > 0) and ((Pos('// UNSAFE:', VetLine(Src, Row)) > 0) or IsMarkComment(VetLine(Src, Row - 1))) then
+          Continue;
+        AddAtElement(Src, A, vsWarning, 'S14', 'the var parameter ' + A.Name + ' of ' + P.Name
+          + ' is never changed: make it const (or put // UNSAFE: <why> on the line above)', Report);
+        Continue;
+      end;
       if (A.Access <> argDefault) or not S14ByValueChecked(A.ArgType, V.Records) then
         Continue;
       Key := S14RoutineName(P) + '.' + LowerCase(A.Name) + ';';
