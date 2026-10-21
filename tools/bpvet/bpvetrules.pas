@@ -1011,7 +1011,6 @@ begin
         + 'the end of the line or on the line above (safe/SPEC.md, section 6)');
   end;
 end;
-end;
 
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 var
