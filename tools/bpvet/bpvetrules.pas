@@ -2243,12 +2243,17 @@ end;
 { S13 }
 
 type
-  { Collects the enumerations and the case statements of a module (fcl-passrc ForEachCall). }
+  TS13Subs = array of TBinaryExpr;
+
+  { Collects the enumerations, the case statements, the variant records, the field accesses Name.Field and the
+    assignment targets of a module (fcl-passrc ForEachCall). }
   TS13Walker = class
   public
     Enums: array of TPasEnumType;
     Cases: array of TPasImplCaseOf;
     Records: array of TPasRecordType;
+    Subs: TS13Subs;
+    Writes: array of TPasExpr;
     // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
     procedure Visit(El: TPasElement; Arg: System.Pointer);
   end;
@@ -2256,6 +2261,16 @@ type
 // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
 procedure TS13Walker.Visit(El: TPasElement; Arg: System.Pointer);
 begin
+  if (El is TBinaryExpr) and (TBinaryExpr(El).OpCode = eopSubIdent) then
+  begin
+    SetLength(Subs, Length(Subs) + 1);
+    Subs[High(Subs)] := TBinaryExpr(El);
+  end
+  else if El is TPasImplAssign then
+  begin
+    SetLength(Writes, Length(Writes) + 1);
+    Writes[High(Writes)] := TPasImplAssign(El).left;
+  end;
   if El is TPasEnumType then
   begin
     SetLength(Enums, Length(Enums) + 1);
@@ -2511,6 +2526,88 @@ begin
   end;
 end;
 
+{ The accesses X.Field inside the branches of every case X.Tag of, where Tag is the tag field of a variant record
+  of the module: S13CheckVariantCase checks them. }
+procedure S13CoveredSubs(const C: TPasImplCaseOf; const Records: array of TPasRecordType; var Covered: TS13Subs);
+var
+  E: TBinaryExpr;
+  Owner, Tag: String;
+  I, J, K: Integer;
+  SW: specialize TOwned<TS13SubWalker>;
+  S: TS13SubWalker;
+begin
+  if not (C.CaseExpr is TBinaryExpr) then
+    Exit;
+  E := TBinaryExpr(C.CaseExpr);
+  if (E.OpCode <> eopSubIdent) or not (E.Left is TPrimitiveExpr) or not (E.right is TPrimitiveExpr) then
+    Exit;
+  Owner := LowerCase(TPrimitiveExpr(E.Left).Value);
+  Tag := LowerCase(TPrimitiveExpr(E.right).Value);
+  SW := specialize TOwned<TS13SubWalker>.Own(TS13SubWalker.Create);
+  S := SW.Get;
+  for I := 0 to High(Records) do
+  begin
+    if (Records[I].VariantEl = nil) or (LowerCase(Records[I].VariantEl.Name) <> Tag) then
+      Continue;
+    for J := 0 to C.Elements.Count - 1 do
+      if (TPasElement(C.Elements[J]) is TPasImplCaseStatement)
+        and (TPasImplCaseStatement(C.Elements[J]).Body <> nil) then
+      begin
+        SetLength(S.Subs, 0);
+        TPasImplCaseStatement(C.Elements[J]).Body.ForEachCall(@S.Visit, nil);
+        for K := 0 to High(S.Subs) do
+          if (S.Subs[K].Left is TPrimitiveExpr) and (LowerCase(TPrimitiveExpr(S.Subs[K].Left).Value) = Owner) then
+          begin
+            SetLength(Covered, Length(Covered) + 1);
+            Covered[High(Covered)] := S.Subs[K];
+          end;
+      end;
+  end;
+end;
+
+{ S13, variant field (second part): X.Field of a variant field of a record of the module read outside every case
+  over X.Tag is an error. A write X.Field := ... is allowed: that is how a value of the variant is built. }
+procedure S13CheckVariantRead(const Src: TVetSource; const V: TS13Walker; var Report: TVetReport);
+var
+  Covered: TS13Subs;
+  I, J, Row: Integer;
+  Sub: TBinaryExpr;
+  Name: String;
+  Skip: Boolean;
+begin
+  SetLength(Covered, 0);
+  for I := 0 to High(V.Cases) do
+    S13CoveredSubs(V.Cases[I], V.Records, Covered);
+  for I := 0 to High(V.Subs) do
+  begin
+    Sub := V.Subs[I];
+    if not (Sub.Left is TPrimitiveExpr) or not (Sub.right is TPrimitiveExpr) then
+      Continue;
+    Skip := False;
+    for J := 0 to High(Covered) do
+      if Covered[J] = Sub then
+        Skip := True;
+    for J := 0 to High(V.Writes) do
+      if V.Writes[J] = Sub then
+        Skip := True;
+    if Skip then
+      Continue;
+    Name := TPrimitiveExpr(Sub.right).Value;
+    for J := 0 to High(V.Records) do
+      if S13FieldLabels(V.Records[J], LowerCase(Name)) <> '' then
+      begin
+        Row := Sub.SourceLinenumber;
+        if (Row <= 0) or (Pos('// UNSAFE:', VetLine(Src, Row)) > 0) or IsMarkComment(VetLine(Src, Row - 1)) then
+          Break;
+        VetAdd(Report, Src.FileName, Row, VetWordColumn(VetLine(Src, Row), Name), vsError, 'S13',
+          'the variant field ' + Name + ' of ' + V.Records[J].Name + ' is read outside a case over its tag '
+          + V.Records[J].VariantEl.Name + ': read it only in the branch of its tag, or put a comment '
+          + '// UNSAFE: <why> on the line above (safe/SPEC.md, section 16)');
+        Break;
+      end;
+  end;
+end;
+
 procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 var
   W: specialize TOwned<TS13Walker>;
@@ -2527,6 +2624,7 @@ begin
     S13CheckCase(Src, V.Cases[I], V.Enums, Report);
     S13CheckVariantCase(Src, V.Cases[I], V.Records, Report);
   end;
+  S13CheckVariantRead(Src, V, Report);
 end;
 
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
