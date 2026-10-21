@@ -321,7 +321,7 @@ Thread safety in v0.1: the counters are atomic, so `TShared` can be copied betwe
 | S2 | `Move/FillChar` | **compiler**: the same, `SAFE-S2` |
 | S3 | `.Free`, `FreeAndNil`, `.Destroy` | `FreeAndNil` and `.Free` are a compiler error. `.Free` is closed off by a `TObject` helper with the method `Free(const X: SAFE_S3_NoFree_UseTOwnedReset_or_UnsafeDestroy)`: without an argument the call does not compile, and the type name in the "Found declaration" message explains the rule. `.Destroy` — linter |
 | S4 | `Pointer, PByte, PChar, PAnsiChar, PWideChar`, `^T`, `@`, pointer arithmetic | the types — warning `SAFE-S4`; `^T`, `@`, pointer arithmetic — `bpvet` S4 |
-| S5 | a field/global variable of a class type without `// borrow:` | `bpvet` S5: an error on a global or a field of a class/object/record whose type is a class declared in the module or a common RTL class (`TObject`, `Exception`, `TStringList`, `TList`, `TStream`, `TThread`, …), unless the line ends with or follows `// borrow: <who owns it>`; a module marked `// UNSAFE-UNIT:` is not checked; an assignment `Name := X.Get` / `Self.Name := X.Get` into a global of the module or a field of its class without `// borrow:`, and `Name := AParam` / `Self.Name := AParam` where `AParam` is a parameter of such a class type (a one-line routine header); classes of other units, closures, task fields and `Reset`/`Move` of an owner with a live borrow are the next parts of step 7 |
+| S5 | a field/global variable of a class type without `// borrow:` | `bpvet` S5: an error on a global or a field of a class/object/record whose type is a class declared in the module or a common RTL class (`TObject`, `Exception`, `TStringList`, `TList`, `TStream`, `TThread`, …), unless the line ends with or follows `// borrow: <who owns it>`; a module marked `// UNSAFE-UNIT:` is not checked; an assignment `Name := X.Get` / `Self.Name := X.Get` into a global of the module or a field of its class without `// borrow:`, and `Name := AParam` / `Self.Name := AParam` where `AParam` is a parameter of such a class type (a one-line routine header); `Owner.Reset`/`Owner.Move` after `Local := Owner.Get` while `Local` is still used later in the same routine (before a new `Local := …`), unless `// UNSAFE: <why>` stands on the line above or at its end; task fields are covered by the field rule; closures are not checked: FPC 3.2.2 does not compile anonymous procedures or `reference to` types (fcl-passrc 3.2.2 parses them for pas2js); classes of other units are the next part of step 7 |
 | S6 | `TFoo.Create` not immediately into `Own/Share/Adopt`/an interface/`raise` | linter; partly at runtime (R3) |
 | S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14); a warning is not reported when the uses are marked `// UNSAFE: <why>` (§7), an error has no mark. Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
 | S8 | unsafe code without `// UNSAFE:` / a module without `uses Safe` and without `// UNSAFE-UNIT:` | linter |
@@ -428,7 +428,9 @@ Now: nothing; with `-gh` in a debug build the freed memory is sometimes visible.
 S5 (a field or global of a class type only as `TOwned/TShared/TWeak`/interface or with
 `// borrow: <owner>`) plus the escape rule: the result of `.Get` and a class-type parameter
 cannot be stored into a field, a global, a closure or a task field; `Reset`/`Move` of the owner
-while a borrow from it is alive in the same procedure is an error. Step 7.
+while a borrow from it is alive in the same procedure is an error. Step 7. Closures: FPC 3.2.2,
+the compiler of this dialect, has no anonymous procedures, so a borrow cannot escape into one;
+the rule is added when the dialect moves to FPC 3.3+.
 
 **H2. A `TShared` cycle.**
 
