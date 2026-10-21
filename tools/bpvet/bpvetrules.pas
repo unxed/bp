@@ -134,6 +134,16 @@ procedure VetCheckS10(const Src: TVetSource; const Module: TPasModule; var Repor
              findings. The check is by name over the whole module, not by scope. }
 procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S13 (first part): a case over an enumeration of the module (safe/SPEC.md §6, §16, register H11). A module marked
+  // UNSAFE-UNIT: is not checked.
+    Error    a case whose labels are all plain values of one enumeration declared in the module, and which has an
+             else branch or does not list every value of it (a new value would silently go to else or nowhere).
+             A // UNSAFE: <why> comment on the line above the case or at the end of its line drops it.
+    bpvet has no types: the enumeration is found by the labels, not by the expression; a case with a range, a
+    constant expression or a value of an enumeration of another unit is not checked. The variant field part of S13
+    is next. }
+procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 implementation
 
 type
@@ -2228,6 +2238,148 @@ begin
       S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Intfs, Ptrs, Report);
 end;
 
+{ S13 }
+
+type
+  { Collects the enumerations and the case statements of a module (fcl-passrc ForEachCall). }
+  TS13Walker = class
+  public
+    Enums: array of TPasEnumType;
+    Cases: array of TPasImplCaseOf;
+    // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
+    procedure Visit(El: TPasElement; Arg: System.Pointer);
+  end;
+
+// UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
+procedure TS13Walker.Visit(El: TPasElement; Arg: System.Pointer);
+begin
+  if El is TPasEnumType then
+  begin
+    SetLength(Enums, Length(Enums) + 1);
+    Enums[High(Enums)] := TPasEnumType(El);
+  end
+  else if El is TPasImplCaseOf then
+  begin
+    SetLength(Cases, Length(Cases) + 1);
+    Cases[High(Cases)] := TPasImplCaseOf(El);
+  end;
+end;
+
+{ The values of E as ' a b c ' in lower case. }
+function S13Values(const E: TPasEnumType): String;
+var
+  I: Integer;
+begin
+  Result := ' ';
+  if E.Values <> nil then
+    for I := 0 to E.Values.Count - 1 do
+      Result := Result + LowerCase(TPasEnumValue(E.Values[I]).Name) + ' ';
+end;
+
+{ The labels of C as ' a b ' in lower case, or '' when a label is not a plain name. }
+function S13Labels(const C: TPasImplCaseOf): String;
+var
+  I, J: Integer;
+  St: TPasImplCaseStatement;
+  X: TPasExpr;
+begin
+  Result := ' ';
+  for I := 0 to C.Elements.Count - 1 do
+  begin
+    if not (TPasElement(C.Elements[I]) is TPasImplCaseStatement) then
+      Continue; // the else branch is in Elements too
+    St := TPasImplCaseStatement(C.Elements[I]);
+    for J := 0 to St.Expressions.Count - 1 do
+    begin
+      X := TPasExpr(St.Expressions[J]);
+      if not (X is TPrimitiveExpr) or (TPrimitiveExpr(X).Kind <> pekIdent) then
+        Exit('');
+      Result := Result + LowerCase(TPrimitiveExpr(X).Value) + ' ';
+    end;
+  end;
+  if Result = ' ' then
+    Result := '';
+end;
+
+procedure S13CheckCase(const Src: TVetSource; const C: TPasImplCaseOf; const Enums: array of TPasEnumType;
+  var Report: TVetReport);
+var
+  Labels, Values, Missing, W: String;
+  I, P, Row: Integer;
+  E: TPasEnumType;
+  Rest: String;
+begin
+  Labels := S13Labels(C);
+  if Labels = '' then
+    Exit;
+  E := nil;
+  for I := 0 to High(Enums) do
+  begin
+    Values := S13Values(Enums[I]);
+    // every label is a value of this enumeration
+    Rest := Trim(Labels);
+    E := Enums[I];
+    while Rest <> '' do
+    begin
+      P := Pos(' ', Rest + ' ');
+      W := Copy(Rest, 1, P - 1);
+      Rest := Trim(Copy(Rest, P + 1, Length(Rest)));
+      if Pos(' ' + W + ' ', Values) = 0 then
+      begin
+        E := nil;
+        Break;
+      end;
+    end;
+    if E <> nil then
+      Break;
+  end;
+  if E = nil then
+    Exit;
+  Row := C.SourceLinenumber;
+  if (Pos('// UNSAFE:', VetLine(Src, Row)) > 0) or IsMarkComment(VetLine(Src, Row - 1)) then
+    Exit;
+  if C.ElseBranch <> nil then
+  begin
+    VetAdd(Report, Src.FileName, Row, VetWordColumn(VetLine(Src, Row), 'case'), vsError, 'S13',
+      'a case over the enumeration ' + E.Name + ' has else: list the values instead, so that a new value is not '
+      + 'silently taken by else, or put a comment // UNSAFE: <why> on the line above (safe/SPEC.md, section 6)');
+    Exit;
+  end;
+  Missing := '';
+  Rest := Trim(S13Values(E));
+  while Rest <> '' do
+  begin
+    P := Pos(' ', Rest + ' ');
+    W := Copy(Rest, 1, P - 1);
+    Rest := Trim(Copy(Rest, P + 1, Length(Rest)));
+    if Pos(' ' + W + ' ', Labels) = 0 then
+    begin
+      if Missing <> '' then
+        Missing := Missing + ', ';
+      Missing := Missing + W;
+    end;
+  end;
+  if Missing <> '' then
+    VetAdd(Report, Src.FileName, Row, VetWordColumn(VetLine(Src, Row), 'case'), vsError, 'S13',
+      'a case over the enumeration ' + E.Name + ' does not list ' + Missing + ': list every value, or put a '
+      + 'comment // UNSAFE: <why> on the line above (safe/SPEC.md, section 6)');
+end;
+
+procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  W: specialize TOwned<TS13Walker>;
+  V: TS13Walker;
+  I: Integer;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  W := specialize TOwned<TS13Walker>.Own(TS13Walker.Create);
+  V := W.Get;
+  Module.ForEachCall(@V.Visit, nil);
+  for I := 0 to High(V.Cases) do
+    S13CheckCase(Src, V.Cases[I], V.Enums, Report);
+end;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 begin
   VetCheckS3(Src, Module, Report);
@@ -2241,6 +2393,7 @@ begin
   VetCheckS7(Src, Module, Report);
   VetCheckS8(Src, Module, Report);
   VetCheckS12(Src, Module, Report);
+  VetCheckS13(Src, Module, Report);
 end;
 
 end.
