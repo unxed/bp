@@ -39,7 +39,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | `bpvet` rule S10, static part (`TOwned` copied only through `.Move`, no `TOwned` by value in a parameter) | **implemented, lint tests, CI**; the `SAFE_DEBUG` runtime check is **plan** | §6 |
 | `bpvet` rule S5, fields and globals (a field/global of a class declared in the module or of a common RTL class only with `// borrow:`) | **implemented, lint tests, CI**; classes of other units and the borrow-escape rule are **plan** | §6 |
 | `bpvet` rule S15 (no `TShared` cycles: a warning on a `TShared` field that leads back to its own class, heuristic over one module) | **implemented, lint tests, CI**; the `SAFE_DEBUG` cycle report of `SafeCheckNoLeaks` is **implemented, test** (`test_safe`, `SharedCycleReported`) | §6, H2 |
-| `bpvet` rule S11 (a field of a task with a class type is an error, also with `// borrow:`; so is a field with an interface type) | **implemented, lint tests, CI**; a field `^T` is caught by S4; named pointer types in task fields and the thread-safe `TWeak.TryLock` are **plan** | §6, §14, H6 |
+| `bpvet` rule S11 (a field of a task with a class type is an error, also with `// borrow:`; so is a field with an interface type or a named pointer type) | **implemented, lint tests, CI**; a field `^T` is caught by S4; pointer types of used units in task fields and the thread-safe `TWeak.TryLock` are **plan** | §6, §14, H6 |
 | `bpvet` rules S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
@@ -337,7 +337,7 @@ Thread safety in v0.1: the counters are atomic, so `TShared` can be copied betwe
 | S8 | unsafe code without `// UNSAFE:` / a module without `uses Safe` and without `// UNSAFE-UNIT:` | linter |
 | S9 | `UnicodeString/WideString/ShortString` outside unsafe | `bpvet` S9: an error on the type name or a sized `String[N]` (a `ShortString`) without a `// UNSAFE: <why>` mark on the line above or at the end of the line (§7); a `// UNSAFE-UNIT:` module is not checked |
 | S10 | a copy of `TOwned` not via `.Move`; `TOwned` by value in a parameter | `bpvet` S10: an error on `X := Y` where `Y` is declared with a `TOwned` type and on a `TOwned` parameter without `const`/`var`/`out`/`constref`, unless marked `// UNSAFE: <why>` (§7); at run time R9 in debug mode; the runtime is safe in any case (§4) |
-| S11 | a field of a `TTask` task is a borrow or a mutable object accessible to other threads | `bpvet` S11: an error on a field of a task class of the module (descending from `TTask`, directly or through a task class of the module) whose type is a class (the class set of S5: the module, common RTL classes, classes of used units next to the file or by `-Fu`), also when the field is marked `// borrow:`: a task runs on another thread and can outlive the caller; the same error on a field whose type is an interface (of the module, `IInterface`, `IUnknown`, `IInvokable`, interfaces of used units next to the file or by `-Fu`): the object behind it is shared with the caller; `// UNSAFE: <why>` on the line above or at its end drops it; a `// UNSAFE-UNIT:` module is not checked; a field `^T` needs no rule of S11: S4 already rejects it without `// UNSAFE:` (`tests/lint/s11_ptr_bad.pas`); fields of named pointer types (`Pointer`, `PChar`, a pointer type declared elsewhere) are not checked yet — plan |
+| S11 | a field of a `TTask` task is a borrow or a mutable object accessible to other threads | `bpvet` S11: an error on a field of a task class of the module (descending from `TTask`, directly or through a task class of the module) whose type is a class (the class set of S5: the module, common RTL classes, classes of used units next to the file or by `-Fu`), also when the field is marked `// borrow:`: a task runs on another thread and can outlive the caller; the same error on a field whose type is an interface (of the module, `IInterface`, `IUnknown`, `IInvokable`, interfaces of used units next to the file or by `-Fu`): the object behind it is shared with the caller; `// UNSAFE: <why>` on the line above or at its end drops it; a `// UNSAFE-UNIT:` module is not checked; a field `^T` needs no rule of S11: S4 already rejects it without `// UNSAFE:` (`tests/lint/s11_ptr_bad.pas`); the same error of S11 on a field of a named pointer type: `Pointer`, `PChar` and the other pointer types of System that S4 knows, or a pointer type of the module (`PNode = ^TNode`; `tests/lint/s11_ptrtype_bad.pas`, `s11_ptrmod_bad.pas`): the memory behind it has no owner; a full name `System.PChar` is already an error of S8, one `// UNSAFE:` covers both (`s11_ptrsys_bad.pas`); pointer types of used units are not checked yet — plan |
 | S12 | `external` outside a `// UNSAFE-UNIT:` module; a binding's public API with pointers | linter |
 | S13 | a `case` over an enumeration does not list all values or has `else`; a variant field is read outside the branch of its tag (§16) | linter (FPC 3.2.2 does not warn) |
 | S14 | a parameter without `const`/`var`/`out`; `var` although the caller does not need the change (§16) | linter |
@@ -386,7 +386,7 @@ System.GetMem(Buf, Len);
 | No `TShared` cycles | programmer + linter `bpvet` (S15, heuristic) | H2 |
 | Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
-| Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter `bpvet` (S11: class and interface fields of a task); the `TryLock` race is open (§11) | H6 |
+| Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter `bpvet` (S11: class, interface and pointer fields of a task); the `TryLock` race is open (§11) | H6 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter `bpvet` (S6, S9); R3 only for `TInterfacedObject` | H8 |
 | `Safe` is last in `uses` | linter `bpvet` S7; in a program with `BP` first only a warning (§14) | H9 |
@@ -413,7 +413,7 @@ compensating check, and accepted risks are listed with a reason.
 | H3 | use after `TArena.FreeAll` | `TArenaRef<T>` + arena generations → `ESafety` R10 in debug; plain borrows: `-gh`, sometimes | done; release cost measured (`tests/bench/bench_arena.pas`): `Get` is a call, not yet zero cost | 8 |
 | H4 | `^T`, `@`, pointer arithmetic | `bpvet` S4 | `bpvet` S4 | 4 |
 | H5 | a copy of `TOwned` | nothing (the runtime stays safe) | `bpvet` S10 + `SAFE_DEBUG` runtime check | 6 |
-| H6 | shared task fields; `TryLock` race | `bpvet` S11: a class or interface field of a task is an error | `bpvet` S11 + lock in the cell, stress test | 10 |
+| H6 | shared task fields; `TryLock` race | `bpvet` S11: a class, interface or named pointer field of a task is an error | `bpvet` S11 + lock in the cell, stress test | 10 |
 | H7 | `.Destroy` | nothing | `bpvet` S3 | 4 |
 | H8 | `TFoo.Create` not owned; `ShortString` | R3 partly | `bpvet` S6, S9 | 5 |
 | H9 | `Safe` not last in `uses` | `bpvet` S7; a program with `BP` first: a warning | program header that keeps `BP` last | 2, 2b |
@@ -551,7 +551,7 @@ begin
 end;
 ```
 
-Now: `bpvet` S11 rejects a field of a task whose type is a class (also with `// borrow:`) or an interface; `TWeak.TryLock` from another thread concurrently with the last `Reset` is a race
+Now: `bpvet` S11 rejects a field of a task whose type is a class (also with `// borrow:`), an interface or a named pointer type; `TWeak.TryLock` from another thread concurrently with the last `Reset` is a race
 (§11). Target: `bpvet` S11 allows task fields only of value types, `String`, `TArray`, `TChan`,
 `TShared`, or `TOwned` passed through `Move`; `TWeak.TryLock` becomes thread-safe (a lock in the
 cell), with a stress test against destruction in another thread on x86_64 and aarch64. Step 10.
@@ -705,7 +705,7 @@ end;                                    // the list is destroyed here, also on a
 
 ## §11. Next iterations (what does not exist yet)
 
-- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S4, S5 (fields and globals), S6, S7, S8, S9, S10 (static part), S11 (class and interface fields of a task), S12 and S15 are done, the borrow-escape part of S5,
+- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S4, S5 (fields and globals), S6, S7, S8, S9, S10 (static part), S11 (class, interface and pointer fields of a task), S12 and S15 are done, the borrow-escape part of S5,
   rules S13–S14 are next (unxed/bp#56); output in the format of FPC messages so that the IDE shows them as compiler errors.
 - **Lazarus package** `safepascal.lpk` in OPM: one-click installation.
 - **GC heap** as a tracing arena: objects declare `procedure Trace(V: TVisitor)`,

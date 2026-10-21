@@ -102,7 +102,11 @@ procedure VetCheckS15(const Src: TVetSource; const Module: TPasModule; var Repor
            TChan instead, or put a comment // UNSAFE: <why> on the line above or at the end of the line.
     Error  a field of a task class whose type is an interface (of the module, of a used unit found as for S5, or
            IInterface, IUnknown, IInvokable):
-           the object behind the reference is shared with the caller, and its state is reachable from two threads. }
+           the object behind the reference is shared with the caller, and its state is reachable from two threads.
+    Error  a field of a task class whose type is a named pointer type: Pointer, PChar and the other pointer types
+           of System that S4 knows, or a pointer type declared in the module (PNode = ^TNode). S4 rejects a field
+           ^T itself, but not a field of a named pointer type; the memory behind it has no owner. Pointer types of
+           used units are not known yet. }
 procedure VetCheckS11(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
@@ -2123,7 +2127,7 @@ begin
   end;
 end;
 
-procedure S11CheckList(const Src: TVetSource; const L: TFPList; const Tasks, ClassNames, Intfs: String;
+procedure S11CheckList(const Src: TVetSource; const L: TFPList; const Tasks, ClassNames, Intfs, Ptrs: String;
   var Report: TVetReport);
 var
   I, J: Integer;
@@ -2156,9 +2160,17 @@ begin
             'the field ' + E.Name + '.' + M.Name + ' of a task holds the interface ' + TPasVariable(M).VarType.Name
             + ': the object behind it is shared with the caller, so its state is reachable from two threads (a data '
             + 'race); pass TShared, TOwned via Move, a value, String, TArray or TChan, or put a comment '
-            + '// UNSAFE: <why> on the line above (safe/SPEC.md, section 14)', Report);
+            + '// UNSAFE: <why> on the line above (safe/SPEC.md, section 14)', Report)
+        else if (T <> '') and IsPointerType(TPasVariable(M).VarType, Ptrs)
+          and not S5UnsafeMarked(Src, M.SourceLinenumber) then
+          AddAtElement(Src, M, vsError, 'S11',
+            'the field ' + E.Name + '.' + M.Name + ' of a task holds the raw pointer type '
+            + TPasVariable(M).VarType.Name + ': the memory behind it has no owner and is shared with the caller, so '
+            + 'the task on another thread can read it while it changes or after it is freed; pass TShared, TOwned '
+            + 'via Move, a value, String, TArray or TChan, or put a comment // UNSAFE: <why> on the line above '
+            + '(safe/SPEC.md, section 14)', Report);
       end;
-    S11CheckList(Src, TPasClassType(E).Members, Tasks, ClassNames, Intfs, Report);
+    S11CheckList(Src, TPasClassType(E).Members, Tasks, ClassNames, Intfs, Ptrs, Report);
   end;
 end;
 
@@ -2207,7 +2219,7 @@ begin
       S5UsedClasses(Src, TPasSection(Sections[I]).UsesClause, Intfs, 'interface');
   for I := 0 to 1 do
     if Sections[I] <> nil then
-      S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Intfs, Report);
+      S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Intfs, ModulePointerTypes(Module), Report);
 end;
 
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
