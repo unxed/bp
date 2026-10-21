@@ -4,7 +4,10 @@
 program mf_libc_guard;
 {$mode objfpc}{$H+}
 uses BP, SysUtils;
-function c_getpid: LongInt; cdecl; external 'c' name 'getpid';
+{ The library name is a constant, not the literal 'c': fcl-passrc 3.2.2 (bpvet) does not parse
+  external with a one-character string literal. }
+const LibC = 'c';
+function c_getpid: LongInt; cdecl; external LibC name 'getpid';
 procedure Nop; begin end;
 var G: TGroup;
 begin
