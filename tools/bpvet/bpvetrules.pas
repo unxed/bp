@@ -35,6 +35,12 @@ procedure VetCheckS12(const Src: TVetSource; const Module: TPasModule; var Repor
              Comments and string literals are skipped. }
 procedure VetCheckS8(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S3: manual destruction (safe/SPEC.md §7). A module marked // UNSAFE-UNIT: is not checked.
+    Error    a call Obj.Destroy without a // UNSAFE: <why> comment on the line above (one comment covers a block of
+             such lines right below it) or at the end of the line. A destructor declaration or heading
+             (destructor TFoo.Destroy) and inherited Destroy are not calls of it. }
+procedure VetCheckS3(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 implementation
 
 type
@@ -503,8 +509,66 @@ begin
   end;
 end;
 
+{ S3 }
+
+{ The column of the first call .Destroy in Code (Code is a line without comments and strings), or 0. }
+function DestroyCall(const Code: String): Integer;
+var
+  I, K: Integer;
+  L: String;
+begin
+  Result := 0;
+  L := LowerCase(Code);
+  if Pos('destructor', TrimLeft(L)) = 1 then
+    Exit;
+  I := 1;
+  while I <= Length(L) do
+  begin
+    if L[I] = '.' then
+    begin
+      K := I + 1;
+      while (K <= Length(L)) and (L[K] = ' ') do
+        Inc(K);
+      if (Copy(L, K, 7) = 'destroy') and ((K + 7 > Length(L)) or not IsWordChar(L[K + 7])) then
+        Exit(I + 1);
+    end;
+    Inc(I);
+  end;
+end;
+
+procedure VetCheckS3(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  I, Col: Integer;
+  InBrace, InParen, Covered: Boolean;
+  Code, Tail: String;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  InBrace := False;
+  InParen := False;
+  Covered := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    Col := DestroyCall(Code);
+    if Col = 0 then
+    begin
+      if IsMarkComment(Src.Lines[I]) then
+        Covered := True
+      else if Trim(Code) <> '' then
+        Covered := False;
+      Continue;
+    end;
+    if not Covered and not IsMarkComment(Tail) then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S3',
+        'manual destruction .Destroy: own the object by TOwned and call Reset, or put a comment '
+        + '// UNSAFE: <why nobody else refers to it> on the line above (safe/SPEC.md, section 7)');
+  end;
+end;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 begin
+  VetCheckS3(Src, Module, Report);
   VetCheckS7(Src, Module, Report);
   VetCheckS8(Src, Module, Report);
   VetCheckS12(Src, Module, Report);
