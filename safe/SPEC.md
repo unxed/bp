@@ -75,6 +75,7 @@ REFERENCES
     field/global variable of a class type  → TOwned/TShared/TWeak/interface
     parameter/local variable of a class type → borrow, lives no longer than the call
     a borrow field/global is allowed only with a comment  // borrow: <who owns it>   (S5, checked by bpvet)
+    the result of .Get is not saved into a field or a global: Cache := Box.Get is an error (S5, bpvet)
   The result of TFoo.Create goes straight into Own/Share/Adopt, into an interface or into raise (S6).
   No .Free, FreeAndNil, Destroy, GetMem, New, Dispose, Move, FillChar, Pointer, ^T, @ (S1–S4).
   Instead of FillChar(R, SizeOf(R), 0) — R := Default(TRec).
@@ -320,7 +321,7 @@ Thread safety in v0.1: the counters are atomic, so `TShared` can be copied betwe
 | S2 | `Move/FillChar` | **compiler**: the same, `SAFE-S2` |
 | S3 | `.Free`, `FreeAndNil`, `.Destroy` | `FreeAndNil` and `.Free` are a compiler error. `.Free` is closed off by a `TObject` helper with the method `Free(const X: SAFE_S3_NoFree_UseTOwnedReset_or_UnsafeDestroy)`: without an argument the call does not compile, and the type name in the "Found declaration" message explains the rule. `.Destroy` — linter |
 | S4 | `Pointer, PByte, PChar, PAnsiChar, PWideChar`, `^T`, `@`, pointer arithmetic | the types — warning `SAFE-S4`; `^T`, `@`, pointer arithmetic — `bpvet` S4 |
-| S5 | a field/global variable of a class type without `// borrow:` | `bpvet` S5: an error on a global or a field of a class/object/record whose type is a class declared in the module or a common RTL class (`TObject`, `Exception`, `TStringList`, `TList`, `TStream`, `TThread`, …), unless the line ends with or follows `// borrow: <who owns it>`; a module marked `// UNSAFE-UNIT:` is not checked; classes of other units and the escape of `.Get`/parameters into fields are the next part of step 7 |
+| S5 | a field/global variable of a class type without `// borrow:` | `bpvet` S5: an error on a global or a field of a class/object/record whose type is a class declared in the module or a common RTL class (`TObject`, `Exception`, `TStringList`, `TList`, `TStream`, `TThread`, …), unless the line ends with or follows `// borrow: <who owns it>`; a module marked `// UNSAFE-UNIT:` is not checked; and an assignment `Name := X.Get` / `Self.Name := X.Get` into such a global or field without `// borrow:`; classes of other units, parameters saved into fields, closures, task fields and `Reset`/`Move` of an owner with a live borrow are the next parts of step 7 |
 | S6 | `TFoo.Create` not immediately into `Own/Share/Adopt`/an interface/`raise` | linter; partly at runtime (R3) |
 | S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14); a warning is not reported when the uses are marked `// UNSAFE: <why>` (§7), an error has no mark. Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
 | S8 | unsafe code without `// UNSAFE:` / a module without `uses Safe` and without `// UNSAFE-UNIT:` | linter |

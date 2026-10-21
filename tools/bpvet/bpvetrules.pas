@@ -66,8 +66,11 @@ procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report
            declared in this module or a well-known class of the RTL (S5ClassTypes). Such a reference is a borrow
            that can outlive its owner; hold the object through TOwned/TShared/TWeak or an interface instead, or put
            a comment // borrow: <who owns it> at the end of the line or on the line above.
-    Not checked yet (next parts of step 7, unxed/bp#56): classes of other units, saving the result of .Get or a
-    class parameter into a field, Reset/Move of an owner while a borrow from it is alive. }
+    Error  the result of .Get is saved into a global variable or a field of a class of the module
+           (Name := Owner.Get; or Self.Name := Owner.Get;): the borrow escapes and can outlive its owner; keep it
+           in a local variable, or put a comment // borrow: <who owns it> at the end of the line or on the line above.
+    Not checked yet (next parts of step 7, unxed/bp#56): classes of other units, saving a class parameter into a
+    field, a closure or a task field, Reset/Move of an owner while a borrow from it is alive. }
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
@@ -855,11 +858,81 @@ begin
   end;
 end;
 
+{ The names of the global variables of Decls and of the fields of the classes declared there, as ' a b '. }
+procedure S5CollectStores(const L: TFPList; const InClass: Boolean; var Names: String);
+var
+  I: Integer;
+  E: TPasElement;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+  begin
+    E := TPasElement(L[I]);
+    if (E.ClassType = TPasVariable) and (E.Name <> '') then
+      Names := Names + LowerCase(E.Name) + ' '
+    else if (E is TPasClassType) and (TPasClassType(E).ObjKind = okClass) then
+      S5CollectStores(TPasClassType(E).Members, True, Names);
+  end;
+end;
+
+{ The column of a statement Name := X.Get; or Self.Name := X.Get; in Code whose Name is in Stores, or 0. }
+function S5GetEscape(const Code, Stores: String; out Name: String): Integer;
+var
+  P, I: Integer;
+  L, R: String;
+begin
+  Result := 0;
+  Name := '';
+  P := Pos(':=', Code);
+  if P = 0 then
+    Exit;
+  L := LowerCase(Trim(Copy(Code, 1, P - 1)));
+  if Pos('self.', L) = 1 then
+    L := Trim(Copy(L, 6, Length(L)));
+  if L = '' then
+    Exit;
+  for I := 1 to Length(L) do
+    if not IsWordChar(L[I]) then
+      Exit;
+  R := LowerCase(Trim(Copy(Code, P + 2, Length(Code))));
+  if (R <> '') and (R[Length(R)] = ';') then
+    R := TrimRight(Copy(R, 1, Length(R) - 1));
+  if (Length(R) > 2) and (Copy(R, Length(R) - 1, 2) = '()') then
+    R := TrimRight(Copy(R, 1, Length(R) - 2));
+  if (Length(R) < 5) or (Copy(R, Length(R) - 3, 4) <> '.get') then
+    Exit;
+  if Pos(' ' + L + ' ', Stores) = 0 then
+    Exit;
+  Name := L;
+  Result := Length(Code) - Length(TrimLeft(Code)) + 1;
+end;
+
+procedure S5CheckEscapes(const Src: TVetSource; const Stores: String; var Report: TVetReport);
+var
+  I, Col: Integer;
+  InBrace, InParen: Boolean;
+  Code, Tail, Name: String;
+begin
+  InBrace := False;
+  InParen := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    Col := S5GetEscape(Code, Stores, Name);
+    if (Col > 0) and not S5Marked(Src, I + 1) then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S5',
+        'the result of .Get is saved into the field or global ' + Name + ': the borrow escapes and can outlive '
+        + 'its owner; keep it in a local variable or a parameter, or put a comment // borrow: <who owns it> at the '
+        + 'end of the line or on the line above (safe/SPEC.md, section 6)');
+  end;
+end;
+
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 var
   Sections: array[0..1] of TPasDeclarations;
   I: Integer;
-  ClassNames: String;
+  ClassNames, Stores: String;
 begin
   if IsUnsafeUnit(Src) then
     Exit;
@@ -881,6 +954,11 @@ begin
   for I := 0 to 1 do
     if Sections[I] <> nil then
       S5CheckList(Src, Sections[I].Declarations, ClassNames, 'the global variable', Report);
+  Stores := ' ';
+  for I := 0 to 1 do
+    if Sections[I] <> nil then
+      S5CollectStores(Sections[I].Declarations, False, Stores);
+  S5CheckEscapes(Src, Stores, Report);
 end;
 
 { S9 }
