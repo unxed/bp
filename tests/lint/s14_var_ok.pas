@@ -35,7 +35,8 @@ procedure ThroughWith(var P: TPoint);
 procedure ThroughNested(var N: Integer);
 procedure ThroughUnsafe(var N: Integer);
 procedure Raw(var Buffer);
-procedure ExternalInput(var N: Integer);
+// Declaration only: S14 skips routines without a body.
+procedure DeclarationOnlyInput(var N: Integer);
 
 implementation
 
@@ -111,8 +112,5 @@ end;
 procedure Raw(var Buffer);
 begin
 end;
-
-// UNSAFE: external declaration has no body to analyze.
-procedure ExternalInput(var N: Integer); external name 'ExternalInput';
 
 end.
