@@ -9,7 +9,7 @@ unit BpvetRules;
 interface
 
 uses
-  SysUtils, PasTree, BpvetCore, Safe;
+  SysUtils, Classes, PasTree, BpvetCore, Safe;
 
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
@@ -19,6 +19,13 @@ procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Repor
     Warning  units follow BP that is first in the uses of a program (BP goes first there for the thread manager,
              SPEC §14, and the units after it shadow it in the program file). }
 procedure VetCheckS7(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
+{ S12: FFI lives in binding modules (safe/SPEC.md §13). A binding module is marked by a comment
+  // UNSAFE-UNIT: <why> before its header; its public API is a safe facade.
+    Error    an external routine or variable in a module without // UNSAFE-UNIT:;
+    Error    a routine of the interface of a binding module (an UNSAFE-UNIT unit with external declarations)
+             takes or returns a pointer (^T, Pointer, PChar and the like, or a pointer type of this module). }
+procedure VetCheckS12(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 implementation
 
@@ -143,9 +150,174 @@ begin
     + ' into the implementation uses if the interface does not need it', Report);
 end;
 
+{ S12 }
+
+{ The module is marked // UNSAFE-UNIT: on a line before its header (unit, program or library). }
+function IsUnsafeUnit(const Src: TVetSource): Boolean;
+var
+  I: Integer;
+  L: String;
+begin
+  Result := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    L := LowerCase(Trim(Src.Lines[I]));
+    if (Pos('unit ', L) = 1) or (Pos('program ', L) = 1) or (Pos('library ', L) = 1) then
+      Exit;
+    if Pos('// unsafe-unit:', L) = 1 then
+      Exit(True);
+  end;
+end;
+
+{ A finding at the element E: its line, the column of its name in the line. }
+procedure AddAtElement(const Src: TVetSource; const E: TPasElement; const Severity: TVetSeverity;
+  const Rule, Msg: String; var Report: TVetReport);
+begin
+  if (E.SourceFilename = '') or SameText(ExtractFileName(E.SourceFilename), ExtractFileName(Src.FileName)) then
+    VetAdd(Report, Src.FileName, E.SourceLinenumber,
+      VetWordColumn(VetLine(Src, E.SourceLinenumber), E.Name), Severity, Rule, Msg)
+  else
+    VetAdd(Report, E.SourceFilename, E.SourceLinenumber, 1, Severity, Rule, Msg);
+end;
+
+function IsExternal(const E: TPasElement): Boolean;
+begin
+  if E is TPasProcedure then
+    Result := pmExternal in TPasProcedure(E).Modifiers
+  else if E is TPasVariable then
+    Result := vmExternal in TPasVariable(E).VarModifiers
+  else
+    Result := False;
+end;
+
+{ Declarations: a borrow of the list of a section of the module. }
+procedure CollectExternals(const Decls: TPasDeclarations; var Found: array of TPasElement; var N: Integer);
+var
+  I: Integer;
+  E: TPasElement;
+begin
+  if Decls = nil then
+    Exit;
+  for I := 0 to Decls.Declarations.Count - 1 do
+  begin
+    E := TPasElement(Decls.Declarations[I]);
+    if IsExternal(E) and (N <= High(Found)) then
+    begin
+      Found[N] := E;
+      Inc(N);
+    end;
+  end;
+end;
+
+{ Names of the pointer types (type PFoo = ^TFoo) declared in the section, lower case, ';'-separated. }
+function PointerTypeNames(const Decls: TPasDeclarations): String;
+var
+  I: Integer;
+  E: TPasElement;
+begin
+  Result := '';
+  if Decls = nil then
+    Exit;
+  for I := 0 to Decls.Declarations.Count - 1 do
+  begin
+    E := TPasElement(Decls.Declarations[I]);
+    if E is TPasPointerType then
+      Result := Result + ';' + LowerCase(E.Name);
+  end;
+  Result := Result + ';';
+end;
+
+const
+  { the pointer types of the System unit that a binding most often takes from a C header }
+  SystemPointers = ';pointer;pchar;pansichar;pwidechar;punicodechar;pbyte;pword;pinteger;plongint;pcardinal;'
+    + 'pdword;pint64;pqword;psingle;pdouble;psizeint;psizeuint;pptrint;pptruint;ppchar;ppansichar;ppointer;'
+    + 'psmallint;pshortint;plongword;pboolean;';
+
+function IsPointerType(const T: TPasType; const ModulePointers: String): Boolean;
+begin
+  if T = nil then
+    Exit(False);
+  if T is TPasPointerType then
+    Exit(True);
+  Result := (T.Name <> '') and ((Pos(';' + LowerCase(T.Name) + ';', SystemPointers) > 0)
+    or (Pos(';' + LowerCase(T.Name) + ';', ModulePointers) > 0));
+end;
+
+{ The pointer in the signature of P (a parameter or the result), '' when there is none. }
+function PointerInSignature(const P: TPasProcedure; const ModulePointers: String): String;
+var
+  I: Integer;
+  A: TPasArgument;
+  R: TPasType;
+begin
+  Result := '';
+  if P.ProcType = nil then
+    Exit;
+  for I := 0 to P.ProcType.Args.Count - 1 do
+  begin
+    A := TPasArgument(P.ProcType.Args[I]);
+    if IsPointerType(A.ArgType, ModulePointers) then
+      Exit('parameter ' + A.Name);
+  end;
+  if (P.ProcType is TPasFunctionType) and (TPasFunctionType(P.ProcType).ResultEl <> nil) then
+  begin
+    R := TPasFunctionType(P.ProcType).ResultEl.ResultType;
+    if IsPointerType(R, ModulePointers) then
+      Exit('result');
+  end;
+end;
+
+procedure VetCheckS12(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  Found: array[0..255] of TPasElement;
+  N, I: Integer;
+  Intf: TPasDeclarations;
+  Pointers, Where: String;
+  E: TPasElement;
+begin
+  N := 0;
+  if Module is TPasProgram then
+    CollectExternals(TPasProgram(Module).ProgramSection, Found, N)
+  else if Module is TPasLibrary then
+    CollectExternals(TPasLibrary(Module).LibrarySection, Found, N)
+  else
+  begin
+    CollectExternals(Module.InterfaceSection, Found, N);
+    CollectExternals(Module.ImplementationSection, Found, N);
+  end;
+  if N = 0 then
+    Exit;
+  if not IsUnsafeUnit(Src) then
+  begin
+    for I := 0 to N - 1 do
+      AddAtElement(Src, Found[I], vsError, 'S12',
+        'external ' + Found[I].Name + ' outside a binding module: move the external declarations into a unit marked '
+        + '// UNSAFE-UNIT: <why> (a *_c.pas file or the unsafe/ folder) and call them through its safe facade '
+        + '(safe/SPEC.md, section 13)', Report);
+    Exit;
+  end;
+  if (Module is TPasProgram) or (Module is TPasLibrary) or (Module.InterfaceSection = nil) then
+    Exit;
+  Intf := Module.InterfaceSection;
+  Pointers := PointerTypeNames(Intf) + PointerTypeNames(Module.ImplementationSection);
+  for I := 0 to Intf.Declarations.Count - 1 do
+  begin
+    E := TPasElement(Intf.Declarations[I]);
+    if not (E is TPasProcedure) then
+      Continue;
+    Where := PointerInSignature(TPasProcedure(E), Pointers);
+    if Where <> '' then
+      AddAtElement(Src, E, vsError, 'S12',
+        'the public API of a binding module takes or returns a pointer (' + E.Name + ', ' + Where + '): '
+        + 'keep the external declaration with pointers in the implementation and export a facade with String, '
+        + 'TBytes, records or an owner (TCResource) instead (safe/SPEC.md, section 13)', Report);
+  end;
+end;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 begin
   VetCheckS7(Src, Module, Report);
+  VetCheckS12(Src, Module, Report);
 end;
 
 end.
