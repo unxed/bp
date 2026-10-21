@@ -69,8 +69,12 @@ procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report
     Error  the result of .Get is saved into a global variable or a field of a class of the module
            (Name := Owner.Get; or Self.Name := Owner.Get;): the borrow escapes and can outlive its owner; keep it
            in a local variable, or put a comment // borrow: <who owns it> at the end of the line or on the line above.
-    Not checked yet (next parts of step 7, unxed/bp#56): classes of other units, saving a class parameter into a
-    field, a closure or a task field, Reset/Move of an owner while a borrow from it is alive. }
+    Error  Owner.Reset or Owner.Move in a routine after Local := Owner.Get; while Local is still used later in
+           the same routine (before a new Local := ...): the object is freed or moved under the borrow; finish with
+           the borrow first, or put a comment // UNSAFE: <why> on the line above or at the end of the line.
+    Closures (anonymous procedures, reference to) are not checked: FPC 3.2.2 does not compile them, although
+    fcl-passrc 3.2.2 parses them (for pas2js).
+    Not checked yet (next parts of step 7, unxed/bp#56): classes of other units. }
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
@@ -979,23 +983,173 @@ begin
   Result := Length(Code) - Length(TrimLeft(Code)) + 1;
 end;
 
+{ Owner when Code is a statement Local := Owner.Get; with Local a plain name not in Stores; Local gets the name. }
+function S5LocalBorrow(const Code, Stores: String; out Local: String): String;
+var
+  P, I: Integer;
+  R: String;
+begin
+  Result := '';
+  Local := '';
+  P := Pos(':=', Code);
+  if P = 0 then
+    Exit;
+  Local := LowerCase(Trim(Copy(Code, 1, P - 1)));
+  if (Local = '') or (Pos(' ' + Local + ' ', Stores) > 0) then
+    Exit;
+  for I := 1 to Length(Local) do
+    if not IsWordChar(Local[I]) then
+      Exit;
+  R := LowerCase(Trim(Copy(Code, P + 2, Length(Code))));
+  if (R <> '') and (R[Length(R)] = ';') then
+    R := TrimRight(Copy(R, 1, Length(R) - 1));
+  if (Length(R) > 2) and (Copy(R, Length(R) - 1, 2) = '()') then
+    R := TrimRight(Copy(R, 1, Length(R) - 2));
+  if (Length(R) < 5) or (Copy(R, Length(R) - 3, 4) <> '.get') then
+    Exit;
+  R := Copy(R, 1, Length(R) - 4);
+  if Pos('self.', R) = 1 then
+    R := Copy(R, 6, Length(R));
+  if R = '' then
+    Exit;
+  for I := 1 to Length(R) do
+    if not IsWordChar(R[I]) then
+      Exit;
+  Result := R;
+end;
+
+{ The column of the word W (lower case) in Code, or 0. }
+function S5WordAt(const Code, W: String): Integer;
+var
+  L: String;
+  P, From: Integer;
+begin
+  Result := 0;
+  L := LowerCase(Code);
+  From := 1;
+  repeat
+    P := Pos(W, Copy(L, From, Length(L)));
+    if P = 0 then
+      Exit;
+    P := P + From - 1;
+    if ((P = 1) or not IsWordChar(L[P - 1])) and ((P + Length(W) > Length(L)) or not IsWordChar(L[P + Length(W)]))
+    then
+      Exit(P);
+    From := P + 1;
+  until False;
+end;
+
+{ The column of Owner.Reset or Owner.Move (Self. allowed) in Code, or 0; What gets 'Reset' or 'Move'. }
+function S5Release(const Code, Owner: String; out What: String): Integer;
+var
+  P, E: Integer;
+  L: String;
+begin
+  Result := 0;
+  What := '';
+  L := LowerCase(Code);
+  P := S5WordAt(L, Owner);
+  while P > 0 do
+  begin
+    E := P + Length(Owner);
+    if (Copy(L, E, 6) = '.reset') and ((E + 6 > Length(L)) or not IsWordChar(L[E + 6])) then
+      What := 'Reset'
+    else if (Copy(L, E, 5) = '.move') and ((E + 5 > Length(L)) or not IsWordChar(L[E + 5])) then
+      What := 'Move';
+    if What <> '' then
+      Exit(P);
+    L[P] := ' ';
+    P := S5WordAt(L, Owner);
+  end;
+end;
+
+{ The row (1-based) after Row where Local is still used in the same routine (before the next routine header or a
+  new assignment Local := ...), or 0. }
+function S5LaterUse(const Codes: array of String; const Row: Integer; const Local: String): Integer;
+var
+  I, P: Integer;
+  IsHeader: Boolean;
+  L: String;
+begin
+  Result := 0;
+  for I := Row to High(Codes) do
+  begin
+    S5HeaderParams(Codes[I], ' ', IsHeader);
+    if IsHeader then
+      Exit;
+    L := LowerCase(Codes[I]);
+    P := Pos(':=', L);
+    if (P > 0) and (LowerCase(Trim(Copy(L, 1, P - 1))) = Local) then
+    begin
+      if S5WordAt(Copy(L, P + 2, Length(L)), Local) > 0 then
+        Exit(I + 1);
+      Exit;
+    end;
+    if S5WordAt(L, Local) > 0 then
+      Exit(I + 1);
+  end;
+end;
+
+function S5UnsafeMarked(const Src: TVetSource; const Row: Integer): Boolean;
+begin
+  Result := (Pos('// UNSAFE:', VetLine(Src, Row)) > 0) or IsMarkComment(VetLine(Src, Row - 1));
+end;
+
 procedure S5CheckEscapes(const Src: TVetSource; const Stores, ClassNames: String; var Report: TVetReport);
 var
-  I, Col: Integer;
+  I, J, Col, Later: Integer;
   InBrace, InParen, IsHeader: Boolean;
-  Code, Tail, Name, Params, HeaderParams: String;
+  Code, Tail, Name, Params, HeaderParams, Owner, What: String;
+  Codes, BorrowLocal, BorrowOwner: array of String;
 begin
   InBrace := False;
   InParen := False;
   Params := ' ';
+  SetLength(Codes, Length(Src.Lines));
+  for I := 0 to High(Src.Lines) do
+    Codes[I] := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+  SetLength(BorrowLocal, 0);
+  SetLength(BorrowOwner, 0);
   for I := 0 to High(Src.Lines) do
   begin
-    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    Code := Codes[I];
     HeaderParams := S5HeaderParams(Code, ClassNames, IsHeader);
     if IsHeader then
     begin
       Params := HeaderParams;
+      SetLength(BorrowLocal, 0);
+      SetLength(BorrowOwner, 0);
       Continue;
+    end;
+    for J := 0 to High(BorrowOwner) do
+    begin
+      Col := S5Release(Code, BorrowOwner[J], What);
+      if Col = 0 then
+        Continue;
+      Later := S5LaterUse(Codes, I + 1, BorrowLocal[J]);
+      if (Later > 0) and not S5UnsafeMarked(Src, I + 1) then
+        VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S5',
+          BorrowOwner[J] + '.' + What + ' while the borrow ' + BorrowLocal[J] + ' := ' + BorrowOwner[J]
+          + '.Get is alive (used on line ' + IntToStr(Later) + '): the object is freed or moved under it; '
+          + 'finish with the borrow first, or put a comment // UNSAFE: <why> on the line above '
+          + '(safe/SPEC.md, section 6)');
+    end;
+    Owner := S5LocalBorrow(Code, Stores, Name);
+    if Name <> '' then
+      for J := High(BorrowLocal) downto 0 do
+        if BorrowLocal[J] = Name then
+        begin
+          BorrowLocal[J] := BorrowLocal[High(BorrowLocal)];
+          BorrowOwner[J] := BorrowOwner[High(BorrowOwner)];
+          SetLength(BorrowLocal, Length(BorrowLocal) - 1);
+          SetLength(BorrowOwner, Length(BorrowOwner) - 1);
+        end;
+    if Owner <> '' then
+    begin
+      SetLength(BorrowLocal, Length(BorrowLocal) + 1);
+      SetLength(BorrowOwner, Length(BorrowOwner) + 1);
+      BorrowLocal[High(BorrowLocal)] := Name;
+      BorrowOwner[High(BorrowOwner)] := Owner;
     end;
     Col := S5GetEscape(Code, Stores, Name);
     if (Col > 0) and not S5Marked(Src, I + 1) then
