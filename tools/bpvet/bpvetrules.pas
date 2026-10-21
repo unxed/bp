@@ -150,9 +150,11 @@ procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Repor
   // UNSAFE-UNIT: is not checked.
     Error    a parameter of String, AnsiString, UnicodeString, WideString, RawByteString or UTF8String without
              const, constref, var or out: the callee gets its own copy, and a change of it is lost for the caller.
+    Error    the same for a parameter whose type is a record declared in the module (bpvet has no types: the record
+             is found by its name; records of other units are not checked).
              A // UNSAFE: <why> comment on the line above the parameter or at the end of its line drops it.
     A routine declared in the interface (or in a class) and its body are one routine: one finding.
-    Parameters of other types and var without need are not checked yet (unxed/bp#56). }
+    Parameters of other types (dynamic arrays) and var without need are not checked yet (unxed/bp#56). }
 procedure VetCheckS14(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 implementation
@@ -2647,6 +2649,8 @@ type
   TS14Walker = class
   public
     Procs: array of TPasProcedure;
+    { ';name;' of the named records of the module, in lower case }
+    Records: String;
     // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
     procedure Visit(El: TPasElement; Arg: System.Pointer);
   end;
@@ -2658,12 +2662,16 @@ begin
   begin
     SetLength(Procs, Length(Procs) + 1);
     Procs[High(Procs)] := TPasProcedure(El);
-  end;
+  end
+  else if (El is TPasRecordType) and (El.Name <> '') then
+    Records := Records + LowerCase(El.Name) + ';';
 end;
 
-function S14IsString(const T: TPasType): Boolean;
+{ T is a string type, or a record of the module (Records: ';name;...'). }
+function S14ByValueChecked(const T: TPasType; const Records: String): Boolean;
 begin
-  Result := (T <> nil) and (T.Name <> '') and (Pos(';' + LowerCase(T.Name) + ';', S14StringTypes) > 0);
+  Result := (T <> nil) and (T.Name <> '') and ((Pos(';' + LowerCase(T.Name) + ';', S14StringTypes) > 0)
+    or (Pos(';' + LowerCase(T.Name) + ';', Records) > 0));
 end;
 
 { The name of the routine P with its class or record (the body TFoo.Bar and the declaration Bar inside TFoo give one
@@ -2689,6 +2697,7 @@ begin
     Exit;
   W := specialize TOwned<TS14Walker>.Own(TS14Walker.Create);
   V := W.Get;
+  V.Records := ';';
   Module.ForEachCall(@V.Visit, nil);
   Seen := ';';
   for I := 0 to High(V.Procs) do
@@ -2699,7 +2708,7 @@ begin
     for J := 0 to P.ProcType.Args.Count - 1 do
     begin
       A := TPasArgument(P.ProcType.Args[J]);
-      if (A.Access <> argDefault) or not S14IsString(A.ArgType) then
+      if (A.Access <> argDefault) or not S14ByValueChecked(A.ArgType, V.Records) then
         Continue;
       Key := S14RoutineName(P) + '.' + LowerCase(A.Name) + ';';
       if Pos(';' + Key, Seen) > 0 then
