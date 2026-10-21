@@ -33,7 +33,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | **specification only (plan), no code** | §15 |
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
-| `bpvet` rules S3–S6, S8–S14 | **plan** (unxed/bp#56) | §6, §11 |
+| `bpvet` rules S3–S6, S8–S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
 | Lazarus package (OPM), Windows in CI | **plan** | §11 |
@@ -575,8 +575,8 @@ implementation
 end.
 ```
 
-Now: nothing. Target: `bpvet` S8 (`// UNSAFE:` / `// UNSAFE-UNIT:` marks) and S12 (`external`
-only in a `// UNSAFE-UNIT:` module, no pointers in a binding's public API). Step 3.
+Now: `bpvet` S12 (`external` only in a `// UNSAFE-UNIT:` module, no pointers in a binding's public
+API). Target: also S8 (`// UNSAFE:` / `// UNSAFE-UNIT:` marks). Step 3.
 
 **H11. A non-exhaustive `case`, a parameter without `const`.**
 
@@ -665,8 +665,8 @@ end;                                    // the list is destroyed here, also on a
 
 ## §11. Next iterations (what does not exist yet)
 
-- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S7 is done, rules S3–S6 and S8–S14
-  are next (unxed/bp#56); output in the format of FPC messages so that the IDE shows them as compiler errors.
+- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S7 and S12 are done, rules S3–S6, S8–S11
+  and S13–S14 are next (unxed/bp#56); output in the format of FPC messages so that the IDE shows them as compiler errors.
 - **Lazarus package** `safepascal.lpk` in OPM: one-click installation.
 - **GC heap** as a tracing arena: objects declare `procedure Trace(V: TVisitor)`,
   roots are `TShared` to the heap; `Collect` instead of `FreeAll`. Only for graphs where ownership is unnatural.
