@@ -33,8 +33,8 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | **specification only (plan), no code** | §15 |
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
-| `bpvet` rule S4 for `^T` and `@` | **implemented, lint tests, CI** | §6 |
-| `bpvet` S4 pointer arithmetic, rules S5–S6, S9–S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
+| `bpvet` rule S4 (`^T`, `@`, pointer arithmetic) | **implemented, lint tests, CI** | §6 |
+| `bpvet` rules S5–S6, S9–S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
 | Lazarus package (OPM), Windows in CI | **plan** | §11 |
@@ -314,7 +314,7 @@ Thread safety in v0.1: the counters are atomic, so `TShared` can be copied betwe
 | S1 | `GetMem/FreeMem/ReallocMem/AllocMem/New/Dispose` | **compiler**: shadowed by a stub type → an error + the message `SAFE-S1` |
 | S2 | `Move/FillChar` | **compiler**: the same, `SAFE-S2` |
 | S3 | `.Free`, `FreeAndNil`, `.Destroy` | `FreeAndNil` and `.Free` are a compiler error. `.Free` is closed off by a `TObject` helper with the method `Free(const X: SAFE_S3_NoFree_UseTOwnedReset_or_UnsafeDestroy)`: without an argument the call does not compile, and the type name in the "Found declaration" message explains the rule. `.Destroy` — linter |
-| S4 | `Pointer, PByte, PChar, PAnsiChar, PWideChar`, `^T`, `@`, pointer arithmetic | the types — warning `SAFE-S4`; `^T`, `@` — `bpvet` S4; pointer arithmetic — linter (plan) |
+| S4 | `Pointer, PByte, PChar, PAnsiChar, PWideChar`, `^T`, `@`, pointer arithmetic | the types — warning `SAFE-S4`; `^T`, `@`, pointer arithmetic — `bpvet` S4 |
 | S5 | a field/global variable of a class type without `// borrow:` | linter |
 | S6 | `TFoo.Create` not immediately into `Own/Share/Adopt`/an interface/`raise` | linter; partly at runtime (R3) |
 | S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14). Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
@@ -392,7 +392,7 @@ compensating check, and accepted risks are listed with a reason.
 | H1 | a borrow outlives its owner | nothing | `bpvet` S5 + borrow-escape rule | 7 |
 | H2 | `TShared` cycle | R5 counts live objects, no cycle report | `SAFE_DEBUG` cycle report + lint warning | 9 |
 | H3 | use after `TArena.FreeAll` | `-gh` in debug, sometimes | arena generations, `TArenaRef<T>` → `ESafety` | 8 |
-| H4 | `^T`, `@`, pointer arithmetic | `bpvet` S4 for `^T` and `@`; arithmetic: nothing | `bpvet` S4 | 4 |
+| H4 | `^T`, `@`, pointer arithmetic | `bpvet` S4 | `bpvet` S4 | 4 |
 | H5 | a copy of `TOwned` | nothing (the runtime stays safe) | `bpvet` S10 + `SAFE_DEBUG` runtime check | 6 |
 | H6 | shared task fields; `TryLock` race | nothing | `bpvet` S11 + lock in the cell, stress test | 10 |
 | H7 | `.Destroy` | nothing | `bpvet` S3 | 4 |
@@ -477,8 +477,9 @@ end;
 ```
 
 Now: the named types `Pointer, PByte, PChar, PAnsiChar, PWideChar` give the `SAFE-S4`
-compiler warning; `^T` and `@` outside code marked `// UNSAFE:` are a `bpvet` S4 error (a dereference `P^`
-is not); pointer arithmetic still passes silently. Target: `bpvet` S4 error for the arithmetic too. Step 4.
+compiler warning; `^T`, `@` and pointer arithmetic (`Inc(P)`, `P + N` over a name declared with a pointer type
+in the module) outside code marked `// UNSAFE:` are a `bpvet` S4 error; a dereference `P^` and `Inc(P^)` are
+not. Step 4.
 
 **H5. A copy of `TOwned`.**
 
@@ -666,7 +667,7 @@ end;                                    // the list is destroyed here, also on a
 
 ## §11. Next iterations (what does not exist yet)
 
-- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S4 (`^T`, `@`), S7, S8 and S12 are done, S4 pointer arithmetic, rules S5–S6, S9–S11
+- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S4, S7, S8 and S12 are done, rules S5–S6, S9–S11
   and S13–S14 are next (unxed/bp#56); output in the format of FPC messages so that the IDE shows them as compiler errors.
 - **Lazarus package** `safepascal.lpk` in OPM: one-click installation.
 - **GC heap** as a tracing arena: objects declare `procedure Trace(V: TVisitor)`,

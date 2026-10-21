@@ -44,8 +44,11 @@ procedure VetCheckS3(const Src: TVetSource; const Module: TPasModule; var Report
 { S4: raw pointers (safe/SPEC.md §6, register H4). A module marked // UNSAFE-UNIT: is not checked.
     Error    a pointer type ^T or the address operator @ without a // UNSAFE: <why> comment on the line above (one
              comment covers a block of such lines right below it) or at the end of the line. A dereference P^ is
-             not a finding (the pointer it needs is). Comments and string literals are skipped. Pointer arithmetic
-             (Inc/Dec of a pointer, P + N) needs the types and is not checked yet (unxed/bp#56). }
+             not a finding (the pointer it needs is). Comments and string literals are skipped.
+    Error    pointer arithmetic without such a mark: Inc(P), Dec(P, N), P + N, N + P, P - Q, where P is a variable,
+             parameter or field declared in the module with a pointer type (^T, Pointer, PChar and the like, or a
+             pointer type of this module). Inc(P^) and P^ + 1 change the value, not the pointer, and are not
+             findings. The check is by name over the whole module, not by scope. }
 procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 implementation
@@ -613,14 +616,159 @@ begin
   Result := 0;
 end;
 
+{ The word that ends right before position I of Code (spaces skipped), lower case; Start gets its first column. }
+function WordBefore(const Code: String; I: Integer; out Start: Integer): String;
+var
+  J: Integer;
+begin
+  J := I - 1;
+  while (J >= 1) and (Code[J] = ' ') do
+    Dec(J);
+  Start := J + 1;
+  while (Start > 1) and IsWordChar(Code[Start - 1]) do
+    Dec(Start);
+  Result := LowerCase(Copy(Code, Start, J - Start + 1));
+end;
+
+{ The first non-space position at or after I, or Length(Code) + 1. }
+function SkipSpaces(const Code: String; I: Integer): Integer;
+begin
+  Result := I;
+  while (Result <= Length(Code)) and (Code[Result] = ' ') do
+    Inc(Result);
+end;
+
+{ Names (lower case, ';'-separated) of the variables, parameters and fields of the module declared with a pointer
+  type: A, B: ^T, P: PChar, Q: PNode (a pointer type of the module). }
+function PointerVarNames(const Src: TVetSource; const ModulePointers: String): String;
+var
+  I, C, K, Start: Integer;
+  InBrace, InParen, IsPtr: Boolean;
+  Code, Tail, W: String;
+begin
+  Result := ';';
+  InBrace := False;
+  InParen := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    for C := 1 to Length(Code) do
+    begin
+      if (Code[C] <> ':') or ((C < Length(Code)) and (Code[C + 1] = '=')) then
+        Continue;
+      K := SkipSpaces(Code, C + 1);
+      if K > Length(Code) then
+        Continue;
+      if Code[K] = '^' then
+        IsPtr := True
+      else
+      begin
+        W := '';
+        while (K <= Length(Code)) and IsWordChar(Code[K]) do
+        begin
+          W := W + Code[K];
+          Inc(K);
+        end;
+        W := ';' + LowerCase(W) + ';';
+        IsPtr := (W <> ';;') and ((Pos(W, SystemPointers) > 0) or (Pos(W, ModulePointers) > 0));
+      end;
+      if not IsPtr then
+        Continue;
+      K := C;
+      repeat
+        W := WordBefore(Code, K, Start);
+        if W = '' then
+          Break;
+        Result := Result + W + ';';
+        K := Start - 1;
+        while (K >= 1) and (Code[K] = ' ') do
+          Dec(K);
+        if (K < 1) or (Code[K] <> ',') then
+          Break;
+      until False;
+    end;
+  end;
+end;
+
+{ The column of the first pointer arithmetic in Code over the pointer names Names, or 0; What gets the text. }
+function PointerArith(const Code, Names: String; out What: String): Integer;
+var
+  I, J, K, Start: Integer;
+  W, X: String;
+begin
+  What := '';
+  I := 1;
+  while I <= Length(Code) do
+  begin
+    if not IsWordChar(Code[I]) or ((I > 1) and IsWordChar(Code[I - 1])) or (Code[I] in ['0'..'9']) then
+    begin
+      Inc(I);
+      Continue;
+    end;
+    J := I;
+    while (J <= Length(Code)) and IsWordChar(Code[J]) do
+      Inc(J);
+    W := LowerCase(Copy(Code, I, J - I));
+    K := SkipSpaces(Code, J);
+    if ((W = 'inc') or (W = 'dec')) and (K <= Length(Code)) and (Code[K] = '(') then
+    begin
+      K := SkipSpaces(Code, K + 1);
+      J := K;
+      while (J <= Length(Code)) and IsWordChar(Code[J]) do
+        Inc(J);
+      X := LowerCase(Copy(Code, K, J - K));
+      K := SkipSpaces(Code, J);
+      if (X <> '') and (Pos(';' + X + ';', Names) > 0)
+        and ((K > Length(Code)) or not (Code[K] in ['^', '.', '[', '('])) then
+      begin
+        What := Copy(Code, I, J - I) + ')';
+        Exit(I);
+      end;
+    end
+    else if Pos(';' + W + ';', Names) > 0 then
+    begin
+      if (K <= Length(Code)) and (Code[K] in ['+', '-']) then
+      begin
+        What := Copy(Code, I, J - I) + ' ' + Code[K];
+        Exit(I);
+      end;
+      if not ((K <= Length(Code)) and (Code[K] in ['^', '.', '[', '('])) then
+      begin
+        WordBefore(Code, I, Start);
+        K := Start - 1;
+        while (K >= 1) and (Code[K] = ' ') do
+          Dec(K);
+        if (K >= 1) and (Code[K] in ['+', '-']) then
+        begin
+          What := Code[K] + ' ' + Copy(Code, I, J - I);
+          Exit(I);
+        end;
+      end;
+    end;
+    I := J;
+  end;
+  Result := 0;
+end;
+
+function ModulePointerTypes(const Module: TPasModule): String;
+begin
+  if Module is TPasProgram then
+    Result := PointerTypeNames(TPasProgram(Module).ProgramSection)
+  else if Module is TPasLibrary then
+    Result := PointerTypeNames(TPasLibrary(Module).LibrarySection)
+  else
+    Result := PointerTypeNames(Module.InterfaceSection) + PointerTypeNames(Module.ImplementationSection);
+end;
+
 procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 var
   I, Col: Integer;
-  InBrace, InParen, Covered: Boolean;
-  Code, Tail, What: String;
+  InBrace, InParen, Covered, Arith: Boolean;
+  Code, Tail, What, Names: String;
 begin
   if IsUnsafeUnit(Src) then
     Exit;
+  Names := PointerVarNames(Src, ModulePointerTypes(Module));
   InBrace := False;
   InParen := False;
   Covered := False;
@@ -628,6 +776,12 @@ begin
   begin
     Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
     Col := PointerOp(Code, What);
+    Arith := False;
+    if Col = 0 then
+    begin
+      Col := PointerArith(Code, Names, What);
+      Arith := Col > 0;
+    end;
     if Col = 0 then
     begin
       if IsMarkComment(Src.Lines[I]) then
@@ -638,7 +792,11 @@ begin
     end;
     if Covered or IsMarkComment(Tail) then
       Continue;
-    if What = '@' then
+    if Arith then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S4',
+        'pointer arithmetic ' + What + ': index an array, TArray or TSlice instead, or put a comment '
+        + '// UNSAFE: <why the pointer stays inside its block> on the line above (safe/SPEC.md, section 7)')
+    else if What = '@' then
       VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S4',
         'raw address @: pass the variable as a var or const parameter, or borrow it through an owner '
         + '(TOwned.Get, TSlice), or put a comment // UNSAFE: <why the address does not outlive the variable> '
