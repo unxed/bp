@@ -10,6 +10,7 @@
 
   UTF-8 by default and goroutines are not included here: they live in ext/, and everything together is unit BP (bp.pas).
   The layer's sources are the include files safe/*.inc: the same files are built into unit BP. }
+// UNSAFE-UNIT: the runtime of the safe layer itself: it implements the owners and the poisoning on top of raw memory
 unit Safe;
 
 {$mode objfpc}{$H+}
