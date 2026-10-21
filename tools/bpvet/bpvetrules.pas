@@ -27,6 +27,14 @@ procedure VetCheckS7(const Src: TVetSource; const Module: TPasModule; var Report
              takes or returns a pointer (^T, Pointer, PChar and the like, or a pointer type of this module). }
 procedure VetCheckS12(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S8: unsafe code is marked (safe/SPEC.md §7). A module marked // UNSAFE-UNIT: is not checked.
+    Error    a module uses neither Safe nor BP and is not marked // UNSAFE-UNIT:;
+    Error    a full name of a poisoned routine or type (System.GetMem, System.Move, SysUtils.FreeAndNil,
+             System.Pointer and the rest of safe/poison.intf.inc) without a // UNSAFE: <why> comment on the line
+             above (one comment covers a block of such lines right below it) or at the end of the line.
+             Comments and string literals are skipped. }
+procedure VetCheckS8(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 implementation
 
 type
@@ -314,9 +322,191 @@ begin
   end;
 end;
 
+{ S8 }
+
+const
+  { the names that safe/poison.intf.inc hides; a full name (System.X, SysUtils.X) bypasses the hiding }
+  PoisonNames = ';getmem;allocmem;reallocmem;freemem;new;dispose;move;fillchar;freeandnil;pointer;pchar;pansichar;'
+    + 'pwidechar;pbyte;';
+
+function UsesPoison(const Clause: TPasUsesClause): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 0 to High(Clause) do
+    if (Clause[I].Expr <> nil) and IsPoisonUnit(Clause[I].Name) then
+      Exit(True);
+end;
+
+function ModuleUsesPoison(const Module: TPasModule): Boolean;
+begin
+  if Module is TPasProgram then
+    Exit((TPasProgram(Module).ProgramSection <> nil) and UsesPoison(TPasProgram(Module).ProgramSection.UsesClause));
+  if Module is TPasLibrary then
+    Exit((TPasLibrary(Module).LibrarySection <> nil) and UsesPoison(TPasLibrary(Module).LibrarySection.UsesClause));
+  Result := ((Module.InterfaceSection <> nil) and UsesPoison(Module.InterfaceSection.UsesClause))
+    or ((Module.ImplementationSection <> nil) and UsesPoison(Module.ImplementationSection.UsesClause));
+end;
+
+function IsMarkComment(const S: String): Boolean;
+begin
+  Result := Pos('// UNSAFE:', TrimLeft(S)) = 1;
+end;
+
+{ The code of a line without comments and string literals (replaced by spaces, so the columns stay), and the
+  trailing // comment. InBrace / InParen: a {...} or (*...*) comment goes on from the line before. }
+function CodeOf(const Line: String; var InBrace, InParen: Boolean; out Tail: String): String;
+var
+  I, N: Integer;
+  InStr: Boolean;
+begin
+  Result := Line;
+  Tail := '';
+  N := Length(Line);
+  InStr := False;
+  I := 1;
+  while I <= N do
+  begin
+    if InBrace then
+    begin
+      if Line[I] = '}' then
+        InBrace := False;
+      Result[I] := ' ';
+    end
+    else if InParen then
+    begin
+      if (Line[I] = '*') and (I < N) and (Line[I + 1] = ')') then
+      begin
+        InParen := False;
+        Result[I + 1] := ' ';
+        Result[I] := ' ';
+        Inc(I);
+      end
+      else
+        Result[I] := ' ';
+    end
+    else if InStr then
+    begin
+      if Line[I] = '''' then
+        InStr := False;
+      Result[I] := ' ';
+    end
+    else if Line[I] = '''' then
+    begin
+      InStr := True;
+      Result[I] := ' ';
+    end
+    else if Line[I] = '{' then
+    begin
+      InBrace := True;
+      Result[I] := ' ';
+    end
+    else if (Line[I] = '(') and (I < N) and (Line[I + 1] = '*') then
+    begin
+      InParen := True;
+      Result[I] := ' ';
+      Result[I + 1] := ' ';
+      Inc(I);
+    end
+    else if (Line[I] = '/') and (I < N) and (Line[I + 1] = '/') then
+    begin
+      Tail := Copy(Line, I, N - I + 1);
+      Result := Copy(Result, 1, I - 1);
+      Exit;
+    end;
+    Inc(I);
+  end;
+end;
+
+function IsWordChar(const C: Char): Boolean;
+begin
+  Result := C in ['A'..'Z', 'a'..'z', '0'..'9', '_'];
+end;
+
+{ The first full name System.X / SysUtils.X of a poisoned X in Code: its column, or 0; Name gets it. }
+function PoisonFullName(const Code: String; out Name: String): Integer;
+var
+  I, J, K: Integer;
+  Qual, Ident: String;
+begin
+  Name := '';
+  I := 1;
+  while I <= Length(Code) do
+  begin
+    if IsWordChar(Code[I]) and ((I = 1) or not IsWordChar(Code[I - 1])) and not (Code[I] in ['0'..'9']) then
+    begin
+      J := I;
+      while (J <= Length(Code)) and IsWordChar(Code[J]) do
+        Inc(J);
+      Qual := LowerCase(Copy(Code, I, J - I));
+      K := J;
+      while (K <= Length(Code)) and (Code[K] = ' ') do
+        Inc(K);
+      if ((Qual = 'system') or (Qual = 'sysutils')) and (K <= Length(Code)) and (Code[K] = '.') then
+      begin
+        Inc(K);
+        while (K <= Length(Code)) and (Code[K] = ' ') do
+          Inc(K);
+        J := K;
+        while (J <= Length(Code)) and IsWordChar(Code[J]) do
+          Inc(J);
+        Ident := Copy(Code, K, J - K);
+        if (Ident <> '') and (Pos(';' + LowerCase(Ident) + ';', PoisonNames) > 0) then
+        begin
+          Name := Copy(Code, I, K - I) + Ident;
+          Exit(I);
+        end;
+      end;
+      I := J;
+    end
+    else
+      Inc(I);
+  end;
+  Result := 0;
+end;
+
+procedure VetCheckS8(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  I, Col: Integer;
+  InBrace, InParen, Covered: Boolean;
+  Code, Tail, Name: String;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  if not ModuleUsesPoison(Module) then
+    AddAtElement(Src, Module, vsError, 'S8',
+      'the module uses neither Safe nor BP and is not marked unsafe: end its uses with Safe (or BP), '
+      + 'or put // UNSAFE-UNIT: <why> before its header if the whole module is unsafe (safe/SPEC.md, section 7)',
+      Report);
+  { A // UNSAFE: comment covers the lines with unsafe full names right below it (blank and comment lines
+    between them keep it); any other line of code ends it. }
+  InBrace := False;
+  InParen := False;
+  Covered := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    Col := PoisonFullName(Code, Name);
+    if Col = 0 then
+    begin
+      if IsMarkComment(Src.Lines[I]) then
+        Covered := True
+      else if Trim(Code) <> '' then
+        Covered := False;
+      Continue;
+    end;
+    if not Covered and not IsMarkComment(Tail) then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S8',
+        'unsafe ' + Name + ' without a mark: put a comment // UNSAFE: <why this is safe> on the line above, '
+        + 'or use an owner instead (TOwned, TArray, assignment; safe/SPEC.md, section 7)');
+  end;
+end;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 begin
   VetCheckS7(Src, Module, Report);
+  VetCheckS8(Src, Module, Report);
   VetCheckS12(Src, Module, Report);
 end;
 
