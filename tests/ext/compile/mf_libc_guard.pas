@@ -1,4 +1,5 @@
 // EXPECT: exit 232
+// UNSAFE-UNIT: the check calls libc directly (FFI without a binding unit) on purpose: BPThreads must stop it
 { FFI to libc + goroutines without -dSAFE_LIBC: BPThreads must stop the program
   with an explanation (code 232) instead of letting threads call libc without its TLS. Linux only. }
 program mf_libc_guard;
