@@ -87,6 +87,8 @@ begin
   end;
   Count := 0;
   SetLength(Items, 0);
+  if GenObj <> nil then
+    Inc(GenObj.Generation); // every TArenaRef taken before this point is stale now (R10)
 end;
 
 destructor TSafeArenaImpl.Destroy;
@@ -284,6 +286,8 @@ class function TArena.Create: TArena;
 begin
   Result.FImpl := TSafeArenaImpl.Create;
   Result.FRef := Result.FImpl;
+  Result.FImpl.GenObj := TSafeArenaGen.Create;
+  Result.FImpl.GenRef := Result.FImpl.GenObj;
 end;
 
 procedure TArena.Check;
@@ -318,6 +322,52 @@ function TArena.Count: SizeInt;
 begin
   Check;
   Result := FImpl.Count;
+end;
+
+function TArena.Generation: LongWord;
+begin
+  Check;
+  Result := FImpl.GenObj.Generation;
+end;
+
+function TArena.GenCell: TSafeArenaGen;
+begin
+  Check;
+  Result := FImpl.GenObj;
+end;
+
+{ ---------- TArenaRef ---------- }
+
+class function TArenaRef.Adopt(AObj: T; var A: TArena): TArenaRef;
+begin
+  Result.FObj := T(A.Adopt(AObj));
+  if SafeDebugChecks and (AObj <> nil) then
+  begin
+    Result.FGenObj := A.GenCell;
+    Result.FGenRef := Result.FGenObj;
+    Result.FGen := Result.FGenObj.Generation;
+    Result.FCls := AObj.ClassType;
+  end
+  else
+  begin // Result may reuse the storage of the target variable: clear every field
+    Result.FGenObj := nil;
+    Result.FGenRef := nil;
+    Result.FGen := 0;
+    Result.FCls := nil;
+  end;
+end;
+
+function TArenaRef.IsStale: Boolean;
+begin
+  Result := (FGenObj <> nil) and (FGenObj.Generation <> FGen);
+end;
+
+function TArenaRef.Get: T;
+begin
+  if (FGenObj <> nil) and (FGenObj.Generation <> FGen) then
+    SafeFail('SAFE-R10: TArenaRef.Get of ' + FCls.ClassName +
+      ' after TArena.FreeAll: the object is destroyed; take the reference again after the arena is refilled');
+  Result := FObj;
 end;
 
 { ---------- defer ---------- }

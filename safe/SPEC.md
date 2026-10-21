@@ -281,6 +281,13 @@ TArena = record
   function Adopt(AObj: TObject): TObject;  // the result is a borrow: X := A.Adopt(TFoo.Create) as TFoo
   procedure FreeAll;                       // destroys in reverse order
   function Count: SizeInt;
+  function Generation: LongWord;           // how many times FreeAll ran
+end;
+
+TArenaRef<T: class> = record              // a checked arena reference (H3): R := TNodeRef.Adopt(TNode.Create, Arena)
+  class function Adopt(AObj: T; var A: TArena): TArenaRef; static;
+  function Get: T;                         // after FreeAll, with debug checks on at Adopt → ESafety (R10)
+  function IsStale: Boolean;               // debug checks only: the arena was freed after Adopt
 end;
 
 function CodePoints(const S: String): TCodePointEnumerator;  // for Ch in CodePoints(S)
@@ -309,6 +316,7 @@ Runtime checks (always enabled, cost one comparison):
 | R7 | a group task failed: `TGroup.Wait` raises with the original class and exception text |
 | R8 | `TGroup.Go` without threads: no thread manager is installed, or the target has no threads (DOS) |
 | R9 | debug checks on (`-dSAFE_DEBUG` or `SafeDebugChecks := True`): `TOwned.Reset` while a copy of the owner is alive (S10); the message names the class |
+| R10 | debug checks on at `TArenaRef.Adopt`: `TArenaRef.Get` after `TArena.FreeAll` of its arena (the arena generation changed, H3); the message names the class. With checks off `TArenaRef` keeps no arena link and `Get` is one comparison |
 
 Thread safety in v0.1: the counters are atomic, so `TShared` can be copied between threads;
 `TWeak.TryLock` from different threads concurrently with the last `Reset` is a race (§11).
@@ -373,7 +381,7 @@ System.GetMem(Buf, Len);
 | raw pointers outside unsafe | compiler warning (named pointer types) + linter (plan) (`^T`, `@`, arithmetic) | H4 |
 | A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1 |
 | No `TShared` cycles | programmer + linter (plan, heuristic) | H2 |
-| Arena objects are not used after `FreeAll` | programmer; in debug `-gh` | H3 |
+| Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
 | Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter (plan) (S11); the `TryLock` race is open (§11) | H6 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
@@ -399,7 +407,7 @@ compensating check, and accepted risks are listed with a reason.
 |---|---|---|---|---|
 | H1 | a borrow outlives its owner | nothing | `bpvet` S5 + borrow-escape rule | 7 |
 | H2 | `TShared` cycle | R5 counts live objects, no cycle report | `SAFE_DEBUG` cycle report + lint warning | 9 |
-| H3 | use after `TArena.FreeAll` | `-gh` in debug, sometimes | arena generations, `TArenaRef<T>` → `ESafety` | 8 |
+| H3 | use after `TArena.FreeAll` | `TArenaRef<T>` + arena generations → `ESafety` R10 in debug; plain borrows: `-gh`, sometimes | release cost measured by a benchmark | 8 |
 | H4 | `^T`, `@`, pointer arithmetic | `bpvet` S4 | `bpvet` S4 | 4 |
 | H5 | a copy of `TOwned` | nothing (the runtime stays safe) | `bpvet` S10 + `SAFE_DEBUG` runtime check | 6 |
 | H6 | shared task fields; `TryLock` race | nothing | `bpvet` S11 + lock in the cell, stress test | 10 |
@@ -468,10 +476,14 @@ begin
 end;
 ```
 
-Now: the programmer; `-gh` in a debug build catches it only sometimes. Target: `FreeAll` bumps
-the arena generation; in `SAFE_DEBUG` `// borrow: arena` references go through a checked handle
-`TArenaRef<T>` (arena + generation) and an access after `FreeAll` raises `ESafety`; in a release
-build it is a plain reference with zero cost (measured by a benchmark). Step 8.
+Now (step 8, first part): `FreeAll` bumps the arena generation (`TArena.Generation`); a reference
+taken as `R := TNodeRef.Adopt(TNode.Create, Arena)` (`TNodeRef = specialize TArenaRef<TNode>`) with
+debug checks on (`-dSAFE_DEBUG` or `SafeDebugChecks := True`) remembers the generation, and `R.Get`
+after `FreeAll` raises `ESafety` R10 instead of touching a destroyed object. The generation lives in
+a small cell that outlives the arena while a `TArenaRef` holds it, so the check is valid after the
+arena itself is gone. With checks off `TArenaRef` keeps no arena link: `Get` is one comparison and
+returns the plain reference. A plain `// borrow: arena` variable is still the programmer's
+responsibility (`-gh` sometimes). Left in step 8: a benchmark of the release cost.
 
 **H4. `^T`, `@` and pointer arithmetic.**
 

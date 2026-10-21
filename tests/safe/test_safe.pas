@@ -23,6 +23,7 @@ type
   TProbeWeak = specialize TWeak<TProbe>;
   TInts = specialize TArray<Integer>;
   TIntSlice = specialize TSlice<Integer>;
+  TProbeArenaRef = specialize TArenaRef<TProbe>;
 
 var
   Log: string = ''; // '~name' for each destruction, in order
@@ -223,6 +224,40 @@ begin
   end;
 end;
 
+procedure ArenaRefAfterFreeAll;
+var
+  Ar: TArena;
+  R, Plain: TProbeArenaRef;
+  Caught: string;
+begin
+  Ar := TArena.Create;
+  Check(Ar.Generation = 0, 'arena: generation 0 after Create');
+  Plain := TProbeArenaRef.Adopt(TProbe.Create('g1'), Ar); // checks off: a plain reference
+  SafeDebugChecks := True;
+  try
+    R := TProbeArenaRef.Adopt(TProbe.Create('g2'), Ar);
+    Check((R.Get.Name = 'g2') and not R.IsStale, 'arena ref: Get before FreeAll');
+    Ar.FreeAll;
+    Check((Ar.Generation = 1) and R.IsStale, 'arena ref: FreeAll bumps the generation');
+    Check(not Plain.IsStale, 'arena ref: without debug checks no arena link is kept');
+    Caught := '';
+    try
+      R.Get;
+    except
+      on E: ESafety do
+        Caught := E.Message;
+    end;
+    Check((Pos('SAFE-R10', Caught) > 0) and (Pos('TProbe', Caught) > 0),
+      'arena ref: SAFE_DEBUG catches use after FreeAll (R10)');
+    R := TProbeArenaRef.Adopt(TProbe.Create('g3'), Ar);
+    Check((R.Get.Name = 'g3') and not R.IsStale, 'arena ref: a new reference after FreeAll is valid');
+  finally
+    SafeDebugChecks := False;
+  end;
+  R := TProbeArenaRef.Adopt(TProbe.Create('g4'), Ar); // reuses R: the debug link must be cleared
+  Check(not R.IsStale and (R.Get.Name = 'g4'), 'arena ref: re-Adopt without checks clears the link');
+end;
+
 type
   TDeferProbe = class
   public
@@ -341,6 +376,7 @@ begin
   Run('InterfacedRejected', @InterfacedRejected, '');
   Run('Slices', @Slices, '');
   Run('ArenaScope', @ArenaScope, '~z~y~x~w');
+  Run('ArenaRefAfterFreeAll', @ArenaRefAfterFreeAll, '~g2~g1~g4~g3');
 
   Run('Defers', @Defers, '');
   Run('Leaks', @Leaks, '~leak');
