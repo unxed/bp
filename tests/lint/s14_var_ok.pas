@@ -26,6 +26,7 @@ type
 procedure AssignValue(var N: Integer);
 procedure AssignField(var P: TPoint);
 procedure AssignIndex(var A: array of Integer);
+// UNSAFE: fixture for S14 pointer-parameter write analysis
 procedure AssignDeref(var P: PInt);
 procedure ThroughCall(var N: Integer);
 procedure ThroughAddress(var N: Integer);
