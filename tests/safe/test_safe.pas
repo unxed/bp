@@ -25,6 +25,14 @@ type
   TIntSlice = specialize TSlice<Integer>;
   TProbeArenaRef = specialize TArenaRef<TProbe>;
 
+  TCycleNode = class;
+  TCycleRef = specialize TShared<TCycleNode>;
+  TCycleNode = class(TProbe)
+  public
+    // UNSAFE: the test makes this cycle on purpose: SafeCheckNoLeaks must report it (H2)
+    Next: TCycleRef;
+  end;
+
 var
   Log: string = ''; // '~name' for each destruction, in order
   Failed: Integer = 0;
@@ -320,6 +328,46 @@ begin
   Probe.Destroy;
 end;
 
+procedure SharedCycleReported;
+var
+  A, B, C, Tmp: TCycleRef;
+  PA: TCycleNode;
+  Caught: string;
+begin
+  SafeDebugChecks := True;
+  try
+    A := TCycleRef.Share(TCycleNode.Create('h1'));
+    B := TCycleRef.Share(TCycleNode.Create('h2'));
+    C := TCycleRef.Share(TCycleNode.Create('h3')); // held from outside: not a part of the report
+    A.Get.Next := B;
+    B.Get.Next := A;
+    PA := A.Get;
+    A.Reset; // UNSAFE: the cycle keeps the object alive, PA breaks it below
+    B.Reset;
+    Check(SafeLiveCount = 3, 'cycle: the two objects of the cycle leak');
+    Caught := '';
+    try
+      SafeCheckNoLeaks;
+    except
+      on E: ESafety do
+        Caught := E.Message;
+    end;
+    WriteLn('     ', Caught);
+    Check((Pos('SAFE-R5: 3 owned object(s) still alive', Caught) > 0)
+      and (Pos('2 of them are reachable only from each other', Caught) > 0)
+      and (Pos('types TCycleNode,', Caught) > 0)
+      and (Pos('path TCycleNode -> TCycleNode -> TCycleNode;', Caught) > 0)
+      and (Pos('TWeak', Caught) > 0), 'cycle: SafeCheckNoLeaks reports the TShared cycle (H2)');
+  finally
+    SafeDebugChecks := False;
+  end;
+  Tmp := PA.Next; // a local owner of h2, so that h1 is not freed while its own field is being reset
+  PA.Next.Reset;
+  Tmp.Reset;     // h2 dies, and with its field Next the last owner of h1
+  C.Reset;
+  Check(SafeLiveCount = 0, 'cycle: nothing alive after the cycle is broken');
+end;
+
 procedure Leaks;
 var
   A: TProbeBox;
@@ -379,6 +427,7 @@ begin
   Run('ArenaRefAfterFreeAll', @ArenaRefAfterFreeAll, '~g2~g1~g4~g3');
 
   Run('Defers', @Defers, '');
+  Run('SharedCycleReported', @SharedCycleReported, '~h2~h1~h3');
   Run('Leaks', @Leaks, '~leak');
   Run('DeferFailureIsCounted', @DeferFailureIsCounted, '');
 

@@ -38,7 +38,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | `bpvet` rule S9 (`UnicodeString/WideString/ShortString`, `String[N]` only under `// UNSAFE:`) | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S10, static part (`TOwned` copied only through `.Move`, no `TOwned` by value in a parameter) | **implemented, lint tests, CI**; the `SAFE_DEBUG` runtime check is **plan** | §6 |
 | `bpvet` rule S5, fields and globals (a field/global of a class declared in the module or of a common RTL class only with `// borrow:`) | **implemented, lint tests, CI**; classes of other units and the borrow-escape rule are **plan** | §6 |
-| `bpvet` rule S15 (no `TShared` cycles: a warning on a `TShared` field that leads back to its own class, heuristic over one module) | **implemented, lint tests, CI**; the `SAFE_DEBUG` cycle report is **plan** | §6, H2 |
+| `bpvet` rule S15 (no `TShared` cycles: a warning on a `TShared` field that leads back to its own class, heuristic over one module) | **implemented, lint tests, CI**; the `SAFE_DEBUG` cycle report of `SafeCheckNoLeaks` is **implemented, test** (`test_safe`, `SharedCycleReported`) | §6, H2 |
 | `bpvet` rules S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
@@ -408,7 +408,7 @@ compensating check, and accepted risks are listed with a reason.
 | Id | Hole | Now | Target | Step |
 |---|---|---|---|---|
 | H1 | a borrow outlives its owner | nothing | `bpvet` S5 + borrow-escape rule | 7 |
-| H2 | `TShared` cycle | R5 counts live objects, no cycle report; `bpvet` S15 warns on a field that closes a cycle | `SAFE_DEBUG` cycle report + lint warning | 9 |
+| H2 | `TShared` cycle | R5 counts live objects; in `SAFE_DEBUG` it reports the objects reachable only from each other (number, types, path); `bpvet` S15 warns on a field that closes a cycle | `SAFE_DEBUG` cycle report + lint warning | 9 |
 | H3 | use after `TArena.FreeAll` | `TArenaRef<T>` + arena generations → `ESafety` R10 in debug; plain borrows: `-gh`, sometimes | done; release cost measured (`tests/bench/bench_arena.pas`): `Get` is a call, not yet zero cost | 8 |
 | H4 | `^T`, `@`, pointer arithmetic | `bpvet` S4 | `bpvet` S4 | 4 |
 | H5 | a copy of `TOwned` | nothing (the runtime stays safe) | `bpvet` S10 + `SAFE_DEBUG` runtime check | 6 |
@@ -458,8 +458,11 @@ begin
 end;
 ```
 
-Now: `SafeCheckNoLeaks` raises R5 with the number of live objects, but does not say that they
-form a cycle; `bpvet` S15 warns on a `TShared` field of a class of the module that leads back to its own class
+Now: `SafeCheckNoLeaks` raises R5 with the number of live objects; with debug checks on (`-dSAFE_DEBUG` or
+`SafeDebugChecks := True` when the objects are made) it adds the number of those reachable only from each other,
+their types and the path of the cycle (`… 2 of them are reachable only from each other, a TShared cycle (H2): types
+TNode, path TNode -> TNode -> TNode; make the back reference a TWeak`). It finds the owners in the fields of the
+objects themselves, not in dynamic arrays or heap records they point to. `bpvet` S15 warns on a `TShared` field of a class of the module that leads back to its own class
 (with the path of fields and the hint "a back reference is `TWeak`"). Target: in `SAFE_DEBUG` `SafeCheckNoLeaks` reports live
 `TShared` objects reachable only from each other (type, count, path of the cycle); `bpvet` warns
 on a `TShared<T>` field in a class that is itself held by `TShared` of the same graph, with the
