@@ -3,6 +3,8 @@ program test_utf8;
 
 {$mode objfpc}{$H+}
 
+// UNSAFE: BP goes first for the thread manager (SPEC §14); SysUtils after it shadows it, and the program does
+// not free objects by hand (no FreeAndNil)
 uses
   BP, SysUtils;
 

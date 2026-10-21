@@ -17,7 +17,11 @@ procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Repor
     Error    a unit follows Safe/BP in the same uses clause;
     Warning  the implementation uses come after Safe/BP of the interface (they shadow it in the implementation);
     Warning  units follow BP that is first in the uses of a program (BP goes first there for the thread manager,
-             SPEC §14, and the units after it shadow it in the program file). }
+             SPEC §14, and the units after it shadow it in the program file).
+    A warning is not reported when the uses unit it points at is marked // UNSAFE: <why> (a trailing comment on its
+    line, or a comment line above it; blank lines, comment lines and the line with the word uses between them keep
+    the mark): the shadowing is then a known, explained exception (safe/SPEC.md §7). An error has no mark: the unit
+    can always move. }
 procedure VetCheckS7(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S12: FFI lives in binding modules (safe/SPEC.md §13). A binding module is marked by a comment
@@ -119,6 +123,31 @@ begin
     VetAdd(Report, U.SourceFilename, U.SourceLinenumber, 1, Severity, Rule, Msg);
 end;
 
+{ The S7 warning at the uses unit U is marked: // UNSAFE: ends the line of U, or stands on a line above it with only
+  blank lines, comment lines and the line `uses` in between. }
+function S7Marked(const Src: TVetSource; const U: TPasUsesUnit): Boolean;
+var
+  Row, I: Integer;
+  L: String;
+begin
+  Result := False;
+  if (U.SourceFilename <> '') and not SameText(ExtractFileName(U.SourceFilename), ExtractFileName(Src.FileName)) then
+    Exit;
+  Row := U.SourceLinenumber;
+  if Pos('// UNSAFE:', VetLine(Src, Row)) > 0 then
+    Exit(True);
+  for I := Row - 1 downto 1 do
+  begin
+    L := Trim(VetLine(Src, I));
+    if Pos('// UNSAFE:', L) = 1 then
+      Exit(True);
+    if (L = '') or (Pos('//', L) = 1) or SameText(L, 'uses')
+      or ((Pos('{', L) = 1) and (Pos('{$', L) <> 1) and (L[Length(L)] = '}')) then
+      Continue;
+    Exit;
+  end;
+end;
+
 procedure CheckClause(const Src: TVetSource; const Clause: TPasUsesClause; const InProgram: Boolean;
   var Report: TVetReport);
 var
@@ -133,10 +162,14 @@ begin
   Name := Units[P].Name;
   After := NamesFrom(Units, P + 1);
   if InProgram and (P = 0) and SameText(Name, 'BP') then
-    AddAt(Src, Units[P], vsWarning, 'S7',
+  begin
+    if not S7Marked(Src, Units[P]) then
+      AddAt(Src, Units[P], vsWarning, 'S7',
       'the units after BP in the uses of the program (' + After + ') shadow it in this file, '
       + 'so SysUtils.FreeAndNil compiles here; BP stays first for the thread manager (safe/SPEC.md, section 14): '
-      + 'keep the program file thin and put the code into units whose uses end with BP', Report)
+      + 'keep the program file thin and put the code into units whose uses end with BP, or mark it '
+      + '// UNSAFE: <why> if the program file does need SysUtils', Report);
+  end
   else
     AddAt(Src, Units[P], vsError, 'S7',
       Name + ' is not last in uses: ' + After + ' come after it and shadow the poisoned routines '
@@ -172,11 +205,13 @@ begin
   P := PoisonIndex(Intf);
   if (P < 0) or (Length(Impl) = 0) then
     Exit;
+  if S7Marked(Src, Impl[0]) then
+    Exit;
   Name := Intf[P].Name;
   AddAt(Src, Impl[0], vsWarning, 'S7',
     'the implementation uses (' + NamesFrom(Impl, 0) + ') come after ' + Name + ' of the interface and shadow it '
     + 'in the implementation; move these units into the interface uses before ' + Name + ', or move ' + Name
-    + ' into the implementation uses if the interface does not need it', Report);
+    + ' into the implementation uses if the interface does not need it, or mark it // UNSAFE: <why>', Report);
 end;
 
 { S12 }
