@@ -84,6 +84,16 @@ procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report
     bpvet with -FuDIR. }
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S15: no TShared cycles (safe/SPEC.md §6, register H2). A module marked // UNSAFE-UNIT: is not checked.
+    Warning  a field of a class of the module whose type is TShared of a class of the module (specialize TShared<X>
+             or a module alias NAME = specialize TShared<X>), when X leads back to the class of the field through
+             such fields (X is the class itself, or a field of X, or of a class it holds this way, is a TShared of
+             it): the objects of the cycle keep each other alive and leak. A back reference is TWeak (Shared.Weak).
+             A // UNSAFE: <why> comment on the line above or at the end of the line drops the warning for the field
+             (the program breaks the cycle itself). The check is a heuristic by names over one module: the type of
+             a field is read from the text of its line, classes of other units are not followed. }
+procedure VetCheckS15(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
     Error    a parameter of a TOwned type (TOwned<...> or a module alias NAME = specialize TOwned<...>) passed by
              value: without const, var, out or constref;
@@ -1886,11 +1896,173 @@ begin
   end;
 end;
 
+{ S15 }
+
+type
+  TS15Edge = record
+    Owner, Target, Field: String;  { lower-case class names; the field name as written }
+    Row: Integer;
+    Elem: TPasElement;
+  end;
+
+{ The TShared aliases of the module, each as ' name=class ': NAME = specialize TShared<CLASS>. }
+function S15SharedAliases(const Src: TVetSource): String;
+var
+  I, Eq, Lt, Gt: Integer;
+  L, Name, Rest: String;
+begin
+  Result := ' ';
+  for I := 0 to High(Src.Lines) do
+  begin
+    L := LowerCase(Src.Lines[I]);
+    Eq := Pos('=', L);
+    if Eq = 0 then
+      Continue;
+    Name := Trim(Copy(L, 1, Eq - 1));
+    Rest := TrimLeft(Copy(L, Eq + 1, Length(L)));
+    if (Name = '') or (Pos(' ', Name) > 0) or (Pos('specialize ', Rest) <> 1) then
+      Continue;
+    Rest := TrimLeft(Copy(Rest, 12, Length(Rest)));
+    Lt := Pos('<', Rest);
+    Gt := Pos('>', Rest);
+    if (Lt = 0) or (Gt < Lt) or (Trim(Copy(Rest, 1, Lt - 1)) <> 'tshared') then
+      Continue;
+    Result := Result + Name + '=' + Trim(Copy(Rest, Lt + 1, Gt - Lt - 1)) + ' ';
+  end;
+end;
+
+{ The class that the field type text T (lower case, from after the colon) holds through TShared, or ''. }
+function S15Target(const T, Aliases: String): String;
+var
+  Rest, W: String;
+  Lt, Gt, P: Integer;
+begin
+  Result := '';
+  Rest := TrimLeft(T);
+  if Pos('specialize ', Rest) = 1 then
+  begin
+    Rest := TrimLeft(Copy(Rest, 12, Length(Rest)));
+    Lt := Pos('<', Rest);
+    Gt := Pos('>', Rest);
+    if (Lt > 0) and (Gt > Lt) and (Trim(Copy(Rest, 1, Lt - 1)) = 'tshared') then
+      Result := Trim(Copy(Rest, Lt + 1, Gt - Lt - 1));
+    Exit;
+  end;
+  W := S10FirstWord(Rest);
+  if W = '' then
+    Exit;
+  P := Pos(' ' + W + '=', Aliases);
+  if P = 0 then
+    Exit;
+  Rest := Copy(Aliases, P + Length(W) + 2, Length(Aliases));
+  Result := Copy(Rest, 1, Pos(' ', Rest) - 1);
+end;
+
+{ The TShared fields of the classes in L (and in classes nested in them), as edges owner class -> held class. }
+procedure S15CollectEdges(const Src: TVetSource; const L: TFPList; const Aliases: String;
+  var Edges: array of TS15Edge; var N: Integer);
+var
+  I, J, C: Integer;
+  E, M: TPasElement;
+  Line, Target: String;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+  begin
+    E := TPasElement(L[I]);
+    if not (E is TPasClassType) then
+      Continue;
+    if (TPasClassType(E).ObjKind = okClass) and (E.Name <> '') then
+      for J := 0 to TPasClassType(E).Members.Count - 1 do
+      begin
+        M := TPasElement(TPasClassType(E).Members[J]);
+        if M.ClassType <> TPasVariable then
+          Continue;
+        Line := LowerCase(VetLine(Src, M.SourceLinenumber));
+        C := Pos(':', Line);
+        if C = 0 then
+          Continue;
+        Target := S15Target(Copy(Line, C + 1, Length(Line)), Aliases);
+        if (Target = '') or (N > High(Edges)) then
+          Continue;
+        Edges[N].Owner := LowerCase(E.Name);
+        Edges[N].Target := Target;
+        Edges[N].Field := E.Name + '.' + M.Name;
+        Edges[N].Row := M.SourceLinenumber;
+        Edges[N].Elem := M;
+        Inc(N);
+      end;
+    S15CollectEdges(Src, TPasClassType(E).Members, Aliases, Edges, N);
+  end;
+end;
+
+{ The path of fields from class From back to class Goal, as ' -> A.F -> B.G', or '' when there is none. }
+function S15PathBack(const Edges: array of TS15Edge; const N: Integer; const From, Goal: String;
+  var Seen: String): String;
+var
+  I: Integer;
+  Rest: String;
+begin
+  Result := '';
+  if From = Goal then
+    Exit(' ');
+  if Pos(' ' + From + ' ', Seen) > 0 then
+    Exit;
+  Seen := Seen + From + ' ';
+  for I := 0 to N - 1 do
+    if Edges[I].Owner = From then
+    begin
+      Rest := S15PathBack(Edges, N, Edges[I].Target, Goal, Seen);
+      if Rest <> '' then
+        Exit(' -> ' + Edges[I].Field + TrimRight(Rest));
+    end;
+end;
+
+procedure VetCheckS15(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  Sections: array[0..1] of TPasDeclarations;
+  Edges: array[0..255] of TS15Edge;
+  I, N: Integer;
+  Aliases, Seen, Path: String;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  Sections[0] := nil;
+  Sections[1] := nil;
+  if Module is TPasProgram then
+    Sections[0] := TPasProgram(Module).ProgramSection
+  else if Module is TPasLibrary then
+    Sections[0] := TPasLibrary(Module).LibrarySection
+  else
+  begin
+    Sections[0] := Module.InterfaceSection;
+    Sections[1] := Module.ImplementationSection;
+  end;
+  Aliases := S15SharedAliases(Src);
+  N := 0;
+  for I := 0 to 1 do
+    if Sections[I] <> nil then
+      S15CollectEdges(Src, Sections[I].Declarations, Aliases, Edges, N);
+  for I := 0 to N - 1 do
+  begin
+    Seen := ' ';
+    Path := S15PathBack(Edges, N, Edges[I].Target, Edges[I].Owner, Seen);
+    if (Path <> '') and not S5UnsafeMarked(Src, Edges[I].Row) then
+      AddAtElement(Src, Edges[I].Elem, vsWarning, 'S15',
+        'the field ' + Edges[I].Field + ' holds through TShared an object that leads back to its own class ('
+        + Edges[I].Field + TrimRight(Path) + '): the objects of such a cycle keep each other alive and leak; '
+        + 'a back reference is TWeak (Shared.Weak), or put a comment // UNSAFE: <why> on the line above '
+        + '(safe/SPEC.md, section 6)', Report);
+  end;
+end;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 begin
   VetCheckS3(Src, Module, Report);
   VetCheckS4(Src, Module, Report);
   VetCheckS5(Src, Module, Report);
+  VetCheckS15(Src, Module, Report);
   VetCheckS6(Src, Module, Report);
   VetCheckS9(Src, Module, Report);
   VetCheckS10(Src, Module, Report);
