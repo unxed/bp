@@ -198,7 +198,7 @@ begin
   if Listed then
     SafeUnlistLife(Self);
   if CellObj <> nil then
-    CellObj.Life := nil; // weak references will no longer lock the object
+    CellObj.ClearLife; // weak references will no longer lock the object (under the cell lock: TryLock, H6)
   O := Obj;
   Obj := nil;
   if O <> nil then
@@ -219,6 +219,51 @@ begin
     CellRef := CellObj;
   end;
   Result := CellObj;
+end;
+
+function TSafeLife.TryAddRef: Boolean;
+var
+  N: LongInt;
+begin
+  repeat
+    N := FRefCount;
+    if N <= 0 then
+      Exit(False); // the last reference is gone: the destructor runs or is about to run in another thread
+  until InterlockedCompareExchange(FRefCount, N + 1, N) = N;
+  Result := True;
+end;
+
+{ ---------- TSafeCell ---------- }
+
+procedure SafeCellEnter(C: TSafeCell);
+begin
+  while InterlockedCompareExchange(C.Lock, 1, 0) <> 0 do
+    ThreadSwitch;
+end;
+
+procedure SafeCellLeave(C: TSafeCell);
+begin
+  InterlockedExchange(C.Lock, 0);
+end;
+
+function TSafeCell.AcquireLife: TObject;
+begin
+  Result := nil;
+  SafeCellEnter(Self);
+  try
+    // Life is valid here: its destructor clears it under the same lock before the memory is freed
+    if (Life <> nil) and TSafeLife(Life).TryAddRef then
+      Result := Life;
+  finally
+    SafeCellLeave(Self);
+  end;
+end;
+
+procedure TSafeCell.ClearLife;
+begin
+  SafeCellEnter(Self);
+  Life := nil;
+  SafeCellLeave(Self);
 end;
 
 procedure TSafeArenaImpl.FreeAll;
@@ -381,11 +426,14 @@ var
   L: TSafeLife;
 begin
   C := W.CellObj;
-  Result := (C <> nil) and (C.Life <> nil);
+  L := nil;
+  if C <> nil then
+    L := TSafeLife(C.AcquireLife); // thread-safe against the last Reset in another thread (H6)
+  Result := L <> nil;
   if Result then
   begin
-    L := TSafeLife(C.Life);
     FLife := L; // strong reference: the object will not die while it exists
+    FLife._Release; // the reference that AcquireLife took for us; FLife holds its own
     FLifeObj := L;
     FObj := T(L.Obj);
   end
