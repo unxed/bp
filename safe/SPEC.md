@@ -33,7 +33,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | **specification only (plan), no code** | §15 |
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
-| `bpvet` rules S3–S6, S9–S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
+| `bpvet` rules S4–S6, S9–S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
 | Lazarus package (OPM), Windows in CI | **plan** | §11 |
@@ -367,7 +367,7 @@ System.GetMem(Buf, Len);
 | Arena objects are not used after `FreeAll` | programmer; in debug `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter (plan) (S10); the runtime is safe in any case (§4) | H5 |
 | Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter (plan) (S11); the `TryLock` race is open (§11) | H6 |
-| `.Destroy` outside unsafe | linter (plan) (S3) | H7 |
+| `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter (plan) (S6, S9); R3 only for `TInterfacedObject` | H8 |
 | `Safe` is last in `uses` | linter `bpvet` S7; in a program with `BP` first only a warning (§14) | H9 |
 | Unsafe code is marked, `external` only in unsafe modules | linter (plan) (S8, S12) | H10 |
@@ -529,7 +529,7 @@ begin
 end;                                  // Box destroys the object again: double free
 ```
 
-Now: nothing. Target: `bpvet` S3 error, the hint is `TOwned.Reset` or `// UNSAFE:`. Step 4.
+Now: `bpvet` S3 error, the hint is `TOwned.Reset` or `// UNSAFE:`. Step 4.
 
 **H8. `TFoo.Create` not passed to an owner; legacy string types.**
 
@@ -665,7 +665,7 @@ end;                                    // the list is destroyed here, also on a
 
 ## §11. Next iterations (what does not exist yet)
 
-- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S7, S8 and S12 are done, rules S3–S6, S9–S11
+- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S7, S8 and S12 are done, rules S4–S6, S9–S11
   and S13–S14 are next (unxed/bp#56); output in the format of FPC messages so that the IDE shows them as compiler errors.
 - **Lazarus package** `safepascal.lpk` in OPM: one-click installation.
 - **GC heap** as a tracing arena: objects declare `procedure Trace(V: TVisitor)`,
