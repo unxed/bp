@@ -54,6 +54,13 @@ procedure VetCheckS3(const Src: TVetSource; const Module: TPasModule; var Report
              into an interface reference needs the // UNSAFE: mark. }
 procedure VetCheckS6(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S9: legacy string types (safe/SPEC.md §6, register H8). A module marked // UNSAFE-UNIT: is not checked.
+    Error    the type name UnicodeString, WideString or ShortString, or a sized string String[N] (a ShortString),
+             without a // UNSAFE: <why> comment on the line above (one comment covers a block of such lines right
+             below it) or at the end of the line. The safe dialect uses String (UTF-8, mode $H+); a conversion for an
+             API that needs UTF-16 or a fixed-size record field is the exception that the mark explains. }
+procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 { S4: raw pointers (safe/SPEC.md §6, register H4). A module marked // UNSAFE-UNIT: is not checked.
     Error    a pointer type ^T or the address operator @ without a // UNSAFE: <why> comment on the line above (one
              comment covers a block of such lines right below it) or at the end of the line. A dereference P^ is
@@ -753,6 +760,81 @@ begin
   end;
 end;
 
+{ S9 }
+
+const
+  S9Names = ' unicodestring widestring shortstring ';
+
+{ The column of the first legacy string type in Code (a line without comments and strings) and its name, or 0. }
+function S9Type(const Code: String; out What: String): Integer;
+var
+  I, B, K: Integer;
+  L, W: String;
+begin
+  Result := 0;
+  What := '';
+  L := LowerCase(Code);
+  I := 1;
+  while I <= Length(L) do
+  begin
+    if not IsWordChar(L[I]) or ((I > 1) and IsWordChar(L[I - 1])) then
+    begin
+      Inc(I);
+      Continue;
+    end;
+    B := I;
+    while (I <= Length(L)) and IsWordChar(L[I]) do
+      Inc(I);
+    W := Copy(L, B, I - B);
+    if Pos(' ' + W + ' ', S9Names) > 0 then
+    begin
+      What := Copy(Code, B, I - B);
+      Exit(B);
+    end;
+    if W = 'string' then
+    begin
+      K := I;
+      while (K <= Length(L)) and (L[K] = ' ') do
+        Inc(K);
+      if (K <= Length(L)) and (L[K] = '[') then
+      begin
+        What := 'String[N]';
+        Exit(B);
+      end;
+    end;
+  end;
+end;
+
+procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  I, Col: Integer;
+  InBrace, InParen, Covered: Boolean;
+  Code, Tail, What: String;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  InBrace := False;
+  InParen := False;
+  Covered := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    Col := S9Type(Code, What);
+    if Col = 0 then
+    begin
+      if IsMarkComment(Src.Lines[I]) then
+        Covered := True
+      else if Trim(Code) <> '' then
+        Covered := False;
+      Continue;
+    end;
+    if not Covered and not IsMarkComment(Tail) then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S9',
+        'legacy string type ' + What + ': use String (UTF-8), or put a comment // UNSAFE: <why> on the '
+        + 'line above (safe/SPEC.md, section 6)');
+  end;
+end;
+
 { S4 }
 
 { The first non-space position at or after I, or Length(Code) + 1. }
@@ -1092,6 +1174,7 @@ begin
   VetCheckS3(Src, Module, Report);
   VetCheckS4(Src, Module, Report);
   VetCheckS6(Src, Module, Report);
+  VetCheckS9(Src, Module, Report);
   VetCheckS7(Src, Module, Report);
   VetCheckS8(Src, Module, Report);
   VetCheckS12(Src, Module, Report);
