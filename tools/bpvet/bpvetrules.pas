@@ -11,6 +11,11 @@ interface
 uses
   SysUtils, Classes, PasTree, BpvetCore, Safe;
 
+var
+  { Directories (-FuDIR of bpvet) where S5 also looks for the files of used units, after the directory of the
+    checked file. }
+  VetUnitDirs: array of String;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S7: Safe/BP is the last unit in scope of the module, so that its names shadow the poisoned routines (register H9).
@@ -75,8 +80,8 @@ procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report
     Closures (anonymous procedures, reference to) are not checked: FPC 3.2.2 does not compile them, although
     fcl-passrc 3.2.2 parses them (for pas2js).
     The classes known are those of the module, S5ClassTypes, and the classes declared in the interface of the units
-    it uses whose files lie next to it (name.pas in the same directory, read as text); classes of other units
-    (elsewhere on the unit path) are the next part of step 7, unxed/bp#56. }
+    it uses whose files lie next to it (name.pas in the same directory, read as text) or in a directory given to
+    bpvet with -FuDIR. }
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
@@ -901,16 +906,28 @@ begin
   end;
 end;
 
-{ The classes of the units listed in Clause whose files lie next to the checked file (name.pas, lower case). }
+{ The classes of the units listed in Clause whose files (name.pas, lower case) lie next to the checked file or in
+  a directory of VetUnitDirs. }
 procedure S5UsedClasses(const Src: TVetSource; const Clause: TPasUsesClause; var Names: String);
 var
-  I: Integer;
-  Dir: String;
+  I, J: Integer;
+  Dir, N: String;
 begin
   Dir := ExtractFilePath(Src.FileName);
   for I := 0 to High(Clause) do
     if (Clause[I].Expr <> nil) and (Clause[I].Name <> '') then
-      S5FileClasses(Dir + LowerCase(Clause[I].Name) + '.pas', Names);
+    begin
+      N := LowerCase(Clause[I].Name) + '.pas';
+      if FileExists(Dir + N) then
+        S5FileClasses(Dir + N, Names)
+      else
+        for J := 0 to High(VetUnitDirs) do
+          if FileExists(IncludeTrailingPathDelimiter(VetUnitDirs[J]) + N) then
+          begin
+            S5FileClasses(IncludeTrailingPathDelimiter(VetUnitDirs[J]) + N, Names);
+            Break;
+          end;
+    end;
 end;
 
 { The names of the global variables of Decls and of the fields of the classes declared there, as ' a b '. }

@@ -2,9 +2,10 @@
 { bpvet: the linter of Better Pascal for the rules that the compiler cannot check (safe/SPEC.md §6).
   Built by tools/bpvet/build.sh (FPC with fcl-passrc); it reads the sources only, no other unit is needed.
 
-  usage: bpvet [--report|--strict] [-dNAME]... [-FiDIR]... FILE|DIR...
+  usage: bpvet [--report|--strict] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...
     a directory is walked for *.pas, *.pp, *.lpr (include files are read through the modules that include them);
     -dNAME defines a symbol for conditional compilation, -FiDIR adds an include directory (as for fpc);
+    -FuDIR adds a directory where rule S5 looks for the files of used units (their classes);
     the target for conditional compilation is linux, x86_64.
   Messages are those of FPC, one line each, so that an IDE and a model read them as compiler messages:
     FILE(LINE,COL) Error: SAFE-Sxx <what is wrong>; <how to fix it>
@@ -30,7 +31,7 @@ type
 
 procedure Usage;
 begin
-  WriteLn('usage: bpvet [--report|--strict] [-dNAME]... [-FiDIR]... FILE|DIR...');
+  WriteLn('usage: bpvet [--report|--strict] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...');
   WriteLn('  default: errors fail; --report: everything is a warning, exit code 0; --strict: warnings are errors');
 end;
 
@@ -104,6 +105,11 @@ begin
       AddTo(Defines, Copy(A, 3, Length(A)))
     else if Copy(A, 1, 3) = '-Fi' then
       AddTo(IncludeDirs, Copy(A, 4, Length(A)))
+    else if Copy(A, 1, 3) = '-Fu' then
+    begin
+      SetLength(VetUnitDirs, Length(VetUnitDirs) + 1);
+      VetUnitDirs[High(VetUnitDirs)] := Copy(A, 4, Length(A));
+    end
     else if Copy(A, 1, 1) = '-' then
     begin
       WriteLn('bpvet: unknown option ', A);

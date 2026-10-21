@@ -3,6 +3,7 @@
 #   // EXPECT: clean           no finding: exit code 0, with --strict too
 #   // EXPECT: error SAFE-Sx   exactly one finding, an Error of rule Sx: exit code 1; with --report a Warning and 0
 #   // EXPECT: warn SAFE-Sx    exactly one finding, a Warning of rule Sx: exit code 0; with --strict an Error and 1
+# An optional second line // ARGS: <bpvet options> (@lint@ = tests/lint) is passed to every run of the file.
 # usage: tests/lint.sh BPVET   (the binary built by tools/bpvet/build.sh)
 set -u
 bpvet=$1
@@ -13,7 +14,7 @@ fail=0
 # "FILE(LINE,COL) SEVERITY: RULE ...", or none when SEVERITY is empty
 check() {
   local f=$1 opt=$2 code=$3 sev=$4 rule=$5 out got n ok=
-  out=$("$bpvet" $opt "$f" 2>&1)
+  out=$("$bpvet" $opt $args "$f" 2>&1)
   got=$?
   n=$(printf '%s\n' "$out" | grep -c 'SAFE-')
   if [ -z "$sev" ]; then
@@ -33,6 +34,8 @@ check() {
 
 for f in "$here"/lint/*.pas; do
   read -r _ _ kind rule < "$f"
+  # an optional second line "// ARGS: ..." gives bpvet options; @lint@ stands for the directory tests/lint
+  args=$(sed -n '2s#^// ARGS: ##p' "$f"); args=${args//@lint@/$here/lint}
   case "$kind" in
     clean) check "$f" "" 0 "" ""; check "$f" --strict 0 "" "" ;;
     error) check "$f" "" 1 Error "$rule"; check "$f" --report 0 Warning "$rule" ;;

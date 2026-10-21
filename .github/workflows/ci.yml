@@ -30,7 +30,7 @@ jobs:
       - name: bpvet --strict over its own sources
         run: out/bpvet --strict tools/bpvet
       - name: bpvet --strict over tests/ (without tests/lint, whose *_bad.pas have findings by design)
-        run: out/bpvet --strict tests/safe tests/ext
+        run: out/bpvet --strict -Fusafe -Fuext tests/safe tests/ext
       - name: bpvet --strict over safe/ and ext/
         run: out/bpvet --strict safe ext
 
