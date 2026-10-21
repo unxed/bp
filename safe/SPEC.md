@@ -407,7 +407,7 @@ compensating check, and accepted risks are listed with a reason.
 |---|---|---|---|---|
 | H1 | a borrow outlives its owner | nothing | `bpvet` S5 + borrow-escape rule | 7 |
 | H2 | `TShared` cycle | R5 counts live objects, no cycle report | `SAFE_DEBUG` cycle report + lint warning | 9 |
-| H3 | use after `TArena.FreeAll` | `TArenaRef<T>` + arena generations → `ESafety` R10 in debug; plain borrows: `-gh`, sometimes | done; release cost: `tests/bench/bench_arena.pas` | 8 |
+| H3 | use after `TArena.FreeAll` | `TArenaRef<T>` + arena generations → `ESafety` R10 in debug; plain borrows: `-gh`, sometimes | done; release cost measured (`tests/bench/bench_arena.pas`): `Get` is a call, not yet zero cost | 8 |
 | H4 | `^T`, `@`, pointer arithmetic | `bpvet` S4 | `bpvet` S4 | 4 |
 | H5 | a copy of `TOwned` | nothing (the runtime stays safe) | `bpvet` S10 + `SAFE_DEBUG` runtime check | 6 |
 | H6 | shared task fields; `TryLock` race | nothing | `bpvet` S11 + lock in the cell, stress test | 10 |
@@ -485,8 +485,11 @@ arena itself is gone. With checks off `TArenaRef` keeps no arena link: `Get` is 
 returns the plain reference. A plain `// borrow: arena` variable is still the programmer's
 responsibility (`-gh` sometimes). The cost is measured by `tests/bench/bench_arena.pas` (`tests/bench/run.sh`,
 `-O2`; the CI job `portable` prints the table, report only, no thresholds): a plain reference against
-`TArenaRef.Get` with checks off and with `SAFE_DEBUG`. With checks off `Get` is a call and one comparison;
-it is not inlined, so in a hot loop take `R.Get` once into a local borrow.
+`TArenaRef.Get` with checks off and with `SAFE_DEBUG`. First measurement (2026-10-21, ubuntu-latest, FPC 3.2.2,
+x86_64, 200M reads of one field): plain reference 1.6 ns/op, `TArenaRef.Get` with checks off 8.2 ns/op,
+with `SAFE_DEBUG` 8.4 ns/op. So the generation check itself is almost free, but the release build is not
+zero cost yet: `Get` is a non-inlined call on a record with a managed field. Until it is inlined, take
+`R.Get` once into a local borrow in a hot loop.
 
 **H4. `^T`, `@` and pointer arithmetic.**
 
