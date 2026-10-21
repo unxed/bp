@@ -38,6 +38,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | `bpvet` rule S9 (`UnicodeString/WideString/ShortString`, `String[N]` only under `// UNSAFE:`) | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S10, static part (`TOwned` copied only through `.Move`, no `TOwned` by value in a parameter) | **implemented, lint tests, CI**; the `SAFE_DEBUG` runtime check is **plan** | §6 |
 | `bpvet` rule S5, fields and globals (a field/global of a class declared in the module or of a common RTL class only with `// borrow:`) | **implemented, lint tests, CI**; classes of other units and the borrow-escape rule are **plan** | §6 |
+| `bpvet` rule S15 (no `TShared` cycles: a warning on a `TShared` field that leads back to its own class, heuristic over one module) | **implemented, lint tests, CI**; the `SAFE_DEBUG` cycle report is **plan** | §6, H2 |
 | `bpvet` rules S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
@@ -339,12 +340,13 @@ Thread safety in v0.1: the counters are atomic, so `TShared` can be copied betwe
 | S12 | `external` outside a `// UNSAFE-UNIT:` module; a binding's public API with pointers | linter |
 | S13 | a `case` over an enumeration does not list all values or has `else`; a variant field is read outside the branch of its tag (§16) | linter (FPC 3.2.2 does not warn) |
 | S14 | a parameter without `const`/`var`/`out`; `var` although the caller does not need the change (§16) | linter |
+| S15 | a `TShared` cycle: a field of a class holds through `TShared` an object that leads back to the class of the field (H2) | `bpvet` S15: a warning on a field of a class of the module whose type is `specialize TShared<X>` or a module alias of it, when `X` is the class itself or reaches it through such fields of classes of the module, with the path and the hint "a back reference is `TWeak`"; `// UNSAFE: <why>` on the line above or at its end drops it (the program breaks the cycle itself); a heuristic by names over one module, the type is read from the line of the field, classes of other units are not followed; a `// UNSAFE-UNIT:` module is not checked |
 
 Warnings are turned into errors with one directive in a module, `{$WARN SYMBOL_DEPRECATED ERROR}`,
 or with the switch `-Sew` for the whole project. Migration modes: **permissive** — warnings;
 **strict** — errors.
 
-`bpvet` checks the rules marked "linter" (S3, S4, S5, S6, S7, S8, S9, S10, S12 so far). It reads the sources with `fcl-passrc`
+`bpvet` checks the rules marked "linter" (S3, S4, S5, S6, S7, S8, S9, S10, S12, S15 so far). It reads the sources with `fcl-passrc`
 (shipped with FPC) and prints FPC messages, one line each with the fix: `file(line,col) Error: SAFE-S7 ...`. Build and
 run: `tools/bpvet/build.sh out/bpvet && out/bpvet [--report|--strict] FILE|DIR...`. By default errors fail (exit code 1)
 and warnings are printed; `--report` prints every finding as a warning and never fails (permissive), `--strict` makes
@@ -380,7 +382,7 @@ System.GetMem(Buf, Len);
 | `.Free` outside unsafe | compiler (error) | — |
 | raw pointers outside unsafe | compiler warning (named pointer types) + linter (plan) (`^T`, `@`, arithmetic) | H4 |
 | A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1 |
-| No `TShared` cycles | programmer + linter (plan, heuristic) | H2 |
+| No `TShared` cycles | programmer + linter `bpvet` (S15, heuristic) | H2 |
 | Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
 | Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter (plan) (S11); the `TryLock` race is open (§11) | H6 |
@@ -406,7 +408,7 @@ compensating check, and accepted risks are listed with a reason.
 | Id | Hole | Now | Target | Step |
 |---|---|---|---|---|
 | H1 | a borrow outlives its owner | nothing | `bpvet` S5 + borrow-escape rule | 7 |
-| H2 | `TShared` cycle | R5 counts live objects, no cycle report | `SAFE_DEBUG` cycle report + lint warning | 9 |
+| H2 | `TShared` cycle | R5 counts live objects, no cycle report; `bpvet` S15 warns on a field that closes a cycle | `SAFE_DEBUG` cycle report + lint warning | 9 |
 | H3 | use after `TArena.FreeAll` | `TArenaRef<T>` + arena generations → `ESafety` R10 in debug; plain borrows: `-gh`, sometimes | done; release cost measured (`tests/bench/bench_arena.pas`): `Get` is a call, not yet zero cost | 8 |
 | H4 | `^T`, `@`, pointer arithmetic | `bpvet` S4 | `bpvet` S4 | 4 |
 | H5 | a copy of `TOwned` | nothing (the runtime stays safe) | `bpvet` S10 + `SAFE_DEBUG` runtime check | 6 |
@@ -457,7 +459,8 @@ end;
 ```
 
 Now: `SafeCheckNoLeaks` raises R5 with the number of live objects, but does not say that they
-form a cycle; the rest is the reviewer. Target: in `SAFE_DEBUG` `SafeCheckNoLeaks` reports live
+form a cycle; `bpvet` S15 warns on a `TShared` field of a class of the module that leads back to its own class
+(with the path of fields and the hint "a back reference is `TWeak`"). Target: in `SAFE_DEBUG` `SafeCheckNoLeaks` reports live
 `TShared` objects reachable only from each other (type, count, path of the cycle); `bpvet` warns
 on a `TShared<T>` field in a class that is itself held by `TShared` of the same graph, with the
 hint "a back reference is `TWeak`". Step 9.
