@@ -28,7 +28,7 @@ uses
 {$ifndef NODEBUG}
   FPDebug,
 {$endif}
-  FPIntf, Safe;
+  FPIntf, Safe, TvUnix;
 
 {$ifdef NODEBUG}
 function GoDebugCommand(Cmd: Word): Boolean;
@@ -148,6 +148,7 @@ begin
     else
       Continue;
     SetStatus('Program input (Enter sends, Esc interrupts): ' + StdinLine);
+    UnixFlush;  // ensure the status line is immediately visible in the terminal
   until False;
 end;
 
@@ -448,6 +449,7 @@ var
 begin
   StdinLine := '';
   SetStatus('');
+  UnixFlush;  // ensure the cleared status line is immediately visible
   PumpOutput;
   case R of
     drStopped:
