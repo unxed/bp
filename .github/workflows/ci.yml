@@ -31,6 +31,9 @@ jobs:
         run: out/bpvet --strict tools/bpvet
       - name: bpvet --report over tests/
         run: out/bpvet --report tests
+      - name: bpvet --report over safe/ and ext/ (findings to mark before --strict; does not gate yet)
+        continue-on-error: true
+        run: out/bpvet --report safe ext
 
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
   # the "binary is static, no libc" check, and runs on different distributions.
