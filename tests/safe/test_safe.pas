@@ -243,7 +243,7 @@ end;
 
 procedure Defers;
 begin
-  Probe := TDeferProbe.Create;
+  Probe := TDeferProbe.Create; // UNSAFE: the probe of the defer tests lives to the end of the program
   DeferScope;
   Check(Probe.Hits = 1, 'defer: called at scope exit');
   DeferCancelled;
@@ -281,7 +281,7 @@ var
   D: TDefer;
   P: TDeferProbe;
 begin
-  P := TDeferProbe.Create;
+  P := TDeferProbe.Create; // UNSAFE: the probe of the defer test lives to the end of the program
   D := TDefer.Call(@P.Boom);
   D := Default(TDefer); // the deferred call runs now and raises inside the destructor of the guard
   Check(SafeDeferFailures = 1, 'defer: an exception inside a deferred call is counted, not lost');

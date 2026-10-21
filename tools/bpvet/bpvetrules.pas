@@ -45,6 +45,15 @@ procedure VetCheckS8(const Src: TVetSource; const Module: TPasModule; var Report
              (destructor TFoo.Destroy) and inherited Destroy are not calls of it. }
 procedure VetCheckS3(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S6: a new object that nobody owns (safe/SPEC.md §6). A module marked // UNSAFE-UNIT: is not checked.
+    Error    a call TFoo.Create whose result does not go at once into Own(...), Share(...), Adopt(...), Go(...)
+             or raise, without a // UNSAFE: <who owns it> comment on the line above or at the end of the line.
+             Not calls: constructor TFoo.Create, class function TFoo.Create, inherited Create. The value types of
+             Safe and BP (TArena, TChan, TGroup, TDefer, and a type of the module = specialize TChan<...>) are
+             records, not objects, so their Create is not a finding. bpvet has no types: an object that goes
+             into an interface reference needs the // UNSAFE: mark. }
+procedure VetCheckS6(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 { S4: raw pointers (safe/SPEC.md §6, register H4). A module marked // UNSAFE-UNIT: is not checked.
     Error    a pointer type ^T or the address operator @ without a // UNSAFE: <why> comment on the line above (one
              comment covers a block of such lines right below it) or at the end of the line. A dereference P^ is
@@ -616,6 +625,134 @@ begin
   end;
 end;
 
+{ S6 }
+
+const
+  S6ValueTypes = ' tarena tchan tgroup tdefer ';
+
+{ The value types of the module: the names declared as NAME = specialize TArena|TChan|TGroup|TDefer<...>,
+  each as ' name '. }
+function S6ModuleValueTypes(const Src: TVetSource): String;
+var
+  I, Eq, K: Integer;
+  L, Name, Rest: String;
+begin
+  Result := ' ';
+  for I := 0 to High(Src.Lines) do
+  begin
+    L := LowerCase(Src.Lines[I]);
+    Eq := Pos('=', L);
+    if Eq = 0 then
+      Continue;
+    Name := Trim(Copy(L, 1, Eq - 1));
+    Rest := TrimLeft(Copy(L, Eq + 1, Length(L)));
+    if Pos('specialize ', Rest) <> 1 then
+      Continue;
+    Rest := TrimLeft(Copy(Rest, 12, Length(Rest)));
+    K := Pos('<', Rest);
+    if K = 0 then
+      Continue;
+    if (Name <> '') and (Pos(' ' + Trim(Copy(Rest, 1, K - 1)) + ' ', S6ValueTypes) > 0) then
+      Result := Result + Name + ' ';
+  end;
+end;
+
+{ True when the text before Start (the class name of a Create call) hands the new object to an owner:
+  ...Own( ...Share( ...Adopt( ...Go( or raise. }
+function S6Owned(const L: String; const Start: Integer): Boolean;
+var
+  K, B: Integer;
+  W: String;
+begin
+  K := Start - 1;
+  while (K >= 1) and (L[K] = ' ') do
+    Dec(K);
+  if K < 1 then
+    Exit(False);
+  if L[K] = '(' then
+  begin
+    Dec(K);
+    while (K >= 1) and (L[K] = ' ') do
+      Dec(K);
+    B := K;
+    while (B >= 1) and IsWordChar(L[B]) do
+      Dec(B);
+    W := Copy(L, B + 1, K - B);
+    Exit((W = 'own') or (W = 'share') or (W = 'adopt') or (W = 'go'));
+  end;
+  B := K;
+  while (B >= 1) and IsWordChar(L[B]) do
+    Dec(B);
+  Result := Copy(L, B + 1, K - B) = 'raise';
+end;
+
+{ The column of the first call TFoo.Create in Code (a line without comments and strings) that is not handed to an
+  owner, or 0. ValueTypes: the names of the value types of the module (' name '). }
+function S6Call(const Code, ValueTypes: String): Integer;
+var
+  I, K, B: Integer;
+  L, T, Name: String;
+begin
+  Result := 0;
+  L := LowerCase(Code);
+  T := TrimLeft(L);
+  if (Pos('constructor ', T) = 1) or (Pos('destructor ', T) = 1) or (Pos('class ', T) = 1)
+    or (Pos('function ', T) = 1) or (Pos('procedure ', T) = 1) then
+    Exit;
+  I := 1;
+  while I <= Length(L) do
+  begin
+    if L[I] = '.' then
+    begin
+      K := I + 1;
+      while (K <= Length(L)) and (L[K] = ' ') do
+        Inc(K);
+      if (Copy(L, K, 6) = 'create') and ((K + 6 > Length(L)) or not IsWordChar(L[K + 6])) then
+      begin
+        B := I - 1;
+        while (B >= 1) and IsWordChar(L[B]) do
+          Dec(B);
+        Name := Copy(L, B + 1, I - 1 - B);
+        if (Name <> '') and (Pos(' ' + Name + ' ', S6ValueTypes) = 0) and (Pos(' ' + Name + ' ', ValueTypes) = 0)
+          and not S6Owned(L, B + 1) then
+          Exit(B + 1);
+      end;
+    end;
+    Inc(I);
+  end;
+end;
+
+procedure VetCheckS6(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  I, Col: Integer;
+  InBrace, InParen, Covered: Boolean;
+  Code, Tail, ValueTypes: String;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  ValueTypes := S6ModuleValueTypes(Src);
+  InBrace := False;
+  InParen := False;
+  Covered := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    Col := S6Call(Code, ValueTypes);
+    if Col = 0 then
+    begin
+      if IsMarkComment(Src.Lines[I]) then
+        Covered := True
+      else if Trim(Code) <> '' then
+        Covered := False;
+      Continue;
+    end;
+    if not Covered and not IsMarkComment(Tail) then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S6',
+        'a new object that nobody owns: pass TFoo.Create at once to TOwned.Own, TShared.Share, TArena.Adopt, '
+        + 'TGroup.Go or raise, or put a comment // UNSAFE: <who owns it> on the line above (safe/SPEC.md, section 6)');
+  end;
+end;
+
 { S4 }
 
 { The first non-space position at or after I, or Length(Code) + 1. }
@@ -954,6 +1091,7 @@ procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Repor
 begin
   VetCheckS3(Src, Module, Report);
   VetCheckS4(Src, Module, Report);
+  VetCheckS6(Src, Module, Report);
   VetCheckS7(Src, Module, Report);
   VetCheckS8(Src, Module, Report);
   VetCheckS12(Src, Module, Report);

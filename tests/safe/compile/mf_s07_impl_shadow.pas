@@ -13,6 +13,6 @@ uses SysUtils;
 procedure Drop;
 var O: TObject;
 begin
-  O := TObject.Create; FreeAndNil(O);
+  O := TObject.Create; FreeAndNil(O); // UNSAFE: freed by hand right here
 end;
 end.

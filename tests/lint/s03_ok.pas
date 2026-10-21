@@ -30,7 +30,7 @@ var
   O: TNode;
 begin
   WriteLn('O.Destroy is not called here');
-  O := TNode.Create;
+  O := TNode.Create; // UNSAFE: freed by hand below
   // UNSAFE: O is created on the line above and has no other references
   O.Destroy;
 end;

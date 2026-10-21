@@ -115,7 +115,7 @@ var
   T: TPlainThread;
 begin
   Ev := BasicEventCreate(nil, True, False, '');
-  T := TPlainThread.Create(False);
+  T := TPlainThread.Create(False); // UNSAFE: a TThread, the runtime of FPC owns it
   Sleep(20);
   BasicEventSetEvent(Ev);
   T.WaitFor;
