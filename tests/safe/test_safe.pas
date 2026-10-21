@@ -242,7 +242,7 @@ begin
 end;
 
 var
-  Probe: TDeferProbe;
+  Probe: TDeferProbe; // borrow: nobody frees it, the probe of the defer tests lives to the end of the program
 
 procedure DeferScope;
 var
