@@ -15,7 +15,7 @@
   Exit code: 0 clean, 1 errors, 2 a file cannot be read or parsed, or a usage error.
   Parser limit (fcl-passrc 3.2.2): external with a one-character library name literal (external 'c')
   does not parse and is reported as Fatal; give the library name as a constant (const LibC = 'c').
-  Rules: S7, S12 (bpvetrules.pas). }
+  Rules: S7, S8, S12 (bpvetrules.pas). }
 program bpvet;
 
 {$mode objfpc}{$H+}

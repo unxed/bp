@@ -7,18 +7,21 @@ unit s12_bad;
 
 interface
 
-function CLength(const S: String): SizeInt;
+function ProcessId: LongInt;
 
 implementation
+
+uses
+  Safe;
 
 const
   LibC = 'c';
 
-function c_strlen(P: PAnsiChar): SizeInt; cdecl; external LibC name 'strlen';
+function c_getpid: LongInt; cdecl; external LibC name 'getpid';
 
-function CLength(const S: String): SizeInt;
+function ProcessId: LongInt;
 begin
-  Result := c_strlen(PAnsiChar(S));
+  Result := c_getpid;
 end;
 
 end.
