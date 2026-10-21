@@ -24,12 +24,12 @@ type
     function Greet(const Name: String): String;
   end;
 
-function Greet(const Name: String; Times: Integer): String;
+function Greet(const Name: String; const Times: Integer): String;
 function Same(constref A, B: AnsiString): Boolean;
 procedure Append(var S: String; const Tail: String);
 procedure Fill(out S: String);
 function Len2(const P: TPoint2): Double;
-procedure Move2(var P: TPoint2; DX: Double);
+procedure Move2(var P: TPoint2; const DX: Double);
 function Sum(const Values: array of Integer; var Total: TInts): Integer;
 function Count(const Fmt: String; Args: array of const): Integer;
 function LibRecLen(const R: TLibRec): Integer;
@@ -47,7 +47,7 @@ begin
   Result := 'Hello, ' + Name;
 end;
 
-function Greet(const Name: String; Times: Integer): String;
+function Greet(const Name: String; const Times: Integer): String;
 var
   I: Integer;
 begin
@@ -76,7 +76,7 @@ begin
   Result := P.X * P.X + P.Y * P.Y;
 end;
 
-procedure Move2(var P: TPoint2; DX: Double);
+procedure Move2(var P: TPoint2; const DX: Double);
 begin
   P.X := P.X + DX;
 end;

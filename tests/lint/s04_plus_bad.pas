@@ -9,11 +9,11 @@ interface
 uses
   Safe;
 
-function Skip(P: PAnsiChar; N: Integer): PAnsiChar;
+function Skip(const P: PAnsiChar; const N: Integer): PAnsiChar;
 
 implementation
 
-function Skip(P: PAnsiChar; N: Integer): PAnsiChar;
+function Skip(const P: PAnsiChar; const N: Integer): PAnsiChar;
 begin
   Result := P + N;
 end;
