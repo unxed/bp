@@ -908,24 +908,109 @@ begin
   Result := Length(Code) - Length(TrimLeft(Code)) + 1;
 end;
 
-procedure S5CheckEscapes(const Src: TVetSource; const Stores: String; var Report: TVetReport);
+{ The names of the parameters of a class type (a name in ClassNames) in a routine header on one line of Code,
+  as ' a b '; '' when Code is not a routine header. }
+function S5HeaderParams(const Code, ClassNames: String; out IsHeader: Boolean): String;
+var
+  L, Seg, T, W, Rest: String;
+  P, Q, C, I: Integer;
+begin
+  Result := ' ';
+  L := LowerCase(Trim(Code));
+  if Pos('class ', L) = 1 then
+    L := Trim(Copy(L, 7, Length(L)));
+  IsHeader := (Pos('procedure ', L) = 1) or (Pos('function ', L) = 1) or (Pos('constructor ', L) = 1)
+    or (Pos('destructor ', L) = 1);
+  if not IsHeader then
+    Exit;
+  P := Pos('(', L);
+  Q := Pos(')', L);
+  if (P = 0) or (Q < P) then
+    Exit;
+  Rest := Copy(L, P + 1, Q - P - 1) + ';';
+  while Rest <> '' do
+  begin
+    I := Pos(';', Rest);
+    Seg := Copy(Rest, 1, I - 1);
+    Delete(Rest, 1, I);
+    C := Pos(':', Seg);
+    if C = 0 then
+      Continue;
+    T := Trim(Copy(Seg, C + 1, Length(Seg)));
+    I := Pos('=', T);
+    if I > 0 then
+      T := Trim(Copy(T, 1, I - 1));
+    if Pos(' ' + T + ' ', ClassNames) = 0 then
+      Continue;
+    W := Trim(Copy(Seg, 1, C - 1));
+    if (Pos('const ', W) = 1) or (Pos('var ', W) = 1) or (Pos('out ', W) = 1) or (Pos('constref ', W) = 1) then
+      W := Trim(Copy(W, Pos(' ', W) + 1, Length(W)));
+    W := StringReplace(W, ' ', '', [rfReplaceAll]);
+    Result := Result + StringReplace(W, ',', ' ', [rfReplaceAll]) + ' ';
+  end;
+end;
+
+{ The column of a statement Name := Param; or Self.Name := Param; in Code whose Name is in Stores and Param in
+  Params, or 0. }
+function S5ParamEscape(const Code, Stores, Params: String; out Name: String): Integer;
+var
+  P, I: Integer;
+  L, R: String;
+begin
+  Result := 0;
+  Name := '';
+  P := Pos(':=', Code);
+  if (P = 0) or (Params = ' ') then
+    Exit;
+  L := LowerCase(Trim(Copy(Code, 1, P - 1)));
+  if Pos('self.', L) = 1 then
+    L := Trim(Copy(L, 6, Length(L)));
+  R := LowerCase(Trim(Copy(Code, P + 2, Length(Code))));
+  if (R <> '') and (R[Length(R)] = ';') then
+    R := TrimRight(Copy(R, 1, Length(R) - 1));
+  if (L = '') or (R = '') then
+    Exit;
+  for I := 1 to Length(L) do
+    if not IsWordChar(L[I]) then
+      Exit;
+  if (Pos(' ' + L + ' ', Stores) = 0) or (Pos(' ' + R + ' ', Params) = 0) then
+    Exit;
+  Name := L;
+  Result := Length(Code) - Length(TrimLeft(Code)) + 1;
+end;
+
+procedure S5CheckEscapes(const Src: TVetSource; const Stores, ClassNames: String; var Report: TVetReport);
 var
   I, Col: Integer;
-  InBrace, InParen: Boolean;
-  Code, Tail, Name: String;
+  InBrace, InParen, IsHeader: Boolean;
+  Code, Tail, Name, Params, HeaderParams: String;
 begin
   InBrace := False;
   InParen := False;
+  Params := ' ';
   for I := 0 to High(Src.Lines) do
   begin
     Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    HeaderParams := S5HeaderParams(Code, ClassNames, IsHeader);
+    if IsHeader then
+    begin
+      Params := HeaderParams;
+      Continue;
+    end;
     Col := S5GetEscape(Code, Stores, Name);
     if (Col > 0) and not S5Marked(Src, I + 1) then
       VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S5',
         'the result of .Get is saved into the field or global ' + Name + ': the borrow escapes and can outlive '
         + 'its owner; keep it in a local variable or a parameter, or put a comment // borrow: <who owns it> at the '
         + 'end of the line or on the line above (safe/SPEC.md, section 6)');
+    Col := S5ParamEscape(Code, Stores, Params, Name);
+    if (Col > 0) and not S5Marked(Src, I + 1) then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S5',
+        'a parameter of a class type is saved into the field or global ' + Name + ': the borrow escapes and can '
+        + 'outlive its owner; take an owner (TShared, TWeak) instead, or put a comment // borrow: <who owns it> at '
+        + 'the end of the line or on the line above (safe/SPEC.md, section 6)');
   end;
+end;
 end;
 
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
@@ -958,7 +1043,7 @@ begin
   for I := 0 to 1 do
     if Sections[I] <> nil then
       S5CollectStores(Sections[I].Declarations, False, Stores);
-  S5CheckEscapes(Src, Stores, Report);
+  S5CheckEscapes(Src, Stores, ClassNames, Report);
 end;
 
 { S9 }
