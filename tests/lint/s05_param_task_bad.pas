@@ -20,6 +20,7 @@ type
 
   TWorker = class(TTask)
   private
+    // UNSAFE: the test of S5 only (S11 forbids a borrow in a task field, tests/lint/s11_bad.pas)
     FNode: TNode; // borrow: the caller keeps the node alive
   public
     constructor Create(const ANode: TNode);

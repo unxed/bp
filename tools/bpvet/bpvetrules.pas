@@ -94,6 +94,14 @@ procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report
              a field is read from the text of its line, classes of other units are not followed. }
 procedure VetCheckS15(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S11: task fields (safe/SPEC.md §14, register H6), the first part. A module marked // UNSAFE-UNIT: is not checked.
+    Error  a field of a task class of the module (a class descending from TTask, directly or through a task class of
+           the module) whose type is a class (as for S5: of the module, of S5ClassTypes or of a used unit), also when
+           the field is marked // borrow:. A task runs on another thread and can outlive the caller: a borrow there
+           is a data race or a use after free. Pass an owner (TShared, TOwned via Move), a value, String, TArray or
+           TChan instead, or put a comment // UNSAFE: <why> on the line above or at the end of the line. }
+procedure VetCheckS11(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
     Error    a parameter of a TOwned type (TOwned<...> or a module alias NAME = specialize TOwned<...>) passed by
              value: without const, var, out or constref;
@@ -2057,12 +2065,120 @@ begin
   end;
 end;
 
+{ S11 }
+
+{ Adds to Tasks (' name ') the classes in L whose ancestor is TTask or a class already in Tasks; Changed when one
+  was added. }
+procedure S11CollectTasks(const L: TFPList; var Tasks: String; var Changed: Boolean);
+var
+  I: Integer;
+  E: TPasElement;
+  A: String;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+  begin
+    E := TPasElement(L[I]);
+    if not (E is TPasClassType) then
+      Continue;
+    if (TPasClassType(E).ObjKind = okClass) and (E.Name <> '') and (TPasClassType(E).AncestorType <> nil)
+      and (Pos(' ' + LowerCase(E.Name) + ' ', Tasks) = 0) then
+    begin
+      A := LowerCase(TPasClassType(E).AncestorType.Name);
+      if LastDelimiter('.', A) > 0 then
+        A := Copy(A, LastDelimiter('.', A) + 1, Length(A));
+      if Pos(' ' + A + ' ', Tasks) > 0 then
+      begin
+        Tasks := Tasks + LowerCase(E.Name) + ' ';
+        Changed := True;
+      end;
+    end;
+    S11CollectTasks(TPasClassType(E).Members, Tasks, Changed);
+  end;
+end;
+
+procedure S11CheckList(const Src: TVetSource; const L: TFPList; const Tasks, ClassNames: String;
+  var Report: TVetReport);
+var
+  I, J: Integer;
+  E, M: TPasElement;
+  T: String;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+  begin
+    E := TPasElement(L[I]);
+    if not (E is TPasClassType) then
+      Continue;
+    if Pos(' ' + LowerCase(E.Name) + ' ', Tasks) > 0 then
+      for J := 0 to TPasClassType(E).Members.Count - 1 do
+      begin
+        M := TPasElement(TPasClassType(E).Members[J]);
+        if M.ClassType <> TPasVariable then
+          Continue;
+        T := S5TypeName(TPasVariable(M));
+        if (T <> '') and (Pos(' ' + T + ' ', ClassNames) > 0) and not S5UnsafeMarked(Src, M.SourceLinenumber) then
+          AddAtElement(Src, M, vsError, 'S11',
+            'the field ' + E.Name + '.' + M.Name + ' of a task holds an object of the class '
+            + TPasVariable(M).VarType.Name + ' without an owner: a task runs on another thread and can outlive the '
+            + 'caller, so a borrow is a data race or a use after free even with // borrow:; pass TShared, TOwned via '
+            + 'Move, a value, String, TArray or TChan, or put a comment // UNSAFE: <why> on the line above '
+            + '(safe/SPEC.md, section 14)', Report);
+      end;
+    S11CheckList(Src, TPasClassType(E).Members, Tasks, ClassNames, Report);
+  end;
+end;
+
+procedure VetCheckS11(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  Sections: array[0..1] of TPasDeclarations;
+  I: Integer;
+  Tasks, ClassNames: String;
+  Changed: Boolean;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  Sections[0] := nil;
+  Sections[1] := nil;
+  if Module is TPasProgram then
+    Sections[0] := TPasProgram(Module).ProgramSection
+  else if Module is TPasLibrary then
+    Sections[0] := TPasLibrary(Module).LibrarySection
+  else
+  begin
+    Sections[0] := Module.InterfaceSection;
+    Sections[1] := Module.ImplementationSection;
+  end;
+  Tasks := ' ttask ';
+  repeat
+    Changed := False;
+    for I := 0 to 1 do
+      if Sections[I] <> nil then
+        S11CollectTasks(Sections[I].Declarations, Tasks, Changed);
+  until not Changed;
+  if Tasks = ' ttask ' then
+    Exit;
+  ClassNames := S5ClassTypes;
+  for I := 0 to 1 do
+    if Sections[I] <> nil then
+      S5CollectClasses(Sections[I].Declarations, ClassNames);
+  for I := 0 to 1 do
+    if Sections[I] is TPasSection then
+      S5UsedClasses(Src, TPasSection(Sections[I]).UsesClause, ClassNames);
+  for I := 0 to 1 do
+    if Sections[I] <> nil then
+      S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Report);
+end;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 begin
   VetCheckS3(Src, Module, Report);
   VetCheckS4(Src, Module, Report);
   VetCheckS5(Src, Module, Report);
   VetCheckS15(Src, Module, Report);
+  VetCheckS11(Src, Module, Report);
   VetCheckS6(Src, Module, Report);
   VetCheckS9(Src, Module, Report);
   VetCheckS10(Src, Module, Report);
