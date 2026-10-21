@@ -36,7 +36,8 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | `bpvet` rule S4 (`^T`, `@`, pointer arithmetic) | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S6 (`TFoo.Create` at once into `Own/Share/Adopt/Go`/`raise`, else `// UNSAFE:`) | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S9 (`UnicodeString/WideString/ShortString`, `String[N]` only under `// UNSAFE:`) | **implemented, lint tests, CI** | §6 |
-| `bpvet` rules S5, S10–S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
+| `bpvet` rule S10, static part (`TOwned` copied only through `.Move`, no `TOwned` by value in a parameter) | **implemented, lint tests, CI**; the `SAFE_DEBUG` runtime check is **plan** | §6 |
+| `bpvet` rules S5, S11, S13–S14 | **plan** (unxed/bp#56) | §6, §11 |
 | Fuzzing (`fuzz_*.pas`, `sp fuzz`) | **plan only** | §16 |
 | Immutability by default (S14) | **plan only** (linter check) | §16 |
 | Lazarus package (OPM), Windows in CI | **plan** | §11 |
@@ -322,7 +323,7 @@ Thread safety in v0.1: the counters are atomic, so `TShared` can be copied betwe
 | S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14); a warning is not reported when the uses are marked `// UNSAFE: <why>` (§7), an error has no mark. Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
 | S8 | unsafe code without `// UNSAFE:` / a module without `uses Safe` and without `// UNSAFE-UNIT:` | linter |
 | S9 | `UnicodeString/WideString/ShortString` outside unsafe | `bpvet` S9: an error on the type name or a sized `String[N]` (a `ShortString`) without a `// UNSAFE: <why>` mark on the line above or at the end of the line (§7); a `// UNSAFE-UNIT:` module is not checked |
-| S10 | a copy of `TOwned` not via `.Move`; `TOwned` by value in a parameter | linter; the runtime is safe in any case (§4) |
+| S10 | a copy of `TOwned` not via `.Move`; `TOwned` by value in a parameter | `bpvet` S10: an error on `X := Y` where `Y` is declared with a `TOwned` type and on a `TOwned` parameter without `const`/`var`/`out`/`constref`, unless marked `// UNSAFE: <why>` (§7); the runtime is safe in any case (§4) |
 | S11 | a field of a `TTask` task is a borrow or a mutable object accessible to other threads | linter |
 | S12 | `external` outside a `// UNSAFE-UNIT:` module; a binding's public API with pointers | linter |
 | S13 | a `case` over an enumeration does not list all values or has `else`; a variant field is read outside the branch of its tag (§16) | linter (FPC 3.2.2 does not warn) |
@@ -332,7 +333,7 @@ Warnings are turned into errors with one directive in a module, `{$WARN SYMBOL_D
 or with the switch `-Sew` for the whole project. Migration modes: **permissive** — warnings;
 **strict** — errors.
 
-`bpvet` checks the rules marked "linter" (S3, S4, S6, S7, S8, S9, S12 so far). It reads the sources with `fcl-passrc`
+`bpvet` checks the rules marked "linter" (S3, S4, S6, S7, S8, S9, S10, S12 so far). It reads the sources with `fcl-passrc`
 (shipped with FPC) and prints FPC messages, one line each with the fix: `file(line,col) Error: SAFE-S7 ...`. Build and
 run: `tools/bpvet/build.sh out/bpvet && out/bpvet [--report|--strict] FILE|DIR...`. By default errors fail (exit code 1)
 and warnings are printed; `--report` prints every finding as a warning and never fails (permissive), `--strict` makes
@@ -370,7 +371,7 @@ System.GetMem(Buf, Len);
 | A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1 |
 | No `TShared` cycles | programmer + linter (plan, heuristic) | H2 |
 | Arena objects are not used after `FreeAll` | programmer; in debug `-gh` | H3 |
-| `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter (plan) (S10); the runtime is safe in any case (§4) | H5 |
+| `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
 | Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter (plan) (S11); the `TryLock` race is open (§11) | H6 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter `bpvet` (S6, S9); R3 only for `TInterfacedObject` | H8 |
@@ -674,7 +675,7 @@ end;                                    // the list is destroyed here, also on a
 
 ## §11. Next iterations (what does not exist yet)
 
-- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S4, S6, S7, S8, S9 and S12 are done, rules S5, S10–S11
+- **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S4, S6, S7, S8, S9, S10 (static part) and S12 are done, rules S5, S11
   and S13–S14 are next (unxed/bp#56); output in the format of FPC messages so that the IDE shows them as compiler errors.
 - **Lazarus package** `safepascal.lpk` in OPM: one-click installation.
 - **GC heap** as a tracing arena: objects declare `procedure Trace(V: TVisitor)`,

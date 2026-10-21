@@ -61,6 +61,16 @@ procedure VetCheckS6(const Src: TVetSource; const Module: TPasModule; var Report
              API that needs UTF-16 or a fixed-size record field is the exception that the mark explains. }
 procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
+    Error    a parameter of a TOwned type (TOwned<...> or a module alias NAME = specialize TOwned<...>) passed by
+             value: without const, var, out or constref;
+    Error    a copy X := Y where Y is a variable, field or parameter of a TOwned type (move it with Y.Move);
+    unless a // UNSAFE: <why> comment stands on the line above (one comment covers a block of such lines right below
+    it) or at the end of the line. bpvet has no types: it knows the names declared with a TOwned type before the
+    first routine header of the file and in the current routine (a later declaration of the name with another type
+    hides it); a routine header is read from its first line only. }
+procedure VetCheckS10(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 { S4: raw pointers (safe/SPEC.md §6, register H4). A module marked // UNSAFE-UNIT: is not checked.
     Error    a pointer type ^T or the address operator @ without a // UNSAFE: <why> comment on the line above (one
              comment covers a block of such lines right below it) or at the end of the line. A dereference P^ is
@@ -835,6 +845,213 @@ begin
   end;
 end;
 
+{ S10 }
+
+type
+  TS10Parts = array of String;
+
+{ S split at every D. }
+function S10Split(const S: String; const D: Char): TS10Parts;
+var
+  I, Start, N: Integer;
+begin
+  Result := nil;
+  N := 0;
+  Start := 1;
+  for I := 1 to Length(S) + 1 do
+    if (I > Length(S)) or (S[I] = D) then
+    begin
+      SetLength(Result, N + 1);
+      Result[N] := Copy(S, Start, I - Start);
+      Inc(N);
+      Start := I + 1;
+    end;
+end;
+
+{ The TOwned types of the module, each as ' name ': towned and the names declared as NAME = specialize TOwned<...>. }
+function S10OwnedTypes(const Src: TVetSource): String;
+var
+  I, Eq: Integer;
+  L, Name, Rest: String;
+begin
+  Result := ' towned ';
+  for I := 0 to High(Src.Lines) do
+  begin
+    L := LowerCase(Src.Lines[I]);
+    Eq := Pos('=', L);
+    if Eq = 0 then
+      Continue;
+    Name := Trim(Copy(L, 1, Eq - 1));
+    Rest := TrimLeft(Copy(L, Eq + 1, Length(L)));
+    if Pos('specialize ', Rest) <> 1 then
+      Continue;
+    Rest := TrimLeft(Copy(Rest, 12, Length(Rest)));
+    if (Pos('towned', Rest) = 1) and ((Length(Rest) = 6) or not IsWordChar(Rest[7])) and (Name <> '')
+      and (Pos(' ', Name) = 0) then
+      Result := Result + Name + ' ';
+  end;
+end;
+
+{ The first word of S (lowercase, trimmed). }
+function S10FirstWord(const S: String): String;
+var
+  T: String;
+  K: Integer;
+begin
+  T := TrimLeft(S);
+  K := 1;
+  while (K <= Length(T)) and IsWordChar(T[K]) do
+    Inc(K);
+  Result := Copy(T, 1, K - 1);
+end;
+
+{ True when the type text T (lowercase) names a TOwned type. }
+function S10IsOwned(const T, Owned: String): Boolean;
+var
+  W, Rest: String;
+begin
+  W := S10FirstWord(T);
+  if W = 'specialize' then
+  begin
+    Rest := TrimLeft(T);
+    Rest := Copy(Rest, 11, Length(Rest));
+    Exit(S10FirstWord(Rest) = 'towned');
+  end;
+  Result := (W <> '') and (Pos(' ' + W + ' ', Owned) > 0);
+end;
+
+{ The declaration Seg (lowercase, 'names: type'): adds its names to Vars (' name ') when the type is a TOwned type,
+  removes them otherwise. Returns True when Seg is a declaration of a TOwned type. }
+function S10Declare(const Seg, Owned: String; var Vars: String): Boolean;
+var
+  C: Integer;
+  Left, Name, W: String;
+  Names: TS10Parts;
+begin
+  Result := False;
+  C := Pos(':', Seg);
+  if (C = 0) or ((C < Length(Seg)) and (Seg[C + 1] = '=')) then
+    Exit;
+  Left := Trim(Copy(Seg, 1, C - 1));
+  W := S10FirstWord(Left);
+  if (W = 'var') or (W = 'const') or (W = 'out') or (W = 'constref') then
+    Left := Trim(Copy(Left, Length(W) + 1, Length(Left)));
+  Result := S10IsOwned(Copy(Seg, C + 1, Length(Seg)), Owned);
+  Names := S10Split(Left, ',');
+  for Name in Names do
+  begin
+    W := Trim(Name);
+    if (W = '') or (S10FirstWord(W) <> W) then
+      Continue;
+    Vars := StringReplace(Vars, ' ' + W + ' ', ' ', [rfReplaceAll]);
+    if Result then
+      Vars := Vars + W + ' ';
+  end;
+end;
+
+{ The column of the right side of X := Y in L (lowercase code) when Y is a name path whose last name is in Vars, or 0. }
+function S10Copy(const L, Vars: String): Integer;
+var
+  A, K, E, B: Integer;
+  R: String;
+begin
+  Result := 0;
+  A := Pos(':=', L);
+  if A = 0 then
+    Exit;
+  K := A + 2;
+  while (K <= Length(L)) and (L[K] = ' ') do
+    Inc(K);
+  E := K;
+  while (E <= Length(L)) and (IsWordChar(L[E]) or (L[E] = '.')) do
+    Inc(E);
+  R := TrimRight(Copy(L, E, Length(L)));
+  if (E = K) or not ((R = '') or (R = ';')) then
+    Exit;
+  B := E - 1;
+  while (B >= K) and (L[B] <> '.') do
+    Dec(B);
+  R := Copy(L, B + 1, E - B - 1);
+  if (R <> '') and (Pos(' ' + R + ' ', Vars) > 0) then
+    Result := K;
+end;
+
+procedure VetCheckS10(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  I, Col, P, Q: Integer;
+  InBrace, InParen, Covered, Header, Seen: Boolean;
+  Code, Tail, L, T, W, Owned, Globals, Vars, Msg, Seg: String;
+  Segs: TS10Parts;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  Owned := S10OwnedTypes(Src);
+  Globals := ' ';
+  Vars := ' ';
+  Seen := False;
+  InBrace := False;
+  InParen := False;
+  Covered := False;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
+    L := LowerCase(Code);
+    T := TrimLeft(L);
+    W := S10FirstWord(T);
+    if W = 'class' then
+      W := S10FirstWord(Copy(T, 6, Length(T)));
+    Header := (W = 'procedure') or (W = 'function') or (W = 'constructor') or (W = 'destructor');
+    Col := 0;
+    Msg := '';
+    if Header then
+    begin
+      if not Seen then
+        Globals := Vars;
+      Seen := True;
+      Vars := Globals;
+      P := Pos('(', L);
+      Q := Length(L);
+      while (Q > P) and (L[Q] <> ')') do
+        Dec(Q);
+      if (P > 0) and (Q > P) then
+      begin
+        Segs := S10Split(Copy(L, P + 1, Q - P - 1), ';');
+        for Seg in Segs do
+        begin
+          W := S10FirstWord(Seg);
+          if S10Declare(Seg, Owned, Vars) and (W <> 'const') and (W <> 'var') and (W <> 'out') and (W <> 'constref')
+            and (Col = 0) then
+          begin
+            Col := P + 1;
+            Msg := 'a TOwned parameter passed by value copies the owner: make it const (borrow) or var (take it '
+              + 'with .Move), or put a comment // UNSAFE: <why> on the line above (safe/SPEC.md, section 6)';
+          end;
+        end;
+      end;
+    end
+    else
+    begin
+      Segs := S10Split(L, ';');
+      for Seg in Segs do
+        S10Declare(Seg, Owned, Vars);
+      Col := S10Copy(L, Vars);
+      if Col > 0 then
+        Msg := 'a copy of a TOwned owner: move it with .Move (X := Y.Move), or put a comment // UNSAFE: <why> on '
+          + 'the line above (safe/SPEC.md, section 6)';
+    end;
+    if Col = 0 then
+    begin
+      if IsMarkComment(Src.Lines[I]) then
+        Covered := True
+      else if Trim(Code) <> '' then
+        Covered := False;
+      Continue;
+    end;
+    if not Covered and not IsMarkComment(Tail) then
+      VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S10', Msg);
+  end;
+end;
+
 { S4 }
 
 { The first non-space position at or after I, or Length(Code) + 1. }
@@ -1175,6 +1392,7 @@ begin
   VetCheckS4(Src, Module, Report);
   VetCheckS6(Src, Module, Report);
   VetCheckS9(Src, Module, Report);
+  VetCheckS10(Src, Module, Report);
   VetCheckS7(Src, Module, Report);
   VetCheckS8(Src, Module, Report);
   VetCheckS12(Src, Module, Report);
