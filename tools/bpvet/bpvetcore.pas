@@ -8,7 +8,7 @@ unit BpvetCore;
 interface
 
 uses
-  SysUtils, Classes, PasTree, PParser, Safe;
+  SysUtils, Classes, PasTree, PParser, PScanner, Safe;
 
 type
   { vsFatal: the file could not be read or parsed, so no rule was checked in it }
@@ -65,10 +65,28 @@ type
     function FindElement(const AName: String): TPasElement; override;
   end;
 
+  { fcl-passrc 3.2.2 stops with a Fatal on the procedure directive nostackframe, which FPC accepts on an assembler
+    routine (ext/bpthreads.pas). The parser reads every file and include file through this reader, and the reader
+    blanks "nostackframe;" with spaces, so the rest of the module is parsed and checked and rows and columns stay
+    those of the file. The rules read the text of the file itself (TVetSource), not this one. }
+  TVetLineReader = class(TFileLineReader)
+  public
+    function ReadLine: String; override;
+  end;
+
+  TVetFileResolver = class(TFileResolver)
+  protected
+    function CreateFileReader(const AFileName: String): TLineReader; override;
+  public
+    function FindIncludeFile(const AName: String): TLineReader; override;
+  end;
+
   TEngineBox = specialize TOwned<TVetEngine>;
   TLinesBox = specialize TOwned<TStringList>;
 
 const
+  { the directive that fcl-passrc 3.2.2 does not parse (see TVetLineReader) }
+  UnparsedDirective = 'nostackframe';
   SeverityWord: array[TVetSeverity] of String = ('Warning', 'Error', 'Fatal');
 
 function TVetEngine.CreateElement(AClass: TPTreeElement; const AName: String; AParent: TPasElement;
@@ -148,6 +166,7 @@ begin
     Inc(N);
   end;
   Args[N] := Src.FileName;
+  DefaultFileResolverClass := TVetFileResolver;
   try
     Result := ParseSource(Engine.Get, Args, 'linux', 'x86_64', []);
   except
@@ -174,6 +193,67 @@ end;
 function IsIdentChar(const C: Char): Boolean;
 begin
   Result := C in ['A'..'Z', 'a'..'z', '0'..'9', '_'];
+end;
+
+{ Line with every UnparsedDirective that is a whole word followed by a semicolon (blanks between them allowed)
+  replaced by spaces, the semicolon too; the length of the line stays. }
+function BlankUnparsedDirective(const Line: String): String;
+var
+  L: String;
+  P, K, I, N: Integer;
+begin
+  Result := Line;
+  L := LowerCase(Line);
+  N := Length(UnparsedDirective);
+  P := 1;
+  while P <= Length(L) - N + 1 do
+  begin
+    if (Copy(L, P, N) = UnparsedDirective)
+      and ((P = 1) or not IsIdentChar(L[P - 1]))
+      and ((P + N > Length(L)) or not IsIdentChar(L[P + N])) then
+    begin
+      K := P + N;
+      while (K <= Length(L)) and (L[K] in [' ', #9]) do
+        Inc(K);
+      if (K <= Length(L)) and (L[K] = ';') then
+      begin
+        for I := P to K do
+          Result[I] := ' ';
+        P := K + 1;
+        Continue;
+      end;
+    end;
+    Inc(P);
+  end;
+end;
+
+function TVetLineReader.ReadLine: String;
+var
+  S: String;
+begin
+  S := inherited ReadLine;
+  Result := BlankUnparsedDirective(S);
+end;
+
+function TVetFileResolver.CreateFileReader(const AFileName: String): TLineReader;
+begin
+  // UNSAFE: the reader goes to the scanner of fcl-passrc, which frees it when the file is read
+  Result := TVetLineReader.Create(AFileName);
+end;
+
+function TVetFileResolver.FindIncludeFile(const AName: String): TLineReader;
+var
+  FN: String;
+begin
+  Result := nil;
+  FN := FindIncludeFileName(AName);
+  if FN <> '' then
+    try
+      // UNSAFE: the reader goes to the scanner of fcl-passrc, which frees it when the file is read
+      Result := TVetLineReader.Create(FN);
+    except
+      Result := nil;
+    end;
 end;
 
 function VetWordColumn(const Line, Word: String): Integer;
