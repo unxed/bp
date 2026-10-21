@@ -1,6 +1,6 @@
 // EXPECT: clean
-{ S14: String and record parameters are const, constref, var or out, or marked // UNSAFE:; a Double or an
-  Integer by value is not checked. }
+{ S14: String, array and record parameters are const, constref, var or out, or marked // UNSAFE:; a Double, an
+  Integer or an array of const by value is not checked. }
 unit s14_ok;
 
 {$mode objfpc}{$H+}
@@ -15,6 +15,8 @@ type
     X, Y: Double;
   end;
 
+  TInts = array of Integer;
+
   TGreeter = class
   public
     function Greet(const Name: String): String;
@@ -26,6 +28,8 @@ procedure Append(var S: String; const Tail: String);
 procedure Fill(out S: String);
 function Len2(const P: TPoint2): Double;
 procedure Move2(var P: TPoint2; DX: Double);
+function Sum(const Values: array of Integer; var Total: TInts): Integer;
+function Count(const Fmt: String; Args: array of const): Integer;
 // UNSAFE: the body changes its own copy of the text on purpose
 function Upper(S: String): String;
 
@@ -68,6 +72,16 @@ end;
 procedure Move2(var P: TPoint2; DX: Double);
 begin
   P.X := P.X + DX;
+end;
+
+function Sum(const Values: array of Integer; var Total: TInts): Integer;
+begin
+  Result := Length(Values) + Length(Total);
+end;
+
+function Count(const Fmt: String; Args: array of const): Integer;
+begin
+  Result := Length(Fmt) + Length(Args);
 end;
 
 function Upper(S: String): String; // UNSAFE: the body changes its own copy of the text on purpose

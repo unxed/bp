@@ -152,9 +152,11 @@ procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Repor
              const, constref, var or out: the callee gets its own copy, and a change of it is lost for the caller.
     Error    the same for a parameter whose type is a record declared in the module (bpvet has no types: the record
              is found by its name; records of other units are not checked).
+    Error    the same for an open array parameter (array of T, not array of const) and for a parameter of a dynamic
+             array type declared in the module (T = array of X, found by its name).
              A // UNSAFE: <why> comment on the line above the parameter or at the end of its line drops it.
     A routine declared in the interface (or in a class) and its body are one routine: one finding.
-    Parameters of other types (dynamic arrays) and var without need are not checked yet (unxed/bp#56). }
+    Records and dynamic arrays of other units and var without need are not checked yet (unxed/bp#56). }
 procedure VetCheckS14(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 implementation
@@ -2649,7 +2651,7 @@ type
   TS14Walker = class
   public
     Procs: array of TPasProcedure;
-    { ';name;' of the named records of the module, in lower case }
+    { ';name;' of the named records and dynamic array types of the module, in lower case }
     Records: String;
     // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
     procedure Visit(El: TPasElement; Arg: System.Pointer);
@@ -2664,12 +2666,17 @@ begin
     Procs[High(Procs)] := TPasProcedure(El);
   end
   else if (El is TPasRecordType) and (El.Name <> '') then
+    Records := Records + LowerCase(El.Name) + ';'
+  else if (El is TPasArrayType) and (El.Name <> '') and (Length(TPasArrayType(El).Ranges) = 0) then
     Records := Records + LowerCase(El.Name) + ';';
 end;
 
-{ T is a string type, or a record of the module (Records: ';name;...'). }
+{ T is a string type, an open array (not array of const), or a record or a dynamic array type of the module
+  (Records: ';name;...'). }
 function S14ByValueChecked(const T: TPasType; const Records: String): Boolean;
 begin
+  if (T is TPasArrayType) and (T.Name = '') then
+    Exit((Length(TPasArrayType(T).Ranges) = 0) and (TPasArrayType(T).ElType <> nil));
   Result := (T <> nil) and (T.Name <> '') and ((Pos(';' + LowerCase(T.Name) + ';', S14StringTypes) > 0)
     or (Pos(';' + LowerCase(T.Name) + ';', Records) > 0));
 end;
@@ -2691,7 +2698,7 @@ var
   I, J, Row: Integer;
   P: TPasProcedure;
   A: TPasArgument;
-  Seen, Key: String;
+  Seen, Key, TypeName: String;
 begin
   if IsUnsafeUnit(Src) then
     Exit;
@@ -2717,8 +2724,11 @@ begin
       Row := A.SourceLinenumber;
       if (Row > 0) and ((Pos('// UNSAFE:', VetLine(Src, Row)) > 0) or IsMarkComment(VetLine(Src, Row - 1))) then
         Continue;
+      TypeName := A.ArgType.Name;
+      if TypeName = '' then
+        TypeName := 'open array';
       AddAtElement(Src, A, vsError, 'S14', 'the parameter ' + A.Name + ' of ' + P.Name + ' is a '
-        + A.ArgType.Name + ' by value: make it const (or var/out when the caller must see the change), or put a '
+        + TypeName + ' by value: make it const (or var/out when the caller must see the change), or put a '
         + 'comment // UNSAFE: <why> on the line above (safe/SPEC.md, section 16)', Report);
     end;
   end;
