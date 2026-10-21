@@ -16,7 +16,7 @@
   Parser limit (fcl-passrc 3.2.2): external with a one-character library name literal (external 'c')
   does not parse and is reported as Fatal; give the library name as a constant (const LibC = 'c').
   The directive nostackframe, which that parser does not know, is skipped (bpvetcore.pas, TVetLineReader).
-  Rules: S3, S4, S6, S7, S8, S9, S12 (bpvetrules.pas). }
+  Rules: S3, S4, S6, S7, S8, S9, S10, S12 (bpvetrules.pas). }
 program bpvet;
 
 {$mode objfpc}{$H+}

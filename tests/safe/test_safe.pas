@@ -87,7 +87,7 @@ var
   A, C: TProbeBox;
 begin
   A := TProbeBox.Own(TProbe.Create('c'));
-  C := A; // contract violation (linter), but memory must remain intact
+  C := A; // UNSAFE: contract violation (S10), but memory must remain intact
   A.Reset;
   Check(Log = '', 'owned: copy keeps object alive');
   C.Reset;
