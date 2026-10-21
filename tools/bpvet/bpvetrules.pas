@@ -106,7 +106,7 @@ procedure VetCheckS15(const Src: TVetSource; const Module: TPasModule; var Repor
     Error  a field of a task class whose type is a named pointer type: Pointer, PChar and the other pointer types
            of System that S4 knows, or a pointer type declared in the module (PNode = ^TNode). S4 rejects a field
            ^T itself, but not a field of a named pointer type; the memory behind it has no owner. Pointer types of
-           used units are not known yet. }
+           used units (NAME = ^T in the interface of a unit found as for S5) count too. }
 procedure VetCheckS11(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
@@ -919,7 +919,8 @@ begin
       Continue;
     N := Trim(Copy(L, 1, P - 1));
     R := Trim(Copy(L, P + 1, Length(L)));
-    if (N = '') or (Pos(Kind, R) <> 1) or ((Length(R) > Length(Kind)) and IsWordChar(R[Length(Kind) + 1])) then
+    if (N = '') or (Pos(Kind, R) <> 1)
+      or (IsWordChar(Kind[Length(Kind)]) and (Length(R) > Length(Kind)) and IsWordChar(R[Length(Kind) + 1])) then
       Continue;
     if (Kind = 'class') and (Pos('of ', TrimLeft(Copy(R, 6, Length(R)))) = 1) then
       Continue;
@@ -932,8 +933,8 @@ begin
   end;
 end;
 
-{ The classes (with Kind 'interface': the interface types) of the units listed in Clause whose files (name.pas,
-  lower case) lie next to the checked file or in a directory of VetUnitDirs. }
+{ The classes (with Kind 'interface': the interface types; with Kind '^': the pointer types) of the units listed in
+  Clause whose files (name.pas, lower case) lie next to the checked file or in a directory of VetUnitDirs. }
 procedure S5UsedClasses(const Src: TVetSource; const Clause: TPasUsesClause; var Names: String;
   const Kind: String = 'class');
 var
@@ -2178,7 +2179,7 @@ procedure VetCheckS11(const Src: TVetSource; const Module: TPasModule; var Repor
 var
   Sections: array[0..1] of TPasDeclarations;
   I: Integer;
-  Tasks, ClassNames, Intfs: String;
+  Tasks, ClassNames, Intfs, Ptrs: String;
   Changed: Boolean;
 begin
   if IsUnsafeUnit(Src) then
@@ -2217,9 +2218,14 @@ begin
   for I := 0 to 1 do
     if Sections[I] is TPasSection then
       S5UsedClasses(Src, TPasSection(Sections[I]).UsesClause, Intfs, 'interface');
+  Ptrs := ' ';
+  for I := 0 to 1 do
+    if Sections[I] is TPasSection then
+      S5UsedClasses(Src, TPasSection(Sections[I]).UsesClause, Ptrs, '^');
+  Ptrs := ModulePointerTypes(Module) + StringReplace(Ptrs, ' ', ';', [rfReplaceAll]);
   for I := 0 to 1 do
     if Sections[I] <> nil then
-      S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Intfs, ModulePointerTypes(Module), Report);
+      S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Intfs, Ptrs, Report);
 end;
 
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
