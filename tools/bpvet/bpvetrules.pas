@@ -2651,7 +2651,7 @@ type
   TS14Walker = class
   public
     Procs: array of TPasProcedure;
-    { ';name;' of the named records and dynamic array types of the module, in lower case }
+    { ';name;' of the named records and dynamic array types of the module and used units, in lower case }
     Records: String;
     // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
     procedure Visit(El: TPasElement; Arg: System.Pointer);
@@ -2671,14 +2671,20 @@ begin
     Records := Records + LowerCase(El.Name) + ';';
 end;
 
-{ T is a string type, an open array (not array of const), or a record or a dynamic array type of the module
+{ T is a string type, an open array (not array of const), or a record or a dynamic array type of the module or a used unit
   (Records: ';name;...'). }
 function S14ByValueChecked(const T: TPasType; const Records: String): Boolean;
+var
+  N: String;
 begin
   if (T is TPasArrayType) and (T.Name = '') then
     Exit((Length(TPasArrayType(T).Ranges) = 0) and (TPasArrayType(T).ElType <> nil));
-  Result := (T <> nil) and (T.Name <> '') and ((Pos(';' + LowerCase(T.Name) + ';', S14StringTypes) > 0)
-    or (Pos(';' + LowerCase(T.Name) + ';', Records) > 0));
+  if (T = nil) or (T.Name = '') then
+    Exit(False);
+  N := LowerCase(T.Name);
+  if Pos('.', N) > 0 then
+    N := Copy(N, LastDelimiter('.', N) + 1, Length(N));
+  Result := (Pos(';' + N + ';', S14StringTypes) > 0) or (Pos(';' + N + ';', Records) > 0);
 end;
 
 { The name of the routine P with its class or record (the body TFoo.Bar and the declaration Bar inside TFoo give one
@@ -2696,8 +2702,10 @@ var
   W: specialize TOwned<TS14Walker>;
   V: TS14Walker;
   I, J, Row: Integer;
+  K: Integer;
   P: TPasProcedure;
   A: TPasArgument;
+  Sections: array[0..1] of TPasSection;
   Seen, Key, TypeName: String;
 begin
   if IsUnsafeUnit(Src) then
@@ -2706,6 +2714,27 @@ begin
   V := W.Get;
   V.Records := ';';
   Module.ForEachCall(@V.Visit, nil);
+  Sections[0] := nil;
+  Sections[1] := nil;
+  if Module is TPasProgram then
+    Sections[0] := TPasProgram(Module).ProgramSection
+  else if Module is TPasLibrary then
+    Sections[0] := TPasLibrary(Module).LibrarySection
+  else
+  begin
+    Sections[0] := Module.InterfaceSection;
+    Sections[1] := Module.ImplementationSection;
+  end;
+  TypeName := '';
+  for K := 0 to 1 do
+    if (Sections[K] <> nil) and (Sections[K].UsesClause <> nil) then
+    begin
+      S5UsedClasses(Src, Sections[K].UsesClause, TypeName, 'record');
+      S5UsedClasses(Src, Sections[K].UsesClause, TypeName, 'packed record');
+      S5UsedClasses(Src, Sections[K].UsesClause, TypeName, 'array of');
+    end;
+  if TypeName <> '' then
+    V.Records := V.Records + StringReplace(TypeName, ' ', ';', [rfReplaceAll]);
   Seen := ';';
   for I := 0 to High(V.Procs) do
   begin
