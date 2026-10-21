@@ -1,4 +1,5 @@
 // EXPECT: clean
+// ARGS: -Fu@lint@
 { S14: String, array and record parameters are const, constref, var or out, or marked // UNSAFE:; a Double, an
   Integer or an array of const by value is not checked. }
 unit s14_ok;
@@ -8,6 +9,7 @@ unit s14_ok;
 interface
 
 uses
+  s14_lib,
   Safe;
 
 type
@@ -30,6 +32,11 @@ function Len2(const P: TPoint2): Double;
 procedure Move2(var P: TPoint2; DX: Double);
 function Sum(const Values: array of Integer; var Total: TInts): Integer;
 function Count(const Fmt: String; Args: array of const): Integer;
+function LibRecLen(const R: TLibRec): Integer;
+function LibPackedLen(const R: TLibPacked): Integer;
+function LibArrayLen(var Values: TLibInts): Integer;
+function FixedLen(F: TLibFixed): Integer;
+function QualifiedRecLen(const Q: s14_lib.TLibRec): Integer;
 // UNSAFE: the body changes its own copy of the text on purpose
 function Upper(S: String): String;
 
@@ -82,6 +89,31 @@ end;
 function Count(const Fmt: String; Args: array of const): Integer;
 begin
   Result := Length(Fmt) + Length(Args);
+end;
+
+function LibRecLen(const R: TLibRec): Integer;
+begin
+  Result := R.X;
+end;
+
+function LibPackedLen(const R: TLibPacked): Integer;
+begin
+  Result := R.X;
+end;
+
+function LibArrayLen(var Values: TLibInts): Integer;
+begin
+  Result := Length(Values);
+end;
+
+function FixedLen(F: TLibFixed): Integer;
+begin
+  Result := Length(F);
+end;
+
+function QualifiedRecLen(const Q: s14_lib.TLibRec): Integer;
+begin
+  Result := Q.X;
 end;
 
 function Upper(S: String): String; // UNSAFE: the body changes its own copy of the text on purpose
