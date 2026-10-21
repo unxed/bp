@@ -146,6 +146,15 @@ procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report
              A variant field read outside any case over its tag is not checked yet (unxed/bp#56). }
 procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S14 (first part): a parameter of a string type by value (safe/SPEC.md §6, §16, register H11). A module marked
+  // UNSAFE-UNIT: is not checked.
+    Error    a parameter of String, AnsiString, UnicodeString, WideString, RawByteString or UTF8String without
+             const, constref, var or out: the callee gets its own copy, and a change of it is lost for the caller.
+             A // UNSAFE: <why> comment on the line above the parameter or at the end of its line drops it.
+    A routine declared in the interface (or in a class) and its body are one routine: one finding.
+    Parameters of other types and var without need are not checked yet (unxed/bp#56). }
+procedure VetCheckS14(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 implementation
 
 type
@@ -2627,6 +2636,85 @@ begin
   S13CheckVariantRead(Src, V, Report);
 end;
 
+{ S14 }
+
+const
+  { the string types of the System unit }
+  S14StringTypes = ';string;ansistring;unicodestring;widestring;rawbytestring;utf8string;';
+
+type
+  { Collects the routines of a module: declarations and bodies. }
+  TS14Walker = class
+  public
+    Procs: array of TPasProcedure;
+    // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
+    procedure Visit(El: TPasElement; Arg: System.Pointer);
+  end;
+
+// UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
+procedure TS14Walker.Visit(El: TPasElement; Arg: System.Pointer);
+begin
+  if El is TPasProcedure then
+  begin
+    SetLength(Procs, Length(Procs) + 1);
+    Procs[High(Procs)] := TPasProcedure(El);
+  end;
+end;
+
+function S14IsString(const T: TPasType): Boolean;
+begin
+  Result := (T <> nil) and (T.Name <> '') and (Pos(';' + LowerCase(T.Name) + ';', S14StringTypes) > 0);
+end;
+
+{ The name of the routine P with its class or record (the body TFoo.Bar and the declaration Bar inside TFoo give one
+  name). }
+function S14RoutineName(const P: TPasProcedure): String;
+begin
+  Result := P.Name;
+  if (P.Parent <> nil) and ((P.Parent is TPasClassType) or (P.Parent is TPasRecordType)) then
+    Result := P.Parent.Name + '.' + Result;
+  Result := LowerCase(Result);
+end;
+
+procedure VetCheckS14(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  W: specialize TOwned<TS14Walker>;
+  V: TS14Walker;
+  I, J, Row: Integer;
+  P: TPasProcedure;
+  A: TPasArgument;
+  Seen, Key: String;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  W := specialize TOwned<TS14Walker>.Own(TS14Walker.Create);
+  V := W.Get;
+  Module.ForEachCall(@V.Visit, nil);
+  Seen := ';';
+  for I := 0 to High(V.Procs) do
+  begin
+    P := V.Procs[I];
+    if P.ProcType = nil then
+      Continue;
+    for J := 0 to P.ProcType.Args.Count - 1 do
+    begin
+      A := TPasArgument(P.ProcType.Args[J]);
+      if (A.Access <> argDefault) or not S14IsString(A.ArgType) then
+        Continue;
+      Key := S14RoutineName(P) + '.' + LowerCase(A.Name) + ';';
+      if Pos(';' + Key, Seen) > 0 then
+        Continue;
+      Seen := Seen + Key;
+      Row := A.SourceLinenumber;
+      if (Row > 0) and ((Pos('// UNSAFE:', VetLine(Src, Row)) > 0) or IsMarkComment(VetLine(Src, Row - 1))) then
+        Continue;
+      AddAtElement(Src, A, vsError, 'S14', 'the parameter ' + A.Name + ' of ' + P.Name + ' is a '
+        + A.ArgType.Name + ' by value: make it const (or var/out when the caller must see the change), or put a '
+        + 'comment // UNSAFE: <why> on the line above (safe/SPEC.md, section 16)', Report);
+    end;
+  end;
+end;
+
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 begin
   VetCheckS3(Src, Module, Report);
@@ -2641,6 +2729,7 @@ begin
   VetCheckS8(Src, Module, Report);
   VetCheckS12(Src, Module, Report);
   VetCheckS13(Src, Module, Report);
+  VetCheckS14(Src, Module, Report);
 end;
 
 end.
