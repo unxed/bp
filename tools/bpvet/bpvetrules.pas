@@ -1241,8 +1241,8 @@ begin
     if Sections[I] <> nil then
       S5CollectClasses(Sections[I].Declarations, ClassNames);
   for I := 0 to 1 do
-    if Sections[I] <> nil then
-      S5UsedClasses(Src, Sections[I].UsesClause, ClassNames);
+    if Sections[I] is TPasSection then
+      S5UsedClasses(Src, TPasSection(Sections[I]).UsesClause, ClassNames);
   for I := 0 to 1 do
     if Sections[I] <> nil then
       S5CheckList(Src, Sections[I].Declarations, ClassNames, 'the global variable', Report);
