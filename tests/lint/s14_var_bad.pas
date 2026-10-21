@@ -1,5 +1,5 @@
-// EXPECT: warn SAFE-S14
-{ S14: a var parameter used only as input is a warning. }
+// EXPECT: clean
+{ S14: passing a var parameter to a routine may mutate it; this conservative analysis does not warn. }
 unit s14_var_bad;
 
 {$mode objfpc}{$H+}

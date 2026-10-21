@@ -2726,6 +2726,10 @@ var
 begin
   if El is TPasImplAssign then
     Mark(TPasImplAssign(El).left)
+  else if (El is TBinaryExpr) and (TBinaryExpr(El).OpCode = eopSubIdent) then
+    { A method call on a var parameter can mutate the referenced value even though it is not
+      passed as a call argument (e.g. Box.Reset or Box.Move). Treat the receiver as a write. }
+    Mark(TBinaryExpr(El).left)
   else if (El is TParamsExpr) and (TParamsExpr(El).Kind = pekFuncParams) then
   begin
     P := TParamsExpr(El);

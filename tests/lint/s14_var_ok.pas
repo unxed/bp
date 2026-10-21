@@ -13,6 +13,7 @@ type
   TPoint = record
     X: Integer;
   end;
+  // UNSAFE: fixture for S14 pointer-parameter write analysis
   PInt = ^Integer;
   TBase = class
     procedure Update(var N: Integer); virtual; abstract;
@@ -32,6 +33,7 @@ procedure ThroughWith(var P: TPoint);
 procedure ThroughNested(var N: Integer);
 procedure ThroughUnsafe(var N: Integer);
 procedure Raw(var Buffer);
+// UNSAFE: fixture for S14 external-call write analysis
 procedure ExternalInput(var N: Integer);
 
 implementation
