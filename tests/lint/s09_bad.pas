@@ -17,7 +17,7 @@ function Wide(const S: String): Integer;
 var
   U: UnicodeString;
 begin
-  U := UnicodeString(S);
+  U := S;
   Result := Length(U);
 end;
 
