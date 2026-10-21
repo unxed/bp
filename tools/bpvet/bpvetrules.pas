@@ -61,6 +61,15 @@ procedure VetCheckS6(const Src: TVetSource; const Module: TPasModule; var Report
              API that needs UTF-16 or a fixed-size record field is the exception that the mark explains. }
 procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S5: fields own, locals borrow (safe/SPEC.md §0, §6, register H1). A module marked // UNSAFE-UNIT: is not checked.
+    Error  a global variable of the module, or a field of a class, object or record, whose type is a class: a class
+           declared in this module or a well-known class of the RTL (S5ClassTypes). Such a reference is a borrow
+           that can outlive its owner; hold the object through TOwned/TShared/TWeak or an interface instead, or put
+           a comment // borrow: <who owns it> at the end of the line or on the line above.
+    Not checked yet (next parts of step 7, unxed/bp#56): classes of other units, saving the result of .Get or a
+    class parameter into a field, Reset/Move of an owner while a borrow from it is alive. }
+procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
     Error    a parameter of a TOwned type (TOwned<...> or a module alias NAME = specialize TOwned<...>) passed by
              value: without const, var, out or constref;
@@ -770,6 +779,110 @@ begin
   end;
 end;
 
+{ S5 }
+
+const
+  { classes of the RTL that a module often keeps in a field or a global }
+  S5ClassTypes = ' tobject exception tstrings tstringlist tlist tfplist tobjectlist tstream tmemorystream '
+    + 'tfilestream tstringstream tthread tcomponent tpersistent tcollection ';
+
+{ The names of the classes declared in Decls and in classes nested in them, as ' tfoo tbar '. }
+procedure S5CollectClasses(const L: TFPList; var Names: String);
+var
+  I: Integer;
+  E: TPasElement;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+  begin
+    E := TPasElement(L[I]);
+    if (E is TPasClassType) and (TPasClassType(E).ObjKind = okClass) and (E.Name <> '') then
+      Names := Names + LowerCase(E.Name) + ' ';
+    if E is TPasClassType then
+      S5CollectClasses(TPasClassType(E).Members, Names)
+    else if E is TPasRecordType then
+      S5CollectClasses(TPasRecordType(E).Members, Names);
+  end;
+end;
+
+{ The type name of a variable without a unit prefix, in lower case; '' for an anonymous type (specialize, array). }
+function S5TypeName(const V: TPasVariable): String;
+var
+  I: Integer;
+begin
+  Result := '';
+  if (V.VarType = nil) or (V.VarType.Name = '') then
+    Exit;
+  Result := LowerCase(V.VarType.Name);
+  I := LastDelimiter('.', Result);
+  if I > 0 then
+    Result := Copy(Result, I + 1, Length(Result));
+end;
+
+{ The line Row has a // borrow: comment at its end, or the line above is a // borrow: comment. }
+function S5Marked(const Src: TVetSource; const Row: Integer): Boolean;
+begin
+  Result := (Pos('// borrow:', LowerCase(VetLine(Src, Row))) > 0)
+    or (Pos('// borrow:', LowerCase(TrimLeft(VetLine(Src, Row - 1)))) = 1);
+end;
+
+procedure S5CheckList(const Src: TVetSource; const L: TFPList; const ClassNames, Kind: String;
+  var Report: TVetReport);
+var
+  I: Integer;
+  E: TPasElement;
+  T: String;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+  begin
+    E := TPasElement(L[I]);
+    if E.ClassType = TPasVariable then
+    begin
+      T := S5TypeName(TPasVariable(E));
+      if (T <> '') and (Pos(' ' + T + ' ', ClassNames) > 0) and not S5Marked(Src, E.SourceLinenumber) then
+        AddAtElement(Src, E, vsError, 'S5',
+          Kind + ' ' + E.Name + ' of the class type ' + TPasVariable(E).VarType.Name + ' is a borrow that can '
+          + 'outlive its owner: hold the object through TOwned, TShared, TWeak or an interface, or put a comment '
+          + '// borrow: <who owns it> at the end of the line or on the line above (safe/SPEC.md, section 6)', Report);
+    end
+    else if E is TPasClassType then
+      S5CheckList(Src, TPasClassType(E).Members, ClassNames, 'the field', Report)
+    else if E is TPasRecordType then
+      S5CheckList(Src, TPasRecordType(E).Members, ClassNames, 'the field', Report);
+  end;
+end;
+
+procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  Sections: array[0..1] of TPasDeclarations;
+  I: Integer;
+  ClassNames: String;
+begin
+  if IsUnsafeUnit(Src) then
+    Exit;
+  Sections[0] := nil;
+  Sections[1] := nil;
+  if Module is TPasProgram then
+    Sections[0] := TPasProgram(Module).ProgramSection
+  else if Module is TPasLibrary then
+    Sections[0] := TPasLibrary(Module).LibrarySection
+  else
+  begin
+    Sections[0] := Module.InterfaceSection;
+    Sections[1] := Module.ImplementationSection;
+  end;
+  ClassNames := S5ClassTypes;
+  for I := 0 to 1 do
+    if Sections[I] <> nil then
+      S5CollectClasses(Sections[I].Declarations, ClassNames);
+  for I := 0 to 1 do
+    if Sections[I] <> nil then
+      S5CheckList(Src, Sections[I].Declarations, ClassNames, 'the global variable', Report);
+end;
+
 { S9 }
 
 const
@@ -1390,6 +1503,7 @@ procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Repor
 begin
   VetCheckS3(Src, Module, Report);
   VetCheckS4(Src, Module, Report);
+  VetCheckS5(Src, Module, Report);
   VetCheckS6(Src, Module, Report);
   VetCheckS9(Src, Module, Report);
   VetCheckS10(Src, Module, Report);

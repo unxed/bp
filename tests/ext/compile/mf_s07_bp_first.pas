@@ -5,7 +5,7 @@ program mf_s07_bp_first;
 {$mode objfpc}{$H+}
 // UNSAFE: the shadowing is the subject of this check: FreeAndNil of SysUtils must compile below
 uses BP, SysUtils;
-var O: TObject;
+var O: TObject; // borrow: the program frees it by hand right below
 begin
   O := TObject.Create; FreeAndNil(O); // UNSAFE: freed by hand right here
 end.
