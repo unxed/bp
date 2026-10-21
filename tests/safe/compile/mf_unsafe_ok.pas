@@ -5,7 +5,7 @@ uses SysUtils, Safe;
 var
   // UNSAFE: P holds the raw block allocated and freed below
   P: System.Pointer;
-  O: TObject;
+  O: TObject; // borrow: the program frees it by hand right below
 begin
   // UNSAFE: P is allocated and freed right here
   System.GetMem(P, 16);
