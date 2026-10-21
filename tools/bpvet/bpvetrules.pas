@@ -45,6 +45,11 @@ procedure VetCheckS3(const Src: TVetSource; const Module: TPasModule; var Report
     Error    a pointer type ^T or the address operator @ without a // UNSAFE: <why> comment on the line above (one
              comment covers a block of such lines right below it) or at the end of the line. A dereference P^ is
              not a finding (the pointer it needs is). Comments and string literals are skipped.
+             @Proc and @Obj.Method, where the last name is a procedure or method declared in the module (and not
+             also a variable, parameter, field, property or constant of it), are a procedural value (TDefer.Call,
+             TGroup.Go, a TProcedure parameter), not a raw address, and are not findings; @ followed by ^, [ or (
+             still is. The check is by name over the whole module, not by scope: @ of a routine of another unit
+             stays a finding.
     Error    pointer arithmetic without such a mark: Inc(P), Dec(P, N), P + N, N + P, P - Q, where P is a variable,
              parameter or field declared in the module with a pointer type (^T, Pointer, PChar and the like, or a
              pointer type of this module). Inc(P^) and P^ + 1 change the value, not the pointer, and are not
@@ -578,10 +583,117 @@ end;
 
 { S4 }
 
+{ The first non-space position at or after I, or Length(Code) + 1. }
+function SkipSpaces(const Code: String; I: Integer): Integer;
+begin
+  Result := I;
+  while (Result <= Length(Code)) and (Code[Result] = ' ') do
+    Inc(Result);
+end;
+
+{ Adds the last part of the (dotted: TFoo.Bar) name Name, lower case, to the ';'-separated set S. }
+procedure AddName(var S: String; const Name: String);
+var
+  P: Integer;
+  N: String;
+begin
+  N := LowerCase(Name);
+  P := LastDelimiter('.', N);
+  if P > 0 then
+    N := Copy(N, P + 1, Length(N) - P);
+  if (N <> '') and (Pos(';' + N + ';', S) = 0) then
+    S := S + N + ';';
+end;
+
+procedure CollectNames(const E: TPasElement; var Routines, Vars: String); forward;
+
+procedure CollectList(const L: TFPList; var Routines, Vars: String);
+var
+  I: Integer;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+    CollectNames(TPasElement(L[I]), Routines, Vars);
+end;
+
+{ The names of the routines (procedures, functions, methods, nested ones too) and of the variables (variables,
+  constants, fields, properties, parameters) declared in E and below it, into two ';'-separated sets. }
+procedure CollectNames(const E: TPasElement; var Routines, Vars: String);
+var
+  P: TPasProcedure;
+begin
+  if E = nil then
+    Exit;
+  if E is TPasOverloadedProc then
+  begin
+    AddName(Routines, E.Name);
+    CollectList(TPasOverloadedProc(E).Overloads, Routines, Vars);
+  end
+  else if E is TPasProcedure then
+  begin
+    P := TPasProcedure(E);
+    AddName(Routines, P.Name);
+    if P.ProcType <> nil then
+      CollectList(P.ProcType.Args, Routines, Vars);
+    if P.Body <> nil then
+      CollectList(P.Body.Declarations, Routines, Vars);
+  end
+  else if (E is TPasArgument) or (E is TPasVariable) then
+    AddName(Vars, E.Name)
+  else if E is TPasMembersType then
+    CollectList(TPasMembersType(E).Members, Routines, Vars)
+  else if E is TPasDeclarations then
+    CollectList(TPasDeclarations(E).Declarations, Routines, Vars);
+end;
+
+procedure ModuleNames(const Module: TPasModule; out Routines, Vars: String);
+begin
+  Routines := ';';
+  Vars := ';';
+  if Module is TPasProgram then
+    CollectNames(TPasProgram(Module).ProgramSection, Routines, Vars)
+  else if Module is TPasLibrary then
+    CollectNames(TPasLibrary(Module).LibrarySection, Routines, Vars)
+  else
+  begin
+    CollectNames(Module.InterfaceSection, Routines, Vars);
+    CollectNames(Module.ImplementationSection, Routines, Vars);
+  end;
+end;
+
+{ The @ at position I of Code takes the address of a routine of the module: the designator after it (Name,
+  Obj.Method, A.B.Name; spaces around the dots allowed) ends with a name from Routines that is not in Vars, and no
+  ^, [ or ( follows it. }
+function IsRoutineAddress(const Code: String; const I: Integer; const Routines, Vars: String): Boolean;
+var
+  J, K: Integer;
+  Name: String;
+begin
+  Result := False;
+  K := SkipSpaces(Code, I + 1);
+  repeat
+    if (K > Length(Code)) or not IsWordChar(Code[K]) or (Code[K] in ['0'..'9']) then
+      Exit;
+    J := K;
+    while (J <= Length(Code)) and IsWordChar(Code[J]) do
+      Inc(J);
+    Name := ';' + LowerCase(Copy(Code, K, J - K)) + ';';
+    K := SkipSpaces(Code, J);
+    if (K <= Length(Code)) and (Code[K] = '.') then
+      K := SkipSpaces(Code, K + 1)
+    else
+      Break;
+  until False;
+  if (K <= Length(Code)) and (Code[K] in ['^', '[', '(']) then
+    Exit;
+  Result := (Pos(Name, Routines) > 0) and (Pos(Name, Vars) = 0);
+end;
+
 { The column of the first pointer type ^T or address operator @ in Code (a line without comments and strings), or 0;
   What gets '^T' or '@'. A ^ right after a name, ) or ] is a dereference (P^, F(X)^, A[I]^), except after the
-  keyword of (array of ^T). }
-function PointerOp(const Code: String; out What: String): Integer;
+  keyword of (array of ^T). An @ of a routine of the module (IsRoutineAddress) is a procedural value, not a finding. }
+function PointerOp(const Code, Routines, Vars: String; out What: String): Integer;
 var
   I, J, K: Integer;
   Prev: String;
@@ -591,6 +703,8 @@ begin
   begin
     if Code[I] = '@' then
     begin
+      if IsRoutineAddress(Code, I, Routines, Vars) then
+        Continue;
       What := '@';
       Exit(I);
     end;
@@ -628,14 +742,6 @@ begin
   while (Start > 1) and IsWordChar(Code[Start - 1]) do
     Dec(Start);
   Result := LowerCase(Copy(Code, Start, J - Start + 1));
-end;
-
-{ The first non-space position at or after I, or Length(Code) + 1. }
-function SkipSpaces(const Code: String; I: Integer): Integer;
-begin
-  Result := I;
-  while (Result <= Length(Code)) and (Code[Result] = ' ') do
-    Inc(Result);
 end;
 
 { Names (lower case, ';'-separated) of the variables, parameters and fields of the module declared with a pointer
@@ -764,18 +870,19 @@ procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report
 var
   I, Col: Integer;
   InBrace, InParen, Covered, Arith: Boolean;
-  Code, Tail, What, Names: String;
+  Code, Tail, What, Names, Routines, Vars: String;
 begin
   if IsUnsafeUnit(Src) then
     Exit;
   Names := PointerVarNames(Src, ModulePointerTypes(Module));
+  ModuleNames(Module, Routines, Vars);
   InBrace := False;
   InParen := False;
   Covered := False;
   for I := 0 to High(Src.Lines) do
   begin
     Code := CodeOf(Src.Lines[I], InBrace, InParen, Tail);
-    Col := PointerOp(Code, What);
+    Col := PointerOp(Code, Routines, Vars, What);
     Arith := False;
     if Col = 0 then
     begin
