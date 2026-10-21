@@ -330,11 +330,13 @@ Warnings are turned into errors with one directive in a module, `{$WARN SYMBOL_D
 or with the switch `-Sew` for the whole project. Migration modes: **permissive** — warnings;
 **strict** — errors.
 
-`bpvet` checks the rules marked "linter" (only S7 so far). It reads the sources with `fcl-passrc` (shipped with FPC)
-and prints FPC messages, one line each with the fix: `file(line,col) Error: SAFE-S7 ...`. Build and run:
-`tools/bpvet/build.sh out/bpvet && out/bpvet [--report|--strict] FILE|DIR...`. By default errors fail (exit code 1)
+`bpvet` checks the rules marked "linter" (S3, S4, S7, S8, S12 so far). It reads the sources with `fcl-passrc`
+(shipped with FPC) and prints FPC messages, one line each with the fix: `file(line,col) Error: SAFE-S7 ...`. Build and
+run: `tools/bpvet/build.sh out/bpvet && out/bpvet [--report|--strict] FILE|DIR...`. By default errors fail (exit code 1)
 and warnings are printed; `--report` prints every finding as a warning and never fails (permissive), `--strict` makes
 warnings errors (strict); a file it cannot parse gives exit code 2. Lint tests: `tests/lint/*.pas`, `tests/lint.sh`.
+CI (job `lint`) runs `--strict` over `safe/`, `ext/` and `tests/` (except `tests/lint`, whose `*_bad.pas` have findings
+by design).
 
 Recommended FPC checks for a debug build (in Lazarus — the Debug build mode):
 `-Cr -Co -CR -Sa -gh -gt` (ranges, overflow, object checks, assert, heaptrc, garbage

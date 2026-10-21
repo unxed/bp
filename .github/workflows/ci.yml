@@ -15,8 +15,8 @@ jobs:
       - name: Text policy
         run: python3 tools/text-policy.py
 
-  # bpvet (tools/bpvet, SPEC §6): the linter for the rules the compiler cannot check. Its lint tests, its own sources
-  # with --strict, and the report over tests/ (a file it cannot parse fails the job).
+  # bpvet (tools/bpvet, SPEC §6): the linter for the rules the compiler cannot check. Its lint tests, and --strict over
+  # its own sources, safe/, ext/ and tests/ (a finding, or a file it cannot parse, fails the job).
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -29,11 +29,10 @@ jobs:
         run: bash tests/lint.sh out/bpvet
       - name: bpvet --strict over its own sources
         run: out/bpvet --strict tools/bpvet
-      - name: bpvet --report over tests/ (without tests/lint, whose *_bad.pas have findings by design)
-        run: out/bpvet --report tests/safe tests/ext
-      - name: bpvet --report over safe/ and ext/ (findings to mark before --strict; does not gate yet)
-        continue-on-error: true
-        run: out/bpvet --report safe ext
+      - name: bpvet --strict over tests/ (without tests/lint, whose *_bad.pas have findings by design)
+        run: out/bpvet --strict tests/safe tests/ext
+      - name: bpvet --strict over safe/ and ext/
+        run: out/bpvet --strict safe ext
 
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
   # the "binary is static, no libc" check, and runs on different distributions.
