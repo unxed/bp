@@ -4,6 +4,8 @@ program test_threads;
 
 {$mode objfpc}{$H+}
 
+// UNSAFE: BP goes first for the thread manager (SPEC §14); SysUtils and Classes after it shadow it, and the
+// program does not free objects by hand (no FreeAndNil)
 uses
   BP, SysUtils, Classes;
 

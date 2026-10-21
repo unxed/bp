@@ -3,6 +3,7 @@
   manager (SPEC §14), SysUtils after it shadows it, so FreeAndNil of SysUtils compiles below. }
 program mf_s07_bp_first;
 {$mode objfpc}{$H+}
+// UNSAFE: the shadowing is the subject of this check: FreeAndNil of SysUtils must compile below
 uses BP, SysUtils;
 var O: TObject;
 begin

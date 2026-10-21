@@ -8,6 +8,7 @@ interface
 uses Safe;
 procedure Drop;
 implementation
+// UNSAFE: the shadowing is the subject of this check: FreeAndNil of SysUtils must compile below
 uses SysUtils;
 procedure Drop;
 var O: TObject;

@@ -317,7 +317,7 @@ Thread safety in v0.1: the counters are atomic, so `TShared` can be copied betwe
 | S4 | `Pointer, PByte, PChar, PAnsiChar, PWideChar`, `^T`, `@`, pointer arithmetic | the types — warning `SAFE-S4`; `^T`, `@`, pointer arithmetic — `bpvet` S4 |
 | S5 | a field/global variable of a class type without `// borrow:` | linter |
 | S6 | `TFoo.Create` not immediately into `Own/Share/Adopt`/an interface/`raise` | linter; partly at runtime (R3) |
-| S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14). Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
+| S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14); a warning is not reported when the uses are marked `// UNSAFE: <why>` (§7), an error has no mark. Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
 | S8 | unsafe code without `// UNSAFE:` / a module without `uses Safe` and without `// UNSAFE-UNIT:` | linter |
 | S9 | `UnicodeString/WideString/ShortString` outside unsafe | linter |
 | S10 | a copy of `TOwned` not via `.Move`; `TOwned` by value in a parameter | linter; the runtime is safe in any case (§4) |
@@ -563,7 +563,9 @@ end.
 Now: `bpvet` S7 reports it as an error (step 2). It also warns when the implementation `uses` come after `Safe` of
 the interface (they shadow it there, `tests/safe/compile/mf_s07_impl_shadow.pas`) and when units follow `BP` that is
 first in a program: `BP` goes first there for the thread manager (§14), so SysUtils after it shadows `FreeAndNil` in
-the program file (`tests/ext/compile/mf_s07_bp_first.pas`). Until that is closed, keep the program file thin. Target
+the program file (`tests/ext/compile/mf_s07_bp_first.pas`). Until that is closed, keep the program file thin; where
+it does need SysUtils (the test programs), mark the uses `// UNSAFE: <why>` on the line above or at the end of the
+line of the unit, and the warning goes (an error of S7 has no mark: the unit can always move). Target
 of step 2b: a program header that installs the thread manager first and still ends with `BP` (for example
 `uses BPThreads, SysUtils, ..., BP;`), verified in CI in every mode; then the warning becomes an error.
 
