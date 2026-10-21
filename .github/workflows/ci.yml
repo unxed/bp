@@ -48,6 +48,8 @@ jobs:
           LC_ALL: C.UTF-8
           OUT: ${{ github.workspace }}/out
         run: bash tests/run.sh
+      - name: Benchmarks (report only, no thresholds; tests/bench)
+        run: bash tests/bench/run.sh "$RUNNER_TEMP/bench"
       - name: Audit — static, no INTERP, no NEEDED (static-everywhere Profile S)
         run: |
           for b in safe-Safe/test_safe safe-BP/test_safe ext-BP/test_go ext-BP/test_threads safe-Safe/test_sumtype; do
