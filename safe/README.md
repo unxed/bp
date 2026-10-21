@@ -51,4 +51,5 @@ If any of this is not confirmed, the fallbacks are: (1) an ordinary procedure wi
 
 ## Next iterations
 
-A linter on `fcl-passrc` (rules S3–S10), a Lazarus package for OPM, Windows in CI (SPEC §11).
+The rules of the linter `bpvet` after S7 (`tools/bpvet`, SPEC §6; rules S3–S6, S8–S14), a Lazarus package for OPM,
+Windows in CI (SPEC §11).
