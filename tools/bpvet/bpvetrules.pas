@@ -140,8 +140,10 @@ procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report
              else branch or does not list every value of it (a new value would silently go to else or nowhere).
              A // UNSAFE: <why> comment on the line above the case or at the end of its line drops it.
     bpvet has no types: the enumeration is found by the labels, not by the expression; a case with a range, a
-    constant expression or a value of an enumeration of another unit is not checked. The variant field part of S13
-    is next. }
+    constant expression or a value of an enumeration of another unit is not checked.
+    Error    inside a branch of case X.Tag of, where Tag is the tag field of a variant record of the module, X.Field of a
+             variant field whose variant has none of the labels of the branch (the same // UNSAFE: mark drops it).
+             A variant field read outside any case over its tag is not checked yet (unxed/bp#56). }
 procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 implementation
@@ -2246,6 +2248,7 @@ type
   public
     Enums: array of TPasEnumType;
     Cases: array of TPasImplCaseOf;
+    Records: array of TPasRecordType;
     // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
     procedure Visit(El: TPasElement; Arg: System.Pointer);
   end;
@@ -2262,6 +2265,30 @@ begin
   begin
     SetLength(Cases, Length(Cases) + 1);
     Cases[High(Cases)] := TPasImplCaseOf(El);
+  end
+  else if (El is TPasRecordType) and (TPasRecordType(El).Variants <> nil) then
+  begin
+    SetLength(Records, Length(Records) + 1);
+    Records[High(Records)] := TPasRecordType(El);
+  end;
+end;
+
+type
+  { Collects the field accesses Name.Field (eopSubIdent) under an element. }
+  TS13SubWalker = class
+  public
+    Subs: array of TBinaryExpr;
+    // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
+    procedure Visit(El: TPasElement; Arg: System.Pointer);
+  end;
+
+// UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
+procedure TS13SubWalker.Visit(El: TPasElement; Arg: System.Pointer);
+begin
+  if (El is TBinaryExpr) and (TBinaryExpr(El).OpCode = eopSubIdent) then
+  begin
+    SetLength(Subs, Length(Subs) + 1);
+    Subs[High(Subs)] := TBinaryExpr(El);
   end;
 end;
 
@@ -2365,6 +2392,125 @@ begin
       + 'comment // UNSAFE: <why> on the line above (safe/SPEC.md, section 6)');
 end;
 
+{ The labels of the branch St as ' a b ' in lower case, or '' when a label is not a plain name. }
+function S13BranchLabels(const St: TPasImplCaseStatement): String;
+var
+  J: Integer;
+  X: TPasExpr;
+begin
+  Result := ' ';
+  for J := 0 to St.Expressions.Count - 1 do
+  begin
+    X := TPasExpr(St.Expressions[J]);
+    if not (X is TPrimitiveExpr) or (TPrimitiveExpr(X).Kind <> pekIdent) then
+      Exit('');
+    Result := Result + LowerCase(TPrimitiveExpr(X).Value) + ' ';
+  end;
+end;
+
+{ The labels of the variant of R whose part declares the field Field (lower case), as ' a b ', or '' when R has no
+  such variant field or a label of that variant is not a plain name. }
+function S13FieldLabels(const R: TPasRecordType; const Field: String): String;
+var
+  I, J, K: Integer;
+  V: TPasVariant;
+  X: TPasExpr;
+begin
+  Result := '';
+  for I := 0 to R.Variants.Count - 1 do
+  begin
+    V := TPasVariant(R.Variants[I]);
+    if V.Members = nil then
+      Continue;
+    for J := 0 to V.Members.Members.Count - 1 do
+      if LowerCase(TPasElement(V.Members.Members[J]).Name) = Field then
+      begin
+        Result := ' ';
+        for K := 0 to V.Values.Count - 1 do
+        begin
+          X := TPasExpr(V.Values[K]);
+          if not (X is TPrimitiveExpr) or (TPrimitiveExpr(X).Kind <> pekIdent) then
+            Exit('');
+          Result := Result + LowerCase(TPrimitiveExpr(X).Value) + ' ';
+        end;
+        Exit;
+      end;
+  end;
+end;
+
+{ S13, variant field (first part): inside a branch of case X.Tag of, where Tag is the tag field of a variant record
+  of the module, X.Field of a variant field whose variant has none of the labels of the branch is an error. }
+procedure S13CheckVariantCase(const Src: TVetSource; const C: TPasImplCaseOf; const Records: array of TPasRecordType;
+  var Report: TVetReport);
+var
+  E: TBinaryExpr;
+  Owner, Tag, Labels, FieldLabels, Field, W, Rest, Name: String;
+  I, J, K, P, Row: Integer;
+  St: TPasImplCaseStatement;
+  SW: specialize TOwned<TS13SubWalker>;
+  S: TS13SubWalker;
+  Hit: Boolean;
+begin
+  if not (C.CaseExpr is TBinaryExpr) then
+    Exit;
+  E := TBinaryExpr(C.CaseExpr);
+  if (E.OpCode <> eopSubIdent) or not (E.Left is TPrimitiveExpr) or not (E.right is TPrimitiveExpr) then
+    Exit;
+  Owner := LowerCase(TPrimitiveExpr(E.Left).Value);
+  Tag := LowerCase(TPrimitiveExpr(E.right).Value);
+  SW := specialize TOwned<TS13SubWalker>.Own(TS13SubWalker.Create);
+  S := SW.Get;
+  for I := 0 to High(Records) do
+  begin
+    if (Records[I].VariantEl = nil) or (LowerCase(Records[I].VariantEl.Name) <> Tag) then
+      Continue;
+    for J := 0 to C.Elements.Count - 1 do
+    begin
+      if not (TPasElement(C.Elements[J]) is TPasImplCaseStatement) then
+        Continue;
+      St := TPasImplCaseStatement(C.Elements[J]);
+      Labels := S13BranchLabels(St);
+      if (Labels = '') or (St.Body = nil) then
+        Continue;
+      SetLength(S.Subs, 0);
+      St.Body.ForEachCall(@S.Visit, nil);
+      for K := 0 to High(S.Subs) do
+      begin
+        if not (S.Subs[K].Left is TPrimitiveExpr) or not (S.Subs[K].right is TPrimitiveExpr) then
+          Continue;
+        if LowerCase(TPrimitiveExpr(S.Subs[K].Left).Value) <> Owner then
+          Continue;
+        Name := TPrimitiveExpr(S.Subs[K].right).Value;
+        Field := LowerCase(Name);
+        FieldLabels := S13FieldLabels(Records[I], Field);
+        if FieldLabels = '' then
+          Continue;
+        Hit := False;
+        Rest := Trim(FieldLabels);
+        while Rest <> '' do
+        begin
+          P := Pos(' ', Rest + ' ');
+          W := Copy(Rest, 1, P - 1);
+          Rest := Trim(Copy(Rest, P + 1, Length(Rest)));
+          if Pos(' ' + W + ' ', Labels) > 0 then
+            Hit := True;
+        end;
+        if Hit then
+          Continue;
+        Row := S.Subs[K].SourceLinenumber;
+        if Row <= 0 then
+          Row := St.SourceLinenumber;
+        if (Pos('// UNSAFE:', VetLine(Src, Row)) > 0) or IsMarkComment(VetLine(Src, Row - 1)) then
+          Continue;
+        VetAdd(Report, Src.FileName, Row, VetWordColumn(VetLine(Src, Row), Name), vsError, 'S13',
+          'the variant field ' + Name + ' of ' + Records[I].Name + ' is read in a branch of case ' + Owner + '.'
+          + Tag + ' that is not its variant: read it only in the branch of its tag, or put a comment // UNSAFE: <why> '
+          + 'on the line above (safe/SPEC.md, section 16)');
+      end;
+    end;
+  end;
+end;
+
 procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 var
   W: specialize TOwned<TS13Walker>;
@@ -2377,7 +2523,10 @@ begin
   V := W.Get;
   Module.ForEachCall(@V.Visit, nil);
   for I := 0 to High(V.Cases) do
+  begin
     S13CheckCase(Src, V.Cases[I], V.Enums, Report);
+    S13CheckVariantCase(Src, V.Cases[I], V.Records, Report);
+  end;
 end;
 
 procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
