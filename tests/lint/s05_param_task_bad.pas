@@ -10,7 +10,7 @@ unit s05_param_task_bad;
 interface
 
 uses
-  Safe, BP;
+  BP, Safe;
 
 type
   TNode = class
