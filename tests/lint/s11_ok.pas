@@ -29,6 +29,7 @@ type
   public
     // UNSAFE: the group of the caller waits for the task before the node goes
     Peer: TNode; // borrow: the caller keeps the node alive
+    Buf: PChar; // UNSAFE: the buffer is a constant string literal of the program
   end;
 
   THolder = class
