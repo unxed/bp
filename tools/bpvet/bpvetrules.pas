@@ -100,7 +100,8 @@ procedure VetCheckS15(const Src: TVetSource; const Module: TPasModule; var Repor
            the field is marked // borrow:. A task runs on another thread and can outlive the caller: a borrow there
            is a data race or a use after free. Pass an owner (TShared, TOwned via Move), a value, String, TArray or
            TChan instead, or put a comment // UNSAFE: <why> on the line above or at the end of the line.
-    Error  a field of a task class whose type is an interface (of the module, or IInterface, IUnknown, IInvokable):
+    Error  a field of a task class whose type is an interface (of the module, of a used unit found as for S5, or
+           IInterface, IUnknown, IInvokable):
            the object behind the reference is shared with the caller, and its state is reachable from two threads. }
 procedure VetCheckS11(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
@@ -890,8 +891,9 @@ begin
 end;
 
 { The classes declared in the interface of a unit file: lines Name = class ... before the word implementation
-  (not class of, comments and strings skipped), added to Names as ' tfoo '. A missing file adds nothing. }
-procedure S5FileClasses(const FileName: String; var Names: String);
+  (not class of, comments and strings skipped), added to Names as ' tfoo '. A missing file adds nothing. With Kind
+  'interface' the same for the interface types: lines Name = interface ... }
+procedure S5FileClasses(const FileName: String; var Names: String; const Kind: String = 'class');
 var
   U: TVetSource;
   I, P, J: Integer;
@@ -913,9 +915,9 @@ begin
       Continue;
     N := Trim(Copy(L, 1, P - 1));
     R := Trim(Copy(L, P + 1, Length(L)));
-    if (N = '') or (Pos('class', R) <> 1) or ((Length(R) > 5) and IsWordChar(R[6])) then
+    if (N = '') or (Pos(Kind, R) <> 1) or ((Length(R) > Length(Kind)) and IsWordChar(R[Length(Kind) + 1])) then
       Continue;
-    if Pos('of ', TrimLeft(Copy(R, 6, Length(R)))) = 1 then
+    if (Kind = 'class') and (Pos('of ', TrimLeft(Copy(R, 6, Length(R)))) = 1) then
       Continue;
     Word := True;
     for J := 1 to Length(N) do
@@ -926,9 +928,10 @@ begin
   end;
 end;
 
-{ The classes of the units listed in Clause whose files (name.pas, lower case) lie next to the checked file or in
-  a directory of VetUnitDirs. }
-procedure S5UsedClasses(const Src: TVetSource; const Clause: TPasUsesClause; var Names: String);
+{ The classes (with Kind 'interface': the interface types) of the units listed in Clause whose files (name.pas,
+  lower case) lie next to the checked file or in a directory of VetUnitDirs. }
+procedure S5UsedClasses(const Src: TVetSource; const Clause: TPasUsesClause; var Names: String;
+  const Kind: String = 'class');
 var
   I, J: Integer;
   Dir, N: String;
@@ -939,12 +942,12 @@ begin
     begin
       N := LowerCase(Clause[I].Name) + '.pas';
       if FileExists(Dir + N) then
-        S5FileClasses(Dir + N, Names)
+        S5FileClasses(Dir + N, Names, Kind)
       else
         for J := 0 to High(VetUnitDirs) do
           if FileExists(IncludeTrailingPathDelimiter(VetUnitDirs[J]) + N) then
           begin
-            S5FileClasses(IncludeTrailingPathDelimiter(VetUnitDirs[J]) + N, Names);
+            S5FileClasses(IncludeTrailingPathDelimiter(VetUnitDirs[J]) + N, Names, Kind);
             Break;
           end;
     end;
@@ -2199,6 +2202,9 @@ begin
   for I := 0 to 1 do
     if Sections[I] <> nil then
       S11CollectInterfaces(Sections[I].Declarations, Intfs);
+  for I := 0 to 1 do
+    if Sections[I] is TPasSection then
+      S5UsedClasses(Src, TPasSection(Sections[I]).UsesClause, Intfs, 'interface');
   for I := 0 to 1 do
     if Sections[I] <> nil then
       S11CheckList(Src, Sections[I].Declarations, Tasks, ClassNames, Intfs, Report);
