@@ -74,7 +74,9 @@ procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report
            the borrow first, or put a comment // UNSAFE: <why> on the line above or at the end of the line.
     Closures (anonymous procedures, reference to) are not checked: FPC 3.2.2 does not compile them, although
     fcl-passrc 3.2.2 parses them (for pas2js).
-    Not checked yet (next parts of step 7, unxed/bp#56): classes of other units. }
+    The classes known are those of the module, S5ClassTypes, and the classes declared in the interface of the units
+    it uses whose files lie next to it (name.pas in the same directory, read as text); classes of other units
+    (elsewhere on the unit path) are the next part of step 7, unxed/bp#56. }
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S10: TOwned is unique (safe/SPEC.md §6, register H5). A module marked // UNSAFE-UNIT: is not checked.
@@ -862,6 +864,55 @@ begin
   end;
 end;
 
+{ The classes declared in the interface of a unit file: lines Name = class ... before the word implementation
+  (not class of, comments and strings skipped), added to Names as ' tfoo '. A missing file adds nothing. }
+procedure S5FileClasses(const FileName: String; var Names: String);
+var
+  U: TVetSource;
+  I, P, J: Integer;
+  InBrace, InParen, Word: Boolean;
+  Code, Tail, L, N, R, Err: String;
+begin
+  if not FileExists(FileName) or not VetReadSource(FileName, U, Err) then
+    Exit;
+  InBrace := False;
+  InParen := False;
+  for I := 0 to High(U.Lines) do
+  begin
+    Code := CodeOf(U.Lines[I], InBrace, InParen, Tail);
+    L := LowerCase(Trim(Code));
+    if (L = 'implementation') or (Pos('implementation ', L) = 1) then
+      Break;
+    P := Pos('=', L);
+    if P = 0 then
+      Continue;
+    N := Trim(Copy(L, 1, P - 1));
+    R := Trim(Copy(L, P + 1, Length(L)));
+    if (N = '') or (Pos('class', R) <> 1) or ((Length(R) > 5) and IsWordChar(R[6])) then
+      Continue;
+    if Pos('of ', TrimLeft(Copy(R, 6, Length(R)))) = 1 then
+      Continue;
+    Word := True;
+    for J := 1 to Length(N) do
+      if not IsWordChar(N[J]) then
+        Word := False;
+    if Word and (Pos(' ' + N + ' ', Names) = 0) then
+      Names := Names + N + ' ';
+  end;
+end;
+
+{ The classes of the units listed in Clause whose files lie next to the checked file (name.pas, lower case). }
+procedure S5UsedClasses(const Src: TVetSource; const Clause: TPasUsesClause; var Names: String);
+var
+  I: Integer;
+  Dir: String;
+begin
+  Dir := ExtractFilePath(Src.FileName);
+  for I := 0 to High(Clause) do
+    if (Clause[I].Expr <> nil) and (Clause[I].Name <> '') then
+      S5FileClasses(Dir + LowerCase(Clause[I].Name) + '.pas', Names);
+end;
+
 { The names of the global variables of Decls and of the fields of the classes declared there, as ' a b '. }
 procedure S5CollectStores(const L: TFPList; const InClass: Boolean; var Names: String);
 var
@@ -1189,6 +1240,9 @@ begin
   for I := 0 to 1 do
     if Sections[I] <> nil then
       S5CollectClasses(Sections[I].Declarations, ClassNames);
+  for I := 0 to 1 do
+    if Sections[I] <> nil then
+      S5UsedClasses(Src, Sections[I].UsesClause, ClassNames);
   for I := 0 to 1 do
     if Sections[I] <> nil then
       S5CheckList(Src, Sections[I].Declarations, ClassNames, 'the global variable', Report);
