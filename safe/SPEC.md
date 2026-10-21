@@ -306,6 +306,7 @@ Runtime checks (always enabled, cost one comparison):
 | R6 | `Send` to a closed channel, a repeated `Close` (like panic in Go) |
 | R7 | a group task failed: `TGroup.Wait` raises with the original class and exception text |
 | R8 | `TGroup.Go` without threads: no thread manager is installed, or the target has no threads (DOS) |
+| R9 | debug checks on (`-dSAFE_DEBUG` or `SafeDebugChecks := True`): `TOwned.Reset` while a copy of the owner is alive (S10); the message names the class |
 
 Thread safety in v0.1: the counters are atomic, so `TShared` can be copied between threads;
 `TWeak.TryLock` from different threads concurrently with the last `Reset` is a race (§11).
@@ -323,7 +324,7 @@ Thread safety in v0.1: the counters are atomic, so `TShared` can be copied betwe
 | S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14); a warning is not reported when the uses are marked `// UNSAFE: <why>` (§7), an error has no mark. Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
 | S8 | unsafe code without `// UNSAFE:` / a module without `uses Safe` and without `// UNSAFE-UNIT:` | linter |
 | S9 | `UnicodeString/WideString/ShortString` outside unsafe | `bpvet` S9: an error on the type name or a sized `String[N]` (a `ShortString`) without a `// UNSAFE: <why>` mark on the line above or at the end of the line (§7); a `// UNSAFE-UNIT:` module is not checked |
-| S10 | a copy of `TOwned` not via `.Move`; `TOwned` by value in a parameter | `bpvet` S10: an error on `X := Y` where `Y` is declared with a `TOwned` type and on a `TOwned` parameter without `const`/`var`/`out`/`constref`, unless marked `// UNSAFE: <why>` (§7); the runtime is safe in any case (§4) |
+| S10 | a copy of `TOwned` not via `.Move`; `TOwned` by value in a parameter | `bpvet` S10: an error on `X := Y` where `Y` is declared with a `TOwned` type and on a `TOwned` parameter without `const`/`var`/`out`/`constref`, unless marked `// UNSAFE: <why>` (§7); at run time R9 in debug mode; the runtime is safe in any case (§4) |
 | S11 | a field of a `TTask` task is a borrow or a mutable object accessible to other threads | linter |
 | S12 | `external` outside a `// UNSAFE-UNIT:` module; a binding's public API with pointers | linter |
 | S13 | a `case` over an enumeration does not list all values or has `else`; a variant field is read outside the branch of its tag (§16) | linter (FPC 3.2.2 does not warn) |

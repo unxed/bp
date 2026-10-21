@@ -36,6 +36,10 @@ type
 function SafeNewLife(AObj: TObject; const Who: string): TSafeLife;
 procedure SafeFail(const Msg: string);
 
+{ Debug checks (R9). On with -dSAFE_DEBUG; a program or a test may also switch them at run time. }
+var
+  SafeDebugChecks: Boolean = {$IFDEF SAFE_DEBUG}True{$ELSE}False{$ENDIF};
+
 { Counter of live owned objects (like testing.allocator in Zig): grows on Own/Share/Adopt,
   decreases on destruction. A test that "freed everything" checks SafeCheckNoLeaks (R5). }
 function SafeLiveCount: LongInt;

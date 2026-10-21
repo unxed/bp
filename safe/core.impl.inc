@@ -136,7 +136,18 @@ begin
 end;
 
 procedure TOwned.Reset;
+var
+  N: LongInt;
 begin
+  if SafeDebugChecks and (FLife <> nil) then
+  begin
+    // _AddRef returns the count with this probe: 2 when this owner is the only one (S10, R9)
+    N := FLife._AddRef;
+    FLife._Release;
+    if N > 2 then
+      SafeFail('SAFE-R9: TOwned<' + T.ClassName + '>.Reset: a copy of the owner is alive; copy a TOwned only '
+        + 'with .Move (S10)');
+  end;
   FObj := nil;
   FLife := nil;
 end;

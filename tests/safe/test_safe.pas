@@ -94,6 +94,33 @@ begin
   Check(Log = '~c', 'owned: destroyed exactly once');
 end;
 
+procedure OwnedCopyCaughtInDebug;
+var
+  A, C, D: TProbeBox;
+  Caught: string;
+begin
+  SafeDebugChecks := True;
+  try
+    D := TProbeBox.Own(TProbe.Create('k1'));
+    D.Reset; // the only owner: no finding
+    A := TProbeBox.Own(TProbe.Create('k'));
+    C := A; // UNSAFE: the copy that the debug check (R9) must catch
+    Caught := '';
+    try
+      A.Reset;
+    except
+      on E: ESafety do
+        Caught := E.Message;
+    end;
+    Check((Pos('SAFE-R9', Caught) > 0) and (Pos('TProbe', Caught) > 0), 'owned: SAFE_DEBUG catches a copy (R9)');
+  finally
+    SafeDebugChecks := False;
+  end;
+  A.Reset;
+  C.Reset;
+  Check(Log = '~k1~k', 'owned: destroyed exactly once after R9');
+end;
+
 procedure RaiseInside;
 var
   A: TProbeBox;
@@ -308,6 +335,7 @@ begin
   Run('OwnedScope', @OwnedScope, '~a');
   Run('OwnedMove', @OwnedMove, '~b~b2');
   Run('OwnedAccidentalCopy', @OwnedAccidentalCopy, '~c');
+  Run('OwnedCopyCaughtInDebug', @OwnedCopyCaughtInDebug, '~k1~k');
   Run('OwnedException', @OwnedException, '~d');
   Run('SharedAndWeak', @SharedAndWeak, '~e');
   Run('InterfacedRejected', @InterfacedRejected, '');
