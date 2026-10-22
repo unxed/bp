@@ -19,12 +19,12 @@ type
   TView = class
   public
     Cur: TNode; // borrow: the caller keeps the node alive
-    procedure Show(ANode: TNode);
+    procedure Show(const ANode: TNode);
   end;
 
 implementation
 
-procedure TView.Show(ANode: TNode);
+procedure TView.Show(const ANode: TNode);
 begin
   Self.Cur := ANode;
 end;
