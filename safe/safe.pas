@@ -1,7 +1,7 @@
 { SPDX-License-Identifier: MIT }
 { Safe Pascal: safe-by-default Free Pascal (the "safe" layer only).
   Specification: SPEC.md. Usage: `uses ..., Safe;` LAST in every module.
-  No compiler options needed.
+   For debug builds, compile modules using Safe with -Cr -Co (SPEC §6); release builds may omit these checks.
 
   What the module does (and only this):
   - TOwned/TShared/TWeak/TSlice/TArena, TDefer, FFI (TCResource), leak counter (SPEC §4–5, §13);

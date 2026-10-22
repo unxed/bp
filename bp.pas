@@ -2,7 +2,8 @@
 { Better Pascal: one unit that gives everything.
     1) safe (safe/): ownership, slices, arena, defer, FFI, poisoned dangerous primitives;
     2) ext  (ext/):  UTF-8 by default, goroutines/channels/Select, the thread manager.
-  Usage: `uses BP, ...;` FIRST in the program, `uses ..., BP;` LAST in every other unit. No compiler options.
+  Usage: `uses BP, ...;` FIRST in the program, `uses ..., BP;` LAST in every other unit. For debug builds, compile
+  modules using BP with -Cr -Co (safe/SPEC.md §6); release builds may omit these checks.
   The safe layer alone, without the extensions: unit Safe (safe/safe.pas).
 
   Linux by default is the portable mode without libc (like Go): strings use fpwidestring
