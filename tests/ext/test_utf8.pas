@@ -11,7 +11,7 @@ uses
 var
   Failed: Integer = 0;
 
-procedure Check(Cond: Boolean; const What: string);
+procedure Check(const Cond: Boolean; const What: string);
 begin
   if Cond then
     WriteLn('ok   ', What)

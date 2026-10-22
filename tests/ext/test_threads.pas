@@ -18,7 +18,7 @@ type
     FN: Integer;
     FOut: TIntChan;
   public
-    constructor Create(AN: Integer; const AOut: TIntChan);
+    constructor Create(const AN: Integer; const AOut: TIntChan);
     procedure Run; override;
   end;
 
@@ -58,7 +58,7 @@ var
 const
   StressMagic = $5AFE;
 
-constructor TChurn.Create(AN: Integer; const AOut: TIntChan);
+constructor TChurn.Create(const AN: Integer; const AOut: TIntChan);
 begin
   inherited Create;
   FN := AN;
@@ -130,7 +130,7 @@ begin
   end;
 end;
 
-procedure Check(Cond: Boolean; const What: string);
+procedure Check(const Cond: Boolean; const What: string);
 begin
   if Cond then
     WriteLn('ok   ', What)
@@ -141,7 +141,7 @@ begin
   end;
 end;
 
-procedure Churn(Rounds, PerRound: Integer);
+procedure Churn(const Rounds: Integer; PerRound: Integer);
 var
   G: TGroup;
   Ch: TIntChan;
@@ -181,7 +181,7 @@ end;
 
 { TWeak.TryLock in several threads against the last Reset in the main thread (H6): every object is destroyed exactly
   once, and no TryLock gives an object that is already destroyed or revives it. }
-procedure WeakStress(Rounds, Hammers: Integer);
+procedure WeakStress(const Rounds, Hammers: Integer);
 var
   G: TGroup;
   S: TStressShared;

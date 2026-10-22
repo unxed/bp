@@ -49,7 +49,7 @@ begin
   inherited Destroy;
 end;
 
-procedure Check(Cond: Boolean; const What: string);
+procedure Check(const Cond: Boolean; const What: string);
 begin
   if Cond then
     WriteLn('ok   ', What)
@@ -405,7 +405,7 @@ begin
   P.Destroy;
 end;
 
-procedure Run(const Name: string; Proc: TProcedure; const ExpectLog: string);
+procedure Run(const Name: string; const Proc: TProcedure; const ExpectLog: string);
 begin
   Log := '';
   WriteLn('-- ', Name);

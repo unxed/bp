@@ -10,7 +10,7 @@ type
       skCircle: (R: Double);
       skRect:   (W, H: Double);
   end;
-function Circle(const AName: String; AR: Double): TShape;
+function Circle(const AName: String; const AR: Double): TShape;
 begin
   Result := Default(TShape); Result.Name := AName; Result.Kind := skCircle; Result.R := AR;
 end;
