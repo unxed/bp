@@ -1613,7 +1613,7 @@ end;
 { S4 }
 
 { The first non-space position at or after I, or Length(Code) + 1. }
-function SkipSpaces(const Code: String; I: Integer): Integer;
+function SkipSpaces(const Code: String; const I: Integer): Integer;
 begin
   Result := I;
   while (Result <= Length(Code)) and (Code[Result] = ' ') do
@@ -1760,7 +1760,7 @@ begin
 end;
 
 { The word that ends right before position I of Code (spaces skipped), lower case; Start gets its first column. }
-function WordBefore(const Code: String; I: Integer; out Start: Integer): String;
+function WordBefore(const Code: String; const I: Integer; out Start: Integer): String;
 var
   J: Integer;
 begin
