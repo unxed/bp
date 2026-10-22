@@ -164,6 +164,12 @@ procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Repor
     Records and dynamic arrays of other units are recognized by name from their interface declarations. }
 procedure VetCheckS14(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
+{ S16: range checks stay enabled in safe modules (safe/SPEC.md §6, register H12).
+    Warning  an explicit {$R-} in a module that uses Safe or BP, unless the directive has a // UNSAFE: <why> mark
+             on the same or preceding line. Debug builds should compile safe modules with -Cr -Co; release builds
+             may disable those compiler checks because R1-R4 remain active. }
+procedure VetCheckS16(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+
 implementation
 
 type
@@ -512,6 +518,54 @@ end;
 function IsMarkComment(const S: String): Boolean;
 begin
   Result := Pos('// UNSAFE:', TrimLeft(S)) = 1;
+end;
+
+{ Find an explicit range-check-off compiler directive on a source line. }
+function HasRangeChecksOff(const S: String): Integer;
+var
+  I, J: Integer;
+begin
+  Result := 0;
+  I := 1;
+  while I < Length(S) do
+  begin
+    if (S[I] = '{') and (S[I + 1] = '$') then
+    begin
+      J := I + 2;
+      while (J <= Length(S)) and (S[J] <= ' ') do
+        Inc(J);
+      if (J <= Length(S)) and (UpCase(S[J]) = 'R') then
+      begin
+        Inc(J);
+        while (J <= Length(S)) and (S[J] <= ' ') do
+          Inc(J);
+        if (J < Length(S)) and (S[J] = '-') and (S[J + 1] in ['}', ',']) then
+          Exit(I);
+      end;
+    end;
+    Inc(I);
+  end;
+end;
+
+procedure VetCheckS16(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+var
+  I, Col: Integer;
+  Line: String;
+begin
+  if not ModuleUsesPoison(Module) then
+    Exit;
+  for I := 0 to High(Src.Lines) do
+  begin
+    Line := Src.Lines[I];
+    Col := HasRangeChecksOff(Line);
+    if Col = 0 then
+      Continue;
+    if (Pos('// UNSAFE:', Line) > 0) or ((I > 0) and IsMarkComment(VetLine(Src, I))) then
+      Continue;
+    VetAdd(Report, Src.FileName, I + 1, Col, vsWarning, 'S16',
+      'range checks are disabled in a Safe/BP module: keep {$R+} in debug builds (-Cr -Co), '
+      + 'or mark this exception // UNSAFE: <why> (safe/SPEC.md, section 6)');
+  end;
 end;
 
 { The code of a line without comments and string literals (replaced by spaces, so the columns stay), and the
@@ -2898,6 +2952,7 @@ begin
   VetCheckS12(Src, Module, Report);
   VetCheckS13(Src, Module, Report);
   VetCheckS14(Src, Module, Report);
+  VetCheckS16(Src, Module, Report);
 end;
 
 end.

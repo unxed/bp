@@ -345,6 +345,7 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S13 | a `case` over an enumeration does not list all values or has `else`; a variant field is read outside the branch of its tag (§16) | `bpvet` S13 (FPC 3.2.2 does not warn): an error on a `case` whose labels are all plain values of one enumeration of the module and which has `else` or misses a value (`tests/lint/s13_bad.pas`, `s13_else_bad.pas`); `// UNSAFE: <why>` on the line above or at its end drops it; bpvet has no types, so the enumeration is found by the labels: ranges, constants and enumerations of other units are not checked; inside a branch of `case X.Tag of` (Tag — the tag field of a variant record of the module) `X.Field` of a variant field of another tag is an error (`tests/lint/s13_variant_bad.pas`), the same mark drops it; `X.Field` of a variant field read outside every `case` over its tag is an error too (`tests/lint/s13_read_bad.pas`; a write `X.Field := …` is allowed, `s13_read_ok.pas`), the same mark drops it |
 | S14 | a parameter without `const`/`var`/`out`; `var` although the caller does not need the change (§16) | `bpvet` S14: an error on a by-value `String`, `AnsiString`, `UnicodeString`, `WideString`, `RawByteString` or `UTF8String` (`s14_bad.pas`, `s14_method_bad.pas`), a record of this or an imported unit (`s14_record_bad.pas`, `s14_other_bad.pas`), an open array `array of T` except `array of const` (`s14_openarray_bad.pas`), or a dynamic array of this or an imported unit (`s14_dynarray_bad.pas`, `s14_other_dynarray_bad.pas`) without `const`, `constref`, `var` or `out`; other by-value parameters not syntactically written in a routine body are warnings (`s14_scalar_bad.pas`), as are `var` parameters without a detected write (`s14_var_bad.pas`). Writes through assignment targets, call arguments, method receivers, `@`, `for`, `with` and nested routines count. Overrides, routines without bodies, and routines whose address is taken in the module are skipped; untyped `var` parameters are skipped. The interface/class declaration and body produce one finding; `// UNSAFE: <why>` on or above the parameter drops either warning or error (`s14_ok.pas`, `s14_var_ok.pas`) |
 | S15 | a `TShared` cycle: a field of a class holds through `TShared` an object that leads back to the class of the field (H2) | `bpvet` S15: a warning on a field of a class of the module whose type is `specialize TShared<X>` or a module alias of it, when `X` is the class itself or reaches it through such fields of classes of the module, with the path and the hint "a back reference is `TWeak`"; `// UNSAFE: <why>` on the line above or at its end drops it (the program breaks the cycle itself); a heuristic by names over one module, the type is read from the line of the field, classes of other units are not followed; a `// UNSAFE-UNIT:` module is not checked |
+| S16 | range checks switched off in a module that uses `Safe`/`BP` (H12) | `bpvet` S16 warns on an explicit `{$R-}` in a module using `Safe` or `BP`, unless `// UNSAFE: <why>` is on that line or the line above (`tests/lint/s16_bad.pas`, `s16_ok.pas`); debug builds compile these modules with `-Cr -Co` (`{$R+}{$Q+}`); release builds may disable those compiler checks, while runtime checks R1–R4 remain enabled |
 
 Warnings are turned into errors with one directive in a module, `{$WARN SYMBOL_DEPRECATED ERROR}`,
 or with the switch `-Sew` for the whole project. Migration modes: **permissive** — warnings;
@@ -646,9 +647,10 @@ begin
 end.
 ```
 
-Now: only the recommendation of a debug build with `-Cr -Co` (§6). Target: a module with
-`uses Safe`/`BP` is compiled with `{$R+}{$Q+}` in debug (release may drop them and keeps R1–R4);
-`bpvet` warns on an explicit `{$R-}` without `// UNSAFE:`. Step 12.
+Now: only the recommendation of a debug build with `-Cr -Co` (§6). A module with
+`uses Safe`/`BP` should be compiled with `{$R+}{$Q+}` in debug; release builds may disable these
+compiler checks because runtime checks R1–R4 remain enabled. `bpvet` S16 warns on an explicit
+`{$R-}` without `// UNSAFE: <why>` on the directive or the preceding line. Step 12.
 
 **H13. Turbo Pascal style `object` code.**
 
