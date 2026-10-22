@@ -18,7 +18,7 @@ type
     FN: Integer;
     FOut: TIntChan;
   public
-    constructor Create(AN: Integer; const AOut: TIntChan);
+    constructor Create(const AN: Integer; const AOut: TIntChan);
     procedure Run; override;
   end;
 
@@ -40,7 +40,7 @@ var
   Failed: Integer = 0;
   Counter: LongInt = 0;
 
-constructor TSquare.Create(AN: Integer; const AOut: TIntChan);
+constructor TSquare.Create(const AN: Integer; const AOut: TIntChan);
 begin
   inherited Create;
   FN := AN;
@@ -80,7 +80,7 @@ begin
   InterlockedIncrement(Counter);
 end;
 
-procedure Check(Cond: Boolean; const What: string);
+procedure Check(const Cond: Boolean; const What: string);
 begin
   if Cond then
     WriteLn('ok   ', What)

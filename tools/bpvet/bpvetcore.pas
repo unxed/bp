@@ -60,6 +60,7 @@ type
   TVetEngine = class(TPasTreeContainer)
   public
     function CreateElement(AClass: TPTreeElement; const AName: String; AParent: TPasElement;
+      // UNSAFE: keep the parameter modes required by the fcl-passrc override
       AVisibility: TPasMemberVisibility; const ASourceFilename: String; ASourceLinenumber: Integer): TPasElement;
       overload; override;
     function FindElement(const AName: String): TPasElement; override;
@@ -90,6 +91,7 @@ const
   SeverityWord: array[TVetSeverity] of String = ('Warning', 'Error', 'Fatal');
 
 function TVetEngine.CreateElement(AClass: TPTreeElement; const AName: String; AParent: TPasElement;
+  // UNSAFE: keep the parameter modes required by the fcl-passrc override
   AVisibility: TPasMemberVisibility; const ASourceFilename: String; ASourceLinenumber: Integer): TPasElement;
 begin
   // UNSAFE: the element goes into the tree of fcl-passrc, which counts references to it and frees it by Release
