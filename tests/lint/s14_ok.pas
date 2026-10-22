@@ -1,7 +1,7 @@
 // EXPECT: clean
 // ARGS: -Fu@lint@
-{ S14: String, array and record parameters are const, constref, var or out, or marked // UNSAFE:; a Double, an
-  Integer or an array of const by value is not checked. }
+{ S14: copy-heavy String, array and record parameters use const, constref, var or out, or are marked // UNSAFE:;
+  other by-value parameters are const unless their body writes to them. }
 unit s14_ok;
 
 {$mode objfpc}{$H+}
@@ -37,6 +37,7 @@ function LibPackedLen(const R: TLibPacked): Integer;
 function LibArrayLen(var Values: TLibInts): Integer;
 function FixedLen(F: TLibFixed): Integer;
 function QualifiedRecLen(const Q: s14_lib.TLibRec): Integer;
+function CountDown(N: Integer): Integer;
 // UNSAFE: the body changes its own copy of the text on purpose
 function Upper(S: String): String;
 
@@ -114,6 +115,13 @@ end;
 function QualifiedRecLen(const Q: s14_lib.TLibRec): Integer;
 begin
   Result := Q.X;
+end;
+
+function CountDown(N: Integer): Integer;
+begin
+  while N > 0 do
+    N := N - 1;
+  Result := N;
 end;
 
 function Upper(S: String): String; // UNSAFE: the body changes its own copy of the text on purpose

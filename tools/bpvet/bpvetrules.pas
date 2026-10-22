@@ -146,17 +146,22 @@ procedure VetCheckS4(const Src: TVetSource; const Module: TPasModule; var Report
              A variant field read outside any case over its tag is not checked yet (unxed/bp#56). }
 procedure VetCheckS13(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
-{ S14 (first part): a parameter of a string type by value (safe/SPEC.md §6, §16, register H11). A module marked
+{ S14: parameters by value and var parameters that do not need mutation (safe/SPEC.md §6, §16, register H11). A module marked
   // UNSAFE-UNIT: is not checked.
     Error    a parameter of String, AnsiString, UnicodeString, WideString, RawByteString or UTF8String without
              const, constref, var or out: the callee gets its own copy, and a change of it is lost for the caller.
     Error    the same for a parameter whose type is a record declared in the module (bpvet has no types: the record
              is found by its name; records of other units are not checked).
     Error    the same for an open array parameter (array of T, not array of const) and for a parameter of a dynamic
-             array type declared in the module (T = array of X, found by its name).
-             A // UNSAFE: <why> comment on the line above the parameter or at the end of its line drops it.
+              array type declared in the module (T = array of X, found by its name).
+    Warning  a by-value parameter of another type that is not syntactically written in the body: make it const. Writes
+              through assignment targets, call arguments, method receivers, @, for, with and nested routines count;
+              overrides, procedures without bodies, and procedures whose address is taken in the module are skipped.
+    Warning  a var parameter with a body but no syntactically detected write: make it const. The same write paths and
+              exceptions apply; an untyped var parameter is skipped.
+    A // UNSAFE: <why> comment on the line above the parameter or at the end of its line drops it.
     A routine declared in the interface (or in a class) and its body are one routine: one finding.
-    Records and dynamic arrays of other units and var without need are not checked yet (unxed/bp#56). }
+    Records and dynamic arrays of other units are recognized by name from their interface declarations. }
 procedure VetCheckS14(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 implementation
@@ -2844,8 +2849,23 @@ begin
           + ' is never changed: make it const (or put // UNSAFE: <why> on the line above)', Report);
         Continue;
       end;
-      if (A.Access <> argDefault) or not S14ByValueChecked(A.ArgType, V.Records) then
+      if A.Access <> argDefault then
         Continue;
+      if not S14ByValueChecked(A.ArgType, V.Records) then
+      begin
+        if Pos(';' + LowerCase(A.Name) + ';', WriteWalker.Writes) > 0 then
+          Continue;
+        Key := S14RoutineName(P) + '.' + LowerCase(A.Name) + ';';
+        if Pos(';' + Key, Seen) > 0 then
+          Continue;
+        Seen := Seen + Key;
+        Row := A.SourceLinenumber;
+        if (Row > 0) and ((Pos('// UNSAFE:', VetLine(Src, Row)) > 0) or IsMarkComment(VetLine(Src, Row - 1))) then
+          Continue;
+        AddAtElement(Src, A, vsWarning, 'S14', 'the parameter ' + A.Name + ' of ' + P.Name
+          + ' is never changed: make it const (or put // UNSAFE: <why> on the line above)', Report);
+        Continue;
+      end;
       Key := S14RoutineName(P) + '.' + LowerCase(A.Name) + ';';
       if Pos(';' + Key, Seen) > 0 then
         Continue;
