@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the spike over every module of safe/, ext/ and tests/ (tests/lint excluded): tools/bpvet/spike/run.sh RSPIKE
+# Runs the spike over every module of safe/, ext/ and tests/ (tests/lint excluded): tools/spikes/resolver/run.sh RSPIKE
 # RSPIKE is the binary built from rspike.pas against a pasresolver.pp with the fix of safe/SPEC.md §20 "Spike 1 result".
 set -eu
 root=$(cd "$(dirname "$0")/../../.." && pwd)

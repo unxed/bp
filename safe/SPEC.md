@@ -1047,7 +1047,7 @@ header. It does not mean the code generator of FPC equals LLVM; the benchmark of
 
 ### Spike 1 result: a typed `bpvet` on `PasResolver` (2026-11-04, FPC 3.2.2)
 
-A driver (`tools/bpvet/spike/`) runs `PasResolver` of `fcl-passrc` over every module of `safe/`, `ext/` and `tests/`.
+A driver (`tools/spikes/resolver/`) runs `PasResolver` of `fcl-passrc` over every module of `safe/`, `ext/` and `tests/`.
 Verdict: **it works, with three conditions.**
 
 - **Resolved in full:** `tests/safe/test_safe.pas` with `Safe` (`TOwned`, `TShared`, `TWeak`, `TSlice`, `TArenaRef` are
