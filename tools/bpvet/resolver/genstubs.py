@@ -759,11 +759,19 @@ def main():
     g.run(rtl)
     os.makedirs(out, exist_ok=True)
     written = []
-    for name in sorted(set(g.want) | set(rtl)):  # a used unit is written even when none of its symbols is used
+    todo = sorted(set(g.want) | set(rtl))  # a used unit is written even when none of its symbols is used
+    while todo:
+        name = todo.pop(0)
         u = units.get(name)
-        if u is not None and name != "objpas":
-            g.write_unit(u, out)
-            written.append(name)
+        if u is None or name == "objpas" or name in written:
+            continue
+        g.write_unit(u, out)
+        written.append(name)
+        # the units its stub uses are written too (a unit named only through a type of another one)
+        with open(os.path.join(out, u.name + ".pp"), encoding="utf-8") as f:
+            m = re.search(r"^uses\s+([^;]*);", f.read(), re.M)
+        if m:
+            todo += [n.strip().lower() for n in m.group(1).split(",") if n.strip().lower() not in written]
     print("genstubs: %d units, %d symbols: %s" % (len(written), sum(len(v) for v in g.want.values()),
                                                    " ".join(written)))
 

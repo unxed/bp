@@ -868,7 +868,7 @@ what is already shipped with FPC (verified: `ptop`, `fpdoc`, `data2inc`, `bin2ob
 
 | `sp` | Analogue | Built on |
 |---|---|---|
-| `sp build [-release]` | `go build` | `fpc` + `-Fu` of the dependencies + a check profile (§6): debug `-Cr -Co -CR -Sa -gh -gt`, release without `-Cr -Co -CR` |
+| `sp build [-release]` | `go build` | `fpc` + `-Fu` of the dependencies + a check profile (§6): debug `-Cr -Co -CR -Sa -gh -gt`, release without `-Cr -Co -CR`. **The first part exists: `tools/bp build [--release] [fpc options] FILE`** runs `bpvet --strict --typed` over the directory of `FILE` and calls `fpc` (debug adds `-Cr -Co`) only when the check passes, so unsafe code is built only where it is declared (`// UNSAFE:`, `// borrow:`, `// root:`); bpvet and the RTL stubs are cached by content (`~/.cache/bp`), and a cached check takes about 30 ms (`tests/bp.sh`) |
 | `sp test` | `go test` | a generalized `tests/run.sh`: `test_*.pas` (return code = number of failures) and `compile/*.pas` with `// EXPECT:` (an analogue of trybuild in Rust); `examples/*.pas` are built too (an analogue of Rust doc tests) |
 | `sp vet` | `go vet`, clippy | a linter on `fcl-passrc`: S3–S14 |
 | `sp fmt` | `gofmt` | `ptop` with a single fixed config from this repository: one style, no settings |
