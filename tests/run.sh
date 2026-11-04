@@ -10,7 +10,7 @@
 # usage: tests/run.sh [safe|ext|fpc-utf8|all]      (default: all)
 # Environment variables (for CI; by default — bare fpc on the host):
 #   FPC          compiler (cross: ppcrossa64 ...)          FPCOPTS  its options (-dSAFE_LIBC, -Tlinux -XP...)
-#   RUN          run prefix (qemu-aarch64, wine64)         OUT      where to put binaries (otherwise mktemp)
+#   RUN          run prefix (qemu-aarch64, wine)           OUT      where to put binaries (otherwise mktemp)
 #   EXE          suffix of the binaries (.exe for -Twin64, which writes name.exe)
 #   SKIP         tests to skip ("test_ffi fpc-utf8")                NO_COMPILE_CHECKS=1 — without compile/*.pas
 set -u

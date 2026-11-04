@@ -170,7 +170,10 @@ jobs:
         env:
           WINEDEBUG: -all
           WINEDLLOVERRIDES: mscoree,mshtml=
-        run: wine64 wineboot --init 2>/dev/null; wine64 cmd /c ver 2>/dev/null; wine64 --version
+        run: |
+          wine --version
+          wine wineboot --init 2>/dev/null||true
+          wine cmd /c ver 2>/dev/null||true
       - name: Tests under wine (no compile checks; ext/fpc-utf8 and test_ffi are Unix-only)
         env:
           WINEDEBUG: -all
@@ -179,4 +182,4 @@ jobs:
           LC_ALL: C.UTF-8
         run: |
           I=$HOME/fpccross/lib/fpc/3.2.2
-          FPC=$I/ppcrossx64 FPCOPTS="-Twin64 -Fu$I/units/x86_64-win64/*" EXE=.exe RUN=wine64 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 OUT=$PWD/outwin bash tests/run.sh
+          FPC=$I/ppcrossx64 FPCOPTS="-Twin64 -Fu$I/units/x86_64-win64/*" EXE=.exe RUN=wine SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 OUT=$PWD/outwin bash tests/run.sh
