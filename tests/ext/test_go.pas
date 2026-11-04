@@ -11,6 +11,8 @@ uses
 
 type
   TIntChan = specialize TChan<Integer>;
+  TInts = array of Integer;
+  TArrChan = specialize TChan<TInts>;
 
   { A task: the data are fields, the code is Run. }
   TSquare = class(TTask)
@@ -69,6 +71,7 @@ var
 begin
   repeat
     case Select([FIn.Sel, Done]) of
+      // UNSAFE: the only task that writes Counter in this test; the main block reads it after Wait
       0: if FIn.TryRecv(V) then Inc(Counter, V);
       1: Exit; // the group is cancelled
     end;
@@ -136,6 +139,33 @@ begin
   end;
 end;
 
+{ R17 (debug checks): a dynamic array sent while a second variable holds it. }
+procedure SharedArray;
+var
+  Ch: TArrChan;
+  A, B, Got: TInts;
+  Was: Boolean;
+begin
+  Ch := TArrChan.Create(2);
+  Was := SafeDebugChecks;
+  SafeDebugChecks := True; // UNSAFE: one goroutine runs the tests
+  try
+    SetLength(A, 2);
+    Ch.Send(A); // UNSAFE: the only holder, then B shares A on purpose for R17
+    B := A;
+    try
+      Ch.Send(A);
+      Check(False, 'chan: a shared array raises R17');
+    except
+      on E: ESafety do Check(Pos('SAFE-R17', E.Message) > 0, 'chan: a shared array raises R17');
+    end;
+    Ch.Send(Copy(B));
+    Check(Ch.Recv(Got) and (Length(Got) = 2), 'chan: R17 lets a moved array and a copy through');
+  finally
+    SafeDebugChecks := Was; // UNSAFE: one goroutine runs the tests
+  end;
+end;
+
 procedure Failure;
 var
   G: TGroup;
@@ -196,6 +226,7 @@ begin
 {$endif}
   WriteLn('-- FanIn'); FanIn;
   WriteLn('-- Buffered'); Buffered;
+  WriteLn('-- SharedArray'); SharedArray;
   WriteLn('-- Failure'); Failure;
   WriteLn('-- SelectAndCancel'); SelectAndCancel;
   WriteLn('-- Structured'); Structured;
