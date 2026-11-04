@@ -6,8 +6,7 @@ on:
     branches: [main]
   pull_request:
 
-# Fail fast: a stalled apt mirror once held a job for 13-18 minutes (a normal job takes under 2). tools/ci-apt.sh limits
-# every apt-get run, each install step has a limit of its own (4 min), and each job one a few times its usual time.
+# tools/ci-apt.sh installs packages with retries and no time limit of its own; each job has only a generous limit of its own.
 jobs:
   # English in comments, documents and messages; every text file UTF-8.
   text-policy:
@@ -28,7 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler fp-units-fcl fp-utils
       - name: Build bpvet
         run: bash tools/bpvet/build.sh out/bpvet
@@ -46,6 +44,8 @@ jobs:
         run: bash tests/typed.sh out/bpvet
       - name: tools/bp build checks before it compiles (tests/bp.sh)
         run: bash tests/bp.sh
+      - name: The examples, built with tools/bp build and run (tests/examples.sh)
+        run: bash tests/examples.sh
       - name: tools/bp get, vendor and build with deps.lock over local git repositories (tests/deps.sh)
         run: bash tests/deps.sh
 
@@ -57,7 +57,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler fp-units-fcl
       - name: Tests (no compiler options; layers safe and ext, units Safe and BP; ext/fpc-utf8)
         env:
@@ -92,6 +91,19 @@ jobs:
             docker run --rm -e LANG=C -v "$PWD/out:/t:ro" centos:7 sh -c 'cd /t && ./safe-BP/test_safe >/dev/null && ./ext-BP/test_go >/dev/null && ./ext-BP/test_threads >/dev/null && ./ext-BP/test_utf8 >/dev/null && echo ok'
         run: tools/ci-par.sh
 
+  # The HTTP server of examples/httpd against the same server in Go and in Rust (report only, no thresholds; the table
+  # goes into examples/httpd/README.md). Go and rustc come with the runner.
+  bench-httpd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Free Pascal and ab
+        timeout-minutes: 4
+        run: tools/ci-apt.sh apache2-utils fp-compiler fp-units-fcl fp-utils time
+      - name: Benchmark (examples/httpd/bench/run.sh)
+        run: bash examples/httpd/bench/run.sh "$RUNNER_TEMP/httpd"
+
   # Mode with libc (-dSAFE_LIBC, like cgo): cwstring + cthreads.
   libc:
     runs-on: ubuntu-latest
@@ -99,7 +111,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler fp-units-fcl
       - name: Tests with -dSAFE_LIBC
         env:
@@ -117,7 +128,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal, qemu-user, cross binutils
-        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler qemu-user binutils-aarch64-linux-gnu binutils-i686-linux-gnu
       - name: Cache cross compilers
         id: cache
@@ -163,7 +173,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal and wine
-        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler wine64 wine
       - name: Cache cross compiler
         id: cache

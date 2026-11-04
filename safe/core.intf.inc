@@ -55,6 +55,8 @@ type
   reference interface symbols only. }
 function SafeNewLife(AObj: TObject; const Who: string): TSafeLife;
 procedure SafeFail(const Msg: string);
+{ The reference count of a dynamic array (P is its data pointer, as Pointer(A)); 0 for nil. For the R17 check. }
+function SafeDynArrayRefs(const P: Pointer): SizeInt;
 
 { Debug checks (R9). On with -dSAFE_DEBUG; a program or a test may also switch them at run time. }
 var
