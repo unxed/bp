@@ -1177,6 +1177,29 @@ Verdict: **it works; one form was missing and is added to rule 4 (below).**
   `var`/`out` argument that is not a local is a store of a value of the current region (`s17_varfield_bad`).
 - **A `TRegion` is a local of a routine:** a global, a threadvar or a field is an error (`s17_global_region_bad`).
 
+### Regions: scopes, speed, the debug net, a look at real code (2026-11-04; unxed/bp#124, #125)
+
+- **Scopes like Goose without block variables.** FPC 3.2 has none, but `for ... in` is a real scope, so the runtime
+  gives two enumerators that own a region: `for R in Scope do begin ... end` (a region for the block) and
+  `for Line in Each(Lines)` / `for P in A.Each` (a region per iteration, reset by each `MoveNext`). Measured: blocks nest
+  exactly; an exception and `Exit` release in order; 200 iterations of 1000 objects peak at 60 KiB. FPC copies the
+  enumerator once, before the first `MoveNext`, so the region is created there. A `Break` releases the region late, out
+  of order with a `TRegion` created after it (R14): **S17 forbids `Break` out of a region loop**, and roots what the body
+  allocates in the region of the loop, so a use after the block or in the next iteration is rule 3. With them the region
+  style has three scopes: a routine (`TRegion` local), a block (`Scope`), an iteration (`Each`).
+- **Strings** leave a region as copies: built in a region object in every iteration of `Each`, kept outside, they are
+  intact after each reset (UTF-8 included) with one reference. S17 gives strings no root.
+- **Iteration speed** (x86_64, 2·10^7 reads, ms): dynamic array 49 / 25 (-O1 / -O2), `At` 90 / 49, `for P in A` 43 / 63,
+  `for C in A.Chunks` with `C.Data[I]` 47 / **17**. The loop over chunks is as fast as a plain array or faster; the element
+  enumerator is compiled worse at -O2 than at -O1 by FPC 3.2.2 (a code generation issue of that shape). The fast form of
+  the style is `for C in A.Chunks`; `At` (about 2x) is for random access.
+- **`SAFE_DEBUG` (R12)** works: each block is pages of its own (`mmap`), and a reset or a release removes all access
+  (`mprotect`, never reused), so a use after `Reset` stops with `EAccessViolation` at once. Nothing at access; unix only (no
+  `mmap` on DOS). CI runs spike 2 with it.
+- **Real code, a first look (not a port):** the highlighter of tve (`tve/src/tvehl.pas`) allocates little per line, and
+  its results and language data live as long as the document. Regions fit the scratch work of an operation; the document
+  stays in the owner or the GC style (concept v2). Parsers, AST builders and per-request work are the niches of the style.
+
 ### Spike 3 result: GC roots from the stack of the goroutine (2026-11-04, FPC 3.2.2)
 
 A prototype collector (`tools/spikes/gcroots/`, run by CI on x86_64, aarch64 and i386 at -O1 and -O2): a heap per thread
