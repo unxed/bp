@@ -215,6 +215,44 @@ begin
   Check(Raised and (CurrentRegionDepth = 0), 'R15: an allocation with no current region');
 end;
 
+procedure InScopeRaise;
+var
+  R: Integer;
+begin
+  for R in Scope do
+    raise Exception.Create('x');
+end;
+
+procedure BlockScopes;
+var
+  R, I, J, Inside: Integer;
+  N: TNode;
+  Raised: Boolean;
+begin
+  Inside := 0;
+  for I := 1 to 100 do
+    for R in Scope do
+    begin
+      for J := 1 to 1000 do
+        N := TNode.Create;
+      N.X := J;
+      if CurrentRegionDepth > Inside then
+        Inside := CurrentRegionDepth;
+    end;
+  Check((Inside = 1) and (CurrentRegionDepth = 0), 'for R in Scope: a region per block, released at its end');
+  for R in Scope do
+    for J in Scope do
+      Inside := J;
+  Check((Inside = 2) and (CurrentRegionDepth = 0), 'for R in Scope: blocks nest');
+  Raised := False;
+  try
+    InScopeRaise;
+  except
+    on E: Exception do Raised := True;
+  end;
+  Check(Raised and (CurrentRegionDepth = 0), 'for R in Scope: an exception in the block releases its region');
+end;
+
 procedure ResetLoop;
 var
   R: TRegion;
@@ -336,6 +374,7 @@ begin
   R14;
   R15;
   ResetLoop;
+  BlockScopes;
   Goroutine;
   Speed;
   Check(HeapUsed <= H0, 'nothing leaks: the heap is not above where it was (' + IntToStr(HeapUsed) + ' against ' + IntToStr(H0) + ')');

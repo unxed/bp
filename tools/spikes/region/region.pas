@@ -31,6 +31,29 @@ type
     class operator Copy(constref Src: TRegion; var Dst: TRegion);
   end;
 
+  { for R in Scope do begin ... end: a region for one block (SPEC §20, concept v2). The region is created by the first
+    MoveNext (FPC copies the enumerator before it) and released by the second; Exit and exceptions release it when the
+    routine finalizes the loop; S17 forbids Break out of it. R is the depth of the regions of the goroutine. }
+  TScope = record
+  private
+    D: Pointer;
+    N: Integer;
+  public
+    function MoveNext: Boolean;
+    function GetCurrent: Integer;
+    property Current: Integer read GetCurrent;
+    class operator Initialize(var S: TScope);
+    class operator Finalize(var S: TScope);
+    class operator Copy(constref Src: TScope; var Dst: TScope);
+  end;
+
+  TScopes = record
+    function GetEnumerator: TScope;
+  end;
+
+function Scope: TScopes;
+
+type
   { A class whose objects live in the current region. }
   TRegionObject = class
   public
@@ -259,6 +282,65 @@ begin
   Dispose(PRegionData(D));
   D := nil;
   Inc(RegionReleases);
+end;
+
+procedure ScopeRelease(var S: TScope);
+var
+  R: TRegion;
+begin
+  R.D := S.D;
+  S.D := nil;
+  R.Release;
+end;
+
+function TScope.MoveNext: Boolean;
+var
+  R: TRegion;
+begin
+  Inc(N);
+  if N = 1 then
+  begin
+    R := TRegion.Create;
+    D := R.D;
+    R.D := nil;
+    Exit(True);
+  end;
+  if D <> nil then
+    ScopeRelease(Self);
+  Result := False;
+end;
+
+function TScope.GetCurrent: Integer;
+begin
+  Result := CurrentRegionDepth;
+end;
+
+class operator TScope.Initialize(var S: TScope);
+begin
+  S.D := nil;
+  S.N := 0;
+end;
+
+class operator TScope.Finalize(var S: TScope);
+begin
+  if S.D <> nil then
+    ScopeRelease(S);
+end;
+
+class operator TScope.Copy(constref Src: TScope; var Dst: TScope);
+begin
+  if Src.D <> nil then
+    raise ERegion.Create('SAFE: a TScope is copied after its region was created');
+  Dst.N := Src.N;
+end;
+
+function TScopes.GetEnumerator: TScope;
+begin
+  Result.N := 0;
+end;
+
+function Scope: TScopes;
+begin
 end;
 
 function TRegion.Used: SizeUInt;
