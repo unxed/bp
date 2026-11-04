@@ -353,7 +353,7 @@ asm
   pushl  %edi
   movl   20(%esp), %ecx    // Stack
   andl   $-16, %ecx
-  subl   $16, %ecx
+  subl   $20, %ecx         // Fn is popped, Arg stays at a 16-aligned address: Fn starts as a call made with esp aligned
   movl   28(%esp), %eax    // Arg
   movl   %eax, 4(%ecx)
   movl   16(%esp), %eax    // Fn
