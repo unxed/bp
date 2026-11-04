@@ -76,4 +76,23 @@ each on a port of its own under `/usr/bin/time -v`, warms it up, and loads `/`, 
 the standard library only, a thread per connection and the same minimal HTTP handling, so the comparison is of the
 runtimes and threads, not of HTTP libraries. CI runs it in the job `bench-httpd` (report only).
 
-TABLE
+Measured 2026-11-04 by CI (run 41926782782, job `bench-httpd`) on `ubuntu-latest`, 4 vCPU: FPC 3.2.2, Go 1.24.13,
+rustc 1.99.1; `ab -k -c 64 -n 100000`. Peak RSS is of the whole run of a server (warm-up and three loads).
+
+| Server | Route | Requests/s | Mean latency, ms | Binary, bytes | Peak RSS, KiB |
+|---|---|---|---|---|---|
+| bp | `/` | 63917 | 1.00 | 1637312 | 31756 |
+| bp | `/json?n=100` | 63833 | 1.00 | 1637312 | 31756 |
+| bp | `/stats` | 63526 | 1.01 | 1637312 | 31756 |
+| Go | `/` | 74685 | 0.86 | 8248208 | 14780 |
+| Go | `/json?n=100` | 74251 | 0.86 | 8248208 | 14780 |
+| Go | `/stats` | 74684 | 0.86 | 8248208 | 14780 |
+| Rust | `/` | 63758 | 1.00 | 4619176 | 4304 |
+| Rust | `/json?n=100` | 62535 | 1.02 | 4619176 | 4304 |
+| Rust | `/stats` | 63049 | 1.01 | 4619176 | 4304 |
+
+It shows that the server of bp, with a thread per keep-alive connection, a region per connection and the FPC code
+generator, serves as many small requests as the same design in Rust and within 15 % of Go, from a static binary of a
+fifth of the size of Go's, at about twice Go's memory (64 worker threads with heaps and stacks of their own). It does
+not show which server is faster: `ab` runs on one thread on the same 4 vCPU and is close to its own limit, the runner is
+shared, and 64 connections on one machine say nothing of thousands (where one OS thread per task is the limit of §14).
