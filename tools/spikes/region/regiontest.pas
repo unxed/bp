@@ -303,11 +303,11 @@ begin
   for Line in Each(Lines) do
   begin
     Named := TNamed.Create;
-    Named.Name := 'ё' + Line + '😀';
+    Named.Name := #$D1#$91 + Line + #$F0#$9F#$98#$80;  // a Cyrillic letter and an emoji in UTF-8
     Kept[Count] := Named.Name;
     Inc(Count);
   end;
-  Check((Kept[0] = 'ё0😀') and (Kept[199] = 'ё199😀') and (StringRefCount(Kept[199]) = 1),
+  Check((Kept[0] = #$D1#$91'0'#$F0#$9F#$98#$80) and (Kept[199] = #$D1#$91'199'#$F0#$9F#$98#$80) and (StringRefCount(Kept[199]) = 1),
     'strings leave a region as copies: UTF-8 text intact after the reset of each iteration, one reference left');
   Outer := TRegion.Create;  // the array lives outside the loop
   Pts := TPts.Create;
