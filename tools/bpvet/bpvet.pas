@@ -3,7 +3,7 @@
   Built by tools/bpvet/build.sh (FPC with fcl-passrc); it reads the sources only, no other unit is needed (the typed
   mode reads the RTL from declaration stubs).
 
-  usage: bpvet [--report|--strict] [--typed --rtl DIR [-FaUNIT]... [--fix]] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...
+  usage: bpvet [--report|--strict] [--fix] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...
     a directory is walked for *.pas, *.pp, *.lpr (include files are read through the modules that include them);
     -dNAME defines a symbol for conditional compilation, -FiDIR adds an include directory (as for fpc);
     -FuDIR adds a directory where rule S5 looks for the files of used units (their classes);
@@ -22,13 +22,14 @@
   Parser limit (fcl-passrc 3.2.2): external with a one-character library name literal (external 'c')
   does not parse and is reported as Fatal; give the library name as a constant (const LibC = 'c').
   The directive nostackframe, which that parser does not know, is skipped (bpvetcore.pas, TVetLineReader).
-  Rules: S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16 (bpvetrules.pas). }
+  Rules: S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16 (bpvetrules.pas); S17 (bpvets17.pas, typed);
+  S21, S22 (bpvetstyle.pas, over the text, before the parse). --fix writes the fixes of S17, S21 and S22 into the files. }
 program bpvet;
 
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, BpvetS17, Safe;
+  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, BpvetS17, BpvetStyle, Safe;
 
 type
   TListBox = specialize TOwned<TStringList>;
@@ -36,7 +37,7 @@ type
 
 procedure Usage;
 begin
-  WriteLn('usage: bpvet [--report|--strict] [--typed --rtl DIR [-FaUNIT]... [--fix]] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...');
+  WriteLn('usage: bpvet [--report|--strict] [--fix] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...');
   WriteLn('  default: errors fail; --report: everything is a warning, exit code 0; --strict: warnings are errors');
 end;
 
@@ -107,7 +108,10 @@ begin
     else if A = '--typed' then
       Typed := True
     else if A = '--fix' then
-      S17Fix := True
+    begin
+      S17Fix := True;
+      StyleFix := True;
+    end
     else if (A = '--rtl') and (I <= ParamCount) then
     begin
       RtlDir := ParamStr(I);
@@ -151,6 +155,7 @@ begin
       VetAdd(Report, Files.Get[I], 1, 1, vsFatal, '', 'bpvet cannot read this file: ' + Err);
       Continue;
     end;
+    VetCheckStyle(Src, Report);
     Module := VetParse(Src, Defines, IncludeDirs, Report);
     if Module = nil then
       Continue;
