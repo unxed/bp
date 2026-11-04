@@ -659,6 +659,12 @@ class Gen:
         fieldsyms = {m.get("SymId"): m["Name"] for m in d.get("Fields", []) if m.get("Type") in ("field", "var")
                      and is_named(m)}
         procids = {m.get("Id"): m["Name"] for m in d.get("Fields", []) if m.get("Type") == "proc" and is_named(m)}
+        # A property read or written by a class method is a class property, and its accessors are static (as FPC
+        # requires); ppudump writes neither, only "classmethod" on the accessor (TEncoding.ASCII, GetASCII).
+        classprocs = {m.get("Id") for m in d.get("Fields", []) if m.get("Type") == "proc"
+                      and "classmethod" in m.get("Options", [])}
+        classaccs = {a.get("Id") for m in members if m.get("Type") == "prop"
+                     for a in (m.get("Getter"), m.get("Setter")) if a and a.get("Id") in classprocs}
         for m in members:
             if m.get("Type") in ("field", "var") and kind != "interface":
                 tn = self.tname(u, m.get("VarType"))
@@ -675,6 +681,8 @@ class Gen:
                     mods.append("override" if "overriding" in opts else "virtual")
                 if "abstract" in opts and "overriding" not in opts and kind != "interface":
                     mods.append("abstract")
+                if m.get("Id") in classaccs:
+                    mods.append("static")
                 lines.append("  %s; %s;" % (s, "; ".join(mods)))
                 if kind != "interface" and "abstract" not in opts:
                     q = self.signature(u, m, "%s.%s" % (d["Name"], self.ident(m["Name"])), owner=d)
@@ -687,7 +695,9 @@ class Gen:
                 ps = self.params(u, m) if m.get("Params") else ""
                 if ps is None:
                     continue
-                s = "  property %s%s: %s" % (self.ident(m["Name"]), "[%s]" % ps if ps else "", tn)
+                cls = any(a and a.get("Id") in classaccs for a in (m.get("Getter"), m.get("Setter")))
+                s = "  %sproperty %s%s: %s" % ("class " if cls else "", self.ident(m["Name"]), "[%s]" % ps if ps else "",
+                                              tn)
                 for word, acc in (("read", m.get("Getter")), ("write", m.get("Setter"))):
                     if acc:
                         n = fieldsyms.get(acc.get("SymId")) or procids.get(acc.get("Id"))

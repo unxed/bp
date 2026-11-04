@@ -38,12 +38,12 @@ if [ ! -x "$bpvet" ]; then
   mv "$bpvet.tmp" "$bpvet"
 fi
 
-h=$( { "$fpc" -iV; cat "$src"/*.pas; for d in "${dirs[@]}"; do cat "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true
+h=$( { "$fpc" -iV; cat "$src"/*.pas "$root/bp.pas"; for d in "${dirs[@]}"; do cat "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true
   done; } | sha256sum | cut -c1-16)
 stubs=$cache/stubs-$h
 if [ ! -d "$stubs" ]; then
   rm -rf "$stubs.tmp"
-  python3 "$root/tools/bpvet/resolver/genstubs.py" "$stubs.tmp" "$src" "${dirs[@]}" > /dev/null
+  python3 "$root/tools/bpvet/resolver/genstubs.py" "$stubs.tmp" "$src" "$root/bp.pas" "${dirs[@]}" > /dev/null
   mv "$stubs.tmp" "$stubs"
 fi
 

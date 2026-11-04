@@ -61,7 +61,6 @@ type
     function Loaded(const AName: String): TVetResolver;
   end;
 
-  TSessionBox = specialize TOwned<TVetSession>;
 
 const
   { compiler magic with variable arguments: accepted with any arguments }
@@ -282,18 +281,23 @@ end;
 
 var
   { One session for the whole run: a used unit is read once (safe/SPEC.md §16, the tools are as fast as the compiler).
-    The options are those of the first call; bpvet passes the same ones for every file. }
-  Shared: TSessionBox;
+    The options are those of the first call; bpvet passes the same ones for every file.
+    It is not freed: the process ends after the last check, and the teardown of the trees and the data of
+    fcl-passrc with many units read crashes in ClearResolveDataList (a record of the data list is already reused);
+    skipping it also saves the walk over every tree at exit. }
+  // UNSAFE: lives until the process ends, freed by the OS
+  Shared: TVetSession = nil;
 
 function VetSession(const RtlDir: String; const Defines, IncludeDirs, UnitDirs: array of String): TVetSession;
 var
   I, N: Integer;
   S: TVetSession;
 begin
-  if Shared.IsEmpty then
+  if Shared = nil then
   begin
-    Shared := TSessionBox.Own(TVetSession.Create);
-    S := Shared.Get;
+    // UNSAFE: the session of the run, never freed (see Shared)
+    Shared := TVetSession.Create;
+    S := Shared;
     S.Hub := specialize TOwned<TPasResolverHub>.Own(TPasResolverHub.Create(nil));
     S.Modules := specialize TOwned<TObjectList>.Own(TObjectList.Create(True));
     SetLength(S.SearchDirs, 2 + Length(UnitDirs) + Length(IncludeDirs));
@@ -314,7 +318,7 @@ begin
     for I := 0 to High(Defines) do
       S.Defines[I] := Defines[I];
   end;
-  Result := Shared.Get;
+  Result := Shared;
 end;
 
 function VetResolve(const Src: TVetSource; const RtlDir: String; const Defines, IncludeDirs, UnitDirs,

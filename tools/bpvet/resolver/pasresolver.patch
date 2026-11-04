@@ -9,6 +9,8 @@ in the FPC sources); see README.md.
 4. ObjFPC passes a typed pointer to a var or out argument of type Pointer (GetMem(P, Size)), as FPC does.
 5. A pointer to a member type of a generic declared after it (PData = ^TData) is specialized once all members are.
 6. InterfaceOnly (a used unit read up to its implementation): no section, method bodies or generic bodies are required.
+7. String[N] adds no identifier "string" to the scope: its string type is a sub type of the alias (A = String[3]), so
+   two of them in one unit are not a duplicate and a later "string" still names the type of the system unit.
 
 --- a/packages/fcl-passrc/src/pasresolver.pp
 +++ b/packages/fcl-passrc/src/pasresolver.pp
@@ -165,7 +167,18 @@ in the FPC sources); see README.md.
    FBaseTypeChar:={$ifdef FPC_HAS_CPSTRING}btAnsiChar{$else}btWideChar{$endif};
    FBaseTypeString:={$ifdef FPC_HAS_CPSTRING}btAnsiString{$else}btUnicodeString{$endif};
    FBaseTypeExtended:=btDouble;
-@@ -21692,6 +21732,7 @@
+@@ -20647,7 +20687,9 @@
+       AddGenericTemplateType(TPasGenericTemplateType(El))
+     else if AClass=TPasStringType then
+       begin
+-      AddType(TPasType(El));
++      // bpvet: String[N] is the sub type of its alias (A = String[3]); it adds no identifier "string" to the scope
++      if not (AParent is TPasAliasType) then
++        AddType(TPasType(El));
+       {$ifdef FPC_HAS_CPSTRING}
+       if BaseTypes[btShortString]=nil then
+       {$endif}
+@@ -21692,6 +21734,7 @@
    writeln('TPasResolver.Destroy FPendingForwards...');
    {$ENDIF}
    FreeAndNil(FPendingForwardProcs);
@@ -173,7 +186,7 @@ in the FPC sources); see README.md.
    FreeAndNil(fExprEvaluator);
    ClearBuiltInIdentifiers;
    inherited Destroy;
-@@ -25688,6 +25729,11 @@
+@@ -25688,6 +25731,11 @@
        end;
      if IsGenericTemplType(ParamResolved) then
        exit(cGenericExact);
@@ -185,7 +198,7 @@ in the FPC sources); see README.md.
  
      //writeln('TPasResolver.CheckParamCompatibility NeedVar ParamResolved=',GetResolverResultDbg(ParamResolved),' ExprResolved=',GetResolverResultDbg(ExprResolved));
      if RaiseOnError then
-@@ -27823,6 +27869,24 @@
+@@ -27823,6 +27871,24 @@
    Result:=-1;
  end;
  
@@ -210,7 +223,7 @@ in the FPC sources); see README.md.
  procedure TPasResolver.CheckUseAsType(aType: TPasElement; id: TMaxPrecInt;
    ErrorEl: TPasElement);
  begin
-@@ -27839,7 +27903,7 @@
+@@ -27839,7 +27905,7 @@
        begin
        // ref to generic type without specialization
        if not (msDelphi in CurrentParser.CurrentModeswitches)
