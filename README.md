@@ -16,11 +16,18 @@
 | Ecosystem | comparable: every FPC package and Lazarus can be used as is, as unchecked units (like C libraries in Rust or Zig), and moved to the bp dialect step by step | comparable | larger | larger | larger |
 | Data races | behind for now: Rust checks `Send`/`Sync` in the compiler; `bp build` checks task fields (S11), but a dynamic array, a `TShared` object or a global shared by goroutines is not checked yet (`safe/SPEC.md` §21.2 closes it) | better in kind: a prohibition before the build, not a detector at run time (`-race`), with the same open cases | behind until §21.2: Goose passes only flat values | better: Zig does not check races | unknown |
 | Goroutines | behind in scale: one task is one OS thread, thousands of them (async Rust runs millions; plan: M:N, §21.3) | behind in scale, better in structure: a group waits for its tasks, the error of a task reaches `Wait` | unknown | unknown | unknown |
+| Deploy | better: one static file without libc by default runs on any distribution (Rust links the glibc of the build machine unless a musl target is chosen) | on par: Go is static by default too | unknown | on par | unknown |
+| C and the host | behind until `safe/SPEC.md` §23: today `-dSAFE_LIBC` ties the binary to the build glibc, as Rust does; the plan binds host libraries at run time by name, with no versioned import | better in kind: no C toolchain in the build (cgo needs one); behind in breadth until §23 | unknown | behind: Zig ships libc headers for many versions and `zig cc` | unknown |
+| Standard library | larger: the FCL of FPC ships HTTP, JSON, XML, regular expressions, SQL, zip; Rust leaves them to crates | on par: the Go standard library is as broad | larger | larger: the Zig std is small and C libraries fill the gap | unknown |
+| For a model | better: `safe/SPEC.md` §0 fits one screen, the marks are written by `bp fix` (§24.2), every finding names its fix; no lifetimes to write | on par: Go is as simple to write and has a far larger recent corpus | better: Goose has almost no corpus | better: Zig changes between releases | unknown |
 
 The Lazarus LCL is not yet tested with `bp build`. The plan of concept v3 (one scope object, Send and Sync inferred,
 goroutines M:N, the `TComponent` tree as an owner) and what is reused from which language: `safe/SPEC.md` §21.
 What the tools still lack against `go`, `cargo` and `zig` (`bp run` and scripts, `--watch`, cross targets, tests with a leak
 check, `// derive:`, a profiler, an editor server, a page in the browser): `safe/SPEC.md` §22.
+The fresh look of concept v4 (one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program
+file too, what FPC 3.2 already ships and the dialect had not used, the casts and the uninitialised variables that §8 missed):
+`safe/SPEC.md` §24.
 
 Free Pascal as one would want it by default: safe memory, UTF-8 everywhere, goroutines.
 No FPC fork and no compiler options: a single unit `BP` gives all of it.
