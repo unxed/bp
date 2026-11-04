@@ -61,6 +61,22 @@ type
       function MoveNext: Boolean; inline;
       property Current: PT read Cur;
     end;
+    { for C in A.Chunks: the elements a chunk at a time, C.Data[0..C.Count-1] (a plain array loop inside) }
+    TChunk = record
+      Data: PT;
+      Count: SizeInt;
+    end;
+    TChunkEnum = record
+    private
+      Cur: TChunk;
+      Data: PData;
+      Chunk: Integer;
+      Left: SizeInt;
+    public
+      function MoveNext: Boolean;
+      property Current: TChunk read Cur;
+      function GetEnumerator: TChunkEnum;
+    end;
   private
     P: PData;
     function GetItem(I: SizeInt): T;
@@ -72,6 +88,7 @@ type
     function At(I: SizeInt): PT; inline;
     property Items[I: SizeInt]: T read GetItem write SetItem; default;
     function GetEnumerator: TEnum;
+    function Chunks: TChunkEnum;
   end;
 
 { For the tests: counters of the management operators of TRegion and of released regions. }
@@ -380,6 +397,31 @@ begin
   Cur := Data^.Chunks[Chunk];
   Stop := Cur + N;
   Dec(Left, N);
+  Inc(Chunk);
+  Result := True;
+end;
+
+function TGrowArray.Chunks: TChunkEnum;
+begin
+  Result.Data := P;
+  Result.Chunk := 0;
+  Result.Left := P^.Len;
+end;
+
+function TGrowArray.TChunkEnum.GetEnumerator: TChunkEnum;
+begin
+  Result := Self;
+end;
+
+function TGrowArray.TChunkEnum.MoveNext: Boolean;
+begin
+  if Left <= 0 then
+    Exit(False);
+  Cur.Count := SizeInt(1) shl (Chunk + ChunkLog2);
+  if Cur.Count > Left then
+    Cur.Count := Left;
+  Cur.Data := Data^.Chunks[Chunk];
+  Dec(Left, Cur.Count);
   Inc(Chunk);
   Result := True;
 end;
