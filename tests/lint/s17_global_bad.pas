@@ -17,7 +17,7 @@ type
   end;
   TList = specialize TGrowArray<TFields>;
 
-var
+threadvar
   Last: TFields;  // borrow: an object of the region of Keep
 
 procedure Keep;

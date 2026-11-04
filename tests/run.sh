@@ -10,12 +10,14 @@
 # usage: tests/run.sh [safe|ext|fpc-utf8|all]      (default: all)
 # Environment variables (for CI; by default — bare fpc on the host):
 #   FPC          compiler (cross: ppcrossa64 ...)          FPCOPTS  its options (-dSAFE_LIBC, -Tlinux -XP...)
-#   RUN          run prefix (qemu-aarch64)                 OUT      where to put binaries (otherwise mktemp)
+#   RUN          run prefix (qemu-aarch64, wine)           OUT      where to put binaries (otherwise mktemp)
+#   EXE          suffix of the binaries (.exe for -Twin64, which writes name.exe)
 #   SKIP         tests to skip ("test_ffi fpc-utf8")                NO_COMPILE_CHECKS=1 — without compile/*.pas
 set -u
 FPC=${FPC:-fpc}
 FPCOPTS=${FPCOPTS:-}
 RUN=${RUN:-}
+EXE=${EXE:-}
 SKIP=${SKIP:-}
 layers=${1:-all}
 here=$(cd "$(dirname "$0")" && pwd)
@@ -54,7 +56,7 @@ run_layer() {
     if $FPC $FPCOPTS $LIBOPTS -FU"$dir" "$t.pas" > build.log 2>&1; then
       grep -E 'Warning|Note|Hint' build.log | grep -v "$t.pas" || true
       echo "== run $t ($name)"
-      timeout 300 $RUN "./$t" || fail=1
+      timeout 300 $RUN "./$t$EXE" || fail=1
     else
       cat build.log; fail=1
     fi
@@ -72,8 +74,8 @@ run_layer() {
       fail)  ok=$([ $built = no ] && grep -q "$rule" log && echo 1) ;;
       warn)  ok=$([ $built = yes ] && grep -q "$rule" log && echo 1) ;;
       clean) ok=$([ $built = yes ] && ! grep -q 'SAFE-' log && echo 1) ;;
-      run)   ok=$([ $built = yes ] && ! grep -q 'SAFE-' log && timeout 60 "./${f%.pas}" && echo 1) ;;
-      exit)  ok=$([ $built = yes ] && { timeout 60 "./${f%.pas}" > out 2>&1; [ $? = "$rule" ]; } && echo 1) ;;
+      run)   ok=$([ $built = yes ] && ! grep -q 'SAFE-' log && timeout 60 "./${f%.pas}$EXE" && echo 1) ;;
+      exit)  ok=$([ $built = yes ] && { timeout 60 "./${f%.pas}$EXE" > out 2>&1; [ $? = "$rule" ]; } && echo 1) ;;
     esac
     if [ "${ok:-}" = 1 ]; then echo "ok   $f ($kind $rule)"
     else echo "FAIL $f (expected $kind $rule, built=$built):"; grep -E 'Error|Warning|Fatal' log | head -5; fail=1; fi
@@ -102,7 +104,7 @@ run_fpc_utf8() {
   echo "== build test_utf8 (fpc-utf8)"
   if $FPC $FPCOPTS @utf8.cfg -Fu"$dir" -FU"$dir" test_utf8.pas > build.log 2>&1; then
     echo "== run test_utf8 (fpc-utf8)"
-    LANG=C.UTF-8 LC_ALL=C.UTF-8 timeout 60 $RUN ./test_utf8 || fail=1
+    LANG=C.UTF-8 LC_ALL=C.UTF-8 timeout 60 $RUN "./test_utf8$EXE" || fail=1
   else
     cat build.log; fail=1
   fi

@@ -30,7 +30,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Goroutines: `TGroup/TTask/TChan/Select`, R6–R8 (ext layer, unit `BP`) | **implemented, tests** | §14, `test_go` |
 | Threads without libc (`ext/bpthreads.pas`: `clone`+`futex`+`mmap`), Linux without libc by default | **implemented, tests** (`test_threads`; x86_64, i386, aarch64, Alpine) | §18 |
 | Sum types: example and test; **S13 checks (`case` exhaustiveness, tag)** | example and test exist; **checks (linter) — plan** | §16, `test_sumtype` |
-| Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | **specification only (plan), no code** | §15 |
+| Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | `deps.txt`, `deps.lock`, MVS, the module cache, `vendor`, mirrors: **implemented, test, CI** (`tools/bp get`, `tools/bp vendor`, `tests/deps.sh`); Software Heritage, the unsafe audit: **plan** | §15 |
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S4 (`^T`, `@`, pointer arithmetic) | **implemented, lint tests, CI** | §6 |
@@ -51,11 +51,11 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
-| Final touches: `bp run` and scripts, `--watch`, the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **design (plan)** | §22 |
+| Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; doc tests exist (`tools/doctest.py`); the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
 | An uninitialized local class reference, function result or `out` parameter (H17) | **open**: FPC warns, `bp build` does not fail on it | §8, §22.9 |
-| Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **open**: not checked yet; §0 says how to avoid them | §8, §21.2 |
+| Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **checked** by the typed `bpvet` (`tools/bp build`): S11m, S11s, S19; open: R17 in `SAFE_DEBUG`, the globals of a program reached by a task | §8, §21.2 |
 
 ---
 
@@ -125,7 +125,7 @@ OLD STYLE                              (§12)
 TARGETS                                (§2, table of what was verified)
   Linux (x86_64, i386, aarch64): by default a static binary without libc, works on any distribution;
   threads — BPThreads (inside BP). FFI to C libraries and libc — only with -dSAFE_LIBC (§18).
-  DOS: no threads, TGroup.Go raises R8. Windows: builds, run not verified.
+  DOS: no threads, TGroup.Go raises R8. Windows x86_64: the tests pass under wine in CI (BPThreads is empty there, the RTL thread manager is used).
 
 UNSAFE
   Unsafe things are written with full names (System.GetMem, SysUtils.FreeAndNil, System.Pointer)
@@ -200,10 +200,11 @@ Tests: `test_safe` (core), `test_go` (goroutines, §14), `test_threads` (thread 
 | i386 Linux, static without libc (our cross-compiler) | ✔ 0 failures | ✔ 0 | ✔ 0 | ✔ 0 | ✘ no libc to link against |
 | aarch64 Linux, static without libc (qemu) | ✔ 0 | ✔ 0 | ✔ 0 | ✔ 0 | ✘ same |
 | DOS (go32v2, DOSBox-X) | ✔ 0 | skipped: no threads, `TGroup.Go` raises R8 | skipped (no threads on DOS) | ✔ 0 | ✘ no external libraries |
-| Windows x86_64 (cross-compiler) | builds | builds | builds | builds | builds; run not verified (no wine) |
+| Windows x86_64 (cross-compiler, wine 9, ubuntu-latest, 2026-11-04) | ✔ 0 failures | ✔ 0 | ✔ 0 | ✔ 0 | not built: the facade is over libc, the test is Unix-only |
 
 Conclusion: after v0.5 (Linux without libc by default) the core, goroutines, threads and sum types work on all verified Linux targets, including static i386 and aarch64 without libc, without any switches;
-FFI depends on libc/the OS. To check your own set: `tests/run.sh` with `FPC`/`FPCOPTS`/`RUN` of a cross-compiler (qemu-user); the repository CI runs Linux x86_64, i386 and aarch64.
+FFI depends on libc/the OS. To check your own set: `tests/run.sh` with `FPC`/`FPCOPTS`/`RUN` of a cross-compiler (qemu-user); the repository CI runs Linux x86_64, i386 and aarch64, and Windows x86_64 under wine (job `windows`).
+Windows notes: `test_utf8` (6 checks: byte lengths, `Pos`, `Copy`, the two default code pages) passes under wine; what the real Windows console shows after `SetConsoleOutputCP(CP_UTF8)` is not checked, wine in CI has no console to read it back. On Windows `BPThreads` is empty and `test_threads` runs on the thread manager of the RTL. The compile checks (`tests/*/compile`) and `ext/fpc-utf8` are not run for Windows.
 
 ## §3. Strings: UTF-8 everywhere
 
@@ -368,6 +369,9 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S14 | a parameter without `const`/`var`/`out`; `var` although the caller does not need the change (§16) | `bpvet` S14: an error on a by-value `String`, `AnsiString`, `UnicodeString`, `WideString`, `RawByteString` or `UTF8String` (`s14_bad.pas`, `s14_method_bad.pas`), a record of this or an imported unit (`s14_record_bad.pas`, `s14_other_bad.pas`), an open array `array of T` except `array of const` (`s14_openarray_bad.pas`), or a dynamic array of this or an imported unit (`s14_dynarray_bad.pas`, `s14_other_dynarray_bad.pas`) without `const`, `constref`, `var` or `out`; other by-value parameters not syntactically written in a routine body are warnings (`s14_scalar_bad.pas`), as are `var` parameters without a detected write (`s14_var_bad.pas`). Writes through assignment targets, call arguments, method receivers, `@`, `for`, `with` and nested routines count. Overrides, routines without bodies, and routines whose address is taken in the module are skipped; untyped `var` parameters are skipped. The interface/class declaration and body produce one finding; `// UNSAFE: <why>` on or above the parameter drops either warning or error (`s14_ok.pas`, `s14_var_ok.pas`) |
 | S15 | a `TShared` cycle: a field of a class holds through `TShared` an object that leads back to the class of the field (H2) | `bpvet` S15: a warning on a field of a class of the module whose type is `specialize TShared<X>` or a module alias of it, when `X` is the class itself or reaches it through such fields of classes of the module, with the path and the hint "a back reference is `TWeak`"; `// UNSAFE: <why>` on the line above or at its end drops it (the program breaks the cycle itself); a heuristic by names over one module, the type is read from the line of the field, classes of other units are not followed; a `// UNSAFE-UNIT:` module is not checked |
 | S16 | range checks switched off in a module that uses `Safe`/`BP` (H12) | `bpvet` S16 warns on an explicit `{$R-}` in a module using `Safe` or `BP`, unless `// UNSAFE: <why>` is on that line or the line above (`tests/lint/s16_bad.pas`, `s16_ok.pas`); debug builds compile these modules with `-Cr -Co` (`{$R+}{$Q+}`); release builds may disable those compiler checks, while runtime checks R1–R4 remain enabled |
+| S11m | Send = move (H14): a value that holds a dynamic array goes to another goroutine shared with the sender | `bpvet` S11m (typed, `tools/bpvet/bpvetrace.pas`): an error on the argument of `Ch.Send` (a `TChan`) and on an argument of the constructor of a task (a descendant of `TTask`) whose type holds a dynamic array (one, a static array of one, a record with one; not `TChan`, `TShared`, `TOwned`, `TWeak`, `TGroup`; a `String` does not count: it is copied on write), unless it is `Copy(X)`, an array literal, the result of a function, or the last use of a local or a value parameter: the next read of it (in a loop also the next iteration and the reads after the loop) is none, `X := ...` or `SetLength(X, ...)`; a `const`/`var` parameter, a field, a global and a local read by a nested routine are errors (`tests/lint/s11m_ok.pas`, `s11m_param_bad.pas`, `s11m_after_bad.pas`, `s11m_loop_bad.pas`, `s11m_task_bad.pas`, `s11m_nested_bad.pas`); `// UNSAFE: <why>` drops it |
+| S11s | Sync (H15): an object behind `TShared` reached by two goroutines and changed | `bpvet` S11s (typed): an error on a field of a task class and on a `TChan` (a variable, a field, a parameter) whose type carries `TShared<X>` (also inside a record), unless `X` is frozen or marked `// sync: <the lock or the protocol>` on its declaration line or the comment lines above; frozen: no field of `X` or of its ancestors is written outside the constructors and destructors of `X` and its descendants (an assignment, a `var`/`out` argument, `Inc`, `Dec`, `SetLength`, `Include`, `Exclude`, `Delete`, `Insert`), the type of every field is frozen (values, `String`, `TChan`, `TShared`/`TOwned` of a frozen class, records and arrays of them; not `Pointer`, not an interface), and every ancestor below `TObject`/`TInterfacedObject` is of the module; the finding names the field and the routine that writes it (`tests/lint/s11s_ok.pas`, `s11s_bad.pas`, `s11s_chan_bad.pas`) |
+| S19 | `static mut` (H16): a global of a unit written while goroutines run | `bpvet` S19 (typed): an error on a write (an assignment to it or through it, a `var`/`out` argument, `Inc`, `SetLength` and the others of S11s) to a global variable of a unit in a routine; allowed in `initialization`, `finalization`, a `threadvar`, an `Interlocked*` call (atomic), and in the main block and the routines of a program (its globals are the locals of the main goroutine); `// UNSAFE: <the lock>` on the line or the comment lines above drops it; a `// UNSAFE-UNIT:` module is not checked (`tests/lint/s19_ok.pas`, `s19_bad.pas`, `s19_var_bad.pas`) |
 | S21 | a file without a `program`/`unit`/`library`/`package` header, or a header whose name is not the name of the file (two sources of one name) | `bpvet` S21 (`bpvetstyle.pas`, over the text before the parse): an error; the name is compared without letter case (`unit Region` in `region.pas`); a file without a header is a `unit` when it has `interface`, else a `program`; `bpvet --fix` / `tools/bp fix` inserts the header before the first token or writes the name of the file into it; a file whose name is not an identifier (dots allowed) is reported without a fix (`tests/lint/s21_none_bad.pas`, `s21_name_bad.pas`, `s21_ok.pas`) |
 | S22 | a reserved word with an upper-case letter (`Begin`, `END`): the style of Better Pascal is lower case, upper case is the style of the 1980s and stands out in the text | `bpvet` S22: a warning (an error with `--strict`, so in `tools/bp build`); `--fix` lowers the word; comments, strings, `&escaped` identifiers and the bodies of `asm` blocks are skipped; `string` is not checked, it is written as the type it names (`String`); directives (`override`, `virtual`) are not reserved words and are not checked (`tests/lint/s22_bad.pas`) |
 
@@ -389,7 +393,7 @@ in local variables). In a release you can drop `-Cr -Co -CR`; the R1–R4 checks
 
 ## §7. Unsafe
 
-```pascal
+```pascal sketch
 // UNSAFE: Buf is allocated for Len bytes on the line above and freed in the finally of this same procedure
 System.GetMem(Buf, Len);
 ```
@@ -416,7 +420,7 @@ System.GetMem(Buf, Len);
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
 | Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter `bpvet` (S11: class, interface and pointer fields of a task); `TryLock` takes a lock in the cell (stress test in `test_threads`) | H6 |
 | A class reference is assigned before it is read; a nil dereference is an exception, then impossible | programmer (FPC warns); plan: `bpvet` S21a definite assignment, S21b the size of a class, S21c nil analysis (§22.9) | H17 |
-| A dynamic array, a `TShared` object or a global is not changed by two goroutines at once | programmer (§0); plan: Send = move, Sync inferred, the `static mut` rule in `bpvet` (§21.2) | H14–H16 |
+| A dynamic array, a `TShared` object or a global is not changed by two goroutines at once | the typed `bpvet`: S11m (Send = move), S11s (Sync = frozen or `// sync:`), S19 (`static mut`) (§21.2) | H14–H16 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter `bpvet` (S6, S9); R3 only for `TInterfacedObject` | H8 |
 | `Safe` is last in `uses` | linter `bpvet` S7; in a program with `BP` first only a warning (§14) | H9 |
@@ -456,9 +460,9 @@ compensating check, and accepted risks are listed with a reason.
 | H11 | non-exhaustive `case`, missing `const` | `bpvet` S13; S14 errors on copy-heavy parameters and warns when other by-value parameters are not changed | `bpvet` S13, S14 | 11 |
 | H12 | `{$R-}` in safe code | the debug-build recommendation (§6) | rule `{$R+}{$Q+}` + `bpvet` warning | 12 |
 | H13 | `object`, `New(P, Init)` | nothing: such code stays unsafe | owner over `object` + lint rules | 13 |
-| H14 | a dynamic array shared by goroutines: `TChan.Send` keeps the same array (`FBuf[...] := V`), a `TArray` task field shares it with the caller | nothing (§0 says: move or `Copy`) | Send = move: the last use of a local or `Copy`; `SAFE_DEBUG` R17 at `Recv` | §21 step 2 |
-| H15 | a mutable object behind `TShared` used by two goroutines | nothing | Sync inferred: frozen after its constructors, else `// sync: <how>` on the class | §21 step 2 |
-| H16 | a global written while goroutines run | nothing | `static mut`: a unit global is written only in its initialization; what a task reaches does not name the globals of the program | §21 step 2 |
+| H14 | a dynamic array shared by goroutines: `TChan.Send` keeps the same array (`FBuf[...] := V`), a `TArray` task field shares it with the caller | `bpvet` S11m (typed): `Send` and the constructor of a task take `Copy(X)`, a fresh value or the last use of a local | `SAFE_DEBUG` R17 at `Recv` | §21 step 1 |
+| H15 | a mutable object behind `TShared` used by two goroutines | `bpvet` S11s (typed): `TShared<X>` in a task field or a message needs `X` frozen (inferred over the module) or `// sync: <how>` | a class of another unit is frozen when that unit marks it | §21 step 1 |
+| H16 | a global written while goroutines run | `bpvet` S19 (typed): a global of a unit is written only in `initialization`/`finalization`, atomically (`Interlocked*`) or under `// UNSAFE: <the lock>` | what a task reaches does not name the globals of the program | §21 step 1 |
 | H17 | an unchecked class cast: `TB(O).Y[100]` on an object that is a `TA` reads past it (§24.6) | nothing | `bpvet` S24: a downcast is `as`, `--fix` rewrites it; a cast from `Pointer` or an integer to a reference is S4 | §24 step 3 |
 | H18 | an untyped parameter with a variable typecast, `TBig(Buf)[N] := 1`, writes anywhere (§24.6); `absolute` | nothing | `bpvet` S25: unsafe outside a `// UNSAFE:` mark | §24 step 3 |
 | H19 | an uninitialised local of a class type is a garbage pointer: `var F: TFoo; WriteLn(F.X)` | FPC: a warning | `bp build` adds `-Sew` (0 warnings on the tests today, §24.6) | §24 step 2 |
@@ -466,7 +470,7 @@ compensating check, and accepted risks are listed with a reason.
 
 **H1. A borrow outlives its owner.**
 
-```pascal
+```pascal sketch
 var Cache: TFoo;                      // a global of a class type without // borrow:
 procedure Load;
 var Box: TFooBox;
@@ -487,7 +491,7 @@ the rule is added when the dialect moves to FPC 3.3+.
 
 **H2. A `TShared` cycle.**
 
-```pascal
+```pascal sketch
 type
   TNode = class;
   TNodeRef = specialize TShared<TNode>;
@@ -513,7 +517,7 @@ hint "a back reference is `TWeak`". Step 9.
 
 **H3. Use after `TArena.FreeAll`.**
 
-```pascal
+```pascal sketch
 var
   Arena: TArena;
   N: TNode;                           // borrow: arena
@@ -542,7 +546,7 @@ zero cost yet: `Get` is a non-inlined call on a record with a managed field. Unt
 
 **H4. `^T`, `@` and pointer arithmetic.**
 
-```pascal
+```pascal sketch
 type PInt = ^Integer;                 // ^T: no warning today
 procedure Bump;
 var X: Integer; P: PInt;
@@ -561,7 +565,7 @@ not, nor is `@Proc` / `@Obj.Method` of a procedure or method declared in the mod
 
 **H5. A copy of `TOwned`.**
 
-```pascal
+```pascal sketch
 procedure Use(Box: TFooBox);          // TOwned by value: a hidden copy
 begin
   Box.Get.Run;
@@ -581,7 +585,7 @@ raises `ESafety` with the type name. Step 6.
 
 **H6. Shared task fields; `TWeak.TryLock` across threads.**
 
-```pascal
+```pascal sketch
 type
   TWorker = class(TTask)
     Log: TStringList;                 // a mutable object the caller also uses
@@ -599,7 +603,7 @@ count that never grows back from zero (stress test in `test_threads`, x86_64, i3
 
 **H7. `.Destroy` outside unsafe.**
 
-```pascal
+```pascal sketch
 var Box: TFooBox; F: TFoo;
 begin
   Box := TFooBox.Own(TFoo.Create);
@@ -612,7 +616,7 @@ Now: `bpvet` S3 error, the hint is `TOwned.Reset` or `// UNSAFE:`. Step 4.
 
 **H8. `TFoo.Create` not passed to an owner; legacy string types.**
 
-```pascal
+```pascal sketch
 procedure Leak;
 var F: TFoo; S: ShortString;
 begin
@@ -627,7 +631,7 @@ Now: R3 catches only `Own/Share/Adopt` of a `TInterfacedObject`; the rest passes
 
 **H9. `Safe` is not last in `uses`.**
 
-```pascal
+```pascal sketch
 uses Safe, Classes, SysUtils;         // SysUtils comes after Safe
 var Obj: TFoo;
 begin
@@ -647,7 +651,7 @@ of step 2b: a program header that installs the thread manager first and still en
 
 **H10. Unmarked unsafe code, `external` in a safe module.**
 
-```pascal
+```pascal sketch
 unit Fast;                            // neither `uses Safe` nor `// UNSAFE-UNIT:`
 interface
 function CStrLen(S: PChar): SizeInt; cdecl; external 'c' name 'strlen';
@@ -661,7 +665,7 @@ Now: `bpvet` S8 (`// UNSAFE:` / `// UNSAFE-UNIT:` marks) and S12 (`external` onl
 
 **H11. A non-exhaustive `case`, a parameter without `const`.**
 
-```pascal
+```pascal sketch
 type TColor = (Red, Green, Blue);
 function ColorName(C: TColor): String; // no const
 begin
@@ -676,7 +680,7 @@ Now: `bpvet` S13 reports the missing `Blue`; S14 warns that `C` is never changed
 
 **H12. Range checks switched off in safe code.**
 
-```pascal
+```pascal sketch
 {$R-}                                 // without // UNSAFE:
 var A: array[0..3] of Integer; I: Integer;
 begin
@@ -692,7 +696,7 @@ compiler checks because runtime checks R1–R4 remain enabled. `bpvet` S16 warns
 
 **H13. Turbo Pascal style `object` code.**
 
-```pascal
+```pascal sketch
 type
   PView = ^TView;
   TView = object
@@ -814,7 +818,7 @@ passes into the task (fields, `Move`), and values come back through a channel.
 | `sync.WaitGroup`, `errgroup` | `TGroup` | **better**: the group waits for the tasks on leaving the scope (structured concurrency), a goroutine leak is impossible |
 | a panic in a goroutine kills the process | error → group cancellation → `Wait` raises R7 with the original text | **better** |
 | `context.Context` | `G.Cancel`, `Done` (a closed channel) in `Select`, `Cancelled` | the same in meaning, without an extra parameter |
-| races are caught by `-race` | races are prevented by S11: only values, channels, `TShared`, `Move` go into a task | different: a prohibition instead of a detector; three cases are open until §21.2 (§8, H14–H16) |
+| races are caught by `-race` | races are prevented by S11, S11m, S11s and S19: only values, moved arrays, channels, `TShared` of frozen or `// sync:` classes, `Move` go into a task, and globals are written in `initialization` | different: a prohibition instead of a detector (§21.2); the globals of a program reached by a task are open |
 | M:N scheduler, millions of goroutines | one task = one OS thread | worse: thousands, not millions; honestly "conditional" goroutines; plan: M:N on the stacks of `BPThreads` (§21.3) |
 
 Design (we reuse the RTL, minimal custom code): a thread is `BeginThread`; a lock is `TRTLCriticalSection`;
@@ -883,6 +887,23 @@ mirror  github.com/acme/json https://codeberg.org/acme-mirror/json    // optiona
   The line `deny-unsafe github.com/acme/json` in `deps.txt` stops the build if unsafe code has appeared in a new version
   of the dependency.
 
+**First step (2026-11-04).** What exists is what a library on an amateur's GitHub needs, with no hosting of ours:
+`tools/bp get [DIR]` reads `DIR/deps.txt` (`module`, `safe`, `require path vX.Y.Z`, `mirror path URL`, `dirs`; `//`
+comments), mirrors each repository once into `${BP_CACHE:-~/.cache/bp}/mod/<path>.git` (`git clone --mirror`, later
+`git fetch`; the `mirror` lines when the first URL fails; a path that starts with `/` or `file://` is a local
+repository), selects the versions by MVS (the greatest of the versions required by the modules reached; no solver, no
+ranges) and writes `DIR/deps.lock`, one `path version commit` per selected module, sorted by path. A recorded commit
+wins: a tag that now points elsewhere stops `bp get` with both commits named, until its line is deleted from the lock.
+Each selected version is extracted once, read-only, into `mod/<path>@<version>/` (`git archive`, never a checkout).
+`tools/bp build` and `bp fix` read `deps.lock` and add the `dirs` of each module (from its own `deps.txt`, default
+`. src`) as `-Fu` and `-Fi`, from `vendor/<path>/` when it is there, else from the cache (fetched when missing, so a
+clone with a lock builds without `bp get`); `tools/bp vendor` fills `vendor/` (listed in `vendor/modules.txt`) for a
+build offline and in ten years; `vendor/` is not checked by `bpvet` as a part of the program. The tool is
+`tools/bpget/bpget.pas`, a program of the dialect that `bp build` checks before it builds it; the test is
+`tests/deps.sh`. This repository is a module itself (`deps.txt`: `module github.com/unxed/bp`, `dirs . safe ext`).
+Not yet: the Software Heritage archive as the last fallback, `bp unsafe` and `deny-unsafe`, `bp vendor --flat`, major
+versions as new unit names (nothing checks them yet), the repositories fetched in parallel by goroutines.
+
 ## §16. What else to take from Go and Rust (plan)
 
 ### The `sp` tool: one command, like `go`
@@ -899,7 +920,7 @@ what is already shipped with FPC (verified: `ptop`, `fpdoc`, `data2inc`, `bin2ob
 | `sp fix` | `go fix`, `cargo fix` | **exists as `tools/bp fix [fpc options] FILE`**: `bpvet --fix` over the directory of `FILE`: the header from the file name (S21), reserved words in lower case (S22), the `// root:` marks of exported routines (S17); the rest is listed, nothing is built |
 | `sp fmt` | `gofmt` | `ptop` with a single fixed config from this repository: one style, no settings; reserved words in lower case (S22) |
 | `sp doc` | `go doc` | `fpdoc` |
-| `sp get / vendor / unsafe` | `go get`, `go mod vendor`, cargo-geiger | §15 |
+| `sp get / vendor / unsafe` | `go get`, `go mod vendor`, cargo-geiger | §15. **`tools/bp get` and `tools/bp vendor` exist** (`tools/bpget/bpget.pas`, a program of the dialect): MVS over git tags, `deps.lock` with the commits, the module cache, `vendor/`; `bp build` reads `deps.lock`. `unsafe` is a plan |
 | `sp embed files` | `//go:embed` | `data2inc`: files are turned into a module with constant arrays |
 | `sp fuzz` | `go test -fuzz` | below |
 
@@ -942,6 +963,8 @@ This is a few dozen lines on top of `sp test`.
 Tagged variant records have existed in Pascal since 1970. Two checks are missing, and both are the linter's job, not the library's:
 
 ```pascal
+uses Safe;
+
 type
   TShapeKind = (skCircle, skRect);
   TShape = record
@@ -951,7 +974,7 @@ type
       skRect:   (W, H: Double);
   end;
 
-function Circle(const AName: String; AR: Double): TShape;   // create only this way
+function Circle(const AName: String; const AR: Double): TShape;   // create only this way
 begin
   Result := Default(TShape); Result.Name := AName; Result.Kind := skCircle; Result.R := AR;
 end;
@@ -1014,6 +1037,7 @@ or above the parameter suppresses its S14 finding.
 | v0.8.1 (design) | §22: interpolation on the existing syntax (`Fmt` + `--fix` + S20); nil as a guarantee (§22.9: H17 found, S21a-c); hot reload of routine bodies (§22.10) |
 | v0.9 (design) | §23 systems programming and the world of C: four profiles (S, U, H, F), bindings as tables of names bound at run time with no versioned import, the measurements on FPC binaries, kernels and drivers (hardware as types, inferred contexts) |
 | v0.10 (design) | §24 concept v4: one sentence for all lifetimes; marks of fact written by the machine, marks of intent by hand; `BP` last everywhere (`-FaBPThreads`, measured); what FPC 3.2 ships and the dialect had not used (nested procedure variables, type helpers, CORBA interfaces, all measured); `// raises:` inferred; the holes of §8 the table missed (an unchecked class cast, an untyped parameter, an uninitialised variable: H17–H19, S24, S25, `-Sew`); README rows for deploy, C, the standard library and models |
+| v0.11 | §21 step 1: S11m (Send = move), S11s (Sync = frozen or `// sync:`) and S19 (`static mut`) in the typed `bpvet`; S17 counts only the values whose type can hold one of a region |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1295,7 +1319,7 @@ own), the ban on dynamic dispatch (classes and virtual methods work in the regio
 
 API sketch (names may change in the spike steps of the plan):
 
-```pascal
+```pascal plan
 TRegion = record                          // a bump pointer in blocks that double in size; a managed record
   class function Create: TRegion; static; // the new region becomes the current one of the goroutine
   procedure Reset;                        // rewind to empty, keep the largest block: one region per loop iteration
@@ -1370,7 +1394,7 @@ goes; nobody passes a region around. Better Pascal gets close to that without a 
 - **A routine that declares no `TRegion` allocates in the region of its caller.** This is how a result is "built in the
   caller's destination" in Goose: no region parameter, no copy.
 
-  ```pascal
+  ```pascal plan
   type
     TFields = class(TRegionObject)
       Key, Value: String;
@@ -1447,7 +1471,7 @@ reading memory of another object. A release build reuses the memory.
 
 The aim is the surface of Go: no wrapper, no `.Get`, no owner to choose. A GC object is an ordinary class:
 
-```pascal
+```pascal plan
 type
   TNode = class(TGcObject)      // references first: the collector follows them
     Next, Child: TNode;
@@ -1546,7 +1570,7 @@ Four parts of Better Pascal answer one question, "what is undone when this scope
 undo. The region of §20 already keeps that list (the finalizers of objects with managed fields), so it can hold the other
 three:
 
-```pascal
+```pascal plan
 for S in Scope do                       // or a TRegion local for the whole routine
 begin
   S.Hold(Lines, TStringList.Create);    // any existing class: Destroy is called when the scope ends
@@ -1604,6 +1628,23 @@ shared). Pony closes them with reference capabilities (`iso` is moved, `val` is 
 `String` needs nothing: copy on write with an atomic counter is Send and Sync already. `TChan` is Sync by construction,
 `TOwned` moved with `.Move` is Send. After the three rules the claim of §14, "races are prevented, not detected", holds
 without exceptions; until then §0 tells the programmer what the rules will check.
+
+**Step 1 done (2026-11-04): S11m, S11s and S19** (`tools/bpvet/bpvetrace.pas`, in the typed mode after S17; the rows of
+§6). What the first run found and what it changed:
+
+- **The runtime itself.** S19 found 11 writes to globals in `safe/core.impl.inc` and `ext/go.impl.inc`: the live counter
+  `GLive` and the failure counters through `InterlockedIncrement`/`Decrement` (atomic: S19 accepts the `Interlocked*`
+  calls), and the debug list `GLives` under the spin lock `SafeLockLives` (3 marks `// UNSAFE: under SafeLockLives`). The
+  tests that switch `SafeDebugChecks` from a routine got a mark each: the switch is set before goroutines start.
+- **S17 was too wide.** It took the result of every call for a value of the caller's current region, so `FBox :=
+  TBoxOwner.Own(TBox.Create)` in a plain class was "a value of the caller's region stored into an object of another style",
+  and `Ch.Send(A)` of an `array of Integer` was "a value of a region sent to a channel" (22 such warnings on `bp.pas`,
+  `safe/` and `tests/`). Now a value is in a region only when its type can hold one: a region class, `TObject`, a pointer,
+  a `TGrowArray`, or a record or an array with one of them inside.
+- **The time:** the typed run of `tests/typed.sh` (152 files) stays 0.7 s.
+- **Open:** R17 (`Recv` checks one reference in `SAFE_DEBUG`); the globals of a program file reached by a task (a fixpoint
+  over the routines a task calls; today a program's globals are not checked); a class of another unit is frozen only
+  when its unit marks it `// sync:` (its writes are not seen).
 
 ### 21.3 Goroutines M:N on the stacks that `BPThreads` already has
 
@@ -1707,7 +1748,8 @@ One step is one PR from a fresh `main`, with a criterion of done; a spike may en
 data.
 
 1. **H14–H16 in `bpvet`** (S11m Send = move, S11s Sync, S19 globals) and R17 in `SAFE_DEBUG`. *Done:* ok/bad lint tests for
-   each rule; the rows of §8 updated. First, because it closes a hole of a claim made today.
+   each rule; the rows of §8 updated. First, because it closes a hole of a claim made today. *Status:* **done** for S11m,
+   S11s and S19 (§21.2, step 1 done); R17 and the globals of a program reached by a task are left.
 2. **Spike 4: the M:N switch** (`tools/spikes/mn/`): two goroutines exchange values over a channel on one carrier with a
    stack switch; threadvars, exceptions and the heap work across switches. *Done:* CI green on x86_64, aarch64 and i386; the
    time of a switch, the memory of a goroutine, the goroutines per GiB, guard pages against `-Ct`; a verdict in §21.3.
@@ -1724,7 +1766,7 @@ data.
 
 ## §22. Final touches: what users love in the languages of the niche (design, plan)
 
-Status: design only, nothing of this section is implemented yet; the plan by steps is §22.8. The question: what do the
+Status: design, except `bp run`, `--watch` and `bp new` (§22.1), which exist; the plan by steps is §22.8. The question: what do the
 users of Go, Rust, Zig, Swift, Kotlin, Gleam and Deno praise most, and which of it Better Pascal still lacks. The answer is
 almost all tooling, not the language: one command from a script to a cross build, a checker that teaches, tests that catch
 leaks, derived boilerplate, a profiler, a page to try the language in. Each item rests on something FPC already ships, so
@@ -1734,11 +1776,11 @@ each is small. The `sp` tool of §15 and §16 is `bp` (`tools/bp`); the names be
 
 | Loved in | Better Pascal | Rests on | Cost |
 |---|---|---|---|
-| `go run`, `cargo run`, Deno scripts | `bp run FILE.pas [args]`: check, build into the cache by the hash of the sources, run. With `#!/usr/bin/env -S bp run` on its first line a Pascal file is a script | the caches of `tools/bp build`; the idea of `instantfpc`, shipped with FPC | about 20 lines of `tools/bp` |
-| `cargo watch`, `deno --watch`, `zig build --watch` | `bp run --watch`, `bp build --watch`: check and rebuild on save (an mtime poll every 200 ms; a cached check takes about 30 ms) | the same caches | about 15 lines |
+| `go run`, `cargo run`, Deno scripts | `bp run FILE.pas [args]`: check, build into the cache by the hash of the sources, run. With `#!/usr/bin/env -S bp run` on its first line a Pascal file is a script (fpc does not take the `#!` line, so `bp` checks and builds a copy with that line blank: line numbers stay, findings name the script) | the caches of `tools/bp build`; the idea of `instantfpc`, shipped with FPC | **exists** (`tools/bp`, `tests/bp.sh`): the binary is cached by the hash of the sources, the fpc version and the options; a second run takes about 30 ms |
+| `cargo watch`, `deno --watch`, `zig build --watch` | `bp run --watch`, `bp build --watch`: check and rebuild on save (an mtime poll every 200 ms; a cached check takes about 30 ms); the running program is stopped (SIGTERM, SIGKILL after 2 s) before it runs again, and a failed check keeps the watch | the same caches | **exists** (`tools/bp`, `tests/bp.sh`) |
 | the `toolchain` line of Go 1.21, `rust-toolchain.toml` | an `fpc 3.2.2` line in `deps.txt` (§15): `bp` fetches that release once, checks its SHA-256, keeps it in the cache and builds with it; a project builds the same in ten years | the official FPC release archives | a download and a checksum |
 | `GOOS=linux GOARCH=arm64 go build`, `zig build -Dtarget=` | `bp build --target aarch64-linux`: the cross compiler and its RTL are built once from the sources of the same release and cached | `make crossall` of FPC, which the CI of this repository already runs for i386 and aarch64 | a few minutes per target, once |
-| `cargo new`, `gleam new` | `bp new NAME`: a directory with `deps.txt`, `main.pas` (`uses BP`) and a test | | a few lines |
+| `cargo new`, `gleam new` | `bp new NAME`: a directory with `deps.txt`, `NAME.pas` (`uses BP`; the file is named after the program, S21), `tests/test_NAME.pas` and a three-line `README.md` | | **exists** (`tools/bp`, `tests/bp.sh` builds and tests the generated project) |
 
 The hard part of cross compiling elsewhere is the sysroot: the headers and the libc of the target. The default Linux
 binary of Better Pascal has no libc (§18), so a Linux target needs no sysroot at all, only the binutils of the target (`as`,
@@ -1783,8 +1825,9 @@ this as its main feature; here it is a side effect of §18.
   `N` for about a second and prints ns/op and allocations/op (from the heap status). The `bench_*.pas` of `tests/bench` move
   to it.
 - **Fuzzing** (§16) runs in the same runner: `Fuzz*` methods.
-- **Doc tests** (Rust): a `pascal` code block of the README or of this specification that is a whole program is compiled by
-  `bp test --doc`, so the examples of the documents cannot rot.
+- **Doc tests** (Rust): the Pascal examples of the documents are compiled and linted in CI today (`tools/doctest.py`; the
+  info string `pascal plan` marks a design that does not compile yet, `pascal sketch` an illustration that is not a program
+  of its own), and `bp test --doc` will run them, so the examples cannot rot.
 - **Concurrency by seed**: `bp test --seed N` (§21.3) replays a failing interleaving.
 
 ### 22.4 Derived code instead of boilerplate
@@ -1848,7 +1891,7 @@ One step is one PR from a fresh `main`, with a criterion of done.
 
 0. **S21a and S21b** (§22.9; they close H17, so they go first): definite assignment of class references, the size of a class.
    *Done:* ok/bad lint tests; the rows of §8 updated.
-1. `bp run`, `--watch`, `bp new` in `tools/bp`. *Done:* `tests/bp.sh` runs a script with a shebang, and a second run comes
+1. `bp run`, `--watch`, `bp new` in `tools/bp` (**done**). *Criterion:* `tests/bp.sh` runs a script with a shebang, and a second run comes
    from the cache.
 2. `bp explain` and the readable output. *Done:* every code of §6 and §20 has an entry and an example from `tests/lint`.
 3. The format check and `Fmt` (S20, §22.2) in the typed `bpvet` and the runtime. *Done:* ok/bad lint tests; `--fix` writes the
@@ -1971,7 +2014,7 @@ and F, so the branch to a pure Pascal fallback costs nothing there.
 
 ### 23.5 Bindings: a table of names, not `external`
 
-```pascal
+```pascal plan
 type
   TZlib = record                                    // a binding module, // UNSAFE-UNIT:
     zlibVersion: function: PChar; cdecl;
