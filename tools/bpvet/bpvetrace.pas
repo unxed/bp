@@ -5,8 +5,9 @@
           task only as Copy(X), a fresh value (an array literal, a function result) or the last use of a local;
     S11s  Sync = frozen or declared: TShared<X> in a task field or in a channel message needs X frozen (its fields are
           written only in its constructors, and their types are frozen too) or a // sync: <how> mark on X;
-    S19   static mut is unsafe: a global of a unit is written only in initialization or finalization (and in the
-          main block of a program), or it is a threadvar, or the write is marked // UNSAFE: <why>.
+    S19   static mut is unsafe: a global of a unit is written only in initialization or finalization, or it is a
+          threadvar, or the write is atomic (Interlocked*) or marked // UNSAFE: <why>; a global of a program is not
+          named by a routine that a task reaches.
   A // UNSAFE-UNIT: module is not checked. }
 unit BpvetRace;
 
@@ -65,6 +66,15 @@ type
       const Writes: Boolean);
     procedure ScanDecls(const Decls: TPasDeclarations);
     procedure CheckTypes(const Decls: TPasDeclarations);
+    function ImplOf(const P: TPasProcedure): TPasProcedure;
+    function DeclOf(const P: TPasProcedure): TPasProcedure;
+    function Overrides(const P, C: TPasProcedure): Boolean;
+    procedure AllProcs(const Decls: TPasDeclarations; const All: TFPList);
+    procedure Reach(const R: TPasProcedure; const Who: String; const Reached: TFPList; const From: TStringList;
+      const All: TFPList);
+    procedure GoSites(const Reached: TFPList; const From: TStringList; const All: TFPList);
+    function SyncGlobal(const N: TPasElement; const D: TPasVariable): Boolean;
+    procedure CheckProgramGlobals(const Prog: TPasProgram);
   public
     constructor Create(const ASrc: TVetSource; const AResolver: TPasResolver; const AModule: TPasModule);
   end;
@@ -610,13 +620,14 @@ begin
       + 'or a local the sender does not use after this line', [What, Verb, NameOf(Arg)]));
     Exit;
   end;
-  if (D is TPasArgument) and (TPasArgument(D).Access <> argDefault) then
+  // a dynamic array passed by value is the array of the caller too: only its reference count grows
+  if D is TPasArgument then
   begin
     Add(Arg, 'S11m', Format('%s shares the array of the parameter %s with the caller, who still holds it: %s '
       + 'Copy(%s)', [What, D.Name, Verb, D.Name]));
     Exit;
   end;
-  if not (((D is TPasVariable) and (D.Parent = FLocals)) or (D is TPasArgument)) then
+  if not ((D is TPasVariable) and (D.Parent = FLocals)) then
   begin
     Add(Arg, 'S11m', Format('%s shares the array of %s, which is not a local of this routine: %s Copy(%s)',
       [What, D.Name, Verb, D.Name]));
@@ -839,6 +850,173 @@ begin
   end;
 end;
 
+{ The routine with the body of a declared one. }
+function TRace.ImplOf(const P: TPasProcedure): TPasProcedure;
+begin
+  Result := P;
+  if (P.CustomData is TPasProcedureScope) and (TPasProcedureScope(P.CustomData).ImplProc <> nil) then
+    Result := TPasProcedureScope(P.CustomData).ImplProc;
+end;
+
+{ The declaration of a routine with a body (in its class for a method). }
+function TRace.DeclOf(const P: TPasProcedure): TPasProcedure;
+begin
+  Result := P;
+  if (P.CustomData is TPasProcedureScope) and (TPasProcedureScope(P.CustomData).DeclarationProc <> nil) then
+    Result := TPasProcedureScope(P.CustomData).DeclarationProc;
+end;
+
+{ P overrides the method C, directly or through other overrides: a call of C may run P. }
+function TRace.Overrides(const P, C: TPasProcedure): Boolean;
+var
+  X, Want: TPasProcedure;
+  Depth: Integer;
+begin
+  Want := DeclOf(C);
+  X := DeclOf(P);
+  Depth := 0;
+  while (X <> nil) and (X.CustomData is TPasProcedureScope) and (Depth < 64) do
+  begin
+    X := TPasProcedureScope(X.CustomData).OverriddenProc;
+    if (X <> nil) and (DeclOf(X) = Want) then
+      Exit(True);
+    Inc(Depth);
+  end;
+  Result := False;
+end;
+
+procedure TRace.AllProcs(const Decls: TPasDeclarations; const All: TFPList);
+var
+  I: Integer;
+  D: TPasElement;
+begin
+  if Decls = nil then
+    Exit;
+  for I := 0 to Decls.Declarations.Count - 1 do
+  begin
+    D := TPasElement(Decls.Declarations[I]);
+    if (D is TPasProcedure) and (TPasProcedure(D).Body <> nil) then
+    begin
+      All.Add(D);
+      AllProcs(TPasProcedure(D).Body, All);
+    end;
+  end;
+end;
+
+{ Go(@Proc) among the nodes in FNodes: Proc runs on another goroutine. }
+procedure TRace.GoSites(const Reached: TFPList; const From: TStringList; const All: TFPList);
+var
+  L: Integer;
+  E: TParamsExpr;
+  C, A: TPasElement;
+begin
+  for L := 0 to FNodes.Get.Count - 1 do
+  begin
+    if not ((TObject(FNodes.Get[L]) is TParamsExpr) and (TParamsExpr(FNodes.Get[L]).Kind = pekFuncParams)) then
+      Continue;
+    E := TParamsExpr(FNodes.Get[L]);
+    C := E.Value;
+    if (C is TBinaryExpr) and (TBinaryExpr(C).OpCode = eopSubIdent) then
+      C := TBinaryExpr(C).right;
+    C := Ref(C);
+    if not ((C is TPasProcedure) and SameText(C.Name, 'Go') and (Length(E.Params) = 1)) then
+      Continue;
+    A := E.Params[0];
+    if (A is TUnaryExpr) and (TUnaryExpr(A).OpCode = eopAddress) then
+    begin
+      A := Ref(TUnaryExpr(A).Operand);
+      if A is TPasProcedure then
+        Reach(ImplOf(TPasProcedure(A)), A.Name, Reached, From, All);
+    end;
+  end;
+end;
+
+procedure TRace.Reach(const R: TPasProcedure; const Who: String; const Reached: TFPList; const From: TStringList;
+  const All: TFPList);
+begin
+  if (R <> nil) and (All.IndexOf(R) >= 0) and (Reached.IndexOf(R) < 0) then
+  begin
+    Reached.Add(R);
+    From.Add(Who);
+  end;
+end;
+
+{ A global that goroutines may share by construction: a channel or an RTL lock, or an argument of an Interlocked call. }
+function TRace.SyncGlobal(const N: TPasElement; const D: TPasVariable): Boolean;
+var
+  T: TPasType;
+  C: TPasElement;
+begin
+  T := TypeOf(D.VarType);
+  if (T <> nil) and (StartsWithName(T.Name, 'TChan') or SameText(T.Name, 'TRTLCriticalSection')) then
+    Exit(True);
+  Result := False;
+  if (N.Parent is TParamsExpr) and (TParamsExpr(N.Parent).Kind = pekFuncParams) then
+  begin
+    C := Ref(TParamsExpr(N.Parent).Value);
+    Result := (C is TPasProcedure) and SameText(Copy(C.Name, 1, 11), 'Interlocked');
+  end;
+end;
+
+{ S19 in a program: its globals are the locals of the main goroutine, so a routine that a task reaches (from the Run of a
+  task class of the program or a Go(@Proc), through calls and overrides) does not name them. }
+procedure TRace.CheckProgramGlobals(const Prog: TPasProgram);
+var
+  All, Reached: TListBox;
+  From: TLinesBox;
+  I, J, K: Integer;
+  P, Q: TPasProcedure;
+  N, D: TPasElement;
+begin
+  All := TListBox.Own(TFPList.Create);
+  Reached := TListBox.Own(TFPList.Create);
+  From := TLinesBox.Own(TStringList.Create);
+  AllProcs(Prog.ProgramSection, All.Get);
+  // the entries: the Run of a task class, the procedures given to Go
+  for I := 0 to All.Get.Count - 1 do
+  begin
+    P := TPasProcedure(All.Get[I]);
+    Q := DeclOf(P);
+    if (Q.Parent is TPasClassType) and SameText(Q.Name, 'Run') and IsTaskClass(TPasClassType(Q.Parent)) then
+      Reach(P, Q.Parent.Name + '.Run', Reached.Get, From.Get, All.Get);
+    FNodes.Get.Clear;
+    if P.Body.Body <> nil then
+      P.Body.Body.ForEachCall(@Collect, nil);
+    GoSites(Reached.Get, From.Get, All.Get);
+  end;
+  FNodes.Get.Clear;
+  if Prog.InitializationSection <> nil then
+    Prog.InitializationSection.ForEachCall(@Collect, nil);
+  GoSites(Reached.Get, From.Get, All.Get);
+  // the routines they reach, and the globals those name
+  I := 0;
+  while I < Reached.Get.Count do
+  begin
+    P := TPasProcedure(Reached.Get[I]);
+    FNodes.Get.Clear;
+    if P.Body.Body <> nil then
+      P.Body.Body.ForEachCall(@Collect, nil);
+    for J := 0 to FNodes.Get.Count - 1 do
+    begin
+      N := TPasElement(FNodes.Get[J]);
+      D := Ref(N);
+      if D is TPasProcedure then
+      begin
+        Reach(ImplOf(TPasProcedure(D)), From.Get[I], Reached.Get, From.Get, All.Get);
+        for K := 0 to All.Get.Count - 1 do
+          if Overrides(TPasProcedure(All.Get[K]), TPasProcedure(D)) then
+            Reach(TPasProcedure(All.Get[K]), From.Get[I], Reached.Get, From.Get, All.Get);
+      end
+      else if (N is TPrimitiveExpr) and (D is TPasVariable) and not (D is TPasConst) and not (D is TPasProperty)
+        and (D.Parent = Prog.ProgramSection) and not IsThreadVar(D) and not SyncGlobal(N, TPasVariable(D)) then
+        Add(N, 'S19', Format('the global %s of the program is named in %s, which the task %s reaches: the main '
+          + 'goroutine and the task would share it; give the task its own value (a field, a parameter) or send it '
+          + 'through a channel', [D.Name, P.Name, From.Get[I]]));
+    end;
+    Inc(I);
+  end;
+end;
+
 procedure VetCheckRaces(const Src: TVetSource; const Module: TPasModule; const Resolver: TPasResolver;
   var Report: TVetReport);
 var
@@ -857,6 +1035,8 @@ begin
     R.Get.ScanDecls(TPasProgram(Module).ProgramSection);
     R.Get.Scan(Module.InitializationSection, TPasProgram(Module).ProgramSection, nil, False);
   end;
+  if Module is TPasProgram then
+    R.Get.CheckProgramGlobals(TPasProgram(Module));
   R.Get.CheckTypes(Module.InterfaceSection);
   R.Get.CheckTypes(Module.ImplementationSection);
   if Module is TPasProgram then

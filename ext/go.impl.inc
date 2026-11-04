@@ -124,6 +124,10 @@ begin
       WaitLocked(-1);
     if FClosed then
       SafeFail('SAFE-R6: send on closed channel');
+    // R17: a dynamic array is a reference; a second holder of it would share it with the receiver (H14, S11m)
+    if SafeDebugChecks and (GetTypeKind(T) = tkDynArray) and (SafeDynArrayRefs(PPointer(@V)^) > 1) then
+      SafeFail(Format('SAFE-R17: Send of a dynamic array that %d variables hold: the receiver would share it with '
+        + 'them; send Copy(A), or a local that nothing else holds', [SafeDynArrayRefs(PPointer(@V)^)]));
     FBuf[(FHead + FCount) mod Length(FBuf)] := V;
     Inc(FCount);
     Inc(FSentSeq);

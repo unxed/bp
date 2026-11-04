@@ -87,7 +87,7 @@ begin
     end;
     EnterCriticalSection(CS);   // the recursive RTL lock
     EnterCriticalSection(CS);
-    Inc(Shared);
+    Inc(Shared); // UNSAFE: under CS
     LeaveCriticalSection(CS);
     LeaveCriticalSection(CS);
   end;
@@ -120,6 +120,7 @@ var
 begin
   N := 0;
   // once TryLock fails the object is gone for good; the cap only guards against a hang
+  // UNSAFE: the main thread writes GWeak only while no hammer runs
   while (N < 1000000) and L.TryLock(GWeak) do
   begin
     if L.Get.Magic <> StressMagic then
