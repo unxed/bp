@@ -15,7 +15,7 @@ rtl=
 trap '[ -n "$rtl" ] && rm -rf "$rtl"' EXIT
 if grep -lq '^// ARGS: .*@rtl@' "$here"/lint/*.pas; then
   rtl=$(mktemp -d)
-  python3 "$root/tools/bpvet/resolver/genstubs.py" "$rtl" "$here/lint" "$root/tools/spikes/region" "$root/safe" \
+  python3 "$root/tools/bpvet/resolver/genstubs.py" "$rtl" "$here/lint" "$root/bp.pas" "$root/tools/spikes/region" "$root/safe" \
     "$root/ext" >/dev/null || exit 1
 fi
 

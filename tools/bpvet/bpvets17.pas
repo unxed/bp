@@ -82,6 +82,7 @@ type
     function TypeOf(const E: TPasExpr): TPasType;
     function Resolve(const T: TPasElement): TPasType;
     function Alloc(const E: TPasExpr; const F: TFlow): TRoots;
+    function HoldsRef(const T: TPasType; const Depth: Integer): Boolean;
     function Tracked(const E: TPasExpr): Boolean;
     function RootIndex(const Decl: TPasElement): Integer;
     function AddRoot(const AKind: TRootKind; const ADecl: TPasElement; const AName: String): Integer;
@@ -383,13 +384,35 @@ begin
 end;
 
 { The value of E can refer to the region style: a class, a record, a pointer or an array; not a number or a string. }
-function TS17.Tracked(const E: TPasExpr): Boolean;
+{ A value of type T can hold a value of a region: an object of a region class (or a TObject), a pointer, or a record
+  or an array with one inside. An object of another class is on the heap, and so are its fields. }
+function TS17.HoldsRef(const T: TPasType; const Depth: Integer): Boolean;
 var
-  T: TPasType;
+  I: Integer;
+  M: TPasElement;
 begin
-  T := TypeOf(E);
-  Result := (T is TPasClassType) or (T is TPasRecordType) or (T is TPasPointerType) or (T is TPasArrayType)
-    or ((T <> nil) and SameText(T.Name, 'Pointer'));
+  Result := False;
+  if (T = nil) or (Depth > 8) then
+    Exit;
+  if T is TPasClassType then
+    Exit(IsRegionClass(T) or SameText(T.Name, 'TObject'));
+  if (T is TPasPointerType) or SameText(T.Name, 'Pointer') or IsGrowArray(T) then
+    Exit(True);
+  if T is TPasArrayType then
+    Exit(HoldsRef(Resolve(TPasArrayType(T).ElType), Depth + 1));
+  if T is TPasRecordType then
+    for I := 0 to TPasRecordType(T).Members.Count - 1 do
+    begin
+      M := TPasElement(TPasRecordType(T).Members[I]);
+      if (M is TPasVariable) and not (M is TPasConst) and not (M is TPasProperty)
+        and HoldsRef(Resolve(TPasVariable(M).VarType), Depth + 1) then
+        Exit(True);
+    end;
+end;
+
+function TS17.Tracked(const E: TPasExpr): Boolean;
+begin
+  Result := HoldsRef(TypeOf(E), 0);
 end;
 
 function TS17.RootIndex(const Decl: TPasElement): Integer;
@@ -670,6 +693,9 @@ begin
       Result := RegionArgs
     else
       Result := Current(F);
+    // a value that cannot hold a value of a region is in none
+    if (Result <> 0) and (Where is TPasExpr) and not Tracked(TPasExpr(Where)) then
+      Result := 0;
   end;
 end;
 

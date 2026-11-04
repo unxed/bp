@@ -11,7 +11,7 @@ unit BpvetTyped;
 interface
 
 uses
-  SysUtils, Classes, Contnrs, PasTree, PScanner, PParser, PasResolveEval, PasResolver, BpvetCore, BpvetS17, Safe;
+  SysUtils, Classes, Contnrs, PasTree, PScanner, PParser, PasResolveEval, PasResolver, BpvetCore, BpvetS17, BpvetRace, Safe;
 
 { Resolves the module of Src and checks it with S17 (bpvets17.pas): True when it and every unit it uses resolve;
   otherwise a fatal with the position is in Report. UnitDirs are searched for the used units after RtlDir (the stubs), then the directory of the file.
@@ -381,7 +381,10 @@ begin
     Result := False;
   end;
   if Result then
+  begin
     VetCheckS17(Src, M, Main, Report);
+    VetCheckRaces(Src, M, Main, Report);
+  end;
   if not Result then
     // the main module and every unit left unfinished by the failure are not used again
     for I := 0 to S.Modules.Get.Count - 1 do

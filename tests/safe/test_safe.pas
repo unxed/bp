@@ -108,7 +108,7 @@ var
   A, C, D: TProbeBox;
   Caught: string;
 begin
-  SafeDebugChecks := True;
+  SafeDebugChecks := True; // UNSAFE: one goroutine runs the tests
   try
     D := TProbeBox.Own(TProbe.Create('k1'));
     D.Reset; // the only owner: no finding
@@ -123,7 +123,7 @@ begin
     end;
     Check((Pos('SAFE-R9', Caught) > 0) and (Pos('TProbe', Caught) > 0), 'owned: SAFE_DEBUG catches a copy (R9)');
   finally
-    SafeDebugChecks := False;
+    SafeDebugChecks := False; // UNSAFE: one goroutine runs the tests
   end;
   A.Reset;
   C.Reset;
@@ -241,7 +241,7 @@ begin
   Ar := TArena.Create;
   Check(Ar.Generation = 0, 'arena: generation 0 after Create');
   Plain := TProbeArenaRef.Adopt(TProbe.Create('g1'), Ar); // checks off: a plain reference
-  SafeDebugChecks := True;
+  SafeDebugChecks := True; // UNSAFE: one goroutine runs the tests
   try
     R := TProbeArenaRef.Adopt(TProbe.Create('g2'), Ar);
     Check((R.Get.Name = 'g2') and not R.IsStale, 'arena ref: Get before FreeAll');
@@ -260,7 +260,7 @@ begin
     R := TProbeArenaRef.Adopt(TProbe.Create('g3'), Ar);
     Check((R.Get.Name = 'g3') and not R.IsStale, 'arena ref: a new reference after FreeAll is valid');
   finally
-    SafeDebugChecks := False;
+    SafeDebugChecks := False; // UNSAFE: one goroutine runs the tests
   end;
   R := TProbeArenaRef.Adopt(TProbe.Create('g4'), Ar); // reuses R: the debug link must be cleared
   Check(not R.IsStale and (R.Get.Name = 'g4'), 'arena ref: re-Adopt without checks clears the link');
@@ -334,7 +334,7 @@ var
   PA: TCycleNode;
   Caught: string;
 begin
-  SafeDebugChecks := True;
+  SafeDebugChecks := True; // UNSAFE: one goroutine runs the tests
   try
     A := TCycleRef.Share(TCycleNode.Create('h1'));
     B := TCycleRef.Share(TCycleNode.Create('h2'));
@@ -359,7 +359,7 @@ begin
       and (Pos('path TCycleNode -> TCycleNode -> TCycleNode;', Caught) > 0)
       and (Pos('TWeak', Caught) > 0), 'cycle: SafeCheckNoLeaks reports the TShared cycle (H2)');
   finally
-    SafeDebugChecks := False;
+    SafeDebugChecks := False; // UNSAFE: one goroutine runs the tests
   end;
   Tmp := PA.Next; // a local owner of h2, so that h1 is not freed while its own field is being reset
   PA.Next.Reset;
