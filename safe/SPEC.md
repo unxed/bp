@@ -51,7 +51,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
-| Final touches: `bp run` and scripts, `--watch`, the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **design (plan)** | §22 |
+| Final touches: `bp run` and scripts, `--watch`, the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **design (plan)**, doc tests exist (`tools/doctest.py`) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
 | An uninitialized local class reference, function result or `out` parameter (H17) | **open**: FPC warns, `bp build` does not fail on it | §8, §22.9 |
@@ -389,7 +389,7 @@ in local variables). In a release you can drop `-Cr -Co -CR`; the R1–R4 checks
 
 ## §7. Unsafe
 
-```pascal
+```pascal sketch
 // UNSAFE: Buf is allocated for Len bytes on the line above and freed in the finally of this same procedure
 System.GetMem(Buf, Len);
 ```
@@ -466,7 +466,7 @@ compensating check, and accepted risks are listed with a reason.
 
 **H1. A borrow outlives its owner.**
 
-```pascal
+```pascal sketch
 var Cache: TFoo;                      // a global of a class type without // borrow:
 procedure Load;
 var Box: TFooBox;
@@ -487,7 +487,7 @@ the rule is added when the dialect moves to FPC 3.3+.
 
 **H2. A `TShared` cycle.**
 
-```pascal
+```pascal sketch
 type
   TNode = class;
   TNodeRef = specialize TShared<TNode>;
@@ -513,7 +513,7 @@ hint "a back reference is `TWeak`". Step 9.
 
 **H3. Use after `TArena.FreeAll`.**
 
-```pascal
+```pascal sketch
 var
   Arena: TArena;
   N: TNode;                           // borrow: arena
@@ -542,7 +542,7 @@ zero cost yet: `Get` is a non-inlined call on a record with a managed field. Unt
 
 **H4. `^T`, `@` and pointer arithmetic.**
 
-```pascal
+```pascal sketch
 type PInt = ^Integer;                 // ^T: no warning today
 procedure Bump;
 var X: Integer; P: PInt;
@@ -561,7 +561,7 @@ not, nor is `@Proc` / `@Obj.Method` of a procedure or method declared in the mod
 
 **H5. A copy of `TOwned`.**
 
-```pascal
+```pascal sketch
 procedure Use(Box: TFooBox);          // TOwned by value: a hidden copy
 begin
   Box.Get.Run;
@@ -581,7 +581,7 @@ raises `ESafety` with the type name. Step 6.
 
 **H6. Shared task fields; `TWeak.TryLock` across threads.**
 
-```pascal
+```pascal sketch
 type
   TWorker = class(TTask)
     Log: TStringList;                 // a mutable object the caller also uses
@@ -599,7 +599,7 @@ count that never grows back from zero (stress test in `test_threads`, x86_64, i3
 
 **H7. `.Destroy` outside unsafe.**
 
-```pascal
+```pascal sketch
 var Box: TFooBox; F: TFoo;
 begin
   Box := TFooBox.Own(TFoo.Create);
@@ -612,7 +612,7 @@ Now: `bpvet` S3 error, the hint is `TOwned.Reset` or `// UNSAFE:`. Step 4.
 
 **H8. `TFoo.Create` not passed to an owner; legacy string types.**
 
-```pascal
+```pascal sketch
 procedure Leak;
 var F: TFoo; S: ShortString;
 begin
@@ -627,7 +627,7 @@ Now: R3 catches only `Own/Share/Adopt` of a `TInterfacedObject`; the rest passes
 
 **H9. `Safe` is not last in `uses`.**
 
-```pascal
+```pascal sketch
 uses Safe, Classes, SysUtils;         // SysUtils comes after Safe
 var Obj: TFoo;
 begin
@@ -647,7 +647,7 @@ of step 2b: a program header that installs the thread manager first and still en
 
 **H10. Unmarked unsafe code, `external` in a safe module.**
 
-```pascal
+```pascal sketch
 unit Fast;                            // neither `uses Safe` nor `// UNSAFE-UNIT:`
 interface
 function CStrLen(S: PChar): SizeInt; cdecl; external 'c' name 'strlen';
@@ -661,7 +661,7 @@ Now: `bpvet` S8 (`// UNSAFE:` / `// UNSAFE-UNIT:` marks) and S12 (`external` onl
 
 **H11. A non-exhaustive `case`, a parameter without `const`.**
 
-```pascal
+```pascal sketch
 type TColor = (Red, Green, Blue);
 function ColorName(C: TColor): String; // no const
 begin
@@ -676,7 +676,7 @@ Now: `bpvet` S13 reports the missing `Blue`; S14 warns that `C` is never changed
 
 **H12. Range checks switched off in safe code.**
 
-```pascal
+```pascal sketch
 {$R-}                                 // without // UNSAFE:
 var A: array[0..3] of Integer; I: Integer;
 begin
@@ -692,7 +692,7 @@ compiler checks because runtime checks R1–R4 remain enabled. `bpvet` S16 warns
 
 **H13. Turbo Pascal style `object` code.**
 
-```pascal
+```pascal sketch
 type
   PView = ^TView;
   TView = object
@@ -942,6 +942,8 @@ This is a few dozen lines on top of `sp test`.
 Tagged variant records have existed in Pascal since 1970. Two checks are missing, and both are the linter's job, not the library's:
 
 ```pascal
+uses Safe;
+
 type
   TShapeKind = (skCircle, skRect);
   TShape = record
@@ -951,7 +953,7 @@ type
       skRect:   (W, H: Double);
   end;
 
-function Circle(const AName: String; AR: Double): TShape;   // create only this way
+function Circle(const AName: String; const AR: Double): TShape;   // create only this way
 begin
   Result := Default(TShape); Result.Name := AName; Result.Kind := skCircle; Result.R := AR;
 end;
@@ -1295,7 +1297,7 @@ own), the ban on dynamic dispatch (classes and virtual methods work in the regio
 
 API sketch (names may change in the spike steps of the plan):
 
-```pascal
+```pascal plan
 TRegion = record                          // a bump pointer in blocks that double in size; a managed record
   class function Create: TRegion; static; // the new region becomes the current one of the goroutine
   procedure Reset;                        // rewind to empty, keep the largest block: one region per loop iteration
@@ -1370,7 +1372,7 @@ goes; nobody passes a region around. Better Pascal gets close to that without a 
 - **A routine that declares no `TRegion` allocates in the region of its caller.** This is how a result is "built in the
   caller's destination" in Goose: no region parameter, no copy.
 
-  ```pascal
+  ```pascal plan
   type
     TFields = class(TRegionObject)
       Key, Value: String;
@@ -1447,7 +1449,7 @@ reading memory of another object. A release build reuses the memory.
 
 The aim is the surface of Go: no wrapper, no `.Get`, no owner to choose. A GC object is an ordinary class:
 
-```pascal
+```pascal plan
 type
   TNode = class(TGcObject)      // references first: the collector follows them
     Next, Child: TNode;
@@ -1546,7 +1548,7 @@ Four parts of Better Pascal answer one question, "what is undone when this scope
 undo. The region of §20 already keeps that list (the finalizers of objects with managed fields), so it can hold the other
 three:
 
-```pascal
+```pascal plan
 for S in Scope do                       // or a TRegion local for the whole routine
 begin
   S.Hold(Lines, TStringList.Create);    // any existing class: Destroy is called when the scope ends
@@ -1783,8 +1785,9 @@ this as its main feature; here it is a side effect of §18.
   `N` for about a second and prints ns/op and allocations/op (from the heap status). The `bench_*.pas` of `tests/bench` move
   to it.
 - **Fuzzing** (§16) runs in the same runner: `Fuzz*` methods.
-- **Doc tests** (Rust): a `pascal` code block of the README or of this specification that is a whole program is compiled by
-  `bp test --doc`, so the examples of the documents cannot rot.
+- **Doc tests** (Rust): the Pascal examples of the documents are compiled and linted in CI today (`tools/doctest.py`; the
+  info string `pascal plan` marks a design that does not compile yet, `pascal sketch` an illustration that is not a program
+  of its own), and `bp test --doc` will run them, so the examples cannot rot.
 - **Concurrency by seed**: `bp test --seed N` (§21.3) replays a failing interleaving.
 
 ### 22.4 Derived code instead of boilerplate
@@ -1971,7 +1974,7 @@ and F, so the branch to a pure Pascal fallback costs nothing there.
 
 ### 23.5 Bindings: a table of names, not `external`
 
-```pascal
+```pascal plan
 type
   TZlib = record                                    // a binding module, // UNSAFE-UNIT:
     zlibVersion: function: PChar; cdecl;
