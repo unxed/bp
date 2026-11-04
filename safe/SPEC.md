@@ -1863,8 +1863,9 @@ One step is one PR from a fresh `main`, with a criterion of done.
    verdict.
 10. Spike: S21c (§22.9) on the calculator and on one unit of tve. *Done:* the tests and marks per 100 lines; a verdict:
     error, warning or not taken.
-11. Spike: hot reload of bodies (§22.10), only if the fast restart is not enough. *Done:* a changed routine of a running
-    program is patched on x86_64, a changed layout restarts it; or a verdict.
+11. Spike: hot reload of bodies (§22.10), only if the fast restart is not enough: a `-dSAFE_LIBC` build with exported
+    symbols, the patch as a shared object bound by the host `dlopen`. *Done:* a changed routine of a running program is
+    patched on x86_64, a changed layout restarts it; or a verdict.
 
 ## §23. Systems programming and the world of C (design, plan)
 
@@ -2086,13 +2087,18 @@ virtual method, a global or a threadvar added, removed or moved; the typed `bpve
 back to a restart, which takes a fraction of a second (§22.1). An inlined routine changes its callers, so they are patched
 too, or a debug build does not inline. No object ever meets a layout other than its own, so the guarantees hold.
 
-The cost is the loader. A static binary without libc has no `dlopen` (static-everywhere draws the same line: its Profile S
-has no `dlopen`, its Profile H loads from the host), and a shared library would not help anyway: the patch must bind to the
-globals and routines of the running program, not to copies of them. What is needed is a small relocator in debug builds:
-read the object file of the changed unit, put its sections into new executable pages, resolve its symbols against the map of
-the running program (the link map of its build), apply the few relocation types that FPC emits on the architecture, then
-write the jumps. A few hundred lines per architecture, Linux first. It is the last spike of §22.8, and it is done only if the
-fast restart proves not enough, for example for a text-mode program with a lot of state on the screen.
+The loader costs less than it seems, because a build for hot reload does not have to be static. A static binary without
+libc has no `dlopen` (static-everywhere draws the same line: its Profile S has none, its Profile H loads from the host), and
+two answers exist in the fork of goffi (unxed/goffi): Profile U, shipped, which strips `PT_INTERP` and re-executes the binary
+through the host's own `ld.so` at startup, and ADR-001, a userspace ELF loader of its own, still a proposal. Hot reload needs
+neither: it is a development mode, so its build is a `-dSAFE_LIBC` build (Profile H) whose symbols are exported (`-k-E`),
+and the patch is the object of the changed unit compiled position-independent (`-Cg`) and linked as a shared object with
+its symbols left unresolved. The host `dlopen` then binds those symbols to the running program, to its globals, its heap
+and its RTL, not to copies; `bp` writes the jumps. What remains of our own is the comparison of layouts and the writing of
+the jumps. A relocator of our own is the fallback only for a static build, and it is not planned. A release build stays
+static. The spike checks the chain on x86_64: an FPC unit built with `-Cg` and linked with `ld -shared` binds against an FPC
+program linked with `-k-E`. It stays the last spike of §22.8, done only if the fast restart proves not enough, for
+example for a text-mode program with a lot of state on the screen.
 
 ## §24. Concept v4: one sentence, marks by the machine, what FPC already ships (design, plan)
 
