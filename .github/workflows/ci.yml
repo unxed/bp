@@ -157,7 +157,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Free Pascal and wine
         timeout-minutes: 4
-        run: tools/ci-apt.sh fp-compiler wine64 wine
+        run: CI_APT_SECONDS=150 tools/ci-apt.sh fp-compiler wine64 wine
       - name: Cache cross compiler
         id: cache
         uses: actions/cache@v4
