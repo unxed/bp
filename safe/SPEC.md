@@ -1558,7 +1558,7 @@ by trial deletion, as in CPython). It needs no stack scan and frees acyclic garb
 
 ## §21. Concept v3: fewer things, fewer holes (design, plan)
 
-Status: design only, nothing of this section is implemented yet; the plan by steps is §21.7. A fresh look at the whole
+Status: design; done are step 1 (§21.2) and the spike of the M:N switch (§21.3), the plan by steps is §21.7. A fresh look at the whole
 concept against the table of the README (Rust, Go, Goose, Zig, Mojo) and the languages it does not name (Swift, Odin, Nim,
 Pony, D, C#, Hylo, Erlang). Four changes. Each one reuses a mechanism that Better Pascal or FPC already has, so each one is
 small; two of them remove concepts rather than add them.
@@ -1691,6 +1691,66 @@ goroutine with no extra code. A green thread is a stack and a saved stack pointe
 - `-dSAFE_LIBC` stays 1:1 (libc keeps state of its own in each kernel thread); a define keeps 1:1 in the default mode until
   M:N is proven.
 
+#### Spike 4 result: the M:N switch (2026-11-05, FPC 3.2.2)
+
+A prototype (`tools/spikes/mn/`, run by CI on x86_64, aarch64 and i386 at -O1, -O2 and -O2 -Ct): a goroutine is a region
+of the size and layout of a `BPThreads` stack (the head of the thread record at its start), carved out of one reservation;
+a switch is about ten instructions per architecture (push the callee-saved registers, swap the stack pointer, pop); one
+carrier thread runs a FIFO run queue; the hooks `RTLEventWaitFor`/`RTLEventSetEvent` park and wake a goroutine and a
+contended `EnterCriticalSection` yields. Verdict: **worth it; step 5 goes on**, with the changes listed below.
+
+- **It works on all three targets with no change to `TChan`:** two goroutines on one kernel thread (the same `gettid`)
+  exchange values over unbuffered channels of `ext/go`; threadvars (an `Integer`, a `String`, `ThreadID` of the RTL) follow
+  each goroutine; `try/finally` and `except` run on the goroutine's own stack, and an exception of one goroutine stays live
+  across switches while another one raises and handles its own (a re-raise gives the right one); `ESafety` of `TChan` is
+  caught in a goroutine; 2 x 10^4 strings and objects made in one goroutine are freed in another, and the heap of the
+  producer does not grow over a second round; 1:1 threads keep working under the same hooks. Deadlock detection comes
+  free: when no goroutine is ready the scheduler returns with the parked ones.
+- **The numbers** (-O2; the GitHub runner, i386 natively there too; aarch64 only under qemu, so its times are not those of
+  hardware):
+
+  | | x86_64 | i386 | aarch64 (qemu) |
+  |---|---|---|---|
+  | a switch, with the scheduler loop | 18 ns | 13 ns | 450 ns |
+  | a round trip over two unbuffered `TChan`, M:N on one carrier | 0.45 us | 0.41 us | 26 us |
+  | the same between two threads, 1:1 (futex) | 20 us | 17 us | 97 us |
+  | a parked goroutine, the default heap of the RTL | 44.5 KiB | 77 KiB | 44 KiB |
+  | goroutines per GiB, the default heap | 23 thousand | 13.6 thousand | 23 thousand |
+  | a parked goroutine, `growheapsizesmall = 4096` | 12 KiB | 16 KiB | 12 KiB |
+  | goroutines per GiB, `growheapsizesmall = 4096` | 86 thousand | 65 thousand | 90 thousand |
+  | a region (addresses only) | 8 MiB | 1 MiB | 8 MiB |
+
+  So a round trip is 30-45 times faster on one carrier; with `-Ct` over all of `BP` it is 0.8 us. Of a parked goroutine
+  the record and the threadvar block share 8 KiB (the threadvars are 5624 bytes on 64 bits, 5380 on i386), and the stack
+  in use at a park is 0.6-1.6 KiB (one page). The largest part is the heap of the RTL: a thread's first chunk for small
+  blocks of one size is 32 KiB (`growheapsizesmall`), the RTL cuts it into blocks at once, so all of it is touched, and on
+  i386 the two events of a goroutine fall into two sizes (two chunks). Set before a goroutine starts, a 4 KiB first chunk
+  gives the second row.
+- **The start of a goroutine** takes 40-50 us on a new region and 17-26 us on a reused one: `InitThread` of the RTL
+  makes six system calls (`getrlimit`, `isatty` four times, the `mmap` of the heap chunk) and `DoneThread` one more, and
+  each page is a fault. A start without them (copy the text records of the carrier, set the stack bounds directly, keep
+  the heap chunk) is work for step 5.
+- **Guard areas against `-Ct`.** A guard (`PROT_NONE`, 64 KiB as in `BPThreads`, so no frame jumps over it) makes 2
+  mappings per goroutine: about 32 thousand goroutines under the default `vm.max_map_count` of 65530 (Ubuntu 24.04 ships
+  1048576, the GitHub runner 262144); an endless recursion stops the process with SIGSEGV. Without a guard the regions
+  merge into one mapping (0 per goroutine) and `-Ct` raises `EStackOverflow` in the goroutine, which can be caught while
+  the others go on. But `-Ct` is not a guarantee: code built without it (the RTL, C) is not checked and only has the 16 KiB
+  margin of the RTL plus the unused 64 KiB area above the record; and `StackError` of the RTL is one global, so after one
+  overflow the check is off in every thread until something resets it. **Decision proposed: guard areas by default** (exact
+  for every piece of code); no guard with `-Ct` stays an option for more than 32 thousand goroutines.
+- **32 bits:** a region is 1 MiB there, so the address space caps the goroutines at about 3 thousand. M:N on i386 needs a
+  smaller region (the mask is global: the stacks of all threads shrink with it).
+- **Found and fixed in `BPThreads`:** with `-Ct` the thread manager recursed without end (the stack check reads the
+  threadvar `StackBottom` through `RawRelocateThreadVar`, which checked the stack again): `{$S-}` now; on i386 a new thread
+  started with the stack 4 bytes off the 16-byte alignment that FPC expects (`-Ct` checks it).
+- **What step 5 changes** (the runtime, not the spike): the goroutine record and the carving of regions move into
+  `BPThreads` (the spike repeats its layout and checks it at start); the threadvar block lies in the record page (no `mmap`
+  of its own, no `munmap` in `ReleaseThreadVars`); `BeginThread`, `CloseThread` and `WaitForThreadTerminate` serve
+  goroutines, so `TGroup.Go` and every `TThread` become green; the run queue is per carrier and a wake from another carrier
+  is atomic; a timer list for `RTLEventWaitForTimeout` (`Select` with a timeout); the event of a goroutine (`MyEvent` of
+  `ext/go`) can live in its record instead of the heap; the switch saves the FPU control words (MXCSR and x87, FPCR) or a
+  goroutine that changes the rounding mode changes it for the others; `StackError` is reset per goroutine.
+
 ### 21.4 The tree of `TComponent` is an owner
 
 Delphi and Lazarus have had an ownership tree since 1995: `TButton.Create(Form)` gives the button to the form, which
@@ -1761,7 +1821,7 @@ data.
 2. **Spike 4: the M:N switch** (`tools/spikes/mn/`): two goroutines exchange values over a channel on one carrier with a
    stack switch; threadvars, exceptions and the heap work across switches. *Done:* CI green on x86_64, aarch64 and i386; the
    time of a switch, the memory of a goroutine, the goroutines per GiB, guard pages against `-Ct`; a verdict in §21.3.
-   Independent of step 1.
+   Independent of step 1. *Status:* **done** (§21.3, Spike 4 result): worth it; guard areas proposed by default.
 3. **The scope** on the region runtime (step 4 of unxed/bp#108): `Hold`, `Defer`, `TScopeRef`, `TArena` on the list; S6
    accepts `Hold`, S17 roots it. *Done:* `test_region` covers the order of destruction, an exception in the scope and in a
    destructor; lint tests.
