@@ -48,6 +48,8 @@ jobs:
           LC_ALL: C.UTF-8
           OUT: ${{ github.workspace }}/out
         run: bash tests/run.sh
+      - name: Spike 3 of unxed/bp#108, GC roots from the stack of the goroutine (tools/spikes/gcroots)
+        run: bash tools/spikes/gcroots/run.sh
       - name: Benchmarks (report only, no thresholds; tests/bench)
         run: bash tests/bench/run.sh "$RUNNER_TEMP/bench"
       - name: Audit — static, no INTERP, no NEEDED (static-everywhere Profile S)
@@ -111,6 +113,8 @@ jobs:
           CMDS: |
             FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 LANG=C OUT=$PWD/outa64 bash tests/run.sh
             FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 LANG=C OUT=$PWD/out386 bash tests/run.sh
+            FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 OUT=$PWD/gca64 bash tools/spikes/gcroots/run.sh
+            FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 OUT=$PWD/gc386 bash tools/spikes/gcroots/run.sh
         run: |
           export I=$HOME/fpccross/lib/fpc/3.2.2
           tools/ci-par.sh
