@@ -147,3 +147,48 @@ jobs:
         run: |
           cd out386
           for t in safe-BP/test_safe ext-BP/test_go ext-BP/test_threads ext-BP/test_utf8; do LANG=C ./$t > /dev/null || { echo "FAIL $t"; exit 1; }; echo "ok   $t"; done
+
+  # Windows x86_64: the FPC 3.2.2 cross-compiler for win64 (internal assembler and linker, no binutils) from the official
+  # sources, the tests run under wine. The result per test is recorded in safe/SPEC.md §2.
+  windows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Free Pascal and wine
+        timeout-minutes: 4
+        run: tools/ci-apt.sh fp-compiler wine64 wine
+      - name: Cache cross compiler
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/fpccross
+          key: fpc-3.2.2-cross-win64-v1
+      - name: Build cross compiler (on cache miss)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sSfL -o /tmp/fpc-src.tgz https://downloads.freepascal.org/fpc/dist/3.2.2/source/fpc-3.2.2.source.tar.gz
+          tar xzf /tmp/fpc-src.tgz -C /tmp
+          cd /tmp/fpc-3.2.2
+          make crossall crossinstall CPU_TARGET=x86_64 OS_TARGET=win64 FPC=/usr/bin/fpc INSTALL_PREFIX=$HOME/fpccross > /tmp/win64.log 2>&1 || { tail -50 /tmp/win64.log; exit 1; }
+      - name: Create the wine prefix
+        env:
+          WINEDEBUG: -all
+          WINEDLLOVERRIDES: mscoree,mshtml=
+        run: |
+          wine --version
+          wine wineboot --init 2>/dev/null||true
+          wine cmd /c ver 2>/dev/null||true
+      - name: Tests under wine (no compile checks; ext/fpc-utf8 and test_ffi are Unix-only)
+        env:
+          WINEDEBUG: -all
+          WINEDLLOVERRIDES: mscoree,mshtml=
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
+        run: |
+          I=$HOME/fpccross/lib/fpc/3.2.2
+          FPC=$I/ppcrossx64 FPCOPTS="-Twin64 -Fu$I/units/x86_64-win64/*" EXE=.exe RUN=wine SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 OUT=$PWD/outwin bash tests/run.sh
+      - name: The binaries are Windows executables
+        run: |
+          file outwin/safe-Safe/test_safe.exe outwin/ext-BP/test_threads.exe
+          file outwin/ext-BP/test_go.exe | grep -q 'PE32+'

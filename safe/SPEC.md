@@ -125,7 +125,7 @@ OLD STYLE                              (§12)
 TARGETS                                (§2, table of what was verified)
   Linux (x86_64, i386, aarch64): by default a static binary without libc, works on any distribution;
   threads — BPThreads (inside BP). FFI to C libraries and libc — only with -dSAFE_LIBC (§18).
-  DOS: no threads, TGroup.Go raises R8. Windows: builds, run not verified.
+  DOS: no threads, TGroup.Go raises R8. Windows x86_64: the tests pass under wine in CI (BPThreads is empty there, the RTL thread manager is used).
 
 UNSAFE
   Unsafe things are written with full names (System.GetMem, SysUtils.FreeAndNil, System.Pointer)
@@ -200,10 +200,11 @@ Tests: `test_safe` (core), `test_go` (goroutines, §14), `test_threads` (thread 
 | i386 Linux, static without libc (our cross-compiler) | ✔ 0 failures | ✔ 0 | ✔ 0 | ✔ 0 | ✘ no libc to link against |
 | aarch64 Linux, static without libc (qemu) | ✔ 0 | ✔ 0 | ✔ 0 | ✔ 0 | ✘ same |
 | DOS (go32v2, DOSBox-X) | ✔ 0 | skipped: no threads, `TGroup.Go` raises R8 | skipped (no threads on DOS) | ✔ 0 | ✘ no external libraries |
-| Windows x86_64 (cross-compiler) | builds | builds | builds | builds | builds; run not verified (no wine) |
+| Windows x86_64 (cross-compiler, wine 9, ubuntu-latest, 2026-11-04) | ✔ 0 failures | ✔ 0 | ✔ 0 | ✔ 0 | not built: the facade is over libc, the test is Unix-only |
 
 Conclusion: after v0.5 (Linux without libc by default) the core, goroutines, threads and sum types work on all verified Linux targets, including static i386 and aarch64 without libc, without any switches;
-FFI depends on libc/the OS. To check your own set: `tests/run.sh` with `FPC`/`FPCOPTS`/`RUN` of a cross-compiler (qemu-user); the repository CI runs Linux x86_64, i386 and aarch64.
+FFI depends on libc/the OS. To check your own set: `tests/run.sh` with `FPC`/`FPCOPTS`/`RUN` of a cross-compiler (qemu-user); the repository CI runs Linux x86_64, i386 and aarch64, and Windows x86_64 under wine (job `windows`).
+Windows notes: `test_utf8` (6 checks: byte lengths, `Pos`, `Copy`, the two default code pages) passes under wine; what the real Windows console shows after `SetConsoleOutputCP(CP_UTF8)` is not checked, wine in CI has no console to read it back. On Windows `BPThreads` is empty and `test_threads` runs on the thread manager of the RTL. The compile checks (`tests/*/compile`) and `ext/fpc-utf8` are not run for Windows.
 
 ## §3. Strings: UTF-8 everywhere
 
