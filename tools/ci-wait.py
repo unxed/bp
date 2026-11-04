@@ -10,6 +10,8 @@ leaves "in progress" after every job has finished) and prints a line whenever th
 - A job failed on the runner (cancelled, timed out, or failed in an install step), or waits for a runner longer than
   QUEUE minutes: the run is started again, once; a second such failure is exit 1.
 - No result after LIMIT minutes in all: exit 2.
+- A PR that changes only texts (*.md, *.txt): only the jobs that check texts (a name with "text") are waited for; with
+  none, it is merged at once.
 QUEUE (default 4) and LIMIT (default 30) are environment variables. Needs gh, logged in.
 """
 import json
@@ -54,6 +56,26 @@ def infra_failure(job):
     return any(n.startswith(("Install", "Set up job")) for n in failed)
 
 
+TEXT = (".md", ".txt")
+
+
+def text_only(pr):
+    """The PR changes only texts (Markdown, plain text): only the jobs that check texts matter."""
+    files = gh("pr", "view", pr, "--json", "files", "-q", ".files[].path").split()
+    return bool(files) and all(f.lower().endswith(TEXT) for f in files)
+
+
+def text_job(job):
+    return "text" in job["name"].lower()
+
+
+def merge_now(pr, merge):
+    if merge:
+        print(gh("pr", "merge", pr, "--merge", "--delete-branch", check=False).strip())
+        say("ci-wait: PR %s %s" % (pr, gh("pr", "view", pr, "--json", "state", "-q", ".state").strip()))
+    sys.exit(0)
+
+
 def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
@@ -61,17 +83,28 @@ def main():
     repo = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip()
     sha = gh("pr", "view", pr, "--json", "headRefOid", "-q", ".headRefOid").strip()
     start, reruns, last = time.time(), 0, None
+    texts = text_only(pr)
+    if texts:
+        say("ci-wait: the PR changes only texts: waiting only for the jobs that check texts")
     while True:
         if time.time() - start > LIMIT:
             say("ci-wait: no result in %d min" % (LIMIT // 60))
             sys.exit(2)
         runs = api("repos/%s/actions/runs?head_sha=%s&per_page=20" % (repo, sha))["workflow_runs"]
+        if not runs and texts and time.time() - start > 60:
+            say("ci-wait: no CI run checks texts: nothing to wait for")
+            merge_now(pr, merge)
         if not runs:
             time.sleep(POLL)
             continue
         run = max(runs, key=lambda r: (r["created_at"], r["run_attempt"]))
         jobs = api("repos/%s/actions/runs/%d/attempts/%d/jobs?per_page=100"
                    % (repo, run["id"], run["run_attempt"]))["jobs"]
+        if texts:
+            jobs = [j for j in jobs if text_job(j)]
+            if not jobs and run["status"] == "completed" or not jobs and age(run["created_at"]) > 60:
+                say("ci-wait: no job checks texts: nothing to wait for")
+                merge_now(pr, merge)
         state = " ".join("%s:%s" % (j["name"], j["conclusion"] or j["status"])
                          for j in sorted(jobs, key=lambda j: j["name"]))
         if state != last:
@@ -106,10 +139,7 @@ def main():
                 say("ci-wait: every job passed (GitHub still shows the run as %s)" % run["status"])
             else:
                 say("ci-wait: every job passed")
-            if merge:
-                print(gh("pr", "merge", pr, "--merge", "--delete-branch", check=False).strip())
-                say("ci-wait: PR %s %s" % (pr, gh("pr", "view", pr, "--json", "state", "-q", ".state").strip()))
-            sys.exit(0)
+            merge_now(pr, merge)
         time.sleep(POLL)
 
 
