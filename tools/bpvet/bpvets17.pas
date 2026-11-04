@@ -12,7 +12,7 @@ unit BpvetS17;
 interface
 
 uses
-  SysUtils, Classes, PasTree, PasResolveEval, PasResolver, BpvetCore, Safe;
+  SysUtils, Classes, Math, PasTree, PasResolveEval, PasResolver, BpvetCore, Safe;
 
 { Checks the routines of Module; Resolver is the one that resolved it. }
 procedure VetCheckS17(const Src: TVetSource; const Module: TPasModule; const Resolver: TPasResolver;
@@ -57,11 +57,14 @@ type
     FProc: TPasProcedure;     // borrow: the routine being checked
     FDecl: TPasProcedure;     // borrow: its declaration in the interface or a forward one, else nil
     FResultRoots: TRoots;     // the roots a result and a var/out parameter may have
+    FBound: TRoots;           // the parameters named by // root: in a routine without a TRegion parameter: they are
+                              // in the caller's current region
     FOrder: Integer;
     FExcused: specialize TOwned<TStringList>;  // rows where S5 and S6 of the untyped rules do not apply
     procedure Add(const El: TPasElement; const Msg: String);
     function LineOf(const FileName: String; const Row: Integer): String;
     function Ref(const E: TPasExpr): TPasElement;
+    function IsOuterLocal(const D: TPasElement): Boolean;
     function TypeOf(const E: TPasExpr): TPasType;
     function Resolve(const T: TPasElement): TPasType;
     function Alloc(const E: TPasExpr; const F: TFlow): TRoots;
@@ -82,6 +85,8 @@ type
     procedure WalkLoop(const Cond: TPasExpr; const Body: TPasElement; var F: TFlow; const Before: Boolean);
     function Join(const A, B: TFlow): TFlow;
     function RootMark(const P: TPasProcedure): String;
+    procedure CheckCurrent(const Callee: TPasProcedure; const Name: String; const R: TRoots; const Where: TPasExpr;
+      const F: TFlow);
   public
     constructor Create(const ASrc: TVetSource; const AResolver: TPasResolver);
     procedure CheckRoutine(const P: TPasProcedure);
@@ -211,7 +216,8 @@ begin
 end;
 
 { Adds the findings to Report and drops there the findings of S5 and S6 that the region style answers: an object of a
-  region class is owned by its region (S6), a field of a region class lives in the same region as its object (S5). }
+  region class is owned by its region (S6), a field of a region class lives in the same region as its object and a
+  store of a value of a region is checked here (S5). }
 procedure TS17.Flush(var Report: TVetReport);
 var
   I, N: Integer;
@@ -232,6 +238,13 @@ begin
 end;
 
 { What E names; a parameter of the declaration of the routine being checked is the same parameter of its body. }
+{ D is a variable or a parameter of a routine that encloses the one being checked. }
+function TS17.IsOuterLocal(const D: TPasElement): Boolean;
+begin
+  Result := ((D is TPasVariable) and (D.Parent is TProcedureBody) or (D is TPasArgument)) and (D.Parent <> nil)
+    and (D.Parent <> FProc.Body) and (D.Parent <> FProc.ProcType);
+end;
+
 function TS17.Ref(const E: TPasExpr): TPasElement;
 var
   I: Integer;
@@ -344,8 +357,9 @@ end;
 { The root A lives at least as long as the root B. }
 function TS17.Outlives(const A, B: Integer): Boolean;
 begin
-  if A = B then
-    Exit(True);
+  if (A = B) or (FBound <> 0) and ((FBound or CallerBit) and Bit(A) <> 0) and ((FBound or CallerBit) and Bit(B) <> 0)
+    then
+    Exit(True); // the caller's current region and what // root: names are one region
   case FRoots[B].Kind of
     rkRegion:
       Result := (FRoots[A].Kind <> rkRegion) or (FRoots[A].Order < FRoots[B].Order);
@@ -394,19 +408,60 @@ begin
     F.Alive := F.Alive and not Bit(Region);
 end;
 
+{ The names of "// root: A, B" on the header line of P as ",a,b,"; '' without the mark. }
 function TS17.RootMark(const P: TPasProcedure): String;
 var
   Line: String;
-  I: Integer;
+  I, J: Integer;
 begin
+  Result := '';
   Line := LineOf(P.SourceFilename, P.SourceLinenumber);
   I := Pos('// root:', Line);
   if I = 0 then
-    Exit('');
-  Result := Trim(Copy(Line, I + 8, Length(Line)));
-  I := Pos(' ', Result);
-  if I > 0 then
-    Result := Copy(Result, 1, I - 1);
+    Exit;
+  Inc(I, 8);
+  repeat
+    while (I <= Length(Line)) and (Line[I] = ' ') do
+      Inc(I);
+    J := I;
+    while (I <= Length(Line)) and (Line[I] in ['A'..'Z', 'a'..'z', '0'..'9', '_']) do
+      Inc(I);
+    if I = J then
+      Break;
+    Result := Result + ',' + LowerCase(Copy(Line, J, I - J));
+    while (I <= Length(Line)) and (Line[I] = ' ') do
+      Inc(I);
+    if (I > Length(Line)) or (Line[I] <> ',') then
+      Break;
+    Inc(I);
+  until False;
+  if Result <> '' then
+    Result := Result + ',';
+end;
+
+function InMark(const Mark, Name: String): Boolean;
+begin
+  Result := Pos(',' + LowerCase(Name) + ',', Mark) > 0;
+end;
+
+{ A routine marked "// root: P" keeps values of the current region in P: at the call, P must be in that region. }
+procedure TS17.CheckCurrent(const Callee: TPasProcedure; const Name: String; const R: TRoots; const Where: TPasExpr;
+  const F: TFlow);
+var
+  A, C: Integer;
+begin
+  C := 0;
+  for A := 1 to High(FRoots) do
+    if Current(F) = Bit(A) then
+      C := A;
+  for A := 0 to High(FRoots) do
+    if (R and Bit(A) <> 0) and not Outlives(C, A) then
+    begin
+      Add(Where, Format('%s keeps values of the current region in %s (// root: %s), but %s is in %s, not in the '
+        + 'current region %s (rule 4): call it while %s is the current region', [Callee.Name, Name, Name,
+        NameOf(Where), FRoots[A].Name, FRoots[C].Name, FRoots[A].Name]));
+      Exit;
+    end;
 end;
 
 { The roots of a call of Callee (on Recv, if a method) with Args, and its effects on the flow. }
@@ -483,7 +538,7 @@ begin
     begin
       Inc(Regions);
       RegionArgs := RegionArgs or ArgRoots[I];
-      if SameText(Formal.Name, Mark) then
+      if InMark(Mark, Formal.Name) then
         Named := ArgRoots[I];
     end
     else if (Formal.Access in [argVar, argOut]) and (Args[I] is TPrimitiveExpr) then
@@ -494,6 +549,19 @@ begin
         F.Vars[K].Roots := Current(F);
         F.Vars[K].Dead := '';
       end;
+    end;
+  end;
+  // // root: P without region parameters: P is in the current region
+  if (Regions = 0) and (Mark <> '') then
+  begin
+    for I := 0 to Min(N, Length(Args)) - 1 do
+      if InMark(Mark, TPasArgument(Callee.ProcType.Args[I]).Name) then
+        CheckCurrent(Callee, TPasArgument(Callee.ProcType.Args[I]).Name, ArgRoots[I], Args[I], F);
+    if InMark(Mark, 'Self') then
+    begin
+      if (Recv = nil) and (RootIndex(FProc) > 0) then
+        RecvRoots := Bit(RootIndex(FProc));
+      CheckCurrent(Callee, 'Self', RecvRoots, Where, F);
     end;
   end;
   // the result (rule 4)
@@ -546,7 +614,9 @@ begin
         K := RootIndex(FProc);
         if K > 0 then
           Result := Bit(K);
-      end;
+      end
+      else if IsOuterLocal(D) then
+        Result := CallerBit; // a local of the enclosing routine lives at least as long as this call
     end;
   end
   else if E is TSelfExpr then
@@ -642,13 +712,20 @@ var
 begin
   if (V = 0) or (Target = 0) then
     Exit;
+  Excuse('S5', Where.SourceLinenumber); // the escape of a borrow (S5) is this check for a value of a region
   for A := 0 to High(FRoots) do
     if V and Bit(A) <> 0 then
       for B := 0 to High(FRoots) do
         if (Target and Bit(B) <> 0) and not Outlives(A, B) then
         begin
-          Add(Where, Format('a value of %s is stored into %s, which may outlive it (rule 1): allocate it in the '
-            + 'region of the target, or keep the target in %s', [FRoots[A].Name, What, FRoots[A].Name]));
+          if (FRoots[A].Kind <> rkRegion) and (FRoots[B].Kind = rkParam) then
+            Add(Where, Format('a value of %s is stored into %s, which may outlive it (rule 1): if the callers keep '
+              + 'them in their current region, say so with // root: %s on the header line (rule 4)',
+              [FRoots[A].Name, What, Trim(StringReplace(FRoots[B].Name + ', ' + FRoots[A].Name,
+              ', the caller''s region', '', []))]))
+          else
+            Add(Where, Format('a value of %s is stored into %s, which may outlive it (rule 1): allocate it in the '
+              + 'region of the target, or keep the target in %s', [FRoots[A].Name, What, FRoots[A].Name]));
           Exit;
         end;
 end;
@@ -692,6 +769,14 @@ begin
       else if V <> 0 then
         Add(L, Format('a value of %s is stored into a field of an object of another style (rule 2): keep a copy, '
           + 'or make the class a TRegionObject', [RootNames(V)]));
+    end
+    else if IsOuterLocal(D) then
+    begin
+      // a local of the enclosing routine: as a var parameter
+      Bad := V and not FResultRoots;
+      if Bad <> 0 then
+        Add(L, Format('%s of the enclosing routine gets a value of %s, which is freed when this routine returns '
+          + '(rules 1, 4): allocate it in the caller''s region', [NameOf(L), RootNames(Bad)]));
     end
     else if (D is TPasVariable) and (V <> 0) then
       Add(L, Format('a value of %s is stored into the global %s (rule 2): a global outlives every region; keep it '
@@ -993,6 +1078,7 @@ begin
   FRoots[0].Name := 'the caller''s region';
   FOrder := 0;
   FResultRoots := CallerBit;
+  FBound := 0;
   Regions := 0;
   Named := -1;
   Mark := RootMark(P);
@@ -1021,7 +1107,7 @@ begin
     begin
       Inc(Regions);
       K := AddRoot(rkParam, A, A.Name);
-      if SameText(A.Name, Mark) then
+      if InMark(Mark, A.Name) then
         Named := K;
     end
     else if IsRegionValue(T) then
@@ -1029,6 +1115,16 @@ begin
       K := AddRoot(rkParam, A, A.Name);
       FResultRoots := FResultRoots or Bit(K);
     end;
+  end;
+  // // root: P without region parameters: P (or Self) is in the caller's current region
+  if (Regions = 0) and (Mark <> '') then
+  begin
+    for K := 1 to High(FRoots) do
+      if InMark(Mark, FRoots[K].Name) then
+        FBound := FBound or Bit(K);
+    if FBound = 0 then
+      Add(P, Format('// root: of %s names no region object among its parameters (or Self of a region class)',
+        [P.Name]));
   end;
   // rule 4: with region parameters the result is rooted in one of them
   if Regions = 1 then
