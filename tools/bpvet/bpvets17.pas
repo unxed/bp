@@ -18,6 +18,10 @@ uses
 procedure VetCheckS17(const Src: TVetSource; const Module: TPasModule; const Resolver: TPasResolver;
   var Report: TVetReport);
 
+var
+  { bpvet --fix: S17 writes the // root: marks it infers onto the headers of the exported routines. }
+  S17Fix: Boolean = False;
+
 implementation
 
 type
@@ -61,6 +65,15 @@ type
                               // in the caller's current region
     FOrder: Integer;
     FExcused: specialize TOwned<TStringList>;  // rows where S5 and S6 of the untyped rules do not apply
+    FInferred: specialize TOwned<TStringList>; // routine=",a,b," : what each routine keeps current values in
+    FFixes: specialize TOwned<TStringList>;    // row=text to append (--fix)
+    FInfer: Boolean;   // the inference passes: no findings, the marks grow
+    FChanged: Boolean;
+    FModule: TPasModule;  // borrow: the module being checked
+    function Key(const P: TPasProcedure): String;
+    function MarkOf(const P: TPasProcedure): String;
+    procedure Grow(const Name: String);
+    function Exported(const P: TPasProcedure): Boolean;
     procedure Add(const El: TPasElement; const Msg: String);
     function LineOf(const FileName: String; const Row: Integer): String;
     function Ref(const E: TPasExpr): TPasElement;
@@ -90,12 +103,14 @@ type
   public
     constructor Create(const ASrc: TVetSource; const AResolver: TPasResolver);
     procedure CheckRoutine(const P: TPasProcedure);
+    procedure ReportMissingMarks(const P: TPasProcedure);
     procedure CheckBlock(const Block: TPasImplBlock; const Decls: TPasDeclarations);
     procedure Excuse(const Rule: String; const Row: Integer);
     procedure Flush(var Report: TVetReport);
   end;
 
   TS17Box = specialize TOwned<TS17>;
+  TLinesBox = specialize TOwned<TStringList>;
 
 const
   CallerBit = TRoots(1);
@@ -165,6 +180,57 @@ begin
   FExcused := specialize TOwned<TStringList>.Own(TStringList.Create);
   FExcused.Get.Sorted := True;
   FExcused.Get.Duplicates := dupIgnore;
+  FInferred := specialize TOwned<TStringList>.Own(TStringList.Create);
+  FFixes := specialize TOwned<TStringList>.Own(TStringList.Create);
+end;
+
+{ A routine and its declaration (in the interface, or a forward one) share one entry. }
+function TS17.Key(const P: TPasProcedure): String;
+var
+  D: TPasProcedure;
+begin
+  D := P;
+  if (P.CustomData is TPasProcedureScope) and (TPasProcedureScope(P.CustomData).DeclarationProc <> nil) then
+    D := TPasProcedureScope(P.CustomData).DeclarationProc;
+  Result := IntToHex(PtrUInt(D), 16);
+end;
+
+{ The // root: names of P: written on its header or its declaration, and inferred from the bodies of the module.
+  "^name" is a local of the enclosing routine that a nested routine keeps current values in. }
+function TS17.MarkOf(const P: TPasProcedure): String;
+begin
+  Result := RootMark(P) + FInferred.Get.Values[Key(P)];
+  if (P.CustomData is TPasProcedureScope) and (TPasProcedureScope(P.CustomData).DeclarationProc <> nil) then
+    Result := Result + RootMark(TPasProcedureScope(P.CustomData).DeclarationProc);
+end;
+
+procedure TS17.Grow(const Name: String);
+var
+  K, Cur: String;
+begin
+  if not FInfer or (FProc = nil) then
+    Exit;
+  K := Key(FProc);
+  Cur := FInferred.Get.Values[K];
+  if Pos(',' + LowerCase(Name) + ',', Cur) > 0 then
+    Exit;
+  if Cur = '' then
+    Cur := ',';
+  FInferred.Get.Values[K] := Cur + LowerCase(Name) + ',';
+  FChanged := True;
+end;
+
+{ P is declared in the interface of the unit (a routine, or a method of a type declared there). }
+function TS17.Exported(const P: TPasProcedure): Boolean;
+var
+  D: TPasElement;
+begin
+  D := P;
+  if (P.CustomData is TPasProcedureScope) and (TPasProcedureScope(P.CustomData).DeclarationProc <> nil) then
+    D := TPasProcedureScope(P.CustomData).DeclarationProc;
+  while (D <> nil) and not (D is TPasSection) do
+    D := D.Parent;
+  Result := (D <> nil) and (D = FModule.InterfaceSection);
 end;
 
 procedure TS17.Excuse(const Rule: String; const Row: Integer);
@@ -202,16 +268,18 @@ end;
 procedure TS17.Add(const El: TPasElement; const Msg: String);
 var
   Row: Integer;
-  Key, Line: String;
+  Seen, Line: String;
 begin
+  if FInfer then
+    Exit;
   Row := El.SourceLinenumber;
   Line := VetLine(FSrc, Row);
   if (Pos('// UNSAFE:', Line) > 0) or (Pos('// UNSAFE:', TrimLeft(VetLine(FSrc, Row - 1))) = 1) then
     Exit;
-  Key := Format('%.6d %s', [Row, Msg]);
-  if FSeen.Get.IndexOf(Key) >= 0 then
+  Seen := Format('%.6d %s', [Row, Msg]);
+  if FSeen.Get.IndexOf(Seen) >= 0 then
     Exit;
-  FSeen.Get.Add(Key);
+  FSeen.Get.Add(Seen);
   VetAdd(FFindings, FSrc.FileName, Row, VetWordColumn(Line, NameOf(El)), vsError, 'S17', Msg);
 end;
 
@@ -220,7 +288,8 @@ end;
   store of a value of a region is checked here (S5). }
 procedure TS17.Flush(var Report: TVetReport);
 var
-  I, N: Integer;
+  I, N, Row: Integer;
+  Lines: TLinesBox;
 begin
   N := 0;
   for I := 0 to High(Report.Findings) do
@@ -232,6 +301,18 @@ begin
         Inc(N);
       end;
   SetLength(Report.Findings, N);
+  if S17Fix and (FFixes.Get.Count > 0) then
+  begin
+    Lines := TLinesBox.Own(TStringList.Create);
+    for I := 0 to High(FSrc.Lines) do
+      Lines.Get.Add(FSrc.Lines[I]);
+    for I := 0 to FFixes.Get.Count - 1 do
+    begin
+      Row := StrToInt(FFixes.Get.Names[I]);
+      Lines.Get[Row - 1] := Lines.Get[Row - 1] + FFixes.Get.ValueFromIndex[I];
+    end;
+    Lines.Get.SaveToFile(FSrc.FileName);
+  end;
   for I := 0 to High(FFindings.Findings) do
     with FFindings.Findings[I] do
       VetAdd(Report, FileName, Row, Col, Severity, Rule, Msg);
@@ -455,7 +536,9 @@ begin
     if Current(F) = Bit(A) then
       C := A;
   for A := 0 to High(FRoots) do
-    if (R and Bit(A) <> 0) and not Outlives(C, A) then
+    if (R and Bit(A) <> 0) and not Outlives(C, A) and FInfer and (C = 0) and (FRoots[A].Kind = rkParam) then
+      Grow(FRoots[A].Name)
+    else if (R and Bit(A) <> 0) and not Outlives(C, A) then
     begin
       Add(Where, Format('%s keeps values of the current region in %s (// root: %s), but %s is in %s, not in the '
         + 'current region %s (rule 4): call it while %s is the current region', [Callee.Name, Name, Name,
@@ -528,7 +611,7 @@ begin
   Regions := 0;
   RegionArgs := 0;
   Named := 0;
-  Mark := RootMark(Callee);
+  Mark := MarkOf(Callee);
   for I := 0 to N - 1 do
   begin
     Formal := TPasArgument(Callee.ProcType.Args[I]);
@@ -541,6 +624,8 @@ begin
       if InMark(Mark, Formal.Name) then
         Named := ArgRoots[I];
     end
+    else if (Formal.Access in [argVar, argOut]) and not (Args[I] is TPrimitiveExpr) and Tracked(Args[I]) then
+      Store(Args[I], Current(F), F) // a field gets a value the callee may have allocated in the current region
     else if (Formal.Access in [argVar, argOut]) and (Args[I] is TPrimitiveExpr) then
     begin
       K := VarIndex(F, Ref(Args[I]));
@@ -564,6 +649,11 @@ begin
       CheckCurrent(Callee, 'Self', RecvRoots, Where, F);
     end;
   end;
+  // a nested routine keeps values of the current region in locals of the routine it is in (this one)
+  if Pos(',^', Mark) > 0 then
+    for K := 0 to High(F.Vars) do
+      if InMark(Mark, '^' + F.Vars[K].Decl.Name) then
+        F.Vars[K].Roots := F.Vars[K].Roots or Current(F);
   // the result (rule 4)
   if (Callee is TPasConstructor) or (Callee.ProcType is TPasFunctionType) then
   begin
@@ -653,6 +743,14 @@ begin
     Eval(TBinaryExpr(E).left, F);
     Eval(TBinaryExpr(E).right, F);
   end
+  else if (E is TUnaryExpr) and (TUnaryExpr(E).OpCode = eopAddress) and (Ref(TUnaryExpr(E).Operand) is TPasProcedure)
+    then
+  begin
+    if Pos(',^', MarkOf(TPasProcedure(Ref(TUnaryExpr(E).Operand)))) > 0 then
+      Add(TUnaryExpr(E).Operand, Format('%s keeps values of the current region in locals of the routine it is in; as '
+        + 'a procedure value it may run while another region is current: call it directly (rule 1)',
+        [NameOf(TUnaryExpr(E).Operand)]));
+  end
   else if E is TUnaryExpr then
     Result := Eval(TUnaryExpr(E).Operand, F)
   else if E is TParamsExpr then
@@ -718,7 +816,14 @@ begin
       for B := 0 to High(FRoots) do
         if (Target and Bit(B) <> 0) and not Outlives(A, B) then
         begin
-          if (FRoots[A].Kind <> rkRegion) and (FRoots[B].Kind = rkParam) then
+          if (FRoots[A].Kind <> rkRegion) and (FRoots[B].Kind = rkParam) and FInfer then
+          begin
+            Grow(FRoots[B].Name);
+            if FRoots[A].Kind = rkParam then
+              Grow(FRoots[A].Name);
+            Continue;
+          end
+          else if (FRoots[A].Kind <> rkRegion) and (FRoots[B].Kind = rkParam) then
             Add(Where, Format('a value of %s is stored into %s, which may outlive it (rule 1): if the callers keep '
               + 'them in their current region, say so with // root: %s on the header line (rule 4)',
               [FRoots[A].Name, What, Trim(StringReplace(FRoots[B].Name + ', ' + FRoots[A].Name,
@@ -772,7 +877,9 @@ begin
     end
     else if IsOuterLocal(D) then
     begin
-      // a local of the enclosing routine: as a var parameter
+      // a local of the enclosing routine: as a var parameter; each call sets its roots (CallRoots)
+      if V <> 0 then
+        Grow('^' + D.Name);
       Bad := V and not FResultRoots;
       if Bad <> 0 then
         Add(L, Format('%s of the enclosing routine gets a value of %s, which is freed when this routine returns '
@@ -1065,7 +1172,7 @@ var
   A: TPasArgument;
   T: TPasType;
   Scope: TPasProcedureScope;
-  Mark: String;
+  Mark, Written: String;
   Named: Integer;
 begin
   if (P.Body = nil) or (P.Body.Body = nil) then
@@ -1081,13 +1188,11 @@ begin
   FBound := 0;
   Regions := 0;
   Named := -1;
-  Mark := RootMark(P);
+  Mark := MarkOf(P);
   FDecl := nil;
   if P.CustomData is TPasProcedureScope then
     // borrow: the declaration belongs to the module being checked
     FDecl := TPasProcedureScope(P.CustomData).DeclarationProc;
-  if (FDecl <> nil) and (Mark = '') then
-    Mark := RootMark(FDecl);
   // Self of a method of a region class
   if P.CustomData is TPasProcedureScope then
   begin
@@ -1122,7 +1227,14 @@ begin
     for K := 1 to High(FRoots) do
       if InMark(Mark, FRoots[K].Name) then
         FBound := FBound or Bit(K);
-    if FBound = 0 then
+    Written := RootMark(P);
+    if FDecl <> nil then
+      Written := Written + RootMark(FDecl);
+    Named := 0;
+    for K := 1 to High(FRoots) do
+      if InMark(Written, FRoots[K].Name) then
+        Inc(Named);
+    if (Written <> '') and (Named = 0) then
       Add(P, Format('// root: of %s names no region object among its parameters (or Self of a region class)',
         [P.Name]));
   end;
@@ -1140,7 +1252,48 @@ begin
         + '(rule 4)', [P.Name, Regions]));
   end;
   CheckBlock(P.Body.Body, P.Body);
+  if not FInfer and Exported(P) then
+    ReportMissingMarks(P);
   FProc := nil;
+end;
+
+{ An exported routine shows its // root: names on its declaration: they are a contract for the units that call it. }
+procedure TS17.ReportMissingMarks(const P: TPasProcedure);
+var
+  Written, Inferred, Missing, N: String;
+  D: TPasProcedure;
+  I: Integer;
+begin
+  D := P;
+  if FDecl <> nil then
+    D := FDecl;
+  Written := RootMark(D) + RootMark(P);
+  Inferred := FInferred.Get.Values[Key(P)];
+  Missing := '';
+  for N in Inferred.Split([','], TStringSplitOptions.ExcludeEmpty) do
+    if (N[1] <> '^') and not InMark(Written, N) then
+    begin
+      if Missing <> '' then
+        Missing := Missing + ', ';
+      // the name as it is written in the declaration
+      if N = 'self' then
+        Missing := Missing + 'Self'
+      else
+        for I := 0 to D.ProcType.Args.Count - 1 do
+          if SameText(TPasArgument(D.ProcType.Args[I]).Name, N) then
+            Missing := Missing + TPasArgument(D.ProcType.Args[I]).Name;
+    end;
+  if Missing = '' then
+    Exit;
+  if (D.SourceFilename = '') or SameFileName(ExpandFileName(D.SourceFilename), ExpandFileName(FSrc.FileName)) then
+  begin
+    Add(D, Format('%s keeps values of the caller''s current region in %s: an exported routine says so with '
+      + '// root: %s on its header line (bpvet --fix writes it; rule 4)', [D.Name, Missing, Missing]));
+    if Written = '' then
+      FFixes.Get.Add(IntToStr(D.SourceLinenumber) + '=  // root: ' + Missing)
+    else
+      FFixes.Get.Add(IntToStr(D.SourceLinenumber) + '=, ' + Missing);
+  end;
 end;
 
 procedure ExcuseFields(const S: TS17; const C: TPasClassType);
@@ -1152,7 +1305,24 @@ begin
       S.Excuse('S5', TPasElement(C.Members[I]).SourceLinenumber);
 end;
 
-procedure CheckDecls(const S: TS17; const Decls: TPasDeclarations);
+{ A TRegion is a local of a routine: its scope is the scope of the region (SPEC §20, concept v2). }
+procedure NotLocal(const S: TS17; const V: TPasElement; const T: TPasType; const Where: String);
+begin
+  if IsRegionRecord(S.Resolve(T)) then
+    S.Add(V, Format('a TRegion %s: a region is a local of a routine, released when the routine returns; keep an '
+      + 'object that lives longer in the owner or the GC style', [Where]));
+end;
+
+procedure CheckMembers(const S: TS17; const T: TPasMembersType);
+var
+  I: Integer;
+begin
+  for I := 0 to T.Members.Count - 1 do
+    if TObject(T.Members[I]) is TPasVariable then
+      NotLocal(S, TPasElement(T.Members[I]), TPasVariable(T.Members[I]).VarType, 'field of ' + T.Name);
+end;
+
+procedure CheckDecls(const S: TS17; const Decls: TPasDeclarations; const Top: Boolean);
 var
   I: Integer;
   D: TPasElement;
@@ -1163,12 +1333,16 @@ begin
   begin
     D := TPasElement(Decls.Declarations[I]);
     if (D is TPasClassType) and IsRegionClass(TPasClassType(D)) then
-      ExcuseFields(S, TPasClassType(D))
+      ExcuseFields(S, TPasClassType(D));
+    if (D is TPasMembersType) and not S.FInfer then
+      CheckMembers(S, TPasMembersType(D))
+    else if Top and (D is TPasVariable) and not (D is TPasConst) and not S.FInfer then
+      NotLocal(S, D, TPasVariable(D).VarType, 'global')
     else if D is TPasProcedure then
     begin
       S.CheckRoutine(TPasProcedure(D));
       if TPasProcedure(D).Body <> nil then
-        CheckDecls(S, TPasProcedure(D).Body); // nested routines
+        CheckDecls(S, TPasProcedure(D).Body, False); // nested routines
     end;
   end;
 end;
@@ -1177,13 +1351,28 @@ procedure VetCheckS17(const Src: TVetSource; const Module: TPasModule; const Res
   var Report: TVetReport);
 var
   S: TS17Box;
+  Pass: Integer;
 begin
   S := TS17Box.Own(TS17.Create(Src, Resolver));
-  CheckDecls(S.Get, Module.InterfaceSection);
-  CheckDecls(S.Get, Module.ImplementationSection);
+  // borrow: the module outlives the check
+  S.Get.FModule := Module;
+  // the inference: the // root: names of the routines grow until no body adds one
+  S.Get.FInfer := True;
+  Pass := 0;
+  repeat
+    S.Get.FChanged := False;
+    CheckDecls(S.Get, Module.InterfaceSection, True);
+    CheckDecls(S.Get, Module.ImplementationSection, True);
+    if Module is TPasProgram then
+      CheckDecls(S.Get, TPasProgram(Module).ProgramSection, True);
+    Inc(Pass);
+  until not S.Get.FChanged or (Pass >= 16);
+  S.Get.FInfer := False;
+  CheckDecls(S.Get, Module.InterfaceSection, True);
+  CheckDecls(S.Get, Module.ImplementationSection, True);
   if Module is TPasProgram then
   begin
-    CheckDecls(S.Get, TPasProgram(Module).ProgramSection);
+    CheckDecls(S.Get, TPasProgram(Module).ProgramSection, True);
     if Module.InitializationSection <> nil then
     begin
       SetLength(S.Get.FRoots, 1);

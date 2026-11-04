@@ -20,7 +20,7 @@ type
     Op: Char;
     Left, Right: TExpr;
     Args, Next: TExpr;  // the arguments of a call: a list through Next
-    procedure AddArg(const A: TExpr);  // root: Self, A
+    procedure AddArg(const A: TExpr);
     function ArgCount: Integer;
   end;
 
@@ -45,7 +45,7 @@ type
     Defs: TDefs;
     Lines, Errors: Integer;
     function Find(const Name: String): TDef;
-    procedure Define(const Name: String; const Params: array of String; const Body: TExpr);  // root: Self, Body
+    procedure Define(const Name: String; const Params: array of String; const Body: TExpr);
   end;
 
 procedure TExpr.AddArg(const A: TExpr);
@@ -266,7 +266,7 @@ begin
 end;
 
 { "def f(x, y) = x * y" keeps its tree in the region of the run; any other line is evaluated in Scratch. }
-procedure RunLine(const C: TCalc; const Line: String; const Env: TStringList);  // root: C
+procedure RunLine(const C: TCalc; const Line: String; const Env: TStringList);
 var
   L: TLexer;
   Name: String;
