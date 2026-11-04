@@ -49,7 +49,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **design (plan)** | §20 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
-| GC style: `TGc<T>`, a heap per goroutine, reference counting + a cycle collector | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
+| GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
 
 ---
 
@@ -77,8 +77,8 @@ DATA AND LIFETIME                      (chosen by data structure, not by project
   PLAN (§20, not implemented yet; do not write it until §0 status says so):
   6. Data of one step (a request, a frame, a pass)   → TRegion; N := TNode.Create (TNode = class(TRegionObject)),
      TGrowArray<T>: freed at once, zero cost
-  7. A graph with cycles where no owner is natural      → TGc<TFoo>: collected, a heap per goroutine
-  Styles mix in one program. Between styles only values are copied; region objects, borrows and TGc never cross
+  7. A graph with cycles where no owner is natural      → TNode = class(TGcObject); N := TNode.Create: collected
+  Styles mix in one program. Between styles only values are copied; region objects, borrows and GC objects never cross
   into another style, a task field, a channel or a global (S18).
 
 REFERENCES
@@ -217,7 +217,7 @@ Reductions relative to the original concept (and why):
 | `Slice<T>` for parameters | an open array `array of T` | The compiler itself passes pointer+length, checks bounds under `{$R+}` and **does not let you store** an open array — it is a borrow by construction |
 | `Slice<T>` for storage | `TSlice<T>` on top of `TArray<T>` | A reference-counted dynamic array: the slice keeps the array alive, a dangling slice is impossible. Go slice semantics |
 | `Owned<T>` = unique pointer | `TOwned<T>` on a counter | see below |
-| `GCHeap` | `TGc<T>`, an optional style (§20, plan) | Only for graphs where ownership is unnatural; a program that does not use it has no GC at all |
+| `GCHeap` | `TGcObject` classes, an optional style (§20, plan) | Only for graphs where ownership is unnatural; a program that does not use it has no GC at all |
 | `unsafe begin end` | full names + `// UNSAFE:` | We do not change the syntax; the full name bypasses shadowing and is greppable |
 
 ### Why `TOwned` is reference-counted rather than unique
@@ -247,7 +247,7 @@ The price is one atomic increment on creation and on `Move`. That is cheap.
 | tree/graph/AST/parse results | `TArena` | all at once: `FreeAll` or the arena leaving its scope |
 | an OS resource | a wrapper class with a destructor + `TOwned` | RAII: the destructor closes the handle |
 | data of one step: buffers, parse tables, intermediate objects (plan, §20) | `TRegion` + `TRegionObject` classes + `TGrowArray<T>` | all at once when the region leaves its scope: one store (+ finalizers only for types with strings) |
-| a graph with cycles, no natural owner (plan, §20) | `TGc<T>` | acyclic garbage at once (counter), cycles by the collector of the goroutine |
+| a graph with cycles, no natural owner (plan, §20) | a `TGcObject` class | by the collector of the goroutine |
 
 Inside an arena objects refer to each other with raw references marked `// borrow: arena`.
 
@@ -410,7 +410,7 @@ System.GetMem(Buf, Len);
 | Range and overflow checks are not switched off in safe code | programmer | H12 |
 | Turbo Pascal style `object` code | not covered (§19) | H13 |
 | A region object or a `TGrowArray` element does not outlive its region | plan: `bpvet` S17 (static, zero cost); `SAFE_DEBUG` R12 (released pages lose access) as a second net | §20 |
-| A `TGc` object is never freed while reachable; cycles are collected | plan: `TGc` runtime + `bpvet` S18 (a `TGc` stays in its goroutine) | §20 |
+| A GC object is never freed while reachable; cycles are collected | plan: the collector + `bpvet` S18 (where a GC reference may live, it stays in its goroutine) | §20 |
 
 We do not claim this is Rust. We claim: in safe code there is no **syntactic**
 way to make the typical memory errors, and the remaining holes are listed above.
@@ -724,9 +724,9 @@ end;                                    // the list is destroyed here, also on a
 - **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S4, S5 (fields and globals), S6, S7, S8, S9, S10 (static part), S11 (class, interface and pointer fields of a task), S12 and S15 are done, the borrow-escape part of S5,
   rules S13–S14 are next (unxed/bp#56); output in the format of FPC messages so that the IDE shows them as compiler errors.
 - **Lazarus package** `safepascal.lpk` in OPM: one-click installation.
-- **Memory styles** (§20): the region style from Goose with the root analysis S17 in `bpvet`, and the GC style `TGc<T>`.
-  The earlier sketch "a tracing arena with `procedure Trace(V: TVisitor)`" is replaced by §20: there the edges are found
-  through RTTI, so a class needs no hand-written `Trace`.
+- **Memory styles** (§20): the region style from Goose with the root analysis S17 in `bpvet`, and the GC style (`TGcObject`).
+  The earlier sketch "a tracing arena with `procedure Trace(V: TVisitor)`" is replaced by §20: there the edges are the
+  published fields, read from the VMT, so a class needs no hand-written `Trace`.
 - **Modules and dependencies as in Go** (§15) and the **`sp` tool** — one command for building, testing,
   checking, formatting and dependencies (§16).
 - Windows in CI; `ParamStr` in UTF-8 on Windows.
@@ -959,7 +959,7 @@ or above the parameter suppresses its S14 finding.
 | v0.5.1 | §2 aligned with v0.5: a matrix of verified targets on v0.5 code (i386 and aarch64 without libc pass all tests without switches); `test_threads` is skipped on DOS |
 | v0.5.2 | §0 "What actually exists and what is only a plan so far"; §19 (Turbo Pascal style code) |
 | v0.6 | Better Pascal: the safe layer (`safe/`, `unit Safe`) and the ext layer (`ext/`: UTF-8, goroutines, `BPThreads`); `unit BP` gives both |
-| v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the current region (the Goose scope made implicit), the GC style `TGc<T>` (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
+| v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the current region (the Goose scope made implicit), the GC style (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -972,10 +972,10 @@ or above the parameter suppresses its S14 finding.
 - In the terms of `unxed/static-everywhere` the default is "Profile S"; `SAFE_LIBC` is "Profile H" (the baseline glibc version = the version on the build machine). CI checks that the binaries have no INTERP/NEEDED (`readelf`) and runs them in Alpine, Debian, Ubuntu 16.04 and CentOS 7 containers. Plan: host data (CA certificates, time zones) to be read from the host rather than embedded.
 
 **GC — reconsidered on 2026-11-04 (owner decision): an optional style, §20.** The paragraph below was the v0.5 decision.
-Its argument against a conservative scanner (Boehm) still stands; §20 avoids that scanner: references are counted by the
-compiler (an interface field, as in `TOwned`), the edges of the graph are found through RTTI, and every goroutine has its
-own heap, so there is no stop-the-world and no scan of stacks. The default rule for an LLM below stays: `TGc` is for graphs
-where ownership is unnatural, not "when in doubt".
+Its argument against a conservative scanner of the whole heap (Boehm) still stands; §20 scans conservatively only the
+stack of one goroutine, the heap is precise (edges are the published fields, read from the VMT), and every goroutine has
+its own heap, so there is no stop-the-world. The default rule for an LLM below stays: the GC style is for graphs where
+ownership is unnatural, not "when in doubt".
 
 **GC — weighed, not adopted (v0.5).** For an LLM the difference from Go is choosing the owner of an object and two "holes": `TShared` cycles and a borrow that outlives its owner. Values (strings, arrays, records) are managed automatically anyway. Cycles are caught by `SafeCheckNoLeaks` in tests (R5), a dangling borrow by the debug build `-gh -CR` + `HEAPTRC=keepreleased` (memory is not reused, a method call on a dead object is caught). The ARC + weak + arenas model is the Swift model, and a great deal of application code is written on it without a GC. A tracing GC without compiler support would be a conservative scanner of stacks and heap (Boehm) — a large unsafe component with non-deterministic destructors: overengineering. The default rule for an LLM: "if you do not know what to choose — TShared; back references — TWeak; trees and graphs — TArena".
 
@@ -1009,7 +1009,7 @@ style, flat data uses the region style, and the two meet only through copied val
 | owner | `TOwned`, `TShared`, `TWeak` | one atomic counter | owner leaves its scope / last reference | runtime construction + `bpvet` S5, S10, S15 |
 | arena | `TArena`, `TArenaRef` | a list of objects | `FreeAll` / scope exit | runtime (R10) + `bpvet` S17 (plan) |
 | region (from Goose) | `TRegion`, `TRegionObject`, `TGrowArray<T>` | **zero** in a release build: a bump pointer, release is one store (+ finalizers only for types with managed fields) | the region leaves its scope | `bpvet` S17 (static); `SAFE_DEBUG` R12 as a second net |
-| GC | `TGc<T>` | a non-atomic counter + a collector pass per goroutine | acyclic garbage at once, cycles by the collector | runtime construction + `bpvet` S18 |
+| GC | `TGcObject` classes, `TGcList<T>` | mark and sweep per goroutine, no barrier | by the collector of the goroutine | the collector + `bpvet` S18 |
 
 **The decision tree** (the same as §0, the first that fits wins): a value → values; one owner → `TOwned`; several owners →
 `TShared` + `TWeak`; data that dies together at the end of a step (a request, a frame, a compiler pass) → region; class
@@ -1017,11 +1017,11 @@ objects with one fate → arena; a graph with cycles and no natural owner → GC
 the earlier branch: a wrong early choice is a compile or lint error, never a memory error.
 
 **Style boundaries (S18).** Between styles only values are copied (`record`, `String`, `TArray<T>`, `Copy`). A region
-object, an element of a `TGrowArray`, a borrow and a `TGc` never go into a place of another style (a field of a class owned by
+object, an element of a `TGrowArray`, a borrow and a GC reference never go into a place of another style (a field of a class owned by
 `TOwned`/`TShared`, a global, a task field, a channel message). The rule is the same as S11 for tasks and generalizes it.
 
 **`// BP-STYLES:` allow-list.** A program file may restrict the styles of the whole program, for example
-`// BP-STYLES: values owner region` in a latency-critical service: `bpvet` then rejects `TGc` in every module of the
+`// BP-STYLES: values owner region` in a latency-critical service: `bpvet` then rejects GC classes in every module of the
 program. Without the line all styles are allowed. "No hidden pauses" (unxed/bp#56) is thus a property a project can
 demand and `bpvet` can check, not a property of the language.
 
@@ -1044,6 +1044,36 @@ conditions, and the plan treats each one as a requirement:
 
 "Zero cost" means that the safety of the region style adds nothing to the release binary: no counter, no check, no
 header. It does not mean the code generator of FPC equals LLVM; the benchmark of the plan compares honestly.
+
+### Spike 1 result: a typed `bpvet` on `PasResolver` (2026-11-04, FPC 3.2.2)
+
+A driver (`tools/bpvet/spike/`) runs `PasResolver` of `fcl-passrc` over every module of `safe/`, `ext/` and `tests/`.
+Verdict: **it works, with three conditions.**
+
+- **Resolved in full:** `tests/safe/test_safe.pas` with `Safe` (`TOwned`, `TShared`, `TWeak`, `TSlice`, `TArenaRef` are
+  specialized, method bodies of the generics included), `safe/safe.pas`, `tests/bench/bench_arena.pas`, the compile tests
+  that must compile. The seven compile tests that must **not** compile (`mf_new`, `mf_getmem`, `mf_move`, ...) are rejected
+  by the resolver as by FPC. The rest failed only on stub coverage (below), not on the code.
+- **Condition 1: a small fix of the resolver.** `PasResolver` (3.2.2 and main alike) rejects the ObjFPC idiom
+  `class function TOwned.Own(AObj: T): TOwned;`: the bare name of a generic inside the implementation of its own method.
+  FPC accepts it, and `safe/core.impl.inc` uses it throughout. The exemption in `TPasResolver.CheckUseAsType` covers only
+  elements inside the declaration of the type; it must also cover a method implementation whose procedure scope belongs to
+  that type. With that one condition extended (about 20 lines) the whole of `test_safe` resolves. The method is not
+  virtual, so a subclass cannot do it: `bpvet` must build with a patched `pasresolver.pp`, and the fix should be offered
+  to FPC. How the patched file is obtained (fetched and patched at build time, or kept in the repository) is a licence
+  question for the owner: `fcl-passrc` is under the FPC licence (LGPL with a linking exception).
+- **Condition 2: the RTL is read from stubs, and the stubs are generated.** The real `System` cannot be parsed by
+  `fcl-passrc` (`{$if declared(...)}`, compiler-internal declarations, constructs the resolver does not implement). A stub
+  unit with the declarations only works; hand-written stubs were enough for `test_safe`. They need not be hand-written:
+  `ppudump -Fj` of FPC 3.2.2 exports the full interface of a compiled unit as JSON (`system.ppu`: 1839 symbols, routines
+  with parameters, classes with fields), so a generator turns the `.ppu` files of the installed FPC into exact stubs.
+- **Condition 3: the resolver only resolves, FPC checks.** Where the resolver (made for pas2js) is stricter than FPC
+  (a class or a pointer cast to an integer, `PChar` assigned to `String`), `bpvet` accepts: its overrides of
+  `CheckTypeCastRes` and `CheckAssignCompatibilityCustom` are virtual. Type errors are the compiler's job; `bpvet` needs the
+  types, not a second opinion on them. Compiler magic with variable arguments (`WriteLn`, `SizeOf`, ...) is registered as
+  built-in routines that accept any arguments.
+- **Found on the way:** `for V in Ch` over a channel uses a record enumerator, which the resolver of 3.2.2 rejects
+  ("expected result class"); this needs a second small fix or a class enumerator.
 
 ### Region style (an idea from Goose)
 
@@ -1098,8 +1128,10 @@ pointer, one machine word); bulk data without a header goes into a `TGrowArray` 
 **Elements of a `TGrowArray` in place.** `A.At(I)` returns a typed pointer, and with `{$modeswitch autoderef}` in the
 module the call reads like a field access: `A.At(I).X := 42`, `WriteLn(A.At(I).Name)`. The module of the user never writes
 `^`; the pointer type cannot be named there without `^`, so it cannot be stored (S4 still applies), and S17 roots the result
-in the array. The modeswitch is needed in each module that does in-place access (it is per module in FPC; verified on FPC
-3.2.2); `bpvet` suggests it when it is missing. Without it the array is used by value: `R := A[I]; ...; A[I] := R`. An array
+in the array. The modeswitch is needed in each module that does in-place access (it is per module in FPC), and the machine writes it,
+not the user: `bpvet --fix` inserts `{$modeswitch autoderef}` after the mode line of such a module, as `goimports` adds an
+import, and `sp build` and fpide (on save) run the fix before compiling. A compiler switch cannot do it instead:
+`-Mautoderef` on the command line is reset by the `{$mode objfpc}` line of the module (verified on FPC 3.2.2). Without it the array is used by value: `R := A[I]; ...; A[I] := R`. An array
 of region objects (`TGrowArray<TNode>`) needs no modeswitch: `A[I].X := 1` goes through the class reference.
 
 **Strings and other managed fields are allowed.** A region object or a record in a `TGrowArray` may hold `String`, dynamic
@@ -1197,40 +1229,70 @@ reading memory of another object. A release build reuses the memory.
 
 ### GC style
 
-`TGc<T: class>` is built like `TShared`: a record with an interface field, so the compiler counts the references, and no
-custom `Copy`/`AddRef` operators are used (the reason is in §4). The difference from `TShared`: cycles are allowed and
-collected, and a `TGc` never leaves its goroutine.
+The aim is the surface of Go: no wrapper, no `.Get`, no owner to choose. A GC object is an ordinary class:
 
-- **A heap per goroutine** (as in Erlang). S11 already forbids sharing objects between tasks; S18 extends it to `TGc`. So the
-  counter is not atomic, the collector of one goroutine stops only that goroutine for a time bounded by the size of its own
-  heap, and there is no stop-the-world, no write barrier between threads, no signals.
-- **Acyclic garbage is freed at once** when the counter drops to zero, as with `TShared`: most objects never wait for the
-  collector, and their destructors run at a known point.
-- **Cycles: a synchronous cycle collector by trial deletion** (the method of the CPython cycle collector). Candidates are
-  cells whose counter dropped but not to zero. For each candidate graph the collector counts the references that come
-  from inside the graph; a cell whose counter equals its internal count and that no externally held cell reaches is garbage.
-  The collector runs when the number of candidates passes a threshold and on `GcCollect`.
-- **Edges through RTTI.** The `TGc` fields of an object are managed (the record holds an interface), so they are listed in
-  the managed fields table that FPC already keeps for each class, record and dynamic array. The collector walks those
-  tables: a class needs no hand-written `Trace`, and fields inside dynamic arrays and generic containers are found too.
-  Whether FPC 3.2.2 lists all such fields is the first spike of the plan; the design stands or falls on it.
-- **Not a conservative scanner.** Stacks and registers are never scanned: an external reference is simply a counted
-  reference not found inside the graph. This is why the §18 argument against Boehm does not apply.
-- **No resources in GC objects.** A destructor of an object freed by the collector runs at collection time, so a file, a
-  socket or a lock is held by `TOwned` + `TDefer`, not by a `TGc` object. `bpvet` warns on a class with a destructor used in
-  `TGc` (part of S18).
+```pascal
+type
+  TNode = class(TGcObject)      // references first: the collector follows them
+    Next, Child: TNode;
+  public
+    X: Integer;
+    Name: String;
+  end;
+
+N := TNode.Create;  N.Next := TNode.Create;  N.Next.X := 1;   // nobody frees anything
+```
+
+- **Allocation.** `TGcObject` overrides `NewInstance`, as `TRegionObject` does: the object goes into the heap of the current
+  goroutine. A goroutine has its own GC heap (as in Erlang): S11 already forbids sharing objects between tasks, S18 extends
+  it to GC objects. The collector of one goroutine stops only that goroutine, for a time bounded by its own heap; there is
+  no stop-the-world, no write barrier, no signals.
+- **Edges: published fields.** `TGcObject` is compiled with `{$M+}`, so in a descendant the fields declared before any
+  visibility section are `published`, and FPC lists published class fields with their offsets in the field table of the
+  VMT. The collector walks that table up the class chain: the class needs no hand-written `Trace`. FPC allows only class
+  types in `published`, which is exactly the set of references; other fields go after `public`. Verified on FPC 3.2.2 on
+  2026-11-04 (`TNode.Next @8`, `TNode.Child @16`, read from the VMT; an `Integer` there is a compile error). The machine
+  keeps this order for the user: `bpvet --fix` moves the reference fields of a GC class to its start and the others after
+  `public` (S18), so nobody has to remember it.
+- **Collections of references** are GC classes too (`TGcList<T>`, `TGcMap<K, V>`): their items are traced by the class
+  itself. A dynamic array, a record or a class of another style that holds a GC reference is an error of S18: the collector
+  would not see that reference.
+- **Roots: the stack of the goroutine, scanned conservatively; the heap is precise.** Locals and parameters are plain class
+  references, as everywhere in Better Pascal ("locals borrow"). At a collection the goroutine spills its registers to its
+  stack (a few lines of assembler per architecture, as `clone` in §18 already has) and the collector scans that one stack
+  range, which `BPThreads` knows exactly (§18): a word that points into an object of this heap keeps it alive. The heap
+  itself is never scanned conservatively: edges come only from the field tables. This is the scheme of JavaScriptCore
+  (conservative stack, precise heap), not of Boehm: the unsafe part is one scanner of one stack, a few hundred lines, and
+  the §18 argument against a conservative scanner of the whole heap does not apply. A word that only looks like a pointer
+  can keep garbage alive a little longer; it can never free a live object.
+- **Mark and sweep, objects never move** (conservative roots require it). A collection starts when the heap has grown by a
+  factor since the last one (like `GOGC` in Go, 100% by default) or on `GcCollect`.
+- **Where a GC reference may live (S18):** a local, a parameter, a result, a published field of a GC object, an item of a GC
+  collection. Not a global (a long-lived object is held by a local of the main routine or of the task), not a field of a
+  record or of a class of another style, not a dynamic array, not a task field, not a channel. `bpvet` checks it with types
+  (§20, the spike), so the rule is not left to the programmer.
+- **No resources in GC objects.** A destructor of a GC object never runs; a file, a socket or a lock is held by `TOwned` +
+  `TDefer` in a local. `bpvet` reports a destructor in a GC class (S18).
 - **Leaks.** `SafeCheckNoLeaks` (R5) runs the collector of the goroutine first, then counts what is left.
-- `ESafety` R13 (`SAFE_DEBUG`): a `TGc` is used on a goroutine other than the one that made it (a hole in S18 or unsafe code).
+- `SAFE_DEBUG`: swept memory is not reused and its pages lose access, so a reference the collector did not see (a hole in
+  S18 or unsafe code) stops with `EAccessViolation` at once; a GC object used on another goroutine raises `ESafety` R13.
+- **Targets.** The stack bounds come from `BPThreads` (the default on Linux) and from the main thread; with `-dSAFE_LIBC`
+  the thread stacks of libc are not known yet, so the GC style is limited to the main thread there until the stack bounds
+  are read from the thread attributes. DOS has one thread and works.
+
+Considered and not chosen: a `TGc<T>` record with an interface field (references counted by the compiler, cycles collected
+by trial deletion, as in CPython). It needs no stack scan and frees acyclic garbage at once, but every access is
+`X.Get.Field`: the surface of `TShared`, not of Go. It stays the fallback if the stack scan proves unreliable on a target.
 
 ### New codes
 
 | Code | Meaning |
 |---|---|
 | S17 | root analysis of the region style: S17a no destructor in a region class, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena` |
-| S18 | style boundaries: rooted values and `TGc` stay in their style and goroutine; the `// BP-STYLES:` allow-list; a destructor in a `TGc` class |
+| S18 | style boundaries: rooted values and GC references stay in their style and goroutine; where a GC reference may live; reference fields first in a GC class (`--fix` reorders); a destructor in a GC class; the `// BP-STYLES:` allow-list |
 | R11 | a region or a `TGrowArray` grows past a fixed reservation (small address spaces) |
 | R12 | `SAFE_DEBUG`: access to a released region (its pages lose access: `EAccessViolation`) |
-| R13 | `SAFE_DEBUG`: a `TGc` used on another goroutine |
+| R13 | `SAFE_DEBUG`: a GC object used on another goroutine |
 | R14 | `Release` of a region that is not the innermost one of the goroutine (regions are nested) |
 | R15 | an allocation in the current region when the goroutine has no region |
 | R16 | `Own/Share/Adopt` of a region object (it belongs to its region) |
