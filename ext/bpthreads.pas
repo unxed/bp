@@ -61,6 +61,10 @@ implementation
 
 {$ifdef SAFE_RAW}
 
+{ No stack check in the thread manager (-Ct): the check reads the threadvar StackBottom, whose address comes from
+  RawRelocateThreadVar, which would check the stack again, without end. }
+{$S-}
+
 const
   {$ifdef cpu64}
   RegionLog2 = 23; // 8 MiB of virtual address space per thread, as with pthread
@@ -349,7 +353,7 @@ asm
   pushl  %edi
   movl   20(%esp), %ecx    // Stack
   andl   $-16, %ecx
-  subl   $16, %ecx
+  subl   $20, %ecx         // Fn is popped, Arg stays at a 16-aligned address: Fn starts as a call made with esp aligned
   movl   28(%esp), %eax    // Arg
   movl   %eax, 4(%ecx)
   movl   16(%esp), %eax    // Fn
