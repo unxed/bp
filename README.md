@@ -4,6 +4,7 @@
 > program (`bpvet --strict --typed`: ownership, regions, borrows) and calls `fpc` only when the check passes, so
 > unsafe code is built only where it is declared (`// UNSAFE:`, `// borrow:`, `// root:`). The guarantees of Better
 > Pascal are the guarantees of `bp build`; a cached check takes about 30 ms.
+> `bp run FILE.pas [args]` runs it (a file with `#!/usr/bin/env -S bp run` is a script), `bp new NAME` starts a project.
 
 **How it compares** (built with `bp build`; measured 2026-11-04, details in unxed/bp#108 and `safe/SPEC.md` §20):
 
