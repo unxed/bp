@@ -225,8 +225,9 @@ end;
 
 procedure BlockScopes;
 var
-  Lines: array of String;
+  Lines, Kept: array of String;
   Line: String;
+  Named: TNamed;
   Count: Integer;
   Peak: SizeUInt;
   R, I, J, Inside: Integer;
@@ -271,6 +272,18 @@ begin
   end;
   Check((Count = 200) and (CurrentRegionDepth = 0) and (Peak < 256 * 1024), 'for Line in Each(Lines): a region per '
     + 'iteration (peak ' + IntToStr(Peak div 1024) + ' KiB over 200 rounds of 1000 objects)');
+  // strings leave a region as copies: they outlive the reset of every iteration
+  SetLength(Kept, Length(Lines));
+  Count := 0;
+  for Line in Each(Lines) do
+  begin
+    Named := TNamed.Create;
+    Named.Name := 'ё' + Line + '😀';
+    Kept[Count] := Named.Name;
+    Inc(Count);
+  end;
+  Check((Kept[0] = 'ё0😀') and (Kept[199] = 'ё199😀') and (StringRefCount(Kept[199]) = 1),
+    'strings leave a region as copies: UTF-8 text intact after the reset of each iteration, one reference left');
 end;
 
 procedure ResetLoop;
