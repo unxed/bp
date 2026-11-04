@@ -43,6 +43,8 @@ jobs:
         run: bash tests/typed.sh out/bpvet
       - name: tools/bp build checks before it compiles (tests/bp.sh)
         run: bash tests/bp.sh
+      - name: tools/bp get, vendor and build with deps.lock over local git repositories (tests/deps.sh)
+        run: bash tests/deps.sh
 
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
   # the "binary is static, no libc" check, and runs on different distributions.

@@ -30,7 +30,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Goroutines: `TGroup/TTask/TChan/Select`, R6–R8 (ext layer, unit `BP`) | **implemented, tests** | §14, `test_go` |
 | Threads without libc (`ext/bpthreads.pas`: `clone`+`futex`+`mmap`), Linux without libc by default | **implemented, tests** (`test_threads`; x86_64, i386, aarch64, Alpine) | §18 |
 | Sum types: example and test; **S13 checks (`case` exhaustiveness, tag)** | example and test exist; **checks (linter) — plan** | §16, `test_sumtype` |
-| Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | **specification only (plan), no code** | §15 |
+| Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | `deps.txt`, `deps.lock`, MVS, the module cache, `vendor`, mirrors: **implemented, test, CI** (`tools/bp get`, `tools/bp vendor`, `tests/deps.sh`); Software Heritage, the unsafe audit: **plan** | §15 |
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S4 (`^T`, `@`, pointer arithmetic) | **implemented, lint tests, CI** | §6 |
@@ -883,6 +883,23 @@ mirror  github.com/acme/json https://codeberg.org/acme-mirror/json    // optiona
   The line `deny-unsafe github.com/acme/json` in `deps.txt` stops the build if unsafe code has appeared in a new version
   of the dependency.
 
+**First step (2026-11-04).** What exists is what a library on an amateur's GitHub needs, with no hosting of ours:
+`tools/bp get [DIR]` reads `DIR/deps.txt` (`module`, `safe`, `require path vX.Y.Z`, `mirror path URL`, `dirs`; `//`
+comments), mirrors each repository once into `${BP_CACHE:-~/.cache/bp}/mod/<path>.git` (`git clone --mirror`, later
+`git fetch`; the `mirror` lines when the first URL fails; a path that starts with `/` or `file://` is a local
+repository), selects the versions by MVS (the greatest of the versions required by the modules reached; no solver, no
+ranges) and writes `DIR/deps.lock`, one `path version commit` per selected module, sorted by path. A recorded commit
+wins: a tag that now points elsewhere stops `bp get` with both commits named, until its line is deleted from the lock.
+Each selected version is extracted once, read-only, into `mod/<path>@<version>/` (`git archive`, never a checkout).
+`tools/bp build` and `bp fix` read `deps.lock` and add the `dirs` of each module (from its own `deps.txt`, default
+`. src`) as `-Fu` and `-Fi`, from `vendor/<path>/` when it is there, else from the cache (fetched when missing, so a
+clone with a lock builds without `bp get`); `tools/bp vendor` fills `vendor/` (listed in `vendor/modules.txt`) for a
+build offline and in ten years; `vendor/` is not checked by `bpvet` as a part of the program. The tool is
+`tools/bpget/bpget.pas`, a program of the dialect that `bp build` checks before it builds it; the test is
+`tests/deps.sh`. This repository is a module itself (`deps.txt`: `module github.com/unxed/bp`, `dirs . safe ext`).
+Not yet: the Software Heritage archive as the last fallback, `bp unsafe` and `deny-unsafe`, `bp vendor --flat`, major
+versions as new unit names (nothing checks them yet), the repositories fetched in parallel by goroutines.
+
 ## §16. What else to take from Go and Rust (plan)
 
 ### The `sp` tool: one command, like `go`
@@ -899,7 +916,7 @@ what is already shipped with FPC (verified: `ptop`, `fpdoc`, `data2inc`, `bin2ob
 | `sp fix` | `go fix`, `cargo fix` | **exists as `tools/bp fix [fpc options] FILE`**: `bpvet --fix` over the directory of `FILE`: the header from the file name (S21), reserved words in lower case (S22), the `// root:` marks of exported routines (S17); the rest is listed, nothing is built |
 | `sp fmt` | `gofmt` | `ptop` with a single fixed config from this repository: one style, no settings; reserved words in lower case (S22) |
 | `sp doc` | `go doc` | `fpdoc` |
-| `sp get / vendor / unsafe` | `go get`, `go mod vendor`, cargo-geiger | §15 |
+| `sp get / vendor / unsafe` | `go get`, `go mod vendor`, cargo-geiger | §15. **`tools/bp get` and `tools/bp vendor` exist** (`tools/bpget/bpget.pas`, a program of the dialect): MVS over git tags, `deps.lock` with the commits, the module cache, `vendor/`; `bp build` reads `deps.lock`. `unsafe` is a plan |
 | `sp embed files` | `//go:embed` | `data2inc`: files are turned into a module with constant arrays |
 | `sp fuzz` | `go test -fuzz` | below |
 
