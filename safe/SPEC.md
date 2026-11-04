@@ -50,6 +50,8 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **design (plan)** | §20 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
+| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
+| Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **open**: not checked yet; §0 says how to avoid them | §8, §21.2 |
 
 ---
 
@@ -127,7 +129,9 @@ UNSAFE
 GOROUTINES                             (§14; "do not communicate by sharing memory — share memory by communicating")
   G := TGroup.Create;  G.Go(TWorker.Create(Args, Ch));  ...  G.Wait;   // the group waits for everyone, also on leaving the scope
   A task = a class descending from TTask: arguments are fields set in the constructor, the code is Run.  Simple case: G.Go(@Proc).
-  Task fields: values, String, TArray, TChan, TShared, TOwned via Move. Not borrows, not shared objects (S11).
+  Task fields and messages: values, String, TChan, TOwned via Move. Not borrows, not shared objects (S11).
+    A TArray (or a record holding one) only as the last use of a local or as Copy(A): an array is shared by reference.
+    TShared only of a class nobody changes after its constructor; a global is written only in initialization (§21.2).
   Channels: Ch := specialize TChan<T>.Create(Cap); Send / Recv(out V): Boolean / TryRecv / Close; for V in Ch.
   select: case Select([A.Sel, B.Sel, Done], TimeoutMs) of ... — then TryRecv; -1 = timeout.
   Cancellation: G.Cancel → Done is closed; in a task — Cancelled or Done in Select. A task error → G.Wait raises R7.
@@ -402,6 +406,7 @@ System.GetMem(Buf, Len);
 | Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
 | Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter `bpvet` (S11: class, interface and pointer fields of a task); `TryLock` takes a lock in the cell (stress test in `test_threads`) | H6 |
+| A dynamic array, a `TShared` object or a global is not changed by two goroutines at once | programmer (§0); plan: Send = move, Sync inferred, the `static mut` rule in `bpvet` (§21.2) | H14–H16 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter `bpvet` (S6, S9); R3 only for `TInterfacedObject` | H8 |
 | `Safe` is last in `uses` | linter `bpvet` S7; in a program with `BP` first only a warning (§14) | H9 |
@@ -438,6 +443,9 @@ compensating check, and accepted risks are listed with a reason.
 | H11 | non-exhaustive `case`, missing `const` | `bpvet` S13; S14 errors on copy-heavy parameters and warns when other by-value parameters are not changed | `bpvet` S13, S14 | 11 |
 | H12 | `{$R-}` in safe code | the debug-build recommendation (§6) | rule `{$R+}{$Q+}` + `bpvet` warning | 12 |
 | H13 | `object`, `New(P, Init)` | nothing: such code stays unsafe | owner over `object` + lint rules | 13 |
+| H14 | a dynamic array shared by goroutines: `TChan.Send` keeps the same array (`FBuf[...] := V`), a `TArray` task field shares it with the caller | nothing (§0 says: move or `Copy`) | Send = move: the last use of a local or `Copy`; `SAFE_DEBUG` R17 at `Recv` | §21 step 2 |
+| H15 | a mutable object behind `TShared` used by two goroutines | nothing | Sync inferred: frozen after its constructors, else `// sync: <how>` on the class | §21 step 2 |
+| H16 | a global written while goroutines run | nothing | `static mut`: a unit global is written only in its initialization; what a task reaches does not name the globals of the program | §21 step 2 |
 
 **H1. A borrow outlives its owner.**
 
@@ -785,12 +793,12 @@ passes into the task (fields, `Move`), and values come back through a channel.
 | `go f(x)` | `G.Go(TF.Create(X))` / `G.Go(@Proc)` | worse: no closures in FPC 3.2 (in 3.3+ an overload with an anonymous procedure can be added) |
 | `chan T`, `make(chan T, n)` | `specialize TChan<T>`, `TChan.Create(N)`; a copy of the record is the same channel | the same: a reference type, `N = 0` — rendezvous |
 | `v, ok := <-ch`, `for v := range ch` | `Ch.Recv(V)`, `for V in Ch` | the same |
-| `select` | `Select([A.Sel, B.Sel], TimeoutMs)` + `TryRecv` | worse: receive only, not atomic with the receive (retry on failure) |
+| `select` | `Select([A.Sel, B.Sel], TimeoutMs)` + `TryRecv` | worse: receive only, not atomic with the receive (retry on failure); plan: atomic, with send cases (§21.3) |
 | `sync.WaitGroup`, `errgroup` | `TGroup` | **better**: the group waits for the tasks on leaving the scope (structured concurrency), a goroutine leak is impossible |
 | a panic in a goroutine kills the process | error → group cancellation → `Wait` raises R7 with the original text | **better** |
 | `context.Context` | `G.Cancel`, `Done` (a closed channel) in `Select`, `Cancelled` | the same in meaning, without an extra parameter |
-| races are caught by `-race` | races are prevented by S11: only values, channels, `TShared`, `Move` go into a task | different: a prohibition instead of a detector |
-| M:N scheduler, millions of goroutines | one task = one OS thread | worse: thousands, not millions; honestly "conditional" goroutines |
+| races are caught by `-race` | races are prevented by S11: only values, channels, `TShared`, `Move` go into a task | different: a prohibition instead of a detector; three cases are open until §21.2 (§8, H14–H16) |
+| M:N scheduler, millions of goroutines | one task = one OS thread | worse: thousands, not millions; honestly "conditional" goroutines; plan: M:N on the stacks of `BPThreads` (§21.3) |
 
 Design (we reuse the RTL, minimal custom code): a thread is `BeginThread`; a lock is `TRTLCriticalSection`;
 waiting is an `RTLEvent` (a binary semaphore). A waiting thread puts its event into the channel's waiter list
@@ -805,7 +813,7 @@ On Linux `BPThreads` is threads on `clone`/`futex`/`mmap` without libc (§18), w
 Unixes — `cthreads`. On DOS (go32v2) there are no threads: `TGroup.Go` raises R8 immediately.
 
 Limitations of v0.3: `Select` is receive-only; no timers (`time.After`) — there is a `Select` timeout;
-no deadlock detection ("all goroutines are asleep").
+no deadlock detection ("all goroutines are asleep"). All three are in the plan of §21.3.
 
 ## §15. Dependencies like Go, without a proxy (plan)
 
@@ -965,9 +973,9 @@ or above the parameter suppresses its S14 finding.
 |---|---|
 | borrow checker | impossible without changing the compiler; replaced by the rules S5/S11, the runtime (§4, §8) and, for the region style, the root analysis of Goose in `bpvet` (S17, §20): a reference has one root and does not outlive it, with no lifetime annotations |
 | `?` and `Result<T, E>` | in Pascal exceptions with guaranteed finalization (`TOwned`, `TDefer`) give the same more briefly |
-| the `-race` race detector | races are prevented by S11 (ownership is passed into a task, not shared access) |
+| the `-race` race detector | races are prevented by S11 (ownership is passed into a task, not shared access); the open cases (arrays, shared objects, globals) are closed by §21.2 |
 | a central registry (crates.io), the Go proxy | no infrastructure; in the "hash + mirrors" model (§15) they are not needed |
-| M:N scheduler | honestly "conditional" goroutines (§14) |
+| M:N scheduler | reconsidered: the stacks of `BPThreads` make it small (§21.3, plan) |
 
 ## §17. Version history
 
@@ -983,6 +991,7 @@ or above the parameter suppresses its S14 finding.
 | v0.5.2 | §0 "What actually exists and what is only a plan so far"; §19 (Turbo Pascal style code) |
 | v0.6 | Better Pascal: the safe layer (`safe/`, `unit Safe`) and the ext layer (`ext/`: UTF-8, goroutines, `BPThreads`); `unit BP` gives both |
 | v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the current region (the Goose scope made implicit), the GC style (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
+| v0.7 (design) | §21 concept v3: one scope object (region + defer + held objects; `TArena` and a local `TOwned` fold into it), Send and Sync inferred by `bpvet` (H14–H16 found and listed), goroutines M:N on the stacks of `BPThreads` with deadlock detection and a seeded scheduler, the `TComponent` tree as an owner; what is reused from which language |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1499,3 +1508,194 @@ by trial deletion, as in CPython). It needs no stack scan and frees acyclic garb
 | R14 | `Release` of a region that is not the innermost one of the goroutine (regions are nested) |
 | R15 | an allocation in the current region when the goroutine has no region |
 | R16 | `Own/Share/Adopt` of a region object (it belongs to its region) |
+
+## §21. Concept v3: fewer things, fewer holes (design, plan)
+
+Status: design only, nothing of this section is implemented yet; the plan by steps is §21.7. A fresh look at the whole
+concept against the table of the README (Rust, Go, Goose, Zig, Mojo) and the languages it does not name (Swift, Odin, Nim,
+Pony, D, C#, Hylo, Erlang). Four changes. Each one reuses a mechanism that Better Pascal or FPC already has, so each one is
+small; two of them remove concepts rather than add them.
+
+### 21.1 One scope object: region + defer + held objects
+
+Four parts of Better Pascal answer one question, "what is undone when this scope ends": `TRegion` (memory), `TArena`
+(objects with one fate), `TDefer` (an action) and a local `TOwned` (one object). Go answers it with `defer`, Zig with
+`defer` and arenas, C++ with destructors, Odin with the context allocator; underneath it is always one list of things to
+undo. The region of §20 already keeps that list (the finalizers of objects with managed fields), so it can hold the other
+three:
+
+```pascal
+for S in Scope do                       // or a TRegion local for the whole routine
+begin
+  S.Hold(Lines, TStringList.Create);    // any existing class: Destroy is called when the scope ends
+  Lines.LoadFromFile(Name);             // a plain class reference: no .Get, no type alias
+  S.Defer(@Term.Restore);               // an action: run when the scope ends, also on an exception
+  N := TNode.Create;                    // a TRegionObject: a bump allocation, as in §20
+end;                                    // undone in reverse order: Restore, Lines.Destroy, then the memory
+```
+
+- `Hold(out V; Obj: TObject)` takes an untyped `out`. The compiler cannot type it; the typed `bpvet` does: `V` is a local
+  of a class type and `Obj` is a constructor call of that class or of a descendant (S6 accepts `Hold` as it accepts
+  `Own/Share/Adopt`). Then S17 roots `V` in the scope: it is not stored into a field, a global, a task or a channel, and it is
+  not read after the scope. The trick is legitimate for the reason of §20 ("Why a linter gives the guarantee"): the guarantee
+  is the one of `bp build`.
+- It replaces the most frequent idiom of Pascal, `X := TFoo.Create; try ... finally X.Free end`, with one line, for every
+  class of every package (the LCL included), with no wrapper type.
+- The loop variable of `for S in Scope` is a handle of the region (`TScopeRef`: a pointer, no ownership; S17 roots it too).
+  The spike returns an `Integer` there today.
+- `TOwned` stays the owner of a **field** (ownership that is not lexical, moved with `.Move`); a local `TOwned` is no longer
+  needed. `TArena` keeps its API on the list of a region without bump memory (`Adopt` = `Hold`), and `// borrow: arena` is
+  S17d with no engine of its own. `TDefer` stays for code without a scope; `S.Defer` adds to the same list. An exception in a
+  destructor or a deferred action is counted as in `TDefer` (`SafeDeferFailures`), and the rest of the list still runs.
+- Cost: one list entry per `Hold` or `Defer` (the list exists anyway), nothing at access.
+
+### 21.2 Data races: Send and Sync, inferred
+
+Three ways to share mutable memory between goroutines are open today (§8, H14–H16):
+
+- **H14, a dynamic array is a reference.** `Ch.Send(A)` keeps the same array in the buffer (`FBuf[...] := V` in
+  `ext/go.impl.inc`), and a `TArray` field of a task shares the array with the caller (§0 allowed it until v0.7). Both sides
+  may write `A[I]`. A string does not have the problem: a write to a shared string copies it first.
+- **H15, an object behind `TShared` is mutable.** S11 sends the programmer to `TShared` for an object two tasks need; two
+  goroutines may then change it at once.
+- **H16, a global is visible to every goroutine.** Nothing checks a write to it.
+
+Rust closes all three with two auto traits checked by the compiler: `Send` (may move to another thread) and `Sync` (may be
+shared). Pony closes them with reference capabilities (`iso` is moved, `val` is immutable and shared freely), Swift 6 with
+`Sendable`. All of them reduce to three rules that the typed `bpvet` checks over one module:
+
+1. **Send = move.** A value that holds a dynamic array (a `TArray`, a `TSlice`, a record with one: the typed `bpvet` knows the
+   type) goes into a channel, a task field or a `Go` argument only as the last use of a local variable (a move: the variable
+   is not read again until it is assigned) or as `Copy(X)`. A `const` parameter is not moved (the caller still holds it): it
+   is copied. The engine is the one of S5 that already reports `Local` used after `Owner.Reset`. `SAFE_DEBUG` adds a net:
+   `Recv` checks that a received array has one reference (R17).
+2. **Sync = frozen or declared.** A class may be shared by goroutines (`TShared` in a task field or a message) when it is
+   frozen: every field is written only in its constructors, and the type of every field is frozen too (values, `String`,
+   `TChan`, `TShared` of a frozen class). Frozenness is inferred over the module, as `// root:` is (§20, S17 v2), not
+   declared. Any other class says how it stays safe, `// sync: <the lock or the protocol>` on its declaration: the analogue of
+   `unsafe impl Sync`, found by grep and by the unsafe audit of dependencies (§15).
+3. **`static mut` is unsafe.** A global of a unit is written only in its `initialization` (it is frozen after that, and all
+   initializations run before the first goroutine), or it is a `threadvar`; any other write needs `// UNSAFE:`, as `static mut`
+   does in Rust. The globals of a program file are locals of the main goroutine: a routine that a task can reach in that file
+   (a fixpoint over the module, as for S17) does not name them.
+
+`String` needs nothing: copy on write with an atomic counter is Send and Sync already. `TChan` is Sync by construction,
+`TOwned` moved with `.Move` is Send. After the three rules the claim of §14, "races are prevented, not detected", holds
+without exceptions; until then §0 tells the programmer what the rules will check.
+
+### 21.3 Goroutines M:N on the stacks that `BPThreads` already has
+
+`BPThreads` finds the current thread from the stack pointer (`Sptr and not (R - 1)`: a stack is aligned to its size, and the
+thread record with its threadvar block is at its start; §18). So **a switch of the stack is a switch of the thread** for the
+RTL: the threadvars, the exception frames, `IOResult`, the region stack of §20 and the free lists of the heap follow the
+goroutine with no extra code. A green thread is a stack and a saved stack pointer, and the scheduler sits behind the hooks of
+`TThreadManager` that `BPThreads` already implements:
+
+| Hook | 1:1 today | M:N |
+|---|---|---|
+| `BeginThread` | `clone` | a new stack in the run queue |
+| `RTLEventWaitFor`, a contended `EnterCriticalSection`, `WaitForThreadTerminate` | `futex` wait | park the goroutine, run the next one |
+| `RTLEventSet`, `LeaveCriticalSection`, the end of a thread | `futex` wake | put the parked goroutine into the run queue |
+
+- **Carriers:** one OS thread per CPU. The switch is about ten lines of assembler per architecture (save the callee-saved
+  registers, swap the stack pointer), next to the `clone` code of §18.
+- **Blocking system calls** pin their carrier; a monitor thread adds a carrier when none has made progress for about 10 ms
+  (the handoff of `sysmon` in Go). There is no preemption: a goroutine in a long loop keeps its carrier, as in Go before 1.14,
+  and the monitor covers it the same way. A netpoller (`epoll`) is a later step.
+- **Every `TThread` of every FPC package** becomes a green thread unchanged: `TThread` goes through the same hooks.
+- **Deadlock detection** comes free with the scheduler: all goroutines parked and none in a system call stops the program
+  with the stacks of the parked ones ("all goroutines are asleep" of Go; §14 lists it as missing).
+- **A seeded deterministic mode** comes almost free: `BP_SCHED_SEED=N` runs one carrier and switches at every channel
+  operation in an order drawn from the seed; a failing test prints its seed and replays it. The idea of `shuttle` in Rust and
+  of the deterministic simulation of FoundationDB, at the cost of a random-number generator.
+- **`Select` becomes atomic and gains send cases**, as in Go: lock the channels of the cases in address order (`sellock` of
+  Go), commit one case. A received value goes into a `var` given with its case (`A.RecvCase(V)`, `B.SendCase(X)`); its address
+  lives only during the call (an open array parameter cannot be stored), so the surface stays safe.
+- **The GC style** (§20) gets the exact stack range of a parked goroutine: `[saved stack pointer, top of the stack)`.
+- **The price, to be measured by a spike.** The threadvar block of the RTL (it holds `Input` and `Output`, among others) is a
+  few KiB per goroutine, plus at least one page of stack: about 10^5 goroutines per GiB, not the 10^6 of Go. All stacks have
+  one size (the mask is global), reserved and touched on demand. A guard page makes a stack two mappings, and
+  `vm.max_map_count` (65530 by default) then caps the goroutines at about 32 thousand; the spike decides between guard pages
+  and the stack check of the compiler (`-Ct`, one compare in each prologue) for stacks carved out of one reservation.
+- `-dSAFE_LIBC` stays 1:1 (libc keeps state of its own in each kernel thread); a define keeps 1:1 in the default mode until
+  M:N is proven.
+
+### 21.4 The tree of `TComponent` is an owner
+
+Delphi and Lazarus have had an ownership tree since 1995: `TButton.Create(Form)` gives the button to the form, which
+destroys it. Better Pascal takes it as it is:
+
+- S6 accepts `TFoo.Create(AOwner)` of a `TComponent` descendant when the owner argument is not `nil`: the owner is the
+  component.
+- The result is a borrow rooted in the owner (a root kind of S17). A `published` field of a component whose type is a
+  component (the `Button1: TButton` that the form designer writes and the streaming system fills, with the form as the
+  owner) needs no `// borrow:`; elsewhere the rules of S5 hold.
+- `.Free` of an owned component stays a compile error (S3); `TOwned` or `S.Hold` holds the root of a tree, and a form owned
+  by `Application` needs nothing.
+
+The README says the LCL is not yet tested with `bp build`; this rule is what lets the code of a Lazarus form pass without
+marks. Cost: one exception of S6 and one root kind of S17.
+
+### 21.5 The decision tree after §21
+
+1. A value: `record`, `String`, `TArray<T>`.
+2. Lives as long as a scope (a block, an iteration, a routine): the scope. `S.Hold` for an existing class, a `TRegionObject`
+   class for new data, `S.Defer` for an action.
+3. Owned by a field: `TOwned`; by a component tree: `TFoo.Create(AOwner)`.
+4. Several owners: `TShared` + `TWeak`.
+5. A graph with cycles and no natural owner: GC.
+
+Five branches instead of seven (§0), and the most frequent case, a local object, becomes a plain class reference. §0 and
+§4 change when the steps of §21.7 are done, not before.
+
+### 21.6 Against the other languages, and what is reused from where
+
+| Language | Where it stands against Better Pascal | What §21 takes |
+|---|---|---|
+| Swift | the owner style is its model (ARC + `weak`); Swift 6 checks `Sendable` in the compiler; no regions, no static binary without libc | `Sendable`, as rule 2 of §21.2 |
+| Odin, Jai | the implicit `context.allocator` is the current region of §20; lifetimes are not checked | nothing more: the current region already is it |
+| Nim | ORC: counting plus a cycle collector over the whole heap | nothing: cycles are forbidden (S15) or go to the GC style of one goroutine |
+| Pony | reference capabilities in the type system: the strongest race freedom | `iso` (moved) and `val` (frozen), inferred instead of written |
+| D | `@safe`/`@trusted`/`@system` and `scope`: a safe subset checked by a pass of the compiler | the same shape, done by `bpvet` (§7, S17) |
+| C# | `ref struct` and `scoped`: a value that cannot escape to the heap | the root rule of S17 is the same idea |
+| Hylo | mutable value semantics (`let`, `inout`, `sink`) | nothing new: Pascal has had `const`, `var` and records since 1970, S14 makes them the default |
+| Vale | generational references | not taken: a cost at every access (unxed/bp#108) |
+| Erlang | a heap per process | already in the GC style (§20) |
+
+| Better Pascal | Idea from | FPC mechanism it rests on |
+|---|---|---|
+| poisoned primitives | Rust `#![forbid(unsafe_code)]`, D `@safe` | name shadowing by the last unit of `uses`; a helper method with a stub parameter type (`.Free`) |
+| owner style | Swift | an interface field in a record: the compiler counts |
+| scope (§21.1) | Goose regions, Zig `defer` and arenas, C++ destructors, Odin context | management operators of a record; `for ... in` as a block |
+| root analysis | Goose roots, Rust lifetimes (elided), C# `scoped` | `PasResolver` of `fcl-passrc`; stubs from `ppudump -Fj` |
+| region objects | Goose | `NewInstance`/`FreeInstance` overrides |
+| GC style | Erlang, JavaScriptCore (conservative stack, precise heap), `GOGC` of Go | `{$M+}`: the field table of the VMT gives the edges |
+| Send and Sync (§21.2) | Rust auto traits, Pony capabilities, Swift `Sendable` | the typed `bpvet`, a fixpoint over one module |
+| goroutines M:N (§21.3) | Go (scheduler, `sysmon`, `sellock`), Rust `shuttle`, FoundationDB | the hooks of `TThreadManager`; the thread found from the stack pointer |
+| component tree (§21.4) | Delphi and Lazarus, Qt parents | `TComponent.Owner`, published component fields |
+| Linux without libc | Go | `clone` + `futex` + `mmap` as an FPC thread manager; `fpwidestring` |
+| sum types | Rust `enum` + `match` | variant records + S13 |
+| dependencies | Go modules (MVS), Rust editions | git hashes, Software Heritage (§15) |
+| leak check in tests | the testing allocator of Zig | the R5 counter |
+| in-place access | (none needed) | `{$modeswitch autoderef}`, written by `bpvet --fix` |
+
+### 21.7 Plan by steps
+
+One step is one PR from a fresh `main`, with a criterion of done; a spike may end with "not worth it", written here with its
+data.
+
+1. **H14–H16 in `bpvet`** (S11m Send = move, S11s Sync, S19 globals) and R17 in `SAFE_DEBUG`. *Done:* ok/bad lint tests for
+   each rule; the rows of §8 updated. First, because it closes a hole of a claim made today.
+2. **Spike 4: the M:N switch** (`tools/spikes/mn/`): two goroutines exchange values over a channel on one carrier with a
+   stack switch; threadvars, exceptions and the heap work across switches. *Done:* CI green on x86_64, aarch64 and i386; the
+   time of a switch, the memory of a goroutine, the goroutines per GiB, guard pages against `-Ct`; a verdict in §21.3.
+   Independent of step 1.
+3. **The scope** on the region runtime (step 4 of unxed/bp#108): `Hold`, `Defer`, `TScopeRef`, `TArena` on the list; S6
+   accepts `Hold`, S17 roots it. *Done:* `test_region` covers the order of destruction, an exception in the scope and in a
+   destructor; lint tests.
+4. **The `TComponent` owner** (S6 and a root kind of S17). *Done:* lint tests on a form-like unit (a stub `TComponent` is
+   enough).
+5. **The M:N runtime** after step 2: the scheduler behind the hooks, the monitor, deadlock detection, `BP_SCHED_SEED`.
+   *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test.
+6. **Atomic `Select` with send cases.** *Done:* `test_go` covers a send case and a race between two ready cases.
+7. **The summary:** §0, §4, the README, the statuses at the top: what exists, nothing else.

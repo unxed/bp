@@ -14,8 +14,11 @@
 | Build speed | much better: ~30 ms check + `fpc` | on par | unknown | on par or better | likely better |
 | Array iteration | on par (`for C in A.Chunks` is as fast as a plain array) | on par | on par | on par | on par |
 | Ecosystem | comparable: every FPC package and Lazarus can be used as is, as unchecked units (like C libraries in Rust or Zig), and moved to the bp dialect step by step | comparable | larger | larger | larger |
+| Data races | behind for now: Rust checks `Send`/`Sync` in the compiler; `bp build` checks task fields (S11), but a dynamic array, a `TShared` object or a global shared by goroutines is not checked yet (`safe/SPEC.md` §21.2 closes it) | better in kind: a prohibition before the build, not a detector at run time (`-race`), with the same open cases | behind until §21.2: Goose passes only flat values | better: Zig does not check races | unknown |
+| Goroutines | behind in scale: one task is one OS thread, thousands of them (async Rust runs millions; plan: M:N, §21.3) | behind in scale, better in structure: a group waits for its tasks, the error of a task reaches `Wait` | unknown | unknown | unknown |
 
-The Lazarus LCL is not yet tested with `bp build`.
+The Lazarus LCL is not yet tested with `bp build`. The plan of concept v3 (one scope object, Send and Sync inferred,
+goroutines M:N, the `TComponent` tree as an owner) and what is reused from which language: `safe/SPEC.md` §21.
 
 Free Pascal as one would want it by default: safe memory, UTF-8 everywhere, goroutines.
 No FPC fork and no compiler options: a single unit `BP` gives all of it.
