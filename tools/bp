@@ -1,35 +1,150 @@
 #!/usr/bin/env bash
-# bp: the build command of Better Pascal (safe/SPEC.md §16). It checks the program with bpvet in the typed and strict
-# mode and compiles it with fpc only when the check passes: nothing unsafe is built unless the code declares it
+# bp: the build command of Better Pascal (safe/SPEC.md §16, §22.1). It checks the program with bpvet in the typed and
+# strict mode and compiles it with fpc only when the check passes: nothing unsafe is built unless the code declares it
 # (// UNSAFE:, // borrow:, // root:).
-# usage: tools/bp build [--release] [fpc options] FILE.pas
+# usage: tools/bp build [--watch] [--release] [fpc options] FILE.pas
+#        tools/bp run [--watch] [--release] [fpc options] FILE.pas [program arguments]
+#                                              builds into the cache (skipped when the sources are unchanged) and runs;
+#                                              the exit code is the one of the program; --watch runs it again on a save
 #        tools/bp fix [fpc options] FILE.pas   writes what bpvet --fix knows (the header from the file name, lower-case
 #                                                reserved words, // root: marks) and lists the rest; nothing is built
+#        tools/bp new NAME                     a new project: NAME/NAME.pas, deps.txt, tests/test_NAME.pas, README.md
 #   Checked: FILE and the other sources of its directory. The fpc options are passed on; -Fu, -Fi, -d and -Fa are also
 #   given to bpvet; safe/, ext/ and the BP unit are on the unit path. A debug build adds -Cr -Co (SPEC §6).
+#   A script: a file whose first line is `#!/usr/bin/env -S tools/bp run` (fpc does not take a #! line) is checked and
+#   built from a copy in the cache with that line blank, so the line numbers stay; its directory is searched for units.
+#   --watch: polls the *.pas, *.pp and *.inc of the directory every 200 ms; Ctrl-C stops it and the program.
 #   Caches (BP_CACHE, default ~/.cache/bp): bpvet by the hash of its sources, the RTL stubs by the hash of the checked
-#   sources and the fpc version.
+#   sources and the fpc version, the binaries of `run` by the hash of the sources, the fpc version and the options.
 set -eu
 cmd=${1:-}
-[ "$cmd" = build ] || [ "$cmd" = fix ] || { sed -n '2,12s/^# \{0,1\}//p' "$0"; exit 2; }
+case "$cmd" in build|fix|run|new) ;; *) sed -n '/^set -eu/q;2,$s/^# \{0,1\}//p' "$0"; exit 2 ;; esac
 shift
 root=$(cd "$(dirname "$0")/.." && pwd)
 cache=${BP_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/bp}
 fpc=${FPC:-fpc}
+
+say() { echo "$@" >&2; }
+now() {
+  local t; t=$(date +%s%N)
+  case "$t" in *N) t=$(python3 -c 'import time; print(int(time.time() * 1e9))') ;; esac
+  echo "$t"
+}
+
+# bp new NAME: the files of a project; they pass bp build themselves
+if [ "$cmd" = new ]; then
+  name=${1:-}
+  case "$name" in
+    ''|[0-9]*|*[!A-Za-z0-9_]*) say "usage: bp new NAME   (an identifier: the file name is the program name, S21)"; exit 2 ;;
+  esac
+  [ ! -e "$name" ] || { say "bp: $name exists"; exit 1; }
+  mkdir -p "$name/tests"
+  cat > "$name/$name.pas" <<PAS
+program $name;
+
+{\$mode objfpc}{\$H+}
+
+uses
+  // UNSAFE: BP goes first in a program (the thread manager); SysUtils after it shadows it, and the program does not
+  // free objects by hand (no FreeAndNil)
+  BP,
+  SysUtils;
+
+begin
+  writeln('Hello from ', '$name');
+end.
+PAS
+  printf 'module %s\nsafe 0.6\n' "$name" > "$name/deps.txt"
+  cat > "$name/tests/test_$name.pas" <<PAS
+{ Tests of $name. Exit code = number of failed checks. }
+program test_$name;
+
+{\$mode objfpc}{\$H+}
+
+uses
+  // UNSAFE: BP goes first in a program (the thread manager); SysUtils after it shadows it, and the program does not
+  // free objects by hand (no FreeAndNil)
+  BP,
+  SysUtils;
+
+var
+  Failed: Integer = 0;
+
+procedure Check(const Cond: Boolean; const What: string);
+begin
+  if Cond then
+    writeln('ok   ', What)
+  else
+  begin
+    writeln('FAIL ', What);
+    Inc(Failed);
+  end;
+end;
+
+begin
+  Check(Length('abc') = 3, 'a string has its length');
+  SafeCheckNoLeaks;
+  writeln(Failed, ' failed');
+  Halt(Failed);
+end.
+PAS
+  printf '%s\n' "Build: \`bp build $name.pas\`" "Run: \`bp run $name.pas\`" "Test: \`bp run tests/test_$name.pas\`" \
+    > "$name/README.md"
+  say "bp: created $name/"
+  exit 0
+fi
+
 lib=(-Fu"$root" -Fu"$root/safe" -Fu"$root/ext" -Fi"$root/safe" -Fi"$root/ext")
-file= checks=(-Cr -Co) opts=() vet=() dirs=("$root/safe" "$root/ext")
-for a in "$@"; do
+file= checks=(-Cr -Co) opts=() vet=() dirs=("$root/safe" "$root/ext") watch=0 pargs=() userfe=0
+while [ $# -gt 0 ]; do
+  a=$1; shift
   case "$a" in
     --release) checks=() ;;
+    --watch) watch=1 ;;
     -Fu*|-Fi*) opts+=("$a"); vet+=("$a"); dirs+=("${a:3}") ;;
     -d*|-Fa*) opts+=("$a"); vet+=("$a") ;;
+    -FE*) opts+=("$a"); userfe=1 ;;
     -*) opts+=("$a") ;;
-    *) file=$a ;;
+    *) file=$a; if [ "$cmd" = run ]; then pargs=("$@"); break; fi ;;
   esac
 done
-[ -n "$file" ] || { echo "bp: no source file" >&2; exit 2; }
+[ -n "$file" ] || { say "bp: no source file"; exit 2; }
 src=$(dirname "$file")
+absdir=$(cd "$src" && pwd)
+base=$(basename "$file")
+name=${base%.*}
 mkdir -p "$cache"
+
+# A script: fpc gets a copy from the cache with the #! line blank; the directory of the file is on the unit and include
+# paths, and its other sources are checked with it.
+scr= targets=("$src") srcfile=$file
+first=; IFS= read -r first < "$file" || true
+if [ "${first:0:2}" = '#!' ]; then
+  scr=$cache/script/$(printf %s "$absdir/$base" | sha256sum | cut -c1-16)
+  srcfile=$scr/$base targets=("$srcfile")
+  opts+=(-Fu"$absdir" -Fi"$absdir"); vet+=(-Fu"$absdir" -Fi"$absdir"); dirs+=("$absdir")
+  [ "$userfe" = 1 ] || [ "$cmd" = run ] || opts+=(-FE"$absdir")
+  opts+=(-FU"$scr")
+fi
+refresh_script() {
+  [ -n "$scr" ] || return 0
+  local f s; mkdir -p "$scr"
+  { echo; tail -n +2 "$file"; } > "$srcfile"
+  targets=("$srcfile")
+  for f in "$absdir"/*.pas "$absdir"/*.pp; do
+    [ -e "$f" ] && [ "$f" != "$absdir/$base" ] || continue
+    s=; IFS= read -r s < "$f" || true
+    [ "${s:0:2}" = '#!' ] || targets+=("$f")
+  done
+}
+# runs a command; the findings of a script name the file, not its copy
+shown() {
+  if [ -z "$scr" ]; then "$@"; return; fi
+  local out rc=0 d=; [ "$src" = . ] || d=$src/
+  out=$("$@" 2>&1) || rc=$?
+  if [ -n "$out" ]; then printf '%s\n' "$out" | sed "s#$scr/#$d#g"; fi
+  return $rc
+}
 
 h=$(cat "$root"/tools/bpvet/*.pas "$root"/tools/bpvet/build.sh "$root"/tools/bpvet/resolver/* | sha256sum | cut -c1-16)
 bpvet=$cache/bpvet-$h
@@ -38,20 +153,95 @@ if [ ! -x "$bpvet" ]; then
   mv "$bpvet.tmp" "$bpvet"
 fi
 
-h=$( { "$fpc" -iV; cat "$src"/*.pas "$root/bp.pas"; for d in "${dirs[@]}"; do cat "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true
-  done; } | sha256sum | cut -c1-16)
-stubs=$cache/stubs-$h
-if [ ! -d "$stubs" ]; then
-  rm -rf "$stubs.tmp"
-  python3 "$root/tools/bpvet/resolver/genstubs.py" "$stubs.tmp" "$src" "$root/bp.pas" "${dirs[@]}" > /dev/null
-  mv "$stubs.tmp" "$stubs"
-fi
+# the text of everything a build depends on: the fpc version, the BP unit, the sources of the directory and of the
+# unit path
+sources() {
+  { "$fpc" -iV; cat "$absdir"/*.pas "$absdir"/*.pp "$absdir"/*.inc "$root/bp.pas"
+    for d in "${dirs[@]}"; do cat "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true; done; } 2>/dev/null || true
+}
+make_stubs() {
+  local sh; sh=$(sources | sha256sum | cut -c1-16)
+  stubs=$cache/stubs-$sh
+  if [ ! -d "$stubs" ]; then
+    rm -rf "$stubs.tmp"
+    python3 "$root/tools/bpvet/resolver/genstubs.py" "$stubs.tmp" "${targets[@]}" "$root/bp.pas" "${dirs[@]}" > /dev/null
+    mv "$stubs.tmp" "$stubs"
+  fi
+}
 
 if [ "$cmd" = fix ]; then
-  exec "$bpvet" --fix --report --typed --rtl "$stubs" "${lib[@]}" "${vet[@]}" "$src"
+  refresh_script; make_stubs
+  rc=0
+  shown "$bpvet" --fix --report --typed --rtl "$stubs" "${lib[@]}" ${vet[@]+"${vet[@]}"} "${targets[@]}" || rc=$?
+  # what --fix wrote into the copy of a script goes back into the script, below its #! line
+  if [ -n "$scr" ]; then { echo "$first"; tail -n +2 "$srcfile"; } > "$scr/fixed"; cat "$scr/fixed" > "$file"; fi
+  exit $rc
 fi
-t0=$(date +%s%N)
-"$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" "${vet[@]}" "$src" || { echo "bp: the check failed: nothing built" >&2
-  exit 1; }
-echo "bp: checked in $(( ($(date +%s%N) - t0) / 1000000 )) ms"
-exec "$fpc" "${checks[@]}" "${lib[@]}" "${opts[@]}" "$file"
+
+# the check and the build; for `run`, into the directory $1
+build() {
+  local t0 extra=() quiet=() rc=0; t0=$(now)
+  refresh_script; make_stubs
+  shown "$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" ${vet[@]+"${vet[@]}"} "${targets[@]}" || {
+    echo "bp: the check failed: nothing built"; return 1; }
+  echo "bp: checked in $(( ($(now) - t0) / 1000000 )) ms"
+  if [ "$cmd" = run ]; then rm -rf "$1.tmp"; mkdir -p "$1.tmp"; extra=(-FE"$1.tmp" -FU"$1.tmp"); quiet=(-l- -v0ew); fi
+  shown "$fpc" ${quiet[@]+"${quiet[@]}"} ${checks[@]+"${checks[@]}"} "${lib[@]}" ${opts[@]+"${opts[@]}"} ${extra[@]+"${extra[@]}"} "$srcfile" || rc=$?
+  [ "$rc" = 0 ] || return 1
+  if [ "$cmd" = run ]; then rm -rf "$1"; mv "$1.tmp" "$1"; fi
+}
+# build: checks and builds; run: the binary (bin) from the cache or built; the messages go to stderr
+prepare() {
+  [ "$cmd" = run ] || { build; return; }
+  local rh; rh=$( { sources; echo "$bpvet ${checks[*]-} ${opts[*]-} $base"; } | sha256sum | cut -c1-16)
+  bin=$cache/run/$rh/$name
+  if [ -x "$bin" ]; then say "bp: cached"; return 0; fi
+  mkdir -p "$cache/run"
+  build "$cache/run/$rh" >&2
+}
+
+if [ "$watch" = 0 ]; then
+  prepare || exit 1
+  [ "$cmd" != run ] || exec "$bin" ${pargs[@]+"${pargs[@]}"}
+  exit 0
+fi
+
+# --watch: poll the mtimes and sizes of the sources every 200 ms
+pid=
+stop() {
+  [ -n "$pid" ] || return 0
+  local i=0
+  kill "$pid" 2>/dev/null || true
+  while kill -0 "$pid" 2>/dev/null && [ $i -lt 20 ]; do sleep 0.1; i=$((i + 1)); done
+  kill -9 "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  pid=
+}
+sig() {
+  local f fl=(); shopt -s nullglob
+  for f in "$absdir"/*.pas "$absdir"/*.pp "$absdir"/*.inc; do fl+=("$f"); done
+  if [ ${#fl[@]} -gt 0 ]; then stat -c '%n %Y %s' "${fl[@]}" 2>/dev/null || stat -f '%N %m %z' "${fl[@]}"; fi
+}
+trap 'exit 130' INT TERM
+trap stop EXIT
+# one round: build, and for `run` start the program; $1 is the time of the change (empty at the start)
+cycle() {
+  prepare || return 0
+  [ -z "$1" ] || say "bp: rebuilt in $(( ($(now) - $1) / 1000000 )) ms"
+  if [ "$cmd" = run ]; then "$bin" ${pargs[@]+"${pargs[@]}"} <&0 & pid=$!; fi
+}
+last=$(sig)
+cycle ""
+while :; do
+  sleep 0.2
+  if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+    rc=0; wait "$pid" || rc=$?
+    pid=; say "bp: the program exited with code $rc"
+  fi
+  cur=$(sig)
+  [ "$cur" != "$last" ] || continue
+  last=$cur
+  t0=$(now)
+  stop
+  cycle "$t0"
+done

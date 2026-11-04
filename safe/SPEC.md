@@ -51,7 +51,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
-| Final touches: `bp run` and scripts, `--watch`, the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **design (plan)** | §22 |
+| Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
 | An uninitialized local class reference, function result or `out` parameter (H17) | **open**: FPC warns, `bp build` does not fail on it | §8, §22.9 |
@@ -1724,7 +1724,7 @@ data.
 
 ## §22. Final touches: what users love in the languages of the niche (design, plan)
 
-Status: design only, nothing of this section is implemented yet; the plan by steps is §22.8. The question: what do the
+Status: design, except `bp run`, `--watch` and `bp new` (§22.1), which exist; the plan by steps is §22.8. The question: what do the
 users of Go, Rust, Zig, Swift, Kotlin, Gleam and Deno praise most, and which of it Better Pascal still lacks. The answer is
 almost all tooling, not the language: one command from a script to a cross build, a checker that teaches, tests that catch
 leaks, derived boilerplate, a profiler, a page to try the language in. Each item rests on something FPC already ships, so
@@ -1734,11 +1734,11 @@ each is small. The `sp` tool of §15 and §16 is `bp` (`tools/bp`); the names be
 
 | Loved in | Better Pascal | Rests on | Cost |
 |---|---|---|---|
-| `go run`, `cargo run`, Deno scripts | `bp run FILE.pas [args]`: check, build into the cache by the hash of the sources, run. With `#!/usr/bin/env -S bp run` on its first line a Pascal file is a script | the caches of `tools/bp build`; the idea of `instantfpc`, shipped with FPC | about 20 lines of `tools/bp` |
-| `cargo watch`, `deno --watch`, `zig build --watch` | `bp run --watch`, `bp build --watch`: check and rebuild on save (an mtime poll every 200 ms; a cached check takes about 30 ms) | the same caches | about 15 lines |
+| `go run`, `cargo run`, Deno scripts | `bp run FILE.pas [args]`: check, build into the cache by the hash of the sources, run. With `#!/usr/bin/env -S bp run` on its first line a Pascal file is a script (fpc does not take the `#!` line, so `bp` checks and builds a copy with that line blank: line numbers stay, findings name the script) | the caches of `tools/bp build`; the idea of `instantfpc`, shipped with FPC | **exists** (`tools/bp`, `tests/bp.sh`): the binary is cached by the hash of the sources, the fpc version and the options; a second run takes about 30 ms |
+| `cargo watch`, `deno --watch`, `zig build --watch` | `bp run --watch`, `bp build --watch`: check and rebuild on save (an mtime poll every 200 ms; a cached check takes about 30 ms); the running program is stopped (SIGTERM, SIGKILL after 2 s) before it runs again, and a failed check keeps the watch | the same caches | **exists** (`tools/bp`, `tests/bp.sh`) |
 | the `toolchain` line of Go 1.21, `rust-toolchain.toml` | an `fpc 3.2.2` line in `deps.txt` (§15): `bp` fetches that release once, checks its SHA-256, keeps it in the cache and builds with it; a project builds the same in ten years | the official FPC release archives | a download and a checksum |
 | `GOOS=linux GOARCH=arm64 go build`, `zig build -Dtarget=` | `bp build --target aarch64-linux`: the cross compiler and its RTL are built once from the sources of the same release and cached | `make crossall` of FPC, which the CI of this repository already runs for i386 and aarch64 | a few minutes per target, once |
-| `cargo new`, `gleam new` | `bp new NAME`: a directory with `deps.txt`, `main.pas` (`uses BP`) and a test | | a few lines |
+| `cargo new`, `gleam new` | `bp new NAME`: a directory with `deps.txt`, `NAME.pas` (`uses BP`; the file is named after the program, S21), `tests/test_NAME.pas` and a three-line `README.md` | | **exists** (`tools/bp`, `tests/bp.sh` builds and tests the generated project) |
 
 The hard part of cross compiling elsewhere is the sysroot: the headers and the libc of the target. The default Linux
 binary of Better Pascal has no libc (§18), so a Linux target needs no sysroot at all, only the binutils of the target (`as`,
@@ -1848,7 +1848,7 @@ One step is one PR from a fresh `main`, with a criterion of done.
 
 0. **S21a and S21b** (§22.9; they close H17, so they go first): definite assignment of class references, the size of a class.
    *Done:* ok/bad lint tests; the rows of §8 updated.
-1. `bp run`, `--watch`, `bp new` in `tools/bp`. *Done:* `tests/bp.sh` runs a script with a shebang, and a second run comes
+1. `bp run`, `--watch`, `bp new` in `tools/bp` (**done**). *Criterion:* `tests/bp.sh` runs a script with a shebang, and a second run comes
    from the cache.
 2. `bp explain` and the readable output. *Done:* every code of §6 and §20 has an entry and an example from `tests/lint`.
 3. The format check and `Fmt` (S20, §22.2) in the typed `bpvet` and the runtime. *Done:* ok/bad lint tests; `--fix` writes the
