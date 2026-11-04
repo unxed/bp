@@ -53,6 +53,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **design (plan)** | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
+| An uninitialized local class reference, function result or `out` parameter (H17) | **open**: FPC warns, `bp build` does not fail on it | §8, §22.9 |
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **open**: not checked yet; §0 says how to avoid them | §8, §21.2 |
 
 ---
@@ -413,6 +414,7 @@ System.GetMem(Buf, Len);
 | Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
 | Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter `bpvet` (S11: class, interface and pointer fields of a task); `TryLock` takes a lock in the cell (stress test in `test_threads`) | H6 |
+| A class reference is assigned before it is read; a nil dereference is an exception, then impossible | programmer (FPC warns); plan: `bpvet` S21a definite assignment, S21b the size of a class, S21c nil analysis (§22.9) | H17 |
 | A dynamic array, a `TShared` object or a global is not changed by two goroutines at once | programmer (§0); plan: Send = move, Sync inferred, the `static mut` rule in `bpvet` (§21.2) | H14–H16 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter `bpvet` (S6, S9); R3 only for `TInterfacedObject` | H8 |
@@ -453,6 +455,7 @@ compensating check, and accepted risks are listed with a reason.
 | H14 | a dynamic array shared by goroutines: `TChan.Send` keeps the same array (`FBuf[...] := V`), a `TArray` task field shares it with the caller | nothing (§0 says: move or `Copy`) | Send = move: the last use of a local or `Copy`; `SAFE_DEBUG` R17 at `Recv` | §21 step 2 |
 | H15 | a mutable object behind `TShared` used by two goroutines | nothing | Sync inferred: frozen after its constructors, else `// sync: <how>` on the class | §21 step 2 |
 | H16 | a global written while goroutines run | nothing | `static mut`: a unit global is written only in its initialization; what a task reaches does not name the globals of the program | §21 step 2 |
+| H17 | an uninitialized local class reference, function result or `out` parameter: garbage, not nil | FPC warns, `bp build` does not fail | S21a: definite assignment in the typed `bpvet` | §22 step 0 |
 
 **H1. A borrow outlives its owner.**
 
@@ -1001,6 +1004,7 @@ or above the parameter suppresses its S14 finding.
 | v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the current region (the Goose scope made implicit), the GC style (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
 | v0.7 (design) | §21 concept v3: one scope object (region + defer + held objects; `TArena` and a local `TOwned` fold into it), Send and Sync inferred by `bpvet` (H14–H16 found and listed), goroutines M:N on the stacks of `BPThreads` with deadlock detection and a seeded scheduler, the `TComponent` tree as an owner; what is reused from which language |
 | v0.8 (design) | §22 final touches: what the users of Go, Rust, Zig, Swift, Kotlin, Gleam and Deno love and Better Pascal lacks (mostly tooling), each on something FPC already ships; what is not taken now and why |
+| v0.8.1 (design) | §22: interpolation on the existing syntax (`Fmt` + `--fix` + S20); nil as a guarantee (§22.9: H17 found, S21a-c); hot reload of routine bodies (§22.10) |
 | v0.9 (design) | §23 systems programming and the world of C: four profiles (S, U, H, F), bindings as tables of names bound at run time with no versioned import, the measurements on FPC binaries, kernels and drivers (hardware as types, inferred contexts) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -1745,6 +1749,13 @@ this as its main feature; here it is a side effect of §18.
   time in FPC. The typed `bpvet` checks a constant format string against the types of the `array of const` before the build
   (S20; `Format`, `FmtStr`, `Exception.CreateFmt` and the like). This removes the part of string interpolation that hurts
   without a new syntax (§22.7).
+- **Interpolation on the existing syntax.** `Fmt('Loaded {N} files in {T:0:2} s', [N, T])`: an ordinary literal with names
+  in braces and an ordinary `array of const`. The user writes only the literal; `bpvet --fix` writes the list from the names
+  (as it writes `{$modeswitch autoderef}` and `// root:`), and S20 checks on every build that the list is exactly the names
+  of the literal, in their order. A renamed variable is then a finding with its fix, never a wrong text, and nothing can
+  disagree. A brace holds a name or an expression (`{Count * 2}`, `{Node.Name}`) and the widths of `Write` (`{X:8}`,
+  `{T:0:2}`); `{{` writes a brace. `Fmt` reads the literal at run time and formats each value by its type (`TVarRec`). The
+  literal reads as in Swift or Kotlin, and the machine writes the rest. About 60 lines of runtime, plus the check and the fix.
 - **The editor: `bp lsp`.** A proxy between the editor and an existing Pascal language server (built on the CodeTools of
   Lazarus), in a separate process, so nothing is linked. It passes everything through and adds the findings of `bpvet` on
   save (from the cache, about 30 ms), and the fixes of `bpvet --fix` as code actions: add `// root:`, add
@@ -1802,26 +1813,16 @@ spike: does `bpvet` build with pas2js; if not, the page is not made.
 ### 22.7 Considered and not taken now, and why
 
 Each of these is loved for something concrete. Below: what users get from it, what Better Pascal already has for that, and
-what stops the rest. Two of the four turn out to be mostly taken in another form.
+what stops the rest. Three of the five turn out to be taken in another form, on the existing syntax.
 
 - **Closures and iterator chains** (Rust, Swift, Kotlin). FPC 3.2 has no anonymous functions; FPC main has them and
   function references. `G.Go(procedure ...)` and `Filter`/`Map` come when a release with them is the base (§14).
-- **String interpolation** (Swift, Kotlin, the f-strings of Python). Users get two things: the text and the values stand in
-  their order, so a format string cannot disagree with its arguments; and brevity. Pascal has had the first since 1970:
-  `Write` takes any mix of strings and values, checked by the compiler, with widths (`X:8:2`), and
-  `WriteStr(S, 'Loaded ', N, ' files in ', T:0:2, ' s')` builds a string the same way (FPC, all modes): there is no format
-  string to disagree with. `Format` stays for translations, where the order of the values changes with the language
-  (`%1:s`), and S20 checks it (§22.2). What is left is the `{Name}` inside a literal, and that is a new syntax of the
-  compiler: Better Pascal has no syntax of its own (§1).
-- **Null safety** (Kotlin, Swift). Users get: a missing value does not crash the program, and this is known before the run.
-  The crash part is there: in FPC a nil dereference is an `EAccessViolation` exception with a backtrace, not undefined
-  behaviour (on every target of §2 that protects the zero page, which is all of them except DOS). The "before the run" part
-  needs two kinds of class types, `TFoo` and `TFoo?`, in every declaration: a change of the type system, that is a fork of
-  the compiler. A linter without that mark has to treat every class field as possibly nil (noise) or trust it (no
-  guarantee). Better Pascal makes nil rare instead: an owner is never nil (`Get` of an empty `TOwned` raises R1), a created
-  or held local is never nil (§21.1), "may be absent" is `TryX(out V): Boolean` and `TWeak.TryLock`. One cheap step remains
-  open: a rule that a routine of safe code never returns `nil` (a syntactic check of `Result := nil` and `Exit(nil)`). It
-  closes the most common source, as a style rule, not a guarantee.
+- **String interpolation** (Swift, Kotlin, the f-strings of Python): taken on the existing syntax, `Fmt('{N} files', [N])`
+  with the list written by `bpvet --fix` and checked by S20 (§22.2). Only the compiler-made list is not taken: it is a new
+  syntax, and the machine writes the list instead.
+- **Null safety** (Kotlin, Swift): taken as a guarantee of `bpvet` without `TFoo?` in the type system (§22.9), on the
+  pattern of S17 v2 and §21.2: inferred inside a module, written at its boundary by `--fix`. On the way a real hole was
+  found (H17: an uninitialized local class reference is garbage, not nil).
 - **`comptime` (Zig), macros (Rust, Nim).** They do three jobs. Code generic over types and constants: FPC has generics, with
   constant parameters since 3.2. Code chosen at compile time: `{$if}`, constant expressions, `inline` (dead branches are
   removed). Code written by code: `// derive:` (§22.4), and in general a Pascal program that `bp` runs before `fpc` and whose
@@ -1829,22 +1830,21 @@ what stops the rest. Two of the four turn out to be mostly taken in another form
   no build of its own. What is missing is code that runs inside the compiler on its types (`@typeInfo`, procedural macros);
   without a fork the generator reads the types with `fcl-passrc`, as derive does. So `comptime` is taken as a build step,
   not as a feature of the language.
-- **Hot reload** (V, Elixir, Flutter). Users get a change on the screen without losing the state of the running program.
-  Two things stop it. The default Linux binary is static with no libc (§18), so there is no dynamic loader to load new code
-  into. And reloading compiled code breaks the guarantees: live objects keep the VMT pointers and the field layout of the
-  old code, so a changed class leaves objects with a wrong layout; Erlang and Dart can do it because a virtual machine owns
-  all code and data. What remains is the fast loop, and that is taken: `bp run --watch` checks, builds and restarts in a
-  fraction of a second (a cached check takes about 30 ms, `fpc` builds a small program in about 0.15 s). The state survives
-  a restart only if the program saves it.
+- **Hot reload** (V, Elixir, Flutter). The VMT does not block it; it blocks only a change of a layout. Reloading the bodies of
+  routines is possible with a jump at the entry of the old routine (§22.10); the cost is a small relocator in debug builds,
+  so it waits until the fast restart of `bp run --watch` proves not enough.
 
 ### 22.8 Plan by steps (cheapest first)
 
 One step is one PR from a fresh `main`, with a criterion of done.
 
+0. **S21a and S21b** (§22.9; they close H17, so they go first): definite assignment of class references, the size of a class.
+   *Done:* ok/bad lint tests; the rows of §8 updated.
 1. `bp run`, `--watch`, `bp new` in `tools/bp`. *Done:* `tests/bp.sh` runs a script with a shebang, and a second run comes
    from the cache.
 2. `bp explain` and the readable output. *Done:* every code of §6 and §20 has an entry and an example from `tests/lint`.
-3. The format check (S20) in the typed `bpvet`. *Done:* ok/bad lint tests.
+3. The format check and `Fmt` (S20, §22.2) in the typed `bpvet` and the runtime. *Done:* ok/bad lint tests; `--fix` writes the
+   list of a `Fmt` literal.
 4. `bp test`: discovery, the leak check after each test, benchmarks, doc tests. *Done:* `tests/run.sh` becomes a call of
    `bp test`, and CI shows the same results.
 5. The `fpc` line and `--target`. *Done:* CI builds and runs `test_safe` for aarch64 through `bp build --target` (qemu).
@@ -1853,6 +1853,10 @@ One step is one PR from a fresh `main`, with a criterion of done.
 8. `bp lsp`. *Done:* an editor shows a finding of S17 on save and applies its fix.
 9. Spike: `bpvet` under pas2js, then the page. *Done:* the page checks `tests/lint/s17_calc_ok.pas` in a browser, or a
    verdict.
+10. Spike: S21c (§22.9) on the calculator and on one unit of tve. *Done:* the tests and marks per 100 lines; a verdict:
+    error, warning or not taken.
+11. Spike: hot reload of bodies (§22.10), only if the fast restart is not enough. *Done:* a changed routine of a running
+    program is patched on x86_64, a changed layout restarts it; or a verdict.
 
 ## §23. Systems programming and the world of C (design, plan)
 
@@ -2029,3 +2033,55 @@ Marwin (#129) runs in profile S, and GUI showcases need profile U.
    ok/bad lint tests, among them a chain of three calls.
 7. **Hardware types:** `TMmio<T>`, `TPhysAddr`/`TVirtAddr`, `TAtomic<T>`, `Cpu.NoIrq`. *Done:* used by the kernel of
    step 5, and tested in hosted mode over a buffer.
+
+### 22.9 Nil: from a safe crash to a guarantee
+
+Three layers, the cheapest first.
+
+1. **H17, a real hole: garbage, not nil.** FPC initializes only managed types: the fields of an object are zeroed
+   (`InitInstance`), but a local variable of a class type, a function result and an `out` parameter hold whatever was on
+   the stack, and so does a class field of a local record. A call through such a reference is undefined behaviour, the one
+   memory hole of this area. FPC warns ("does not seem to be initialized"), but `bp build` does not fail on a warning of
+   `fpc`. **S21a:** the typed `bpvet` proves that such a reference is assigned on every path before every read (the
+   dataflow of S17: loops walked twice, branches joined; a `var` argument and a nested routine count as writes); unproven is
+   an error. `Default(TRec)` assigns a record.
+2. **A nil dereference is always an exception.** On every target of §2 except DOS the lowest pages are not mapped: nothing
+   below `vm.mmap_min_addr` on Linux and a static FPC binary starts at 4 MiB on x86_64 and aarch64; on Windows the first 64
+   KiB are reserved. So `nil.Field` faults (`EAccessViolation` with a backtrace) as long as the field is near the start of
+   the object. **S21b:** a class whose instance is larger than 64 KiB is an error (a large buffer goes into a dynamic array).
+   With S21a and S21b "a nil dereference is a safe crash" is a proven property, not an assumption.
+3. **No nil dereference at all** (the guarantee of Kotlin), **S21c**, without `TFoo?`: inferred inside a module and written at
+   its boundary by `--fix`, the pattern of S17 v2 (`// root:`) and §21.2 (frozen classes).
+   - A value is **never nil** when it comes from a constructor, from `Hold`, from a never-nil field, from a routine of safe
+     code (a routine never returns nil: absence is `TryX`), or from a local tested by `if X <> nil`, `Assigned(X)` or
+     `while X <> nil`. A local cannot change behind the test: Pascal has no aliases of a local except a `var` argument and a
+     nested routine, and `bpvet` sees both.
+   - A field is never nil when every allocation of its class in the module sets it before the object escapes (the Pascal
+     idiom `Result := TExpr.Create; Result.Left := A` included) and nothing assigns it nil later. Otherwise it is **maybe
+     nil**, and an exported class says so on its declaration, `// nil: Next` (written by `--fix`), as an exported routine
+     writes `// root:`.
+   - A value from code that is not checked (an FPC package: `FindComponent` returns nil) is maybe nil.
+   - Dereferencing a maybe-nil value is an error. The fix is the smart cast of Kotlin, in Pascal: copy into a local and test
+     it (`M := N.Next; if M <> nil then ...`); the walk of a list, `while N <> nil do N := N.Next`, already has this form.
+   - `if TryFind(K, V) then V.Use`: `V` is never nil in the branch where the call returned True; S21c checks in the body of
+     every `Try` routine of the module that each path that sets `Result := True` gives `V` a never-nil value.
+   - The expected noise is a tree whose child is nil in some kinds of nodes (a leaf). As with the early S17, a spike measures
+     it first (§22.8, step 10) and decides whether S21c is an error, a warning or not taken.
+
+### 22.10 Hot reload of routine bodies (later, optional)
+
+The VMT does not block hot reload; it blocks only a change of a layout. Live++ (C++), `subsecond` (Rust) and the hot patching
+of Windows patch bodies: the new code of a changed routine is loaded beside the old one, and a jump written at the entry of
+the old routine sends every call there, whichever way it comes (a direct call, a VMT slot, a procedure variable). Old code is
+never unloaded, so a routine that is still running on some stack finishes in its old body. A changed layout (a field, a
+virtual method, a global or a threadvar added, removed or moved; the typed `bpvet` knows the layouts and compares them) falls
+back to a restart, which takes a fraction of a second (§22.1). An inlined routine changes its callers, so they are patched
+too, or a debug build does not inline. No object ever meets a layout other than its own, so the guarantees hold.
+
+The cost is the loader. A static binary without libc has no `dlopen` (static-everywhere draws the same line: its Profile S
+has no `dlopen`, its Profile H loads from the host), and a shared library would not help anyway: the patch must bind to the
+globals and routines of the running program, not to copies of them. What is needed is a small relocator in debug builds:
+read the object file of the changed unit, put its sections into new executable pages, resolve its symbols against the map of
+the running program (the link map of its build), apply the few relocation types that FPC emits on the architecture, then
+write the jumps. A few hundred lines per architecture, Linux first. It is the last spike of §22.8, and it is done only if the
+fast restart proves not enough, for example for a text-mode program with a lot of state on the screen.
