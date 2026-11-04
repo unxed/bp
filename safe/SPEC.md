@@ -1092,7 +1092,8 @@ written to the stack, edges from the field table of the VMT, mark and sweep. Ver
   copy of its address was still in a slot of the same live frame. This is the known price of conservative roots: never a
   live object freed, but an unreferenced one may wait until the frame that held it returns. So `GcCollect` frees "what no
   live frame can still see", not "what the program no longer names"; a test or `SafeCheckNoLeaks` must drop references in
-  a routine that has returned. Open for the concept: whether this is acceptable as the documented rule of the GC style.
+  a routine that has returned. Decided by the owner on 2026-11-04: this is the documented rule of the GC style
+  ("When garbage is freed", below).
 
 ### Spike 2 result: the region style (2026-11-04, FPC 3.2.2)
 
@@ -1312,15 +1313,30 @@ N := TNode.Create;  N.Next := TNode.Create;  N.Next.X := 1;   // nobody frees an
   (conservative stack, precise heap), not of Boehm: the unsafe part is one scanner of one stack, a few hundred lines, and
   the §18 argument against a conservative scanner of the whole heap does not apply. A word that only looks like a pointer
   can keep garbage alive a little longer; it can never free a live object.
+- **When garbage is freed (the rule).** `GcCollect` frees what no live frame can still see, which is not always everything
+  the program no longer names: a stale copy of an address in a slot of a frame that has not returned (or an integer that
+  happens to equal an address) keeps its object until that frame returns. A collection is not prompt and not guaranteed for
+  a given object, and a program cannot tell: a GC object has no destructor, no finalizer and no weak reference (S18), so the
+  moment it is freed is not observable, only the amount of memory is. The retention is bounded twice: by the life of the
+  frame, and by the life of the goroutine, whose whole heap is dropped when it exits (no GC reference leaves it, S18), so
+  nothing can leak past a goroutine. The one real risk is a long loop in a long-lived frame (the main loop of a server)
+  holding an old address of a large graph; the idiom is the same as for regions: the work of one iteration goes into a
+  nested routine.
 - **Mark and sweep, objects never move** (conservative roots require it). A collection starts when the heap has grown by a
   factor since the last one (like `GOGC` in Go, 100% by default) or on `GcCollect`.
 - **Where a GC reference may live (S18):** a local, a parameter, a result, a published field of a GC object, an item of a GC
-  collection. Not a global (a long-lived object is held by a local of the main routine or of the task), not a field of a
+  collection. Not a `TWeak` (it would make the moment of freeing observable). Not a global (a long-lived object is held by
+  a local of the main routine or of the task), not a field of a
   record or of a class of another style, not a dynamic array, not a task field, not a channel. `bpvet` checks it with types
   (§20, the spike), so the rule is not left to the programmer.
 - **No resources in GC objects.** A destructor of a GC object never runs; a file, a socket or a lock is held by `TOwned` +
   `TDefer` in a local. `bpvet` reports a destructor in a GC class (S18).
-- **Leaks.** `SafeCheckNoLeaks` (R5) runs the collector of the goroutine first, then counts what is left.
+- **Leaks.** The heap of a goroutine is dropped as a whole when the goroutine exits, without a scan. `SafeCheckNoLeaks`
+  (R5) runs the collector of the goroutine first, then counts what is left; a test checks the GC heap after the routines
+  that used it have returned (make and drop the objects in a nested routine), since a stale word in a live frame may still
+  hold them.
+- `SAFE_DEBUG`: `GcStats` reports the stack words that keep the most memory (the address of the word, so its frame, and
+  the bytes reachable from it), to find the long-lived frame when memory grows.
 - `SAFE_DEBUG`: swept memory is not reused and its pages lose access, so a reference the collector did not see (a hole in
   S18 or unsafe code) stops with `EAccessViolation` at once; a GC object used on another goroutine raises `ESafety` R13.
 - **Targets.** The stack bounds come from `BPThreads` (the default on Linux) and from the main thread; with `-dSAFE_LIBC`
@@ -1336,7 +1352,7 @@ by trial deletion, as in CPython). It needs no stack scan and frees acyclic garb
 | Code | Meaning |
 |---|---|
 | S17 | root analysis of the region style: S17a no destructor in a region class, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena` |
-| S18 | style boundaries: rooted values and GC references stay in their style and goroutine; where a GC reference may live; reference fields first in a GC class (`--fix` reorders); a destructor in a GC class; the `// BP-STYLES:` allow-list |
+| S18 | style boundaries: rooted values and GC references stay in their style and goroutine; where a GC reference may live; reference fields first in a GC class (`--fix` reorders); a destructor in a GC class; `TWeak` or any other observer of the life of a GC object; the `// BP-STYLES:` allow-list |
 | R11 | a region or a `TGrowArray` grows past a fixed reservation (small address spaces) |
 | R12 | `SAFE_DEBUG`: access to a released region (its pages lose access: `EAccessViolation`) |
 | R13 | `SAFE_DEBUG`: a GC object used on another goroutine |
