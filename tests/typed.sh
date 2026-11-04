@@ -9,8 +9,8 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 rtl=$(mktemp -d)
 trap 'rm -rf "$rtl"' EXIT
 cd "$root"
-python3 tools/bpvet/resolver/genstubs.py "$rtl" bp.pas safe ext tests || exit 1
-dirs=(-Fu. -Fusafe -Fuext -Fisafe -Fiext -Futests/lint/units)
+python3 tools/bpvet/resolver/genstubs.py "$rtl" bp.pas safe ext tests tools/spikes/region || exit 1
+dirs=(-Fu. -Fusafe -Fuext -Fisafe -Fiext -Futests/lint/units -Futools/spikes/region)
 out=$("$bpvet" --report --typed --rtl "$rtl" "${dirs[@]}" bp.pas safe tests \
   $(find ext -maxdepth 1 -name '*.pas') 2>&1)
 # ext/fpc-utf8 is built with -FaUTF8Everywhere (utf8.cfg)

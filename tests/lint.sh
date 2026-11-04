@@ -3,12 +3,21 @@
 #   // EXPECT: clean           no finding: exit code 0, with --strict too
 #   // EXPECT: error SAFE-Sx   exactly one finding, an Error of rule Sx: exit code 1; with --report a Warning and 0
 #   // EXPECT: warn SAFE-Sx    exactly one finding, a Warning of rule Sx: exit code 0; with --strict an Error and 1
-# An optional second line // ARGS: <bpvet options> (@lint@ = tests/lint) is passed to every run of the file.
+# An optional second line // ARGS: <bpvet options> is passed to every run of the file: @lint@ stands for tests/lint,
+# @root@ for the repository, @rtl@ for the RTL stubs of the typed mode (made once per run by genstubs.py, fp-utils).
 # usage: tests/lint.sh BPVET   (the binary built by tools/bpvet/build.sh)
 set -u
 bpvet=$1
 here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/.." && pwd)
 fail=0
+rtl=
+trap '[ -n "$rtl" ] && rm -rf "$rtl"' EXIT
+if grep -lq '^// ARGS: .*@rtl@' "$here"/lint/*.pas; then
+  rtl=$(mktemp -d)
+  python3 "$root/tools/bpvet/resolver/genstubs.py" "$rtl" "$here/lint" "$root/tools/spikes/region" "$root/safe" \
+    "$root/ext" >/dev/null || exit 1
+fi
 
 # check FILE OPTION CODE SEVERITY RULE: bpvet OPTION FILE exits with CODE and prints exactly one finding
 # "FILE(LINE,COL) SEVERITY: RULE ...", or none when SEVERITY is empty
@@ -34,8 +43,8 @@ check() {
 
 for f in "$here"/lint/*.pas; do
   read -r _ _ kind rule < "$f"
-  # an optional second line "// ARGS: ..." gives bpvet options; @lint@ stands for the directory tests/lint
-  args=$(sed -n '2s#^// ARGS: ##p' "$f"); args=${args//@lint@/$here/lint}
+  args=$(sed -n '2s#^// ARGS: ##p' "$f"); args=${args//@lint@/$here/lint}; args=${args//@root@/$root}
+  args=${args//@rtl@/$rtl}
   case "$kind" in
     clean) check "$f" "" 0 "" ""; check "$f" --strict 0 "" "" ;;
     error) check "$f" "" 1 Error "$rule"; check "$f" --report 0 Warning "$rule" ;;

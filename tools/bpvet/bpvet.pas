@@ -155,7 +155,7 @@ begin
     VetRunRules(Src, Module, Report);
     Module.Release;
     if Typed then
-      VetResolve(Files.Get[I], RtlDir, Defines, IncludeDirs, VetUnitDirs, Implicit, Report);
+      VetResolve(Src, RtlDir, Defines, IncludeDirs, VetUnitDirs, Implicit, Report);
   end;
 
   Errors := 0;
