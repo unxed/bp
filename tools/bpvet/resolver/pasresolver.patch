@@ -1,0 +1,78 @@
+A change of packages/fcl-passrc/src/pasresolver.pp of Free Pascal 3.2.2 (tag release_3_2_2), applied by get.sh.
+Licence of this patch: that of the patched file, the LGPL with the static linking exception of Free Pascal (COPYING.FPC
+in the FPC sources); see README.md.
+
+1. TPasResolver.CheckUseAsType: in ObjFPC the bare name of a generic is allowed inside the implementation of its own
+   methods too (class function TOwned.Own(AObj: T): TOwned), as FPC allows it.
+2. The for-in enumerator may be a record, as FPC allows (for V in Ch over TChan<T>).
+
+--- a/packages/fcl-passrc/src/pasresolver.pp
++++ b/packages/fcl-passrc/src/pasresolver.pp
+@@ -14689,7 +14689,7 @@
+ var
+   LoTypeEl: TPasType;
+   EnumeratorClass: TPasClassType;
+-  EnumeratorScope: TPasDotClassScope;
++  EnumeratorScope: TPasDotClassOrRecordScope;
+   Getter, MoveNext, Current: TPasIdentifier;
+   GetterFunc, MoveNextFunc: TPasFunction;
+   ptm: TProcTypeModifier;
+@@ -14742,14 +14742,19 @@
+   if (ResultResolved.BaseType<>btContext) then
+     RaiseContextXExpectedButYFound(20171221193749,'function GetEnumerator','result class',GetTypeDescription(ResultResolved),Loop.StartExpr);
+   LoTypeEl:=ResultResolved.LoTypeEl;
+-  if not (LoTypeEl is TPasClassType) then
+-    RaiseContextXExpectedButYFound(20171221193749,'function GetEnumerator','result class',GetTypeDescription(ResultResolved.LoTypeEl),Loop.StartExpr);
++  if not ((LoTypeEl is TPasClassType) or (LoTypeEl is TPasRecordType)) then
++    RaiseContextXExpectedButYFound(20171221193749,'function GetEnumerator','result class or record',GetTypeDescription(ResultResolved.LoTypeEl),Loop.StartExpr);
+   if not (rrfReadable in ResultResolved.Flags) then
+     RaiseContextXExpectedButYFound(20171221195506,'function GetEnumerator','result class instance',GetTypeDescription(ResultResolved.LoTypeEl),Loop.StartExpr);
+ 
+-  // find function MoveNext: boolean in Enumerator class
+-  EnumeratorClass:=TPasClassType(LoTypeEl);
+-  EnumeratorScope:=PushClassDotScope(EnumeratorClass);
++  // find function MoveNext: boolean in the enumerator (a class, or a record as FPC allows)
++  if LoTypeEl is TPasRecordType then
++    EnumeratorScope:=PushRecordDotScope(TPasRecordType(LoTypeEl))
++  else
++    begin
++    EnumeratorClass:=TPasClassType(LoTypeEl);
++    EnumeratorScope:=PushClassDotScope(EnumeratorClass);
++    end;
+   MoveNext:=EnumeratorScope.FindIdentifier('MoveNext');
+   if MoveNext=nil then
+     RaiseIdentifierNotFound(20171221195632,'MoveNext',Loop.StartExpr);
+@@ -27823,6 +27828,24 @@
+   Result:=-1;
+ end;
+ 
++function InMethodOfGeneric(El, aType: TPasElement): boolean;
++// ObjFPC: inside a method implementation of a generic, its bare name means the generic itself
++var P: TPasElement; Scope: TPasProcedureScope;
++begin
++  P := El;
++  while P <> nil do
++    begin
++    if (P is TPasProcedure) and (P.CustomData is TPasProcedureScope) then
++      begin
++      Scope := TPasProcedureScope(P.CustomData);
++      if (Scope.ClassRecScope <> nil) and (Scope.ClassRecScope.Element = aType) then exit(true);
++      if (Scope.DeclarationProc <> nil) and Scope.DeclarationProc.HasParent(aType) then exit(true);
++      end;
++    P := P.Parent;
++    end;
++  Result := false;
++end;
++
+ procedure TPasResolver.CheckUseAsType(aType: TPasElement; id: TMaxPrecInt;
+   ErrorEl: TPasElement);
+ begin
+@@ -27839,7 +27862,7 @@
+       begin
+       // ref to generic type without specialization
+       if not (msDelphi in CurrentParser.CurrentModeswitches)
+-          and (ErrorEl.HasParent(aType)) then
++          and (ErrorEl.HasParent(aType) or InMethodOfGeneric(ErrorEl, aType)) then
+         // ObjFPC allows referring to parent without type params
+       else
+         RaiseMsg(id,nGenericsWithoutSpecializationAsType,sGenericsWithoutSpecializationAsType,
