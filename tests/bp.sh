@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # tools/bp (safe/SPEC.md §16): bp fix writes the missing header of a program from its file name (S21); then the
-# program in the region style is checked, built and runs; a program with a use after Release is not built. Needs ppudump (fp-utils) for the stubs.
+# program in the region style is checked, built and runs; a program with a use after Release is not built; a
+# program with uses BP is built (the stubs read bp.pas). Needs ppudump (fp-utils) for the stubs.
 # usage: tests/bp.sh
 set -u
 root=$(cd "$(dirname "$0")/.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 export BP_CACHE=$tmp/cache
-mkdir -p "$tmp/ok" "$tmp/bad"
+mkdir -p "$tmp/ok" "$tmp/bad" "$tmp/bp"
 sed '1,2d;/^program s17_calc_ok;$/d' "$root/tests/lint/s17_calc_ok.pas" > "$tmp/ok/calc.pas"
 sed '1,2d;s/^unit s17_release_bad;/unit rel;/' "$root/tests/lint/s17_release_bad.pas" > "$tmp/bad/rel.pas"
 fail=0
@@ -29,5 +30,12 @@ if "$root/tools/bp" build -Fu"$root/tools/spikes/region" -FE"$tmp/bad" "$tmp/bad
 else
   grep -q 'SAFE-S17' "$tmp/bad.log" && echo "ok   bp build: a use after Release is not built" \
     || { echo "FAIL bp build: no S17 finding:"; cat "$tmp/bad.log"; fail=1; }
+fi
+printf 'program hello;\n\n{$mode objfpc}{$H+}\n\nuses\n  BP;\n\nbegin\n  WriteLn(CPLength(%s));\nend.\n' "'ab'" \
+  > "$tmp/bp/hello.pas"
+if "$root/tools/bp" build -FE"$tmp/bp" "$tmp/bp/hello.pas" > "$tmp/bp.log" 2>&1 && [ "$("$tmp/bp/hello")" = 2 ]; then
+  echo "ok   bp build: a program with uses BP is checked, built and runs"
+else
+  echo "FAIL bp build of a program with uses BP:"; cat "$tmp/bp.log"; fail=1
 fi
 exit $fail
