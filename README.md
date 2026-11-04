@@ -29,6 +29,17 @@ The fresh look of concept v4 (one sentence for all lifetimes, marks of fact writ
 file too, what FPC 3.2 already ships and the dialect had not used, the casts and the uninitialised variables that §8 missed):
 `safe/SPEC.md` §24.
 
+**Try it**: an HTTP/1.1 server on goroutines, with the scratch of each request in a region
+([`examples/httpd/README.md`](examples/httpd/README.md)):
+
+```sh
+tools/bp build -Futools/spikes/region -FEout examples/httpd/httpd.pas
+out/httpd 8080 &
+curl 'localhost:8080/json?n=5'
+```
+
+BENCHSENTENCE
+
 Free Pascal as one would want it by default: safe memory, UTF-8 everywhere, goroutines.
 No FPC fork and no compiler options: a single unit `BP` gives all of it.
 
