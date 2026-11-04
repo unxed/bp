@@ -958,7 +958,7 @@ or above the parameter suppresses its S14 finding.
 | v0.5.1 | §2 aligned with v0.5: a matrix of verified targets on v0.5 code (i386 and aarch64 without libc pass all tests without switches); `test_threads` is skipped on DOS |
 | v0.5.2 | §0 "What actually exists and what is only a plan so far"; §19 (Turbo Pascal style code) |
 | v0.6 | Better Pascal: the safe layer (`safe/`, `unit Safe`) and the ext layer (`ext/`: UTF-8, goroutines, `BPThreads`); `unit BP` gives both |
-| v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the GC style `TGc<T>` (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
+| v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the current region (the Goose scope made implicit), the GC style `TGc<T>` (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1061,28 +1061,73 @@ API sketch (names may change in the spike steps of the plan):
 
 ```pascal
 TRegion = record                          // a reserved range of addresses + a bump pointer; a managed record
-  class function Create(AReserve: SizeUInt = 0): TRegion; static; // 0 = the default of the target (below)
+  class function Create(AReserve: SizeUInt = 0): TRegion; static; // 0 = the default of the target (below);
+                                          // the new region becomes the current one of the goroutine
+  procedure Reset;                        // rewind to empty and keep the memory: one region per loop iteration
   procedure Release;                      // everything allocated in it, at once; also when it leaves its scope
 end;
 
 generic TGrowArray<T> = record            // grow-only, never moves: an element reference stays valid while it grows
-  class function Create(var R: TRegion): TGrowArray; static;
+  class function Create: TGrowArray; static;                // in the current region (below)
+  class function Create(var R: TRegion): TGrowArray; static; // in a region named explicitly
   function Push(const V: T): SizeInt;     // index of the new element
   function Len: SizeInt;
   property Items[I: SizeInt]: T; default; // bounds checked (R2) as TSlice
 end;
 
 generic TRef<T> = record                  // a rooted reference to a record in a region; release build: a bare address
-  class function New(var R: TRegion): TRef; static;
+  class function New: TRef; static;                  // in the current region
+  class function New(var R: TRegion): TRef; static;   // in a region named explicitly
 end;
 ```
+
+**The current region (the Goose scope, made implicit).** In Goose a scope is a region and the compiler picks where a value
+goes; nobody passes a region around. Better Pascal gets close to that without a new syntax:
+
+- Every goroutine has a stack of regions (a threadvar). `TRegion.Create` pushes the region, leaving its scope or `Release`
+  pops it. Regions are strictly nested, as the scopes of Goose are; releasing a region that is not the innermost one raises
+  `ESafety` R14 (one comparison at `Release`, not at access).
+- `TGrowArray.Create` and `TRef.New` without an argument allocate in the **current** region: the innermost one of the
+  goroutine. With none, they raise `ESafety` R15; `bpvet` reports it statically where it can.
+- **A routine that declares no `TRegion` allocates in the region of its caller.** This is how a result is "built in the
+  caller's destination" in Goose: no region parameter, no copy.
+
+  ```pascal
+  function ParseLine(const S: String): TFieldsRef;   // no region here: the result lives in the caller's region
+  begin
+    Result := TFieldsRef.New;
+    ...
+  end;
+
+  procedure ProcessFile(const Name: String);
+  var Scratch: TRegion; Fields: TFieldsRef; Line: String;
+  begin
+    Scratch := TRegion.Create;              // the scope of ProcessFile is now a region
+    for Line in ReadLines(Name) do
+    begin
+      Fields := ParseLine(Line);            // allocated in Scratch, rooted in Scratch
+      Emit(Fields);
+      Scratch.Reset;                        // one region per iteration, as `for` scopes in Goose
+    end;
+  end;                                      // Scratch is released here: one store
+  ```
+
+- A routine that needs scratch memory of its own declares a `TRegion`; what it returns to the caller is then allocated
+  explicitly in the caller's region (`Create(var R)` with a region parameter, rule 4 below) or in a nested routine called
+  before the local region is created. FPC 3.2 has no block-scoped variables, so the scope of a region is a routine; a loop
+  uses `Reset` or a nested routine per iteration.
+- Cost: pushing and popping at `Create`/`Release`, one threadvar read per allocation (`BPThreads` finds threadvars by the
+  stack pointer); nothing at access.
+- The explicit form `Create(var R)` stays for the cases where the current region is not the right one; S17 treats both
+  forms alike.
 
 - **Flat records only (S17a).** A type placed in a region has no managed fields (`String`, dynamic arrays, interfaces,
   `TOwned`...): releasing a region is one store and runs no finalizers. Text in a region is bytes in a `TGrowArray<Byte>`.
   A later step may allow managed fields at the cost of a finalizer list for those types only.
 - **Access syntax: an open question for a spike.** A `TRef` must give read and write access to the fields of the record
   without a copy and without a raw pointer in safe code. Candidates: a typed result of `Get` dereferenced as `R.Get^.X`
-  with an S4 exception only for `TRef`; `{$modeswitch autoderef}`; a property. The spike measures and picks one.
+  with an S4 exception only for `TRef`; `{$modeswitch autoderef}`; a property. The spike measures and picks one, together
+  with the current region above: both decide how much ceremony the style has, and they are judged on the same examples.
 - **Reservation and graceful degradation.** On x86_64 and aarch64 a region reserves a large range (`mmap` with no access,
   committed as it grows; `VirtualAlloc` on Windows) and growth is a bump. On i386, DOS and other small address spaces the
   default reservation is small and fixed (given to `Create`); growing past it raises `ESafety` R11 rather than moving data.
@@ -1090,12 +1135,16 @@ end;
 - **Goroutines.** A region belongs to one goroutine; S18 keeps its references there; data leaves through a channel by value.
 
 **Root analysis (S17), the core of the style.** The root of a `TRef`, of a `TGrowArray` and of a reference to one of its
-elements is the `TRegion` variable or parameter it was made from. The rules:
+elements is the `TRegion` variable or parameter it was made from. An allocation in the current region is rooted in the
+innermost `TRegion` of the routine created before it; in a routine without one, in the caller's current region: such a
+value may be returned, and at the call site it is rooted in the caller's innermost region (so a call inside an inner region
+cannot be stored into a variable of an outer one). The rules:
 
 1. A rooted value is stored only where it lives no longer than its root: a local of the same or an inner scope, or a field
    of a record that is itself in the same region.
 2. It is never stored into a global, a field of a class, a task field, a channel or another style (S18).
-3. `Release` of a region, or the end of its scope, while a value rooted in it is used later in the routine is an error.
+3. `Release` or `Reset` of a region, or the end of its scope, while a value rooted in it is used later in the routine is an
+   error.
 4. A routine that takes one region parameter and returns a rooted value roots the result in that parameter: the result is
    built in the caller's region. With several region parameters the routine names the root with `// root: <parameter>`
    on its header line. The signature is the contract; bodies of other routines are not read (modularity).
@@ -1143,3 +1192,5 @@ collected, and a `TGc` never leaves its goroutine.
 | R11 | a region or a `TGrowArray` grows past a fixed reservation (small address spaces) |
 | R12 | `SAFE_DEBUG`: access through a `TRef` after its region was released |
 | R13 | `SAFE_DEBUG`: a `TGc` used on another goroutine |
+| R14 | `Release` of a region that is not the innermost one of the goroutine (regions are nested) |
+| R15 | an allocation in the current region when the goroutine has no region |
