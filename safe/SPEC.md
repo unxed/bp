@@ -55,7 +55,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
 | An uninitialized local class reference, function result or `out` parameter (H17) | **open**: FPC warns, `bp build` does not fail on it | §8, §22.9 |
-| Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **open**: not checked yet; §0 says how to avoid them | §8, §21.2 |
+| Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **checked** by the typed `bpvet` (`tools/bp build`): S11m, S11s, S19; open: R17 in `SAFE_DEBUG`, the globals of a program reached by a task | §8, §21.2 |
 
 ---
 
@@ -368,6 +368,9 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S14 | a parameter without `const`/`var`/`out`; `var` although the caller does not need the change (§16) | `bpvet` S14: an error on a by-value `String`, `AnsiString`, `UnicodeString`, `WideString`, `RawByteString` or `UTF8String` (`s14_bad.pas`, `s14_method_bad.pas`), a record of this or an imported unit (`s14_record_bad.pas`, `s14_other_bad.pas`), an open array `array of T` except `array of const` (`s14_openarray_bad.pas`), or a dynamic array of this or an imported unit (`s14_dynarray_bad.pas`, `s14_other_dynarray_bad.pas`) without `const`, `constref`, `var` or `out`; other by-value parameters not syntactically written in a routine body are warnings (`s14_scalar_bad.pas`), as are `var` parameters without a detected write (`s14_var_bad.pas`). Writes through assignment targets, call arguments, method receivers, `@`, `for`, `with` and nested routines count. Overrides, routines without bodies, and routines whose address is taken in the module are skipped; untyped `var` parameters are skipped. The interface/class declaration and body produce one finding; `// UNSAFE: <why>` on or above the parameter drops either warning or error (`s14_ok.pas`, `s14_var_ok.pas`) |
 | S15 | a `TShared` cycle: a field of a class holds through `TShared` an object that leads back to the class of the field (H2) | `bpvet` S15: a warning on a field of a class of the module whose type is `specialize TShared<X>` or a module alias of it, when `X` is the class itself or reaches it through such fields of classes of the module, with the path and the hint "a back reference is `TWeak`"; `// UNSAFE: <why>` on the line above or at its end drops it (the program breaks the cycle itself); a heuristic by names over one module, the type is read from the line of the field, classes of other units are not followed; a `// UNSAFE-UNIT:` module is not checked |
 | S16 | range checks switched off in a module that uses `Safe`/`BP` (H12) | `bpvet` S16 warns on an explicit `{$R-}` in a module using `Safe` or `BP`, unless `// UNSAFE: <why>` is on that line or the line above (`tests/lint/s16_bad.pas`, `s16_ok.pas`); debug builds compile these modules with `-Cr -Co` (`{$R+}{$Q+}`); release builds may disable those compiler checks, while runtime checks R1–R4 remain enabled |
+| S11m | Send = move (H14): a value that holds a dynamic array goes to another goroutine shared with the sender | `bpvet` S11m (typed, `tools/bpvet/bpvetrace.pas`): an error on the argument of `Ch.Send` (a `TChan`) and on an argument of the constructor of a task (a descendant of `TTask`) whose type holds a dynamic array (one, a static array of one, a record with one; not `TChan`, `TShared`, `TOwned`, `TWeak`, `TGroup`; a `String` does not count: it is copied on write), unless it is `Copy(X)`, an array literal, the result of a function, or the last use of a local or a value parameter: the next read of it (in a loop also the next iteration and the reads after the loop) is none, `X := ...` or `SetLength(X, ...)`; a `const`/`var` parameter, a field, a global and a local read by a nested routine are errors (`tests/lint/s11m_ok.pas`, `s11m_param_bad.pas`, `s11m_after_bad.pas`, `s11m_loop_bad.pas`, `s11m_task_bad.pas`, `s11m_nested_bad.pas`); `// UNSAFE: <why>` drops it |
+| S11s | Sync (H15): an object behind `TShared` reached by two goroutines and changed | `bpvet` S11s (typed): an error on a field of a task class and on a `TChan` (a variable, a field, a parameter) whose type carries `TShared<X>` (also inside a record), unless `X` is frozen or marked `// sync: <the lock or the protocol>` on its declaration line or the comment lines above; frozen: no field of `X` or of its ancestors is written outside the constructors and destructors of `X` and its descendants (an assignment, a `var`/`out` argument, `Inc`, `Dec`, `SetLength`, `Include`, `Exclude`, `Delete`, `Insert`), the type of every field is frozen (values, `String`, `TChan`, `TShared`/`TOwned` of a frozen class, records and arrays of them; not `Pointer`, not an interface), and every ancestor below `TObject`/`TInterfacedObject` is of the module; the finding names the field and the routine that writes it (`tests/lint/s11s_ok.pas`, `s11s_bad.pas`, `s11s_chan_bad.pas`) |
+| S19 | `static mut` (H16): a global of a unit written while goroutines run | `bpvet` S19 (typed): an error on a write (an assignment to it or through it, a `var`/`out` argument, `Inc`, `SetLength` and the others of S11s) to a global variable of a unit in a routine; allowed in `initialization`, `finalization`, a `threadvar`, an `Interlocked*` call (atomic), and in the main block and the routines of a program (its globals are the locals of the main goroutine); `// UNSAFE: <the lock>` on the line or the comment lines above drops it; a `// UNSAFE-UNIT:` module is not checked (`tests/lint/s19_ok.pas`, `s19_bad.pas`, `s19_var_bad.pas`) |
 | S21 | a file without a `program`/`unit`/`library`/`package` header, or a header whose name is not the name of the file (two sources of one name) | `bpvet` S21 (`bpvetstyle.pas`, over the text before the parse): an error; the name is compared without letter case (`unit Region` in `region.pas`); a file without a header is a `unit` when it has `interface`, else a `program`; `bpvet --fix` / `tools/bp fix` inserts the header before the first token or writes the name of the file into it; a file whose name is not an identifier (dots allowed) is reported without a fix (`tests/lint/s21_none_bad.pas`, `s21_name_bad.pas`, `s21_ok.pas`) |
 | S22 | a reserved word with an upper-case letter (`Begin`, `END`): the style of Better Pascal is lower case, upper case is the style of the 1980s and stands out in the text | `bpvet` S22: a warning (an error with `--strict`, so in `tools/bp build`); `--fix` lowers the word; comments, strings, `&escaped` identifiers and the bodies of `asm` blocks are skipped; `string` is not checked, it is written as the type it names (`String`); directives (`override`, `virtual`) are not reserved words and are not checked (`tests/lint/s22_bad.pas`) |
 
@@ -416,7 +419,7 @@ System.GetMem(Buf, Len);
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
 | Task fields are not shared mutable objects; `TWeak.TryLock` across threads | programmer + linter `bpvet` (S11: class, interface and pointer fields of a task); `TryLock` takes a lock in the cell (stress test in `test_threads`) | H6 |
 | A class reference is assigned before it is read; a nil dereference is an exception, then impossible | programmer (FPC warns); plan: `bpvet` S21a definite assignment, S21b the size of a class, S21c nil analysis (§22.9) | H17 |
-| A dynamic array, a `TShared` object or a global is not changed by two goroutines at once | programmer (§0); plan: Send = move, Sync inferred, the `static mut` rule in `bpvet` (§21.2) | H14–H16 |
+| A dynamic array, a `TShared` object or a global is not changed by two goroutines at once | the typed `bpvet`: S11m (Send = move), S11s (Sync = frozen or `// sync:`), S19 (`static mut`) (§21.2) | H14–H16 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter `bpvet` (S6, S9); R3 only for `TInterfacedObject` | H8 |
 | `Safe` is last in `uses` | linter `bpvet` S7; in a program with `BP` first only a warning (§14) | H9 |
@@ -456,9 +459,9 @@ compensating check, and accepted risks are listed with a reason.
 | H11 | non-exhaustive `case`, missing `const` | `bpvet` S13; S14 errors on copy-heavy parameters and warns when other by-value parameters are not changed | `bpvet` S13, S14 | 11 |
 | H12 | `{$R-}` in safe code | the debug-build recommendation (§6) | rule `{$R+}{$Q+}` + `bpvet` warning | 12 |
 | H13 | `object`, `New(P, Init)` | nothing: such code stays unsafe | owner over `object` + lint rules | 13 |
-| H14 | a dynamic array shared by goroutines: `TChan.Send` keeps the same array (`FBuf[...] := V`), a `TArray` task field shares it with the caller | nothing (§0 says: move or `Copy`) | Send = move: the last use of a local or `Copy`; `SAFE_DEBUG` R17 at `Recv` | §21 step 2 |
-| H15 | a mutable object behind `TShared` used by two goroutines | nothing | Sync inferred: frozen after its constructors, else `// sync: <how>` on the class | §21 step 2 |
-| H16 | a global written while goroutines run | nothing | `static mut`: a unit global is written only in its initialization; what a task reaches does not name the globals of the program | §21 step 2 |
+| H14 | a dynamic array shared by goroutines: `TChan.Send` keeps the same array (`FBuf[...] := V`), a `TArray` task field shares it with the caller | `bpvet` S11m (typed): `Send` and the constructor of a task take `Copy(X)`, a fresh value or the last use of a local | `SAFE_DEBUG` R17 at `Recv` | §21 step 1 |
+| H15 | a mutable object behind `TShared` used by two goroutines | `bpvet` S11s (typed): `TShared<X>` in a task field or a message needs `X` frozen (inferred over the module) or `// sync: <how>` | a class of another unit is frozen when that unit marks it | §21 step 1 |
+| H16 | a global written while goroutines run | `bpvet` S19 (typed): a global of a unit is written only in `initialization`/`finalization`, atomically (`Interlocked*`) or under `// UNSAFE: <the lock>` | what a task reaches does not name the globals of the program | §21 step 1 |
 | H17 | an unchecked class cast: `TB(O).Y[100]` on an object that is a `TA` reads past it (§24.6) | nothing | `bpvet` S24: a downcast is `as`, `--fix` rewrites it; a cast from `Pointer` or an integer to a reference is S4 | §24 step 3 |
 | H18 | an untyped parameter with a variable typecast, `TBig(Buf)[N] := 1`, writes anywhere (§24.6); `absolute` | nothing | `bpvet` S25: unsafe outside a `// UNSAFE:` mark | §24 step 3 |
 | H19 | an uninitialised local of a class type is a garbage pointer: `var F: TFoo; WriteLn(F.X)` | FPC: a warning | `bp build` adds `-Sew` (0 warnings on the tests today, §24.6) | §24 step 2 |
@@ -814,7 +817,7 @@ passes into the task (fields, `Move`), and values come back through a channel.
 | `sync.WaitGroup`, `errgroup` | `TGroup` | **better**: the group waits for the tasks on leaving the scope (structured concurrency), a goroutine leak is impossible |
 | a panic in a goroutine kills the process | error → group cancellation → `Wait` raises R7 with the original text | **better** |
 | `context.Context` | `G.Cancel`, `Done` (a closed channel) in `Select`, `Cancelled` | the same in meaning, without an extra parameter |
-| races are caught by `-race` | races are prevented by S11: only values, channels, `TShared`, `Move` go into a task | different: a prohibition instead of a detector; three cases are open until §21.2 (§8, H14–H16) |
+| races are caught by `-race` | races are prevented by S11, S11m, S11s and S19: only values, moved arrays, channels, `TShared` of frozen or `// sync:` classes, `Move` go into a task, and globals are written in `initialization` | different: a prohibition instead of a detector (§21.2); the globals of a program reached by a task are open |
 | M:N scheduler, millions of goroutines | one task = one OS thread | worse: thousands, not millions; honestly "conditional" goroutines; plan: M:N on the stacks of `BPThreads` (§21.3) |
 
 Design (we reuse the RTL, minimal custom code): a thread is `BeginThread`; a lock is `TRTLCriticalSection`;
@@ -1016,6 +1019,7 @@ or above the parameter suppresses its S14 finding.
 | v0.8.1 (design) | §22: interpolation on the existing syntax (`Fmt` + `--fix` + S20); nil as a guarantee (§22.9: H17 found, S21a-c); hot reload of routine bodies (§22.10) |
 | v0.9 (design) | §23 systems programming and the world of C: four profiles (S, U, H, F), bindings as tables of names bound at run time with no versioned import, the measurements on FPC binaries, kernels and drivers (hardware as types, inferred contexts) |
 | v0.10 (design) | §24 concept v4: one sentence for all lifetimes; marks of fact written by the machine, marks of intent by hand; `BP` last everywhere (`-FaBPThreads`, measured); what FPC 3.2 ships and the dialect had not used (nested procedure variables, type helpers, CORBA interfaces, all measured); `// raises:` inferred; the holes of §8 the table missed (an unchecked class cast, an untyped parameter, an uninitialised variable: H17–H19, S24, S25, `-Sew`); README rows for deploy, C, the standard library and models |
+| v0.11 | §21 step 1: S11m (Send = move), S11s (Sync = frozen or `// sync:`) and S19 (`static mut`) in the typed `bpvet`; S17 counts only the values whose type can hold one of a region |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1607,6 +1611,23 @@ shared). Pony closes them with reference capabilities (`iso` is moved, `val` is 
 `TOwned` moved with `.Move` is Send. After the three rules the claim of §14, "races are prevented, not detected", holds
 without exceptions; until then §0 tells the programmer what the rules will check.
 
+**Step 1 done (2026-11-04): S11m, S11s and S19** (`tools/bpvet/bpvetrace.pas`, in the typed mode after S17; the rows of
+§6). What the first run found and what it changed:
+
+- **The runtime itself.** S19 found 11 writes to globals in `safe/core.impl.inc` and `ext/go.impl.inc`: the live counter
+  `GLive` and the failure counters through `InterlockedIncrement`/`Decrement` (atomic: S19 accepts the `Interlocked*`
+  calls), and the debug list `GLives` under the spin lock `SafeLockLives` (3 marks `// UNSAFE: under SafeLockLives`). The
+  tests that switch `SafeDebugChecks` from a routine got a mark each: the switch is set before goroutines start.
+- **S17 was too wide.** It took the result of every call for a value of the caller's current region, so `FBox :=
+  TBoxOwner.Own(TBox.Create)` in a plain class was "a value of the caller's region stored into an object of another style",
+  and `Ch.Send(A)` of an `array of Integer` was "a value of a region sent to a channel" (22 such warnings on `bp.pas`,
+  `safe/` and `tests/`). Now a value is in a region only when its type can hold one: a region class, `TObject`, a pointer,
+  a `TGrowArray`, or a record or an array with one of them inside.
+- **The time:** the typed run of `tests/typed.sh` (152 files) stays 0.7 s.
+- **Open:** R17 (`Recv` checks one reference in `SAFE_DEBUG`); the globals of a program file reached by a task (a fixpoint
+  over the routines a task calls; today a program's globals are not checked); a class of another unit is frozen only
+  when its unit marks it `// sync:` (its writes are not seen).
+
 ### 21.3 Goroutines M:N on the stacks that `BPThreads` already has
 
 `BPThreads` finds the current thread from the stack pointer (`Sptr and not (R - 1)`: a stack is aligned to its size, and the
@@ -1709,7 +1730,8 @@ One step is one PR from a fresh `main`, with a criterion of done; a spike may en
 data.
 
 1. **H14–H16 in `bpvet`** (S11m Send = move, S11s Sync, S19 globals) and R17 in `SAFE_DEBUG`. *Done:* ok/bad lint tests for
-   each rule; the rows of §8 updated. First, because it closes a hole of a claim made today.
+   each rule; the rows of §8 updated. First, because it closes a hole of a claim made today. *Status:* **done** for S11m,
+   S11s and S19 (§21.2, step 1 done); R17 and the globals of a program reached by a task are left.
 2. **Spike 4: the M:N switch** (`tools/spikes/mn/`): two goroutines exchange values over a channel on one carrier with a
    stack switch; threadvars, exceptions and the heap work across switches. *Done:* CI green on x86_64, aarch64 and i386; the
    time of a switch, the memory of a goroutine, the goroutines per GiB, guard pages against `-Ct`; a verdict in §21.3.

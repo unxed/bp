@@ -46,9 +46,9 @@ var
 begin
   Ar := TArena.Create;
   Rel := TNodeRef.Adopt(TNode.Create, Ar);
-  SafeDebugChecks := True;
+  SafeDebugChecks := True; // UNSAFE: one goroutine runs the benchmark
   Dbg := TNodeRef.Adopt(TNode.Create, Ar);
-  SafeDebugChecks := False;
+  SafeDebugChecks := False; // UNSAFE: one goroutine runs the benchmark
   Plain := Rel.Get;
   Plain.Value := 1;
   Dbg.Get.Value := 1;
