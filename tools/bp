@@ -5,17 +5,47 @@
 # usage: tools/bp build [--release] [fpc options] FILE.pas
 #        tools/bp fix [fpc options] FILE.pas   writes what bpvet --fix knows (the header from the file name, lower-case
 #                                                reserved words, // root: marks) and lists the rest; nothing is built
-#   Checked: FILE and the other sources of its directory. The fpc options are passed on; -Fu, -Fi, -d and -Fa are also
-#   given to bpvet; safe/, ext/ and the BP unit are on the unit path. A debug build adds -Cr -Co (SPEC §6).
-#   Caches (BP_CACHE, default ~/.cache/bp): bpvet by the hash of its sources, the RTL stubs by the hash of the checked
-#   sources and the fpc version.
+#        tools/bp get [DIR]      resolves the require lines of DIR/deps.txt (default: the current directory) by MVS
+#                                over git tags vX.Y.Z and writes DIR/deps.lock, one "path version commit" per module
+#        tools/bp vendor [DIR]   copies the modules of DIR/deps.lock into DIR/vendor/<path>/, for an offline build
+#   Checked: FILE and the other sources of its directory (not its vendor/). The fpc options are passed on; -Fu, -Fi, -d
+#   and -Fa are also given to bpvet; safe/, ext/ and the BP unit are on the unit path. A debug build adds -Cr -Co (SPEC
+#   §6). When the directory has a deps.lock (SPEC §15), the unit directories of its modules (vendor/<path>/, else the
+#   cache, fetched when missing) are added as -Fu and -Fi for bpvet and fpc.
+#   Caches (BP_CACHE, default ~/.cache/bp): bpvet and bpget by the hash of their sources, the RTL stubs by the hash of
+#   the checked sources and the fpc version, the git mirrors and the extracted versions of the modules in mod/.
 set -eu
 cmd=${1:-}
-[ "$cmd" = build ] || [ "$cmd" = fix ] || { sed -n '2,12s/^# \{0,1\}//p' "$0"; exit 2; }
+case "$cmd" in build|fix|get|vendor) ;; *) sed -n '2,16s/^# \{0,1\}//p' "$0"; exit 2 ;; esac
 shift
 root=$(cd "$(dirname "$0")/.." && pwd)
 cache=${BP_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/bp}
 fpc=${FPC:-fpc}
+mkdir -p "$cache"
+export GIT_TERMINAL_PROMPT=0
+
+# bpget (tools/bpget/bpget.pas): the dependencies. It is built by bp build itself, so the tool passes the check it gives.
+bpget() {
+  local h b u
+  h=$( { "$fpc" -iV; cat "$root/tools/bpget/bpget.pas"; } | sha256sum | cut -c1-16)
+  b=$cache/bpget-$h
+  if [ ! -x "$b" ]; then
+    u=$(mktemp -d)
+    "$0" build -FU"$u" -o"$b.tmp" "$root/tools/bpget/bpget.pas" > "$cache/bpget-build.log" 2>&1 \
+      || { cat "$cache/bpget-build.log" >&2; rm -rf "$u"; exit 1; }
+    rm -rf "$u"
+    mv "$b.tmp" "$b"
+  fi
+  "$b" "$@"
+}
+
+if [ "$cmd" = get ] || [ "$cmd" = vendor ]; then
+  dir=${1:-.}
+  [ -d "$dir" ] || dir=$(dirname "$dir")
+  bpget "$cmd" "$dir" "$cache"
+  exit
+fi
+
 lib=(-Fu"$root" -Fu"$root/safe" -Fu"$root/ext" -Fi"$root/safe" -Fi"$root/ext")
 file= checks=(-Cr -Co) opts=() vet=() dirs=("$root/safe" "$root/ext")
 for a in "$@"; do
@@ -29,7 +59,26 @@ for a in "$@"; do
 done
 [ -n "$file" ] || { echo "bp: no source file" >&2; exit 2; }
 src=$(dirname "$file")
-mkdir -p "$cache"
+
+# The modules of deps.lock; vendor/ is a copy of them, not a part of the program, so it is not checked.
+targets=("$src")
+if [ -f "$src/deps.lock" ]; then
+  mods=$(bpget paths "$src" "$cache") || exit 1
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    opts+=(-Fu"$d" -Fi"$d"); vet+=(-Fu"$d" -Fi"$d"); dirs+=("$d")
+  done <<< "$mods"
+fi
+if [ -d "$src/vendor" ]; then
+  targets=()
+  for e in "$src"/*; do
+    if [ -d "$e" ]; then
+      [ "$e" = "$src/vendor" ] || targets+=("$e")
+    else
+      case "$e" in *.pas|*.pp|*.lpr) targets+=("$e") ;; esac
+    fi
+  done
+fi
 
 h=$(cat "$root"/tools/bpvet/*.pas "$root"/tools/bpvet/build.sh "$root"/tools/bpvet/resolver/* | sha256sum | cut -c1-16)
 bpvet=$cache/bpvet-$h
@@ -48,10 +97,10 @@ if [ ! -d "$stubs" ]; then
 fi
 
 if [ "$cmd" = fix ]; then
-  exec "$bpvet" --fix --report --typed --rtl "$stubs" "${lib[@]}" "${vet[@]}" "$src"
+  exec "$bpvet" --fix --report --typed --rtl "$stubs" "${lib[@]}" "${vet[@]}" "${targets[@]}"
 fi
 t0=$(date +%s%N)
-"$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" "${vet[@]}" "$src" || { echo "bp: the check failed: nothing built" >&2
+"$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" "${vet[@]}" "${targets[@]}" || { echo "bp: the check failed: nothing built" >&2
   exit 1; }
 echo "bp: checked in $(( ($(date +%s%N) - t0) / 1000000 )) ms"
 exec "$fpc" "${checks[@]}" "${lib[@]}" "${opts[@]}" "$file"
