@@ -19,6 +19,8 @@
 
 The Lazarus LCL is not yet tested with `bp build`. The plan of concept v3 (one scope object, Send and Sync inferred,
 goroutines M:N, the `TComponent` tree as an owner) and what is reused from which language: `safe/SPEC.md` §21.
+What the tools still lack against `go`, `cargo` and `zig` (`bp run` and scripts, `--watch`, cross targets, tests with a leak
+check, `// derive:`, a profiler, an editor server, a page in the browser): `safe/SPEC.md` §22.
 
 Free Pascal as one would want it by default: safe memory, UTF-8 everywhere, goroutines.
 No FPC fork and no compiler options: a single unit `BP` gives all of it.
