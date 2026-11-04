@@ -228,6 +228,10 @@ var
   Lines, Kept: array of String;
   Line: String;
   Named: TNamed;
+  Outer: TRegion;
+  Pts: TPts;
+  Pt: TPt;
+  Q: TPts.PT;
   Count: Integer;
   Peak: SizeUInt;
   R, I, J, Inside: Integer;
@@ -284,6 +288,26 @@ begin
   end;
   Check((Kept[0] = 'ё0😀') and (Kept[199] = 'ё199😀') and (StringRefCount(Kept[199]) = 1),
     'strings leave a region as copies: UTF-8 text intact after the reset of each iteration, one reference left');
+  Outer := TRegion.Create;  // the array lives outside the loop
+  Pts := TPts.Create;
+  for I := 1 to 300 do
+  begin
+    Pt.X := I;
+    Pt.Y := 0;
+    Pts.Push(Pt);
+  end;
+  Count := 0;
+  Peak := 0;
+  for Q in Pts.Each do
+  begin
+    for J := 1 to 1000 do
+      N := TNode.Create;
+    Inc(Count, Q^.X);
+    if CurrentRegionUsed > Peak then
+      Peak := CurrentRegionUsed;
+  end;
+  Check((Count = 300 * 301 div 2) and (CurrentRegionDepth = 1) and (Peak < 256 * 1024), 'for P in A.Each: every '
+    + 'element in place, a region per iteration (peak ' + IntToStr(Peak div 1024) + ' KiB)');
 end;
 
 procedure ResetLoop;
