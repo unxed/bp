@@ -993,7 +993,7 @@ The order (the RUP method: from simple to complex, atomic steps with tests, some
 
 ## §20. Memory styles: one language, several safe styles (design, plan)
 
-Status: design only, nothing of this section is implemented yet. The plan by steps: unxed/bp#ISSUE.
+Status: design only, nothing of this section is implemented yet. The plan by steps: unxed/bp#108.
 
 ### The principle
 
