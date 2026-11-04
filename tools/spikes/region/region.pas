@@ -9,6 +9,7 @@ unit Region;
 interface
 
 uses
+  {$if defined(SAFE_DEBUG) and defined(unix)}BaseUnix,{$endif}
   SysUtils;
 
 const
@@ -213,7 +214,14 @@ begin
     Size := 2 * D^.Blocks^.Size;
   while Size < Need + SizeOf(TBlock) + 16 do
     Size := 2 * Size;
+  {$if defined(SAFE_DEBUG) and defined(unix)}
+  // SAFE_DEBUG: each block is pages of its own, and a released block loses all access (R12)
+  B := fpmmap(nil, Size, PROT_READ or PROT_WRITE, MAP_PRIVATE or MAP_ANONYMOUS, -1, 0);
+  if Pointer(B) = MAP_FAILED then
+    raise ERegion.Create('SAFE: mmap of a region block failed');
+  {$else}
   GetMem(B, Size);
+  {$endif}
   B^.Next := D^.Blocks;
   B^.Size := Size;
   D^.Blocks := B;
@@ -270,12 +278,19 @@ begin
   while B <> nil do
   begin
     N := B^.Next;
+    {$if defined(SAFE_DEBUG) and defined(unix)}
+    // a reset keeps no block: what it held must stop at the first access (R12); the pages are never reused
+    fpmprotect(B, B^.Size, PROT_NONE);
+    {$else}
     if KeepFirst and (N = nil) then
       Break;
     FreeMem(B);
+    {$endif}
     B := N;
   end;
   D^.Blocks := B;
+  D^.Cur := nil;
+  D^.Limit := nil;
   if B <> nil then
   begin
     D^.Cur := PByte(Align(PByte(B) + SizeOf(TBlock), 16));

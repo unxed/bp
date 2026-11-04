@@ -64,6 +64,8 @@ jobs:
         run: bash tools/spikes/gcroots/run.sh
       - name: Spike 2 of unxed/bp#108, the region style (tools/spikes/region)
         run: bash tools/spikes/region/run.sh
+      - name: Spike 2 with SAFE_DEBUG (a use after Reset stops at once, R12)
+        run: FPCOPTS=-dSAFE_DEBUG bash tools/spikes/region/run.sh
       - name: Benchmarks (report only, no thresholds; tests/bench)
         run: bash tests/bench/run.sh "$RUNNER_TEMP/bench"
       - name: Audit — static, no INTERP, no NEEDED (static-everywhere Profile S)

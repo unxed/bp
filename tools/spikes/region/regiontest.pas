@@ -223,6 +223,27 @@ begin
     raise Exception.Create('x');
 end;
 
+{$if defined(SAFE_DEBUG) and defined(unix)}
+procedure DebugNet;
+var
+  R: TRegion;
+  N: TNode;
+  Caught: Boolean;
+begin
+  R := TRegion.Create;
+  N := TNode.Create;
+  N.X := 1;
+  R.Reset;
+  Caught := False;
+  try
+    N.X := 2;  // a use after Reset: the block has no access any more
+  except
+    on E: EAccessViolation do Caught := True;
+  end;
+  Check(Caught, 'SAFE_DEBUG: a use after Reset stops with EAccessViolation at once (R12)');
+end;
+{$endif}
+
 procedure BlockScopes;
 var
   Lines, Kept: array of String;
@@ -432,6 +453,7 @@ begin
   R15;
   ResetLoop;
   BlockScopes;
+  {$if defined(SAFE_DEBUG) and defined(unix)}DebugNet;{$endif}
   Goroutine;
   Speed;
   Check(HeapUsed <= H0, 'nothing leaks: the heap is not above where it was (' + IntToStr(HeapUsed) + ' against ' + IntToStr(H0) + ')');
