@@ -11,13 +11,13 @@ unit BpvetTyped;
 interface
 
 uses
-  SysUtils, Classes, Contnrs, PasTree, PScanner, PParser, PasResolveEval, PasResolver, BpvetCore, Safe;
+  SysUtils, Classes, Contnrs, PasTree, PScanner, PParser, PasResolveEval, PasResolver, BpvetCore, BpvetS17, Safe;
 
-{ Resolves the module FileName: True when it and every unit it uses resolve; otherwise a fatal with the position is
-  in Report. UnitDirs are searched for the used units after RtlDir (the stubs), then the directory of the file.
+{ Resolves the module of Src and checks it with S17 (bpvets17.pas): True when it and every unit it uses resolve;
+  otherwise a fatal with the position is in Report. UnitDirs are searched for the used units after RtlDir (the stubs), then the directory of the file.
   Implicit: units the module uses without naming them (fpc -Fa), except the module itself. }
-function VetResolve(const FileName, RtlDir: String; const Defines, IncludeDirs, UnitDirs, Implicit: array of String;
-  var Report: TVetReport): Boolean;
+function VetResolve(const Src: TVetSource; const RtlDir: String; const Defines, IncludeDirs, UnitDirs,
+  Implicit: array of String; var Report: TVetReport): Boolean;
 
 implementation
 
@@ -317,8 +317,8 @@ begin
   Result := Shared.Get;
 end;
 
-function VetResolve(const FileName, RtlDir: String; const Defines, IncludeDirs, UnitDirs, Implicit: array of String;
-  var Report: TVetReport): Boolean;
+function VetResolve(const Src: TVetSource; const RtlDir: String; const Defines, IncludeDirs, UnitDirs,
+  Implicit: array of String; var Report: TVetReport): Boolean;
 var
   S: TVetSession;
   Main, R: TVetResolver;
@@ -327,8 +327,10 @@ var
   I: Integer;
   Found: Boolean;
   El: TPasElement;
+  FileName: String;
 begin
   Result := False;
+  FileName := Src.FileName;
   S := VetSession(RtlDir, Defines, IncludeDirs, UnitDirs);
   S.SearchDirs[High(S.SearchDirs)] := ExtractFileDir(ExpandFileName(FileName));
   S.UnitError := '';
@@ -374,6 +376,8 @@ begin
     AddFatal(Report, FileName, 1, 1, 'a used unit: ' + S.UnitError);
     Result := False;
   end;
+  if Result then
+    VetCheckS17(Src, M, Main, Report);
   if not Result then
     // the main module and every unit left unfinished by the failure are not used again
     for I := 0 to S.Modules.Get.Count - 1 do
