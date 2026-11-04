@@ -3,12 +3,15 @@
 # mode and compiles it with fpc only when the check passes: nothing unsafe is built unless the code declares it
 # (// UNSAFE:, // borrow:, // root:).
 # usage: tools/bp build [--release] [fpc options] FILE.pas
+#        tools/bp fix [fpc options] FILE.pas   writes what bpvet --fix knows (the header from the file name, lower-case
+#                                                reserved words, // root: marks) and lists the rest; nothing is built
 #   Checked: FILE and the other sources of its directory. The fpc options are passed on; -Fu, -Fi, -d and -Fa are also
 #   given to bpvet; safe/, ext/ and the BP unit are on the unit path. A debug build adds -Cr -Co (SPEC §6).
 #   Caches (BP_CACHE, default ~/.cache/bp): bpvet by the hash of its sources, the RTL stubs by the hash of the checked
 #   sources and the fpc version.
 set -eu
-[ "${1:-}" = build ] || { sed -n '2,10s/^# \{0,1\}//p' "$0"; exit 2; }
+cmd=${1:-}
+[ "$cmd" = build ] || [ "$cmd" = fix ] || { sed -n '2,12s/^# \{0,1\}//p' "$0"; exit 2; }
 shift
 root=$(cd "$(dirname "$0")/.." && pwd)
 cache=${BP_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/bp}
@@ -44,6 +47,9 @@ if [ ! -d "$stubs" ]; then
   mv "$stubs.tmp" "$stubs"
 fi
 
+if [ "$cmd" = fix ]; then
+  exec "$bpvet" --fix --report --typed --rtl "$stubs" "${lib[@]}" "${vet[@]}" "$src"
+fi
 t0=$(date +%s%N)
 "$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" "${vet[@]}" "$src" || { echo "bp: the check failed: nothing built" >&2
   exit 1; }

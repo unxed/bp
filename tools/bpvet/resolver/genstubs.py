@@ -139,7 +139,7 @@ class Units:
             return json.load(open(cached))
         r = subprocess.run([self.ppudump, "-Fj", path], capture_output=True, text=True)
         # ppudump writes NaN and Inf as bare words, which JSON does not have.
-        text = re.sub(r":(\s*)-?(Nan|Inf)\b", r":\1null", r.stdout)
+        text = re.sub(r":(\s*)[-+]?(Nan|Inf)\b", r":\1null", r.stdout)
         try:
             j = json.loads(text)[0]
         except (ValueError, IndexError):
