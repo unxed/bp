@@ -183,3 +183,7 @@ jobs:
         run: |
           I=$HOME/fpccross/lib/fpc/3.2.2
           FPC=$I/ppcrossx64 FPCOPTS="-Twin64 -Fu$I/units/x86_64-win64/*" EXE=.exe RUN=wine SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 OUT=$PWD/outwin bash tests/run.sh
+      - name: The binaries are Windows executables
+        run: |
+          file outwin/safe-Safe/test_safe.exe outwin/ext-BP/test_threads.exe
+          file outwin/ext-BP/test_go.exe | grep -q 'PE32+'
