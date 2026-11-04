@@ -51,6 +51,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
+| Final touches: `bp run` and scripts, `--watch`, the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **design (plan)** | §22 |
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **open**: not checked yet; §0 says how to avoid them | §8, §21.2 |
 
 ---
@@ -998,6 +999,7 @@ or above the parameter suppresses its S14 finding.
 | v0.6 | Better Pascal: the safe layer (`safe/`, `unit Safe`) and the ext layer (`ext/`: UTF-8, goroutines, `BPThreads`); `unit BP` gives both |
 | v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the current region (the Goose scope made implicit), the GC style (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
 | v0.7 (design) | §21 concept v3: one scope object (region + defer + held objects; `TArena` and a local `TOwned` fold into it), Send and Sync inferred by `bpvet` (H14–H16 found and listed), goroutines M:N on the stacks of `BPThreads` with deadlock detection and a seeded scheduler, the `TComponent` tree as an owner; what is reused from which language |
+| v0.8 (design) | §22 final touches: what the users of Go, Rust, Zig, Swift, Kotlin, Gleam and Deno love and Better Pascal lacks (mostly tooling), each on something FPC already ships; what is not taken now and why |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1705,3 +1707,116 @@ data.
    *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test.
 6. **Atomic `Select` with send cases.** *Done:* `test_go` covers a send case and a race between two ready cases.
 7. **The summary:** §0, §4, the README, the statuses at the top: what exists, nothing else.
+
+## §22. Final touches: what users love in the languages of the niche (design, plan)
+
+Status: design only, nothing of this section is implemented yet; the plan by steps is §22.8. The question: what do the
+users of Go, Rust, Zig, Swift, Kotlin, Gleam and Deno praise most, and which of it Better Pascal still lacks. The answer is
+almost all tooling, not the language: one command from a script to a cross build, a checker that teaches, tests that catch
+leaks, derived boilerplate, a profiler, a page to try the language in. Each item rests on something FPC already ships, so
+each is small. The `sp` tool of §15 and §16 is `bp` (`tools/bp`); the names below use `bp`.
+
+### 22.1 One command, from a script to a cross build
+
+| Loved in | Better Pascal | Rests on | Cost |
+|---|---|---|---|
+| `go run`, `cargo run`, Deno scripts | `bp run FILE.pas [args]`: check, build into the cache by the hash of the sources, run. With `#!/usr/bin/env -S bp run` on its first line a Pascal file is a script | the caches of `tools/bp build`; the idea of `instantfpc`, shipped with FPC | about 20 lines of `tools/bp` |
+| `cargo watch`, `deno --watch`, `zig build --watch` | `bp run --watch`, `bp build --watch`: check and rebuild on save (an mtime poll every 200 ms; a cached check takes about 30 ms) | the same caches | about 15 lines |
+| the `toolchain` line of Go 1.21, `rust-toolchain.toml` | an `fpc 3.2.2` line in `deps.txt` (§15): `bp` fetches that release once, checks its SHA-256, keeps it in the cache and builds with it; a project builds the same in ten years | the official FPC release archives | a download and a checksum |
+| `GOOS=linux GOARCH=arm64 go build`, `zig build -Dtarget=` | `bp build --target aarch64-linux`: the cross compiler and its RTL are built once from the sources of the same release and cached | `make crossall` of FPC, which the CI of this repository already runs for i386 and aarch64 | a few minutes per target, once |
+| `cargo new`, `gleam new` | `bp new NAME`: a directory with `deps.txt`, `main.pas` (`uses BP`) and a test | | a few lines |
+
+The hard part of cross compiling elsewhere is the sysroot: the headers and the libc of the target. The default Linux
+binary of Better Pascal has no libc (§18), so a Linux target needs no sysroot at all, only the binutils of the target (`as`,
+`ld`: a distribution package); a Windows target needs nothing more (FPC has its own assembler and linker for it). Zig sells
+this as its main feature; here it is a side effect of §18.
+
+### 22.2 A checker that teaches
+
+- **Readable output** (Rust, Elm): on a terminal `bp build` prints the source line, a caret under the column, the rule, the
+  fix that `bpvet` already knows, and `help: bp explain S17`. The one-line FPC format stays for pipes and IDEs (chosen by
+  `isatty`), so fpide (bpide after unxed/bp#128) keeps showing the findings as compiler messages.
+- **`bp explain CODE`** (`rustc --explain`): every S and R code prints its section of this specification with a wrong and a
+  right example. The examples are the lint tests (`tests/lint/<code>_bad.pas`, `<code>_ok.pas`), so an explanation cannot
+  drift from the checker.
+- **Format strings are checked** (the printf check of `go vet`): `Format('%d items', [Name])` raises `EConvertError` at run
+  time in FPC. The typed `bpvet` checks a constant format string against the types of the `array of const` before the build
+  (S20; `Format`, `FmtStr`, `Exception.CreateFmt` and the like). This removes the part of string interpolation that hurts
+  without a new syntax (§22.7).
+- **The editor: `bp lsp`.** A proxy between the editor and an existing Pascal language server (built on the CodeTools of
+  Lazarus), in a separate process, so nothing is linked. It passes everything through and adds the findings of `bpvet` on
+  save (from the cache, about 30 ms), and the fixes of `bpvet --fix` as code actions: add `// root:`, add
+  `{$modeswitch autoderef}`, wrap a sent array in `Copy`, reorder the fields of a GC class. These are the quick fixes of
+  rust-analyzer, for the cost of a message filter.
+
+### 22.3 Tests that catch leaks by default
+
+- **`bp test`** finds `test_*.pas` (the convention of `tests/run.sh`) and runs, in each of them, the published methods
+  `Test*` of the descendants of `TTest`, found through RTTI as fpcunit finds them (Go finds `TestXxx` by name the same way).
+  `bp test -run REGEX`; files run in parallel.
+- **Every test is a leak test** (the testing allocator of Zig):
+  after each test method the runner checks that nothing it made is still alive: `SafeCheckNoLeaks` (R5: owners, regions,
+  the GC heap of the goroutine) and the used heap of FPC before and after (`GetFPCHeapStatus`). A failure names the types of
+  what is left. A test that keeps something on purpose says so, `// keeps: <what and why>`.
+- **Benchmarks** (`testing.B` of Go): `procedure BenchParse(var B: TBench)` with `for I := 1 to B.N do ...`; the runner picks
+  `N` for about a second and prints ns/op and allocations/op (from the heap status). The `bench_*.pas` of `tests/bench` move
+  to it.
+- **Fuzzing** (§16) runs in the same runner: `Fuzz*` methods.
+- **Doc tests** (Rust): a `pascal` code block of the README or of this specification that is a whole program is compiled by
+  `bp test --doc`, so the examples of the documents cannot rot.
+- **Concurrency by seed**: `bp test --seed N` (§21.3) replays a failing interleaving.
+
+### 22.4 Derived code instead of boilerplate
+
+`// derive: Eq, Hash, Show, Json` on a record (Kotlin data classes, `derive` and serde of Rust). `bp gen`, which `bp build`
+also runs, reads the fields with `fcl-passrc` and writes two include files next to the unit, `name.derive.intf.inc` (the
+headers of the global operators `=` and `<>`, `Hash`, `ToString`, `ToJson`, `FromJson`) and `name.derive.impl.inc` (their
+bodies; JSON through `fpjson` of FCL), the same interface and implementation split as the parts of `bp.pas`. `bpvet --fix`
+adds the two `{$I}` lines. A generated file starts with `Generated by tools/...` and CI generates it again to compare (the
+rule of generated files in tv3). A variant record compares and writes its tag first and then only the fields of the branch
+of that tag (the semantics of S13). A class needs no generator for JSON: `fpjsonrtti` of FCL already streams its published
+properties.
+
+### 22.5 A profiler in the runtime
+
+`BP_PROF=cpu.folded ./app` (pprof of Go): `setitimer(ITIMER_PROF)` and a `SIGPROF` handler that records the program counter
+and the chain of frame pointers into a ring per thread, with no allocation in the handler. `BPThreads` knows the bounds of
+every stack (§18), so the walk is bounded and cannot fault. At exit the addresses are resolved with the line information of
+FPC (`-gl`, the backtrace code of the RTL) and written as collapsed stacks, which speedscope and `flamegraph.pl` open. With
+M:N (§21.3) a sample also names its goroutine. About 200 lines, Linux; a spike checks the walk at -O1 and -O2 on three
+targets, as spike 3 checked the GC roots.
+
+### 22.6 Try it in the browser
+
+`bpvet` is built on `fcl-passrc`, the parser of pas2js, and pas2js compiles its own compiler to JavaScript (its web
+compiler). So the checker can run in a static page: the code is checked as it is typed, the findings show inline, and the
+code lives in the fragment of the URL, so a link shares it with no server (no infrastructure of our own, §15). Running the
+code in the page is a later step (the WebAssembly target of FPC main, or pas2js for code without threads). It starts as a
+spike: does `bpvet` build with pas2js; if not, the page is not made.
+
+### 22.7 Considered and not taken now
+
+| Loved in | Why not now |
+|---|---|
+| closures and iterator chains (Rust, Swift, Kotlin) | FPC 3.2 has no anonymous functions; FPC main has them and function references. `G.Go(procedure ...)` and `Filter`/`Map` come when a release with them is the base (§14) |
+| string interpolation (Swift, Kotlin, Python) | a new syntax; the format check (§22.2) removes the run-time error of `Format`, the part that hurts |
+| null safety (Kotlin, Swift) | a nil dereference is an exception in FPC (`EAccessViolation`), not undefined behaviour; "may be absent" is `TryX(out V)` (§0); a flow analysis of nil over Pascal code would be noisy |
+| `comptime` (Zig), macros (Rust, Nim) | generics, `inline` and `{$I}` cover the common use; `// derive:` covers the boilerplate that macros are mostly written for |
+| hot reload (V, Elixir) | `bp run --watch` restarts in tens of milliseconds, which covers most of it |
+
+### 22.8 Plan by steps (cheapest first)
+
+One step is one PR from a fresh `main`, with a criterion of done.
+
+1. `bp run`, `--watch`, `bp new` in `tools/bp`. *Done:* `tests/bp.sh` runs a script with a shebang, and a second run comes
+   from the cache.
+2. `bp explain` and the readable output. *Done:* every code of §6 and §20 has an entry and an example from `tests/lint`.
+3. The format check (S20) in the typed `bpvet`. *Done:* ok/bad lint tests.
+4. `bp test`: discovery, the leak check after each test, benchmarks, doc tests. *Done:* `tests/run.sh` becomes a call of
+   `bp test`, and CI shows the same results.
+5. The `fpc` line and `--target`. *Done:* CI builds and runs `test_safe` for aarch64 through `bp build --target` (qemu).
+6. `// derive:`. *Done:* a generated record round-trips through JSON; CI regenerates the files to compare.
+7. Spike: the profiler. *Done:* a flame graph of `tests/bench` on three targets, or a verdict.
+8. `bp lsp`. *Done:* an editor shows a finding of S17 on save and applies its fix.
+9. Spike: `bpvet` under pas2js, then the page. *Done:* the page checks `tests/lint/s17_calc_ok.pas` in a browser, or a
+   verdict.
