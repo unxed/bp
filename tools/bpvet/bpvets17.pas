@@ -68,6 +68,7 @@ type
     FInferred: specialize TOwned<TStringList>; // routine=",a,b," : what each routine keeps current values in
     FFixes: specialize TOwned<TStringList>;    // row=text to append (--fix)
     FInfer: Boolean;   // the inference passes: no findings, the marks grow
+    FLoops: String;    // the loops around the statement being walked (Walk)
     FChanged: Boolean;
     FModule: TPasModule;  // borrow: the module being checked
     function Key(const P: TPasProcedure): String;
@@ -95,6 +96,8 @@ type
     procedure CheckStore(const V, Target: TRoots; const Where: TPasElement; const What: String);
     procedure Store(const L: TPasExpr; const V: TRoots; var F: TFlow);
     procedure Walk(const El: TPasElement; var F: TFlow);
+    procedure WalkStmt(const El: TPasElement; var F: TFlow);
+    procedure WalkRegionLoop(const L: TPasImplForLoop; var F: TFlow);
     procedure WalkLoop(const Cond: TPasExpr; const Body: TPasElement; var F: TFlow; const Before: Boolean);
     function Join(const A, B: TFlow): TFlow;
     function RootMark(const P: TPasProcedure): String;
@@ -474,7 +477,9 @@ var
   Freed: TRoots;
   What: String;
 begin
-  if Release then
+  if FRoots[Region].Decl is TPasImplForLoop then
+    What := 'the end of the iteration of a region loop'
+  else if Release then
     What := FRoots[Region].Name + '.Release'
   else
     What := FRoots[Region].Name + '.Reset';
@@ -974,7 +979,65 @@ begin
   end;
 end;
 
+{ The loops around the statement: 'S' a region loop (for R in Scope, for X in Each(...)), 'L' another loop. A Break
+  out of a region loop releases its region late, out of order with a TRegion created after it (R14): an error. }
 procedure TS17.Walk(const El: TPasElement; var F: TFlow);
+var
+  T: TPasType;
+  K: Char;
+begin
+  K := #0;
+  if (El is TPasImplForLoop) and (TPasImplForLoop(El).LoopType = ltIn) then
+  begin
+    T := TypeOf(TPasImplForLoop(El).StartExpr);
+    if (T <> nil) and (SameText(T.Name, 'TScopes') or SameText(Copy(T.Name, 1, 5), 'TEach')) then
+      K := 'S'
+    else
+      K := 'L';
+  end
+  else if (El is TPasImplForLoop) or (El is TPasImplWhileDo) or (El is TPasImplRepeatUntil) then
+    K := 'L';
+  if (El is TPasImplSimple) and (TPasImplSimple(El).expr is TPrimitiveExpr)
+    and SameText(NameOf(TPasImplSimple(El).expr), 'Break') and (FLoops <> '') and (FLoops[Length(FLoops)] = 'S') then
+    Add(TPasImplSimple(El).expr, 'Break out of a region loop (for ... in Scope or Each): its region would be released '
+      + 'late, out of order (R14); leave with Exit, or end the loop by its condition');
+  if K <> #0 then
+    FLoops := FLoops + K;
+  if K = 'S' then
+    WalkRegionLoop(TPasImplForLoop(El), F)
+  else
+    WalkStmt(El, F);
+  if K <> #0 then
+    SetLength(FLoops, Length(FLoops) - 1);
+end;
+
+{ for R in Scope / for X in Each(...): the body runs in a region of its own, created before it and released after it
+  (Each: after every iteration). What the body allocates is rooted in it; a later use is rule 3. Walked twice, as
+  every loop, so that the second iteration sees what the first left. }
+procedure TS17.WalkRegionLoop(const L: TPasImplForLoop; var F: TFlow);
+var
+  K, Pass: Integer;
+  B: TFlow;
+begin
+  Eval(L.StartExpr, F);
+  K := RootIndex(L);
+  if K < 0 then
+    K := AddRoot(rkRegion, L, 'the region of the loop');
+  for Pass := 1 to 2 do
+  begin
+    B := F;
+    SetLength(B.Vars, Length(F.Vars));
+    Inc(FOrder);
+    FRoots[K].Order := FOrder;
+    B.Alive := B.Alive or Bit(K);
+    Walk(L.Body, B);
+    if B.Alive and Bit(K) <> 0 then
+      Kill(B, K, True);
+    F := Join(F, B);
+  end;
+end;
+
+procedure TS17.WalkStmt(const El: TPasElement; var F: TFlow);
 var
   I, K: Integer;
   A: TPasImplAssign;
