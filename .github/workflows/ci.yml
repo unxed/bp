@@ -7,7 +7,7 @@ on:
   pull_request:
 
 # Fail fast: a stalled apt mirror once held a job for 13-18 minutes (a normal job takes under 2). tools/ci-apt.sh limits
-# every apt-get run, each install step has a limit of its own, and each job one a few times its usual time.
+# every apt-get run, each install step has a limit of its own (4 min), and each job one a few times its usual time.
 jobs:
   # English in comments, documents and messages; every text file UTF-8.
   text-policy:
@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        timeout-minutes: 7
+        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler fp-units-fcl fp-utils
       - name: Build bpvet
         run: bash tools/bpvet/build.sh out/bpvet
@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        timeout-minutes: 7
+        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler fp-units-fcl
       - name: Tests (no compiler options; layers safe and ext, units Safe and BP; ext/fpc-utf8)
         env:
@@ -88,7 +88,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        timeout-minutes: 7
+        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler fp-units-fcl
       - name: Tests with -dSAFE_LIBC
         env:
@@ -106,7 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal, qemu-user, cross binutils
-        timeout-minutes: 7
+        timeout-minutes: 4
         run: tools/ci-apt.sh fp-compiler qemu-user binutils-aarch64-linux-gnu binutils-i686-linux-gnu
       - name: Cache cross compilers
         id: cache
