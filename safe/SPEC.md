@@ -1771,6 +1771,9 @@ rule of generated files in tv3). A variant record compares and writes its tag fi
 of that tag (the semantics of S13). A class needs no generator for JSON: `fpjsonrtti` of FCL already streams its published
 properties.
 
+The general form is `// gen: PROGRAM.pas > OUT.inc`: `bp gen` runs the program with `bp run` before `fpc` and the unit
+includes its output (tables, parsers, bindings), checked in CI the same way. Derive is one such program, shipped with `bp`.
+
 ### 22.5 A profiler in the runtime
 
 `BP_PROF=cpu.folded ./app` (pprof of Go): `setitimer(ITIMER_PROF)` and a `SIGPROF` handler that records the program counter
@@ -1788,15 +1791,43 @@ code lives in the fragment of the URL, so a link shares it with no server (no in
 code in the page is a later step (the WebAssembly target of FPC main, or pas2js for code without threads). It starts as a
 spike: does `bpvet` build with pas2js; if not, the page is not made.
 
-### 22.7 Considered and not taken now
+### 22.7 Considered and not taken now, and why
 
-| Loved in | Why not now |
-|---|---|
-| closures and iterator chains (Rust, Swift, Kotlin) | FPC 3.2 has no anonymous functions; FPC main has them and function references. `G.Go(procedure ...)` and `Filter`/`Map` come when a release with them is the base (§14) |
-| string interpolation (Swift, Kotlin, Python) | a new syntax; the format check (§22.2) removes the run-time error of `Format`, the part that hurts |
-| null safety (Kotlin, Swift) | a nil dereference is an exception in FPC (`EAccessViolation`), not undefined behaviour; "may be absent" is `TryX(out V)` (§0); a flow analysis of nil over Pascal code would be noisy |
-| `comptime` (Zig), macros (Rust, Nim) | generics, `inline` and `{$I}` cover the common use; `// derive:` covers the boilerplate that macros are mostly written for |
-| hot reload (V, Elixir) | `bp run --watch` restarts in tens of milliseconds, which covers most of it |
+Each of these is loved for something concrete. Below: what users get from it, what Better Pascal already has for that, and
+what stops the rest. Two of the four turn out to be mostly taken in another form.
+
+- **Closures and iterator chains** (Rust, Swift, Kotlin). FPC 3.2 has no anonymous functions; FPC main has them and
+  function references. `G.Go(procedure ...)` and `Filter`/`Map` come when a release with them is the base (§14).
+- **String interpolation** (Swift, Kotlin, the f-strings of Python). Users get two things: the text and the values stand in
+  their order, so a format string cannot disagree with its arguments; and brevity. Pascal has had the first since 1970:
+  `Write` takes any mix of strings and values, checked by the compiler, with widths (`X:8:2`), and
+  `WriteStr(S, 'Loaded ', N, ' files in ', T:0:2, ' s')` builds a string the same way (FPC, all modes): there is no format
+  string to disagree with. `Format` stays for translations, where the order of the values changes with the language
+  (`%1:s`), and S20 checks it (§22.2). What is left is the `{Name}` inside a literal, and that is a new syntax of the
+  compiler: Better Pascal has no syntax of its own (§1).
+- **Null safety** (Kotlin, Swift). Users get: a missing value does not crash the program, and this is known before the run.
+  The crash part is there: in FPC a nil dereference is an `EAccessViolation` exception with a backtrace, not undefined
+  behaviour (on every target of §2 that protects the zero page, which is all of them except DOS). The "before the run" part
+  needs two kinds of class types, `TFoo` and `TFoo?`, in every declaration: a change of the type system, that is a fork of
+  the compiler. A linter without that mark has to treat every class field as possibly nil (noise) or trust it (no
+  guarantee). Better Pascal makes nil rare instead: an owner is never nil (`Get` of an empty `TOwned` raises R1), a created
+  or held local is never nil (§21.1), "may be absent" is `TryX(out V): Boolean` and `TWeak.TryLock`. One cheap step remains
+  open: a rule that a routine of safe code never returns `nil` (a syntactic check of `Result := nil` and `Exit(nil)`). It
+  closes the most common source, as a style rule, not a guarantee.
+- **`comptime` (Zig), macros (Rust, Nim).** They do three jobs. Code generic over types and constants: FPC has generics, with
+  constant parameters since 3.2. Code chosen at compile time: `{$if}`, constant expressions, `inline` (dead branches are
+  removed). Code written by code: `// derive:` (§22.4), and in general a Pascal program that `bp` runs before `fpc` and whose
+  output is included (`// gen:`, §22.4; `go generate`, a step of `build.zig`); `bp run` makes such a program one file with
+  no build of its own. What is missing is code that runs inside the compiler on its types (`@typeInfo`, procedural macros);
+  without a fork the generator reads the types with `fcl-passrc`, as derive does. So `comptime` is taken as a build step,
+  not as a feature of the language.
+- **Hot reload** (V, Elixir, Flutter). Users get a change on the screen without losing the state of the running program.
+  Two things stop it. The default Linux binary is static with no libc (§18), so there is no dynamic loader to load new code
+  into. And reloading compiled code breaks the guarantees: live objects keep the VMT pointers and the field layout of the
+  old code, so a changed class leaves objects with a wrong layout; Erlang and Dart can do it because a virtual machine owns
+  all code and data. What remains is the fast loop, and that is taken: `bp run --watch` checks, builds and restarts in a
+  fraction of a second (a cached check takes about 30 ms, `fpc` builds a small program in about 0.15 s). The state survives
+  a restart only if the program saves it.
 
 ### 22.8 Plan by steps (cheapest first)
 
