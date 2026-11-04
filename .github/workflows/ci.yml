@@ -71,6 +71,8 @@ jobs:
         run: bash tools/spikes/region/run.sh
       - name: Spike 2 with SAFE_DEBUG (a use after Reset stops at once, R12)
         run: FPCOPTS=-dSAFE_DEBUG bash tools/spikes/region/run.sh
+      - name: Spike 4 of unxed/bp#108, the M:N switch (tools/spikes/mn)
+        run: bash tools/spikes/mn/run.sh
       - name: Benchmarks (report only, no thresholds; tests/bench)
         run: bash tests/bench/run.sh "$RUNNER_TEMP/bench"
       - name: Audit — static, no INTERP, no NEEDED (static-everywhere Profile S)
@@ -140,6 +142,8 @@ jobs:
             FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 OUT=$PWD/gc386 bash tools/spikes/gcroots/run.sh
             FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 OUT=$PWD/rga64 bash tools/spikes/region/run.sh
             FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 OUT=$PWD/rg386 bash tools/spikes/region/run.sh
+            FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 OUT=$PWD/mna64 bash tools/spikes/mn/run.sh
+            FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 OUT=$PWD/mn386 bash tools/spikes/mn/run.sh
         run: |
           export I=$HOME/fpccross/lib/fpc/3.2.2
           tools/ci-par.sh
@@ -147,6 +151,9 @@ jobs:
         run: |
           cd out386
           for t in safe-BP/test_safe ext-BP/test_go ext-BP/test_threads ext-BP/test_utf8; do LANG=C ./$t > /dev/null || { echo "FAIL $t"; exit 1; }; echo "ok   $t"; done
+      - name: Spike 4 on i386 natively (the binaries built for qemu)
+        run: |
+          for o in -O1 -O2 -O2-Ct; do echo "== mn $o"; mn386/mn$o/mntest || { echo "FAIL mn $o"; exit 1; }; done
 
   # Windows x86_64: the FPC 3.2.2 cross-compiler for win64 (internal assembler and linker, no binutils) from the official
   # sources, the tests run under wine. The result per test is recorded in safe/SPEC.md §2.

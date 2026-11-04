@@ -61,6 +61,10 @@ implementation
 
 {$ifdef SAFE_RAW}
 
+{ No stack check in the thread manager (-Ct): the check reads the threadvar StackBottom, whose address comes from
+  RawRelocateThreadVar, which would check the stack again, without end. }
+{$S-}
+
 const
   {$ifdef cpu64}
   RegionLog2 = 23; // 8 MiB of virtual address space per thread, as with pthread
