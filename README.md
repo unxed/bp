@@ -1,5 +1,10 @@
 # Better Pascal (bp)
 
+> **Build with `tools/bp build`, not with `fpc` directly.** `bp build [--release] [fpc options] FILE.pas` checks the
+> program (`bpvet --strict --typed`: ownership, regions, borrows) and calls `fpc` only when the check passes, so
+> unsafe code is built only where it is declared (`// UNSAFE:`, `// borrow:`, `// root:`). The guarantees of Better
+> Pascal are the guarantees of `bp build`; a cached check takes about 30 ms.
+
 Free Pascal as one would want it by default: safe memory, UTF-8 everywhere, goroutines.
 No FPC fork and no compiler options: a single unit `BP` gives all of it.
 
