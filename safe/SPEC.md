@@ -1122,6 +1122,49 @@ does not resolve is a Fatal with the position. The conditions of Spike 1 are met
   the typed mode found three lint tests that FPC itself rejects (a nested procedure passed as a plain procedure, a
   `var` parameter as a loop counter, a declaration with a different parameter mode); they were made valid Pascal.
 
+### Early S17 result: the root analysis on code of the region style (step 8 of #108, early, 2026-11-04)
+
+Before the runtime (steps 4 and 12) is built on the root analysis, a first S17 (`tools/bpvet/bpvets17.pas`, in the typed
+mode) was run on the code of the style, to see whether it proves real code with few marks or buries it in findings.
+Verdict: **it works; one form was missing and is added to rule 4 (below).**
+
+- **What it checks:** rules 1-4 inside a routine and through the signatures of the routines it calls. Roots are a bit set:
+  the caller's current region, each region object or region parameter (incomparable with each other), each local `TRegion`
+  in the order of creation (a later one is inner). Stores go into locals (the root is replaced), fields of records and
+  region objects (the roots must outlive the target), `Result` and `var` parameters, globals, fields and methods of other
+  styles, channels; `Reset`, `Release` and a second `TRegion.Create` free what the region and the regions created after it
+  hold, and a later read is rule 3. Loops are walked twice, branches are joined. Nested routines read the locals of the
+  routine they are in as the caller's region and write them as `var` parameters. 2-5 % of the time of the typed run.
+- **Measured.** The spike-2 tests (`tools/spikes/region/regiontest.pas`, 300 lines, 14 routines) and the examples of this
+  section (`tests/lint/s17_ok.pas`): no finding, no mark. A calculator written in the style as a user would write it
+  (`tests/lint/s17_calc_ok.pas`: a lexer, a recursive-descent parser into a tree of region objects, an evaluator,
+  definitions kept across lines in a region of the run, a region per evaluated line; 280 lines, 15 routines): 3 findings,
+  all of one kind, and no `// UNSAFE:`. Building a tree by returning new nodes (`Result := TExpr.Create;
+  Result.Left := A`) needs nothing: the parameters outlive the caller's current region.
+- **The missing form: a routine that keeps a new value in an object it is given.** `TExpr.AddArg(A)` (append to a list of
+  `Self`) and `TCalc.Define` (push a new `TDef` into `Self.Defs`) store a value of the caller's current region into `Self`.
+  Without more information that is an error by rule 1, and a true one: called on an object of an outer region while an
+  inner one is current, the outer object would point into the inner region. Rust says the same with a lifetime bound
+  (`fn add<'a>(&'a mut self, a: &'a Node)`), Go and C# do not need it (a collector). **Added to rule 4:** `// root: Self, A`
+  on the header of a routine without a `TRegion` parameter says that `Self` and `A` are in the caller's current region:
+  the body may keep values of that region in them, and **every call is checked** to pass them in the current region. The
+  calculator needs 3 such marks (`AddArg`, `Define`, and `RunLine`, which calls `Define` on its parameter): about one per
+  90 lines, on each routine that adds to an existing structure.
+- **Not elided by default.** Making every method of a region class bound to the current region (as Rust elides lifetimes
+  of `&self` methods) would turn every read of an outer object inside an inner region (a lookup in a table of the run
+  while a scratch region is current) into a finding at the call. An elision for the methods whose body stores into `Self`
+  is possible inside one unit; it waits for more code of the style (the editor of `dn`, step 12).
+- **The untyped rules do not know the style.** Without `--typed`, S6 reports every allocation of a region object (25 on
+  `regiontest.pas`) and S5 every field of a region class; the typed mode drops those that S17 answers. Code of the region
+  style is checked with `--typed`.
+- **Found for the runtime (step 4).** A `TRegion` global assigned in the main block of a program is copied by FPC (the
+  result goes through a temporary), and the `Copy` operator of the spike raises: a region is a local of a routine, and
+  S17 is to report a `TRegion` global. `tools/bpvet/resolver/genstubs.py` drops `class` from a class property
+  (`TEncoding.Default` when the sources name `Default`).
+- **Not in the early S17:** `with` (a field without a base loses its root), goroutines and `TChan` beyond `Send`, S17a (a
+  destructor), S17d (`// borrow: arena`), allocation in an explicit region (`Create(var R)`, not in the spike). Lint tests:
+  `tests/lint/s17_*.pas`.
+
 ### Spike 3 result: GC roots from the stack of the goroutine (2026-11-04, FPC 3.2.2)
 
 A prototype collector (`tools/spikes/gcroots/`, run by CI on x86_64, aarch64 and i386 at -O1 and -O2): a heap per thread
@@ -1321,7 +1364,10 @@ cannot be stored into a variable of an outer one). The rules:
    error.
 4. A routine that takes one region parameter and returns a rooted value roots the result in that parameter: the result is
    built in the caller's region. With several region parameters the routine names the root with `// root: <parameter>`
-   on its header line. The signature is the contract; bodies of other routines are not read (modularity).
+   on its header line. A routine without a region parameter that keeps values of the current region in an object it is
+   given names it the same way, `// root: Self, A`: those objects are in the caller's current region, and each call is
+   checked to pass them so (the early S17 result, above). The signature is the contract; bodies of other routines are not
+   read (modularity).
 5. Unproven is an error (soundness); `// UNSAFE: <why>` drops it.
 
 The same engine also checks `// borrow: arena` references against their arena (H3 statically), and the borrow-escape part
