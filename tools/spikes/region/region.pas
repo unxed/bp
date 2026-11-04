@@ -48,6 +48,19 @@ type
       Len: SizeInt;
       Chunks: array[0..47] of PT;
     end;
+  public type
+    { for P in A: a pointer to each element in place; the bounds are checked once per chunk }
+    TEnum = record
+    private
+      Cur, Stop: PT;
+      Data: PData;
+      Chunk: Integer;
+      Left: SizeInt;
+      function NextChunk: Boolean;
+    public
+      function MoveNext: Boolean; inline;
+      property Current: PT read Cur;
+    end;
   private
     P: PData;
     function GetItem(I: SizeInt): T;
@@ -58,6 +71,7 @@ type
     function Len: SizeInt; inline;
     function At(I: SizeInt): PT; inline;
     property Items[I: SizeInt]: T read GetItem write SetItem; default;
+    function GetEnumerator: TEnum;
   end;
 
 { For the tests: counters of the management operators of TRegion and of released regions. }
@@ -337,6 +351,37 @@ begin
   end;
   Inc(P^.Len);
   At(Result)^ := V;
+end;
+
+function TGrowArray.GetEnumerator: TEnum;
+begin
+  Result.Cur := nil;
+  Result.Stop := nil;
+  Result.Data := P;
+  Result.Chunk := 0;
+  Result.Left := P^.Len;
+end;
+
+function TGrowArray.TEnum.MoveNext: Boolean;
+begin
+  Inc(Cur);
+  Result := (Cur < Stop) or NextChunk;
+end;
+
+function TGrowArray.TEnum.NextChunk: Boolean;
+var
+  N: SizeInt;
+begin
+  if Left <= 0 then
+    Exit(False);
+  N := SizeInt(1) shl (Chunk + ChunkLog2);
+  if N > Left then
+    N := Left;
+  Cur := Data^.Chunks[Chunk];
+  Stop := Cur + N;
+  Dec(Left, N);
+  Inc(Chunk);
+  Result := True;
 end;
 
 function TGrowArray.GetItem(I: SizeInt): T;

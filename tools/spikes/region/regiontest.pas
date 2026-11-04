@@ -282,7 +282,8 @@ var
   P: TPt;
   I, K: Integer;
   S: Int64;
-  T0, T1, T2: QWord;
+  T0, T1, T2, T3: QWord;
+  Q: TPts.PT;
 begin
   R := TRegion.Create;
   A := TPts.Create;
@@ -303,7 +304,13 @@ begin
     for I := 0 to N - 1 do
       Inc(S, A.At(I).X);
   T2 := GetTickCount64;
-  WriteLn('info 2*10^7 reads: dynamic array ', T1 - T0, ' ms, TGrowArray.At ', T2 - T1, ' ms (', S mod 7, ')');
+  for K := 1 to Rounds do
+    for Q in A do
+      Inc(S, Q^.X);
+  T3 := GetTickCount64;
+  Check(S = 3 * Int64(Rounds) * (Int64(N) * (N - 1) div 2), 'for P in A reads every element once, in order');
+  WriteLn('info 2*10^7 reads: dynamic array ', T1 - T0, ' ms, TGrowArray.At ', T2 - T1, ' ms, for P in A ', T3 - T2,
+    ' ms');
 end;
 
 var
