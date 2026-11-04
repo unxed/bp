@@ -196,6 +196,7 @@ begin
   Check(GetTickCount64 - T0 >= 40, 'select: timeout actually waited');
   B.Send(7);
   Check(Select([A.Sel, B.Sel], 1000) = 1, 'select: ready channel index');
+  Check(Select([A.Sel, B.Sel]) = 1, 'select: without a timeout (no deadline sum, safe under -Co)');
 
   Counter := 0;
   G := TGroup.Create;

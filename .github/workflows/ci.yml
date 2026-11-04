@@ -67,6 +67,14 @@ jobs:
           LC_ALL: C.UTF-8
           OUT: ${{ github.workspace }}/out
         run: bash tests/run.sh
+      - name: Layer ext with overflow checks (-Co, as every tools/bp build without --release; unxed/bp#146)
+        env:
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
+          FPCOPTS: -Co
+          NO_COMPILE_CHECKS: "1"
+          OUT: ${{ github.workspace }}/outco
+        run: bash tests/run.sh ext
       - name: Spike 3 of unxed/bp#108, GC roots from the stack of the goroutine (tools/spikes/gcroots)
         run: bash tools/spikes/gcroots/run.sh
       - name: Spike 2 of unxed/bp#108, the region style (tools/spikes/region)
