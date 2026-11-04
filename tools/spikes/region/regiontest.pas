@@ -215,6 +215,122 @@ begin
   Check(Raised and (CurrentRegionDepth = 0), 'R15: an allocation with no current region');
 end;
 
+procedure InScopeRaise;
+var
+  R: Integer;
+begin
+  for R in Scope do
+    raise Exception.Create('x');
+end;
+
+{$if defined(SAFE_DEBUG) and defined(unix)}
+procedure DebugNet;
+var
+  R: TRegion;
+  N: TNode;
+  Caught: Boolean;
+begin
+  R := TRegion.Create;
+  N := TNode.Create;
+  N.X := 1;
+  R.Reset;
+  Caught := False;
+  try
+    N.X := 2;  // a use after Reset: the block has no access any more
+  except
+    on E: EAccessViolation do Caught := True;
+  end;
+  Check(Caught, 'SAFE_DEBUG: a use after Reset stops with EAccessViolation at once (R12)');
+end;
+{$endif}
+
+procedure BlockScopes;
+var
+  Lines, Kept: array of String;
+  Line: String;
+  Named: TNamed;
+  Outer: TRegion;
+  Pts: TPts;
+  Pt: TPt;
+  Q: TPts.PT;
+  Count: Integer;
+  Peak: SizeUInt;
+  R, I, J, Inside: Integer;
+  N: TNode;
+  Raised: Boolean;
+begin
+  Inside := 0;
+  for I := 1 to 100 do
+    for R in Scope do
+    begin
+      for J := 1 to 1000 do
+        N := TNode.Create;
+      N.X := J;
+      if CurrentRegionDepth > Inside then
+        Inside := CurrentRegionDepth;
+    end;
+  Check((Inside = 1) and (CurrentRegionDepth = 0), 'for R in Scope: a region per block, released at its end');
+  for R in Scope do
+    for J in Scope do
+      Inside := J;
+  Check((Inside = 2) and (CurrentRegionDepth = 0), 'for R in Scope: blocks nest');
+  Raised := False;
+  try
+    InScopeRaise;
+  except
+    on E: Exception do Raised := True;
+  end;
+  Check(Raised and (CurrentRegionDepth = 0), 'for R in Scope: an exception in the block releases its region');
+  SetLength(Lines, 200);
+  for I := 0 to High(Lines) do
+    Lines[I] := IntToStr(I);
+  Count := 0;
+  Peak := 0;
+  for Line in Each(Lines) do
+  begin
+    for J := 1 to 1000 do
+      N := TNode.Create;
+    N.X := Length(Line);
+    Inc(Count);
+    if CurrentRegionUsed > Peak then
+      Peak := CurrentRegionUsed;
+  end;
+  Check((Count = 200) and (CurrentRegionDepth = 0) and (Peak < 256 * 1024), 'for Line in Each(Lines): a region per '
+    + 'iteration (peak ' + IntToStr(Peak div 1024) + ' KiB over 200 rounds of 1000 objects)');
+  // strings leave a region as copies: they outlive the reset of every iteration
+  SetLength(Kept, Length(Lines));
+  Count := 0;
+  for Line in Each(Lines) do
+  begin
+    Named := TNamed.Create;
+    Named.Name := #$D1#$91 + Line + #$F0#$9F#$98#$80;  // a Cyrillic letter and an emoji in UTF-8
+    Kept[Count] := Named.Name;
+    Inc(Count);
+  end;
+  Check((Kept[0] = #$D1#$91'0'#$F0#$9F#$98#$80) and (Kept[199] = #$D1#$91'199'#$F0#$9F#$98#$80) and (StringRefCount(Kept[199]) = 1),
+    'strings leave a region as copies: UTF-8 text intact after the reset of each iteration, one reference left');
+  Outer := TRegion.Create;  // the array lives outside the loop
+  Pts := TPts.Create;
+  for I := 1 to 300 do
+  begin
+    Pt.X := I;
+    Pt.Y := 0;
+    Pts.Push(Pt);
+  end;
+  Count := 0;
+  Peak := 0;
+  for Q in Pts.Each do
+  begin
+    for J := 1 to 1000 do
+      N := TNode.Create;
+    Inc(Count, Q^.X);
+    if CurrentRegionUsed > Peak then
+      Peak := CurrentRegionUsed;
+  end;
+  Check((Count = 300 * 301 div 2) and (CurrentRegionDepth = 1) and (Peak < 256 * 1024), 'for P in A.Each: every '
+    + 'element in place, a region per iteration (peak ' + IntToStr(Peak div 1024) + ' KiB)');
+end;
+
 procedure ResetLoop;
 var
   R: TRegion;
@@ -282,7 +398,9 @@ var
   P: TPt;
   I, K: Integer;
   S: Int64;
-  T0, T1, T2: QWord;
+  T0, T1, T2, T3, T4: QWord;
+  Q: TPts.PT;
+  C: TPts.TChunk;
 begin
   R := TRegion.Create;
   A := TPts.Create;
@@ -303,7 +421,18 @@ begin
     for I := 0 to N - 1 do
       Inc(S, A.At(I).X);
   T2 := GetTickCount64;
-  WriteLn('info 2*10^7 reads: dynamic array ', T1 - T0, ' ms, TGrowArray.At ', T2 - T1, ' ms (', S mod 7, ')');
+  for K := 1 to Rounds do
+    for Q in A do
+      Inc(S, Q^.X);
+  T3 := GetTickCount64;
+  for K := 1 to Rounds do
+    for C in A.Chunks do
+      for I := 0 to C.Count - 1 do
+        Inc(S, C.Data[I].X);
+  T4 := GetTickCount64;
+  Check(S = 4 * Int64(Rounds) * (Int64(N) * (N - 1) div 2), 'for P in A reads every element once, in order');
+  WriteLn('info 2*10^7 reads: dynamic array ', T1 - T0, ' ms, TGrowArray.At ', T2 - T1, ' ms, for P in A ', T3 - T2,
+    ' ms, for C in A.Chunks ', T4 - T3, ' ms');
 end;
 
 var
@@ -323,6 +452,8 @@ begin
   R14;
   R15;
   ResetLoop;
+  BlockScopes;
+  {$if defined(SAFE_DEBUG) and defined(unix)}DebugNet;{$endif}
   Goroutine;
   Speed;
   Check(HeapUsed <= H0, 'nothing leaks: the heap is not above where it was (' + IntToStr(HeapUsed) + ' against ' + IntToStr(H0) + ')');

@@ -9,6 +9,7 @@ unit Region;
 interface
 
 uses
+  {$if defined(SAFE_DEBUG) and defined(unix)}BaseUnix,{$endif}
   SysUtils;
 
 const
@@ -121,6 +122,19 @@ type
       property Current: TChunk read Cur;
       function GetEnumerator: TChunkEnum;
     end;
+    { for P in A.Each: the elements in place, and a region per iteration (reset by each MoveNext) }
+    TEachEnum = record
+    private
+      E: TEnum;
+      D: Pointer;
+      function GetCurrent: PT;
+    public
+      function MoveNext: Boolean;
+      property Current: PT read GetCurrent;
+      function GetEnumerator: TEachEnum;
+      class operator Initialize(var S: TEachEnum);
+      class operator Finalize(var S: TEachEnum);
+    end;
   private
     P: PData;
     function GetItem(I: SizeInt): T;
@@ -133,6 +147,7 @@ type
     property Items[I: SizeInt]: T read GetItem write SetItem; default;
     function GetEnumerator: TEnum;
     function Chunks: TChunkEnum;
+    function Each: TEachEnum;
   end;
 
 { For the tests: counters of the management operators of TRegion and of released regions. }
@@ -199,7 +214,14 @@ begin
     Size := 2 * D^.Blocks^.Size;
   while Size < Need + SizeOf(TBlock) + 16 do
     Size := 2 * Size;
+  {$if defined(SAFE_DEBUG) and defined(unix)}
+  // SAFE_DEBUG: each block is pages of its own, and a released block loses all access (R12)
+  B := fpmmap(nil, Size, PROT_READ or PROT_WRITE, MAP_PRIVATE or MAP_ANONYMOUS, -1, 0);
+  if Pointer(B) = MAP_FAILED then
+    raise ERegion.Create('SAFE: mmap of a region block failed');
+  {$else}
   GetMem(B, Size);
+  {$endif}
   B^.Next := D^.Blocks;
   B^.Size := Size;
   D^.Blocks := B;
@@ -256,12 +278,19 @@ begin
   while B <> nil do
   begin
     N := B^.Next;
+    {$if defined(SAFE_DEBUG) and defined(unix)}
+    // a reset keeps no block: what it held must stop at the first access (R12); the pages are never reused
+    fpmprotect(B, B^.Size, PROT_NONE);
+    {$else}
     if KeepFirst and (N = nil) then
       Break;
     FreeMem(B);
+    {$endif}
     B := N;
   end;
   D^.Blocks := B;
+  D^.Cur := nil;
+  D^.Limit := nil;
   if B <> nil then
   begin
     D^.Cur := PByte(Align(PByte(B) + SizeOf(TBlock), 16));
@@ -582,6 +611,62 @@ begin
   Dec(Left, N);
   Inc(Chunk);
   Result := True;
+end;
+
+function TGrowArray.Each: TEachEnum;
+begin
+  Result.E := GetEnumerator;
+end;
+
+function TGrowArray.TEachEnum.GetEnumerator: TEachEnum;
+begin
+  Result := Self;
+end;
+
+function TGrowArray.TEachEnum.GetCurrent: PT;
+begin
+  Result := E.Current;
+end;
+
+function TGrowArray.TEachEnum.MoveNext: Boolean;
+var
+  R: TRegion;
+begin
+  if D = nil then
+  begin
+    R := TRegion.Create;
+    D := R.D;
+  end
+  else
+  begin
+    R.D := D;
+    R.Reset;  // the region of the iteration before
+  end;
+  R.D := nil;
+  Result := E.MoveNext;
+  if not Result then
+  begin
+    R.D := D;
+    D := nil;
+    R.Release;
+  end;
+end;
+
+class operator TGrowArray.TEachEnum.Initialize(var S: TEachEnum);
+begin
+  S.D := nil;
+end;
+
+class operator TGrowArray.TEachEnum.Finalize(var S: TEachEnum);
+var
+  R: TRegion;
+begin
+  if S.D <> nil then
+  begin
+    R.D := S.D;
+    S.D := nil;
+    R.Release;
+  end;
 end;
 
 function TGrowArray.Chunks: TChunkEnum;
