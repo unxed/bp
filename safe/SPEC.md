@@ -52,6 +52,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **design (plan)** | §22 |
+| Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **open**: not checked yet; §0 says how to avoid them | §8, §21.2 |
 
 ---
@@ -994,6 +995,7 @@ or above the parameter suppresses its S14 finding.
 | v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the current region (the Goose scope made implicit), the GC style (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
 | v0.7 (design) | §21 concept v3: one scope object (region + defer + held objects; `TArena` and a local `TOwned` fold into it), Send and Sync inferred by `bpvet` (H14–H16 found and listed), goroutines M:N on the stacks of `BPThreads` with deadlock detection and a seeded scheduler, the `TComponent` tree as an owner; what is reused from which language |
 | v0.8 (design) | §22 final touches: what the users of Go, Rust, Zig, Swift, Kotlin, Gleam and Deno love and Better Pascal lacks (mostly tooling), each on something FPC already ships; what is not taken now and why |
+| v0.9 (design) | §23 systems programming and the world of C: four profiles (S, U, H, F), bindings as tables of names bound at run time with no versioned import, the measurements on FPC binaries, kernels and drivers (hardware as types, inferred contexts) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1845,3 +1847,179 @@ One step is one PR from a fresh `main`, with a criterion of done.
 8. `bp lsp`. *Done:* an editor shows a finding of S17 on save and applies its fix.
 9. Spike: `bpvet` under pas2js, then the page. *Done:* the page checks `tests/lint/s17_calc_ok.pas` in a browser, or a
    verdict.
+
+## §23. Systems programming and the world of C (design, plan)
+
+Status: design only; the measurements in §23.3 were made on 2026-11-04 (FPC 3.2.2, glibc 2.39, x86_64); the plan by
+steps is §23.7. Two questions:
+
+- what Better Pascal needs to write a kernel, a microkernel, a memory manager or a driver;
+- how it talks to C without being tied to the versions of the system C libraries.
+
+The language must be fit for this to compete with Rust and Zig in their niche.
+
+### 23.1 The principle: the boundary is a module, the hardware is a type
+
+Every hard part of systems code is one of three things:
+
+- memory that no allocator owns (MMIO, page tables, DMA buffers, C memory);
+- code that must not do something (block, allocate, raise) in a context (an interrupt, a spin lock, a C callback);
+- an ABI defined by someone else (the CPU, a device, the C library).
+
+Better Pascal already has the boundary for all three: a `// UNSAFE-UNIT:` module with a safe facade (§7, §13). This
+section adds three things:
+
+- typed views of hardware memory instead of pointers;
+- inferred contexts instead of `unsafe` sprinkled through the code;
+- C bindings that are bound at run time by name, so the binary depends on no version of a C library.
+
+Pascal brings something C and Rust lack. `bitpacked record` gives bit fields with a defined layout. A `set of` an
+enumeration is a flag word. Subrange types (`0..511`) state the width of an index. Enumerations have explicit values.
+A register block or a page table entry is written down as data, not as shifts and masks.
+
+### 23.2 Problems of systems code and their answers
+
+| Problem | Rust / Zig / C | Better Pascal |
+|---|---|---|
+| No OS under the program: no heap, no threads, no files | `no_std`, `-ffreestanding`, Zig `freestanding` | **profile F** (§23.4): a minimal `System` unit (FPC supports a custom RTL: `-Tembedded`, `-Tfreertos`; the Ultibo and Toro projects boot FPC code on bare metal); the kernel installs its page allocator as the memory manager (`SetMemoryManager`) once, and from then on `String`, dynamic arrays and the memory styles of §20 work |
+| Memory with no owner: MMIO registers, page tables | `volatile`, `read_volatile`, crates like `tock-registers` | `TMmio<TRegs>`: a typed view of a `bitpacked record` at an address that one line of a `// UNSAFE-UNIT:` module gives once; `Regs.Load`/`Regs.Store` (volatile accesses through a non-inlined accessor, or the `volatile` intrinsic where the FPC version has it), `ReadBarrier`/`WriteBarrier` of FPC for ordering. No pointer leaves the binding module |
+| Physical and virtual addresses mixed up | newtypes (`PhysAddr`, `VirtAddr` of the `x86_64` crate) | `TPhysAddr`, `TVirtAddr`: records around a `QWord`: distinct types, zero cost, arithmetic only through their methods |
+| An interrupt handler that blocks, allocates or raises | lints by convention (`might_sleep` in Linux), nothing in the type system of Rust | **contexts, inferred** (S23): `// context: irq` on a handler; `bpvet` computes over the call graph (a fixpoint over the module, as for S17) which routines may allocate, block (a lock that sleeps, a channel, `Sleep`) or raise; an `irq` routine that reaches one of them is an error with the call chain. Function colouring with no colours written, except at the roots |
+| Interrupts on and off, locks | RAII guards | a scope object (§21.1): `G := Cpu.NoIrq;` restores the flag at the end of the scope, also on an exception; `TSpinLock.Hold` the same way |
+| DMA: a buffer the device writes while the program may free it | `Pin`, ownership moved into the driver | Send = move (§21.2): a buffer goes into the device queue as a `TOwned` by `.Move` and comes back with the completion; a region that holds a DMA buffer is not released while the buffer is out (S17: the queue is a root) |
+| Concurrency inside the kernel | `Send`/`Sync`, `spin`, atomics | the rules of §21.2; `TAtomic<T>` over `InterlockedXxx` of FPC with an explicit order |
+| Assembler: `cli`, `cr3`, port I/O, context switch | `asm!` / inline asm | `asm` blocks of FPC, only in `// UNSAFE-UNIT:` architecture modules, with a facade of plain routines (`Cpu.LoadPageTable(const T: TPageTable)`) |
+| Layout, sections, entry point, boot header | linker scripts, `#[link_section]` | `section` of FPC variables, a linker script of the profile, a multiboot2 header as a constant record |
+| A microkernel: IPC between address spaces | seL4, Zircon channels with handles | `TChan` of §14: a message is a value (Send rules), a handle is a typed capability (`THandle<TPort>`), the M:N scheduler of §21.3 is the scheduler of the kernel |
+| A memory manager (a user allocator) | `GlobalAlloc` | the allocator is an `// UNSAFE-UNIT:` core over `mmap` (or pages), small and audited; regions (§20) already are an allocator for most needs |
+| Drivers in user space (Linux) | `libusb`, `libfuse`, `vfio` crates | the kernel ABI, not C libraries: `usbfs`, `/dev/fuse`, `uinput`, `evdev`, DRM/KMS and ALSA ioctls as bp units over syscalls (Layer 3 of static-everywhere: a protocol, not a `.so`) |
+| Testing a kernel | QEMU, `cargo test` on the host | **hosted mode:** the same units built as a Linux program with simulated devices (`TMmio` over a buffer); the seeded scheduler of §21.3 (`BP_SCHED_SEED`) makes races reproducible; QEMU in CI for the real boot |
+
+Linux kernel modules are not a goal: the kernel ABI for modules is unstable and Kbuild is a C toolchain. Better Pascal
+targets its own kernels, unikernels, firmware and user-space drivers.
+
+### 23.3 C without versions: what was measured
+
+Facts (2026-11-04, FPC 3.2.2, glibc 2.39, x86_64):
+
+1. **FPC ties a dynamic binary to the glibc it was built on.** A program with one `external 'c'` routine links against
+   `libc.so.6` and imports `__libc_start_main@GLIBC_2.34` from the startup code of FPC. Built on Ubuntu 24.04, it does
+   not start on glibc older than 2.34 or on musl. This is the problem of §2.1 of static-everywhere ("glibc's symbol
+   versioning is forward-only"), and every `external` of a binding adds one more versioned import.
+2. **A static binary cannot reach the host libc.** The default Better Pascal binary (profile S, §18) started by the
+   loader of the host (`ld.so --preload libc.so.6 ./prog`) runs, but no shared object is mapped: the loader does not
+   treat an image without `PT_DYNAMIC` as dynamic.
+3. **An image without `DT_NEEDED`, but with `PT_INTERP`, binds to the libc of the host.** The same FPC program with its
+   `DT_NEEDED` entry removed runs as `ld.so --preload libc.so.6 ./prog` and as `LD_PRELOAD=libc.so.6 ./prog`. The versioned
+   symbols bind against the preloaded libc. Without `PT_INTERP` the glibc loader binds nothing, as unxed/goffi
+   documents for its Profile U.
+
+So the design of unxed/goffi (Profile U: no `PT_INTERP`, no `DT_NEEDED`, a re-exec through the loader of the host with
+its libc preloaded) applies to FPC binaries, with two changes that Better Pascal can make because it owns the build
+(`tools/bp build`) and the startup:
+
+- **No versioned import at all.** The binary imports nothing; after the loader has run, the runtime finds `dlopen` and
+  `dlsym` itself:
+  - `DT_DEBUG` of its own dynamic section points to `r_debug`;
+  - `r_debug.r_map` walks the link map to the libc;
+  - the libc's `.dynsym` gives the address.
+
+  This is the "loader-agnostic symbol resolution" that the notes of goffi describe. Every other C symbol comes from
+  `dlsym` by name, unversioned, so it binds to the default version of whatever libc the host has: glibc of any age or
+  musl.
+- **One startup for both cases.** The entry point is a bridge in Pascal on raw syscalls:
+  - Without a known host loader, or with `ld.so.preload` failing the probe that goffi does, it runs as profile S: FFI is
+    unavailable, `CLib.Available` is `False`, everything else works.
+  - With one, it re-executes itself through the loader: `--preload` on glibc 2.30 and newer and on musl, `LD_PRELOAD`
+    on older glibc, and a `memfd` copy with `PT_INTERP` restored where the glibc loader needs it. This is the start of
+    profile U.
+
+  `__libc_start_main` is never called. Threads: when libc is present, the thread manager creates carriers with
+  `pthread_create` (resolved by `dlsym`), so a C call on any carrier finds a libc thread. A goroutine pins its carrier
+  for the duration of a C call, as in Go. Without libc, carriers stay `clone` (§18).
+
+### 23.4 Four profiles, one source
+
+| Profile | Binary | C | For |
+|---|---|---|---|
+| **S** (default, exists, §18) | static, no `PT_INTERP`, no `DT_NEEDED` | none: syscalls and protocols | CLI, servers, Marwin (#129), anything headless |
+| **U** (plan) | the same image plus an empty `PT_DYNAMIC` | the libc and libraries of the host, bound at run time by name, any version | GUI, GPU, audio, plugins: the irreducible host contract of static-everywhere (`libGL`, `libvulkan`, `libasound` and a few more) |
+| **H** (exists, `-dSAFE_LIBC`) | dynamic, `DT_NEEDED libc.so.6`, versions of the build machine | `external` | compatibility with existing bindings and Lazarus packages that link C |
+| **F** (plan) | freestanding: a custom `System`, no OS | none | kernels, microkernels, firmware |
+
+The program does not change between S, U and H. A binding is written once (§23.5). `CLib.Available` is a constant in S
+and F, so the branch to a pure Pascal fallback costs nothing there.
+
+### 23.5 Bindings: a table of names, not `external`
+
+```pascal
+type
+  TZlib = record                                    // a binding module, // UNSAFE-UNIT:
+    zlibVersion: function: PChar; cdecl;
+    compress2: function(Dst: PByte; var DstLen: CULong; Src: PByte; SrcLen: CULong; Level: CInt): CInt; cdecl;
+  end;
+
+var
+  Zlib: TZlib;
+
+initialization
+  CLib.Bind(['libz.so.1', 'libz.so'], Zlib, ['zlibVersion', 'compress2']);  // the first name found wins
+end.
+```
+
+- `CLib.Bind` fills the procedure variables by `dlsym`. The calling convention is the one of FPC itself. A call costs as
+  much as an indirect call: no trampoline in assembler as in purego and goffi, because the Pascal compiler speaks the C
+  ABI natively.
+- A list of library names covers the sonames of different versions (Nim's `dynlib: "libssl.so(.3|.1.1)"`). A missing
+  symbol leaves the field `nil` and `CLib.Has(Zlib.compress2)` says so. The facade decides: a fallback, an error, or a
+  feature switched off. Nothing fails at load time for a symbol the program does not call.
+- In profile H the same table can be filled by the static linker (`external`). S12 accepts a binding table in a
+  `// UNSAFE-UNIT:` module exactly as it accepts `external` today, and F1–F5 of §13 still hold for the facade.
+- **Layer 1 C code** (zlib, sqlite, a codec: code that computes) is not taken from the host at all: it is compiled
+  freestanding (`zig cc -target x86_64-linux-musl -ffreestanding -c`) and linked statically (`{$L}`). It runs against a
+  small C runtime written in Pascal over the bp RTL: `malloc`/`free` on the heap of FPC, `memcpy`, `strlen`, `qsort`, and
+  for sqlite a VFS over the bp file units. The binary stays profile S.
+- **Headers:** `tools/bp bind header.h --lib 'libfoo.so.1|libfoo.so'` generates the table and a facade skeleton from the
+  JSON AST of clang (`-Xclang -ast-dump=json`; h2pas does not follow modern headers). A model writes the facade, and
+  `bp build` checks it.
+- **The other direction:** a bp `library` with `cdecl` exports for C programs. C sees opaque handles and flat records,
+  never Pascal objects or strings: the facade rules F1–F5 turned around.
+
+### 23.6 Other languages: what is taken
+
+| Language | How it meets C | What Better Pascal takes |
+|---|---|---|
+| Go (cgo) | a C toolchain in every build, a costly call, `LockOSThread` | the boundary rules (§13), pinning a goroutine for a C call |
+| Go (purego, unxed/goffi) | `dlopen` without cgo, assembler trampolines; Profile U | Profile U, the bridge, the probe of `ld.so.preload`, the audit "no `PT_INTERP`, no `DT_NEEDED`" |
+| Zig | `@cImport`, bundled libc headers for many glibc versions, `x86_64-linux-gnu.2.28` targets, `zig cc` | `zig cc` as the C compiler of Layer 1 code; versions avoided rather than pinned |
+| Rust | `extern "C"`, `bindgen`, the `libc` crate, `libloading`, `crt-static` and musl targets | the generator of bindings; `libloading` is the shape of `CLib.Bind` |
+| Nim | `{.importc, dynlib: "lib(|.so.1)".}`: bound at load time by a pattern of names | the list of sonames |
+| Java (Panama, FFM) | `Linker`, `SymbolLookup`, `MemorySegment` with arenas and bounds | C memory as a bounded segment in a region of §20 (`TCSegment`, plan): a C buffer is read with bounds checks and dies with its scope |
+| .NET | `DllImport`/`LibraryImport`, `NativeLibrary.TryLoad`, resolvers by version | `CLib.Has` instead of an exception at load |
+| Swift | the Clang importer, `UnsafePointer`, `Span` | nothing new: the facade rules already keep pointers out of safe code |
+| Cosmopolitan | one binary for several OSes | not taken now: §5.9 of static-everywhere calls it the extreme end |
+
+### 23.7 Plan by steps
+
+Each step is one PR from a fresh `main` with a criterion of done. The FFI steps come before the systems steps:
+Marwin (#129) runs in profile S, and GUI showcases need profile U.
+
+1. **`CLib.Bind` in profile H** (`dynlibs` of FPC). `tests/ffi_libc.pas` is rewritten as a table, and S12 accepts tables.
+   *Done:* `test_ffi` passes with the table; a missing symbol is `nil`.
+2. **Spike 5: profile U on x86_64.** The bridge, the re-exec, `dlopen`/`dlsym` from the link map, carriers on
+   `pthread_create`. *Done:*
+   - one binary calls `strlen` and `zlibVersion` on Debian 11, Ubuntu 16.04, Ubuntu 24.04, CentOS 7 (glibc 2.17,
+     `LD_PRELOAD`) and Alpine (musl);
+   - it runs without FFI where no loader is known;
+   - `readelf` shows no `PT_INTERP` and no `DT_NEEDED`;
+   - a verdict here.
+3. **Layer 1 C code:** zlib compiled freestanding and linked statically against the Pascal C runtime. *Done:* a
+   compress/decompress test in profile S on all CI targets.
+4. **`tools/bp bind`** on the clang JSON AST. *Done:* the tables of zlib and of `libasound` are generated and build.
+5. **Spike 6: profile F.** A toy kernel boots in QEMU (multiboot2), prints over the serial port through `TMmio` or a
+   port facade, has a page allocator installed as the memory manager, and has regions over pages and a timer interrupt.
+   *Done:* CI boots it in QEMU and reads the serial output; a verdict here.
+6. **S23 contexts** in `bpvet` (`// context: irq`: no allocation, no blocking, no raise, reached through calls). *Done:*
+   ok/bad lint tests, among them a chain of three calls.
+7. **Hardware types:** `TMmio<T>`, `TPhysAddr`/`TVirtAddr`, `TAtomic<T>`, `Cpu.NoIrq`. *Done:* used by the kernel of
+   step 5, and tested in hosted mode over a buffer.
