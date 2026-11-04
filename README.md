@@ -34,7 +34,7 @@ No FPC fork and no compiler options: a single unit `BP` gives all of it.
 
 ```pascal
 program Hello;
-uses BP, SysUtils;   // BP goes FIRST in the program (it installs the thread manager before SysUtils)
+uses BP;   // BP goes FIRST in the program (it installs the thread manager before any other unit)
 begin
   WriteLn('Hello, world 😀', CPLength('aё😀'));
 end.
@@ -74,6 +74,7 @@ FFI with C libraries. `-dSAFE_NO_UTF8` turns off the UTF-8 defaults. The specifi
 
 `tests/run.sh all` builds every test with no compiler options except the unit paths: the safe layer twice (with `Safe` and
 with `BP`), the ext layer with `BP`, `ext/fpc-utf8`, and checks that `bp.pas` includes every file of `unit Safe`.
+The Pascal examples of the documents are compiled and linted by `tools/doctest.py` in CI.
 
 ## Licences
 
