@@ -53,7 +53,7 @@ const
 
 var
   Listener: TSocket;                   // for the signal handler; written before the first task starts
-  Requests, BytesSent: Int64;          // requests and bytes of response bodies: interlocked updates by the workers
+  Requests, BytesSent: Int64;          // requests and bytes of response bodies: the workers touch them only through Interlocked* (S19)
 
 function TRequest.Header(const Name: String): String;
 var
@@ -141,8 +141,8 @@ begin
   else if Path = '/json' then
     Send(Sock, '400 Bad Request', 'text/plain', 'n must be 0..1000'#10, Keep)
   else if Path = '/stats' then
-    Send(Sock, '200 OK', 'application/json', '{"requests":' + IntToStr(Requests) + ',"bytes":' + IntToStr(BytesSent) +
-      '}'#10, Keep)
+    Send(Sock, '200 OK', 'application/json', '{"requests":' + IntToStr(InterlockedExchangeAdd64(Requests, 0)) + ',"bytes":'
+      + IntToStr(InterlockedExchangeAdd64(BytesSent, 0)) + '}'#10, Keep)   // atomic reads: S19 allows a global only there
   else
     Send(Sock, '404 Not Found', 'text/plain', 'Not Found'#10, Keep);
 end;
