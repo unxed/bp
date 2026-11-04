@@ -1,4 +1,5 @@
 { SPDX-License-Identifier: MIT }
+// UNSAFE-UNIT: a test of a runtime prototype: goroutine arguments and regions are raw pointers.
 { Spike 4 of unxed/bp#108: the checks and the measurements of the M:N prototype (tools/spikes/mn/mn.pas).
   Every test starts a carrier (one thread of BPThreads), starts goroutines on it with MnGo and runs them with MnRun;
   the goroutines talk over TChan of ext/go. Prints ok/FAIL and info lines, exits with 1 on a failure.
@@ -8,7 +9,7 @@
 program mntest;
 
 uses
-  BPThreads, Mn, BP, SysUtils, UnixType, Linux;
+  BPThreads, Mn, SysUtils, UnixType, Linux, BP;
 
 type
   TIntChan = specialize TChan<Integer>;
@@ -29,7 +30,7 @@ var
   RunOk: Boolean;
   TidCarrier: LongInt;
 
-procedure Check(Cond: Boolean; const What: String);
+procedure Check(const Cond: Boolean; const What: String);
 begin
   if Cond then
     WriteLn('ok   ', What)
@@ -71,7 +72,7 @@ end;
 
 { ---------- /proc ---------- }
 
-function ReadNumbers(const Name: String; Index: Integer): Int64;
+function ReadNumbers(const Name: String; const Index: Integer): Int64;
 var
   F: TextFile;
   L: String;
@@ -502,7 +503,7 @@ end;
 
 { HeapChunk: the first chunk of the heap of a thread for small blocks (growheapsizesmall of the RTL, 32 KiB by default;
   the RTL cuts it into blocks at once, so all of it is touched). }
-procedure Memory(HeapChunk: PtrUInt);
+procedure Memory(const HeapChunk: PtrUInt);
 var
   PerG, PerGiB, MaxMaps, MapsPerG: Double;
   Cap: Int64;
@@ -584,7 +585,7 @@ var
   Depth: Integer;
   OverflowLog: String;
 
-function Deep(N: Integer): Integer;
+function Deep(const N: Integer): Integer;
 var
   Pad: array[0..255] of Integer;
 begin
