@@ -899,8 +899,9 @@ it away. Go (`go vet` on the build cache), ruff (a cache by file content, writte
   bug, as a wrong finding is.
 
 Today (2026-11-04, 114 files, 6.8k lines, one core): `bpvet` 0.13 s (`fpc` builds `tests/safe/test_safe.pas` in 0.14 s),
-the stub generator 0.3 s with a warm cache. The typed mode takes 2.4 s because it parses the used units again for every
-file: over the budget, and the next thing to fix in it.
+the typed mode 0.27 s, the stub generator 0.3 s with a warm cache. The typed mode took 2.4 s while it read every used unit
+again, implementation included, for each file; now a used unit is read once per run, up to its implementation. Next: a
+cache across runs, and timings in CI.
 
 ### Fuzzing almost for free
 
@@ -1105,10 +1106,12 @@ does not resolve is a Fatal with the position. The conditions of Spike 1 are met
 - **The resolver is patched at build time.** The owner's decision: the repository keeps only the patches
   (`tools/bpvet/resolver/*.patch`, under the licence of `fcl-passrc`); `resolver/get.sh` takes `pasresolver.pp`,
   `pparser.pp` and `fcl-passrc.inc` of FPC 3.2.2 (from the installed FPC sources, else from the release tag), checks their
-  SHA-256 and applies the patches; `build.sh` builds `bpvet` with the result. Three changes: the bare name of a generic in
-  its own method, a record enumerator, and `String[N]` in a variable or a field (3.2.2 parses it only in a type
-  declaration when the resolver is on). FPC main already has all three, so no ticket is needed; the patches go when
-  `bpvet` moves to the next FPC release.
+  SHA-256 and applies the patches (`pastree`, `pparser`, `pasresolver`; each header lists its changes); `build.sh`
+  builds `bpvet` with the result. They make the resolver accept what FPC accepts and Better Pascal uses: the bare name of
+  a generic in its own method, a record enumerator, `String[N]` in a variable, the operators of a record (`Implicit`, and
+  the management operators `Initialize`/`Finalize`/`Copy` of `TRegion`), a typed pointer for a `Pointer` var argument, a
+  pointer to a member type of a generic declared after it; and they let a used unit be read up to its implementation.
+  FPC main has most of them; the rest are offered upstream when `bpvet` moves to the next FPC release.
 - **The stubs are generated.** `resolver/genstubs.py OUT SRC...` writes the RTL stubs from `ppudump -Fj` of the installed
   units (fp-utils): only the closure of what the sources name, so one run for the checked tree gives 13 units and a few
   hundred symbols. The used units are found in the stub directory first, then in `-Fu`, `-Fi` and the directory of the

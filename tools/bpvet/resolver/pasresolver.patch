@@ -5,10 +5,73 @@ in the FPC sources); see README.md.
 1. TPasResolver.CheckUseAsType: in ObjFPC the bare name of a generic is allowed inside the implementation of its own
    methods too (class function TOwned.Own(AObj: T): TOwned), as FPC allows it.
 2. The for-in enumerator may be a record, as FPC allows (for V in Ch over TChan<T>).
+3. A class operator of a record is not static, and its implementation is found by the operator name.
+4. ObjFPC passes a typed pointer to a var or out argument of type Pointer (GetMem(P, Size)), as FPC does.
+5. A pointer to a member type of a generic declared after it (PData = ^TData) is specialized once all members are.
+6. InterfaceOnly (a used unit read up to its implementation): no section, method bodies or generic bodies are required.
 
 --- a/packages/fcl-passrc/src/pasresolver.pp
 +++ b/packages/fcl-passrc/src/pasresolver.pp
-@@ -14689,7 +14689,7 @@
+@@ -1509,6 +1509,7 @@
+     FLastSourcePos: TPasSourcePos;
+     FOptions: TPasResolverOptions;
+     FPendingForwardProcs: TFPList; // list of TPasElement needed to check for forward procs
++    FPendingSpecPointers: TFPList; // specialized TPasPointerType to a member type declared later (^TData)
+     FRootElement: TPasModule;
+     FScopeClass_Class: TPasClassScopeClass;
+     FScopeClass_InitialFinalization: TPasInitialFinalizationScopeClass;
+@@ -5849,6 +5850,7 @@
+ var
+   Scope: TPasSectionScope;
+ begin
++  if Section=nil then exit; // a unit read with InterfaceOnly has no implementation
+   Scope:=Section.CustomData as TPasSectionScope;
+   if Scope.Finished then exit;
+   Scope.Finished:=true;
+@@ -7004,8 +7006,8 @@
+         RaiseMsg(20181218195514,nInvalidXModifierY,sInvalidXModifierY,['record '+GetElementTypeName(Proc),'forward'],Proc);
+       if IsClassMethod(Proc) and not IsClassConDestructor then
+         begin
+-        // Note: class constructor/destructor must not be static
+-        if not Proc.IsStatic then
++        // Note: class constructor/destructor must not be static, nor a class operator
++        if not Proc.IsStatic and not (Proc is TPasClassOperator) then
+           RaiseMsg(20190106121503,nClassMethodsMustBeStaticInX,sClassMethodsMustBeStaticInX,['records'],Proc);
+         end
+       else if Proc.IsStatic then
+@@ -7338,8 +7340,10 @@
+     {$IFDEF VerbosePasResolver}
+     writeln('TPasResolver.FinishMethodImplHeader searching declaration "',ImplProc.Name,'" ...');
+     {$ENDIF}
+-    // search ImplProc in class
+-    if not IsValidIdent(ProcName) then
++    // search ImplProc in class; an operator is declared under its name without the signature
++    if ImplProc is TPasOperator then
++      ProcName:=OperatorNames[TPasOperator(ImplProc).OperatorType]
++    else if not IsValidIdent(ProcName) then
+       RaiseNotYetImplemented(20160922163421,ImplProc.ProcType);
+ 
+     // search proc in class/record
+@@ -11730,7 +11734,7 @@
+       if DeclEl is TPasProcedure then
+         begin
+         Proc:=TPasProcedure(DeclEl);
+-        if ProcNeedsImplProc(Proc)
++        if ProcNeedsImplProc(Proc) and not InterfaceOnly
+             and (TPasProcedureScope(Proc.CustomData).ImplProc=nil) then
+           RaiseMsg(20170216152219,nForwardProcNotResolved,sForwardProcNotResolved,
+             [GetElementTypeName(Proc),Proc.Name],Proc);
+@@ -11762,7 +11766,8 @@
+         begin
+         Proc:=TPasProcedure(DeclEl);
+         if Proc.IsAbstract or Proc.IsExternal then continue;
+-        if TPasProcedureScope(Proc.CustomData).ImplProc=nil then
++        // InterfaceOnly: the bodies are in the implementation, which is not read
++        if (TPasProcedureScope(Proc.CustomData).ImplProc=nil) and not InterfaceOnly then
+           begin
+           {$IFDEF VerbosePasResolver}
+           writeln('TPasResolver.CheckPendingForwardProcs Proc.ParentPath=',Proc.PathName);
+@@ -14689,7 +14694,7 @@
  var
    LoTypeEl: TPasType;
    EnumeratorClass: TPasClassType;
@@ -17,7 +80,7 @@ in the FPC sources); see README.md.
    Getter, MoveNext, Current: TPasIdentifier;
    GetterFunc, MoveNextFunc: TPasFunction;
    ptm: TProcTypeModifier;
-@@ -14742,14 +14742,19 @@
+@@ -14742,14 +14747,19 @@
    if (ResultResolved.BaseType<>btContext) then
      RaiseContextXExpectedButYFound(20171221193749,'function GetEnumerator','result class',GetTypeDescription(ResultResolved),Loop.StartExpr);
    LoTypeEl:=ResultResolved.LoTypeEl;
@@ -42,7 +105,87 @@ in the FPC sources); see README.md.
    MoveNext:=EnumeratorScope.FindIdentifier('MoveNext');
    if MoveNext=nil then
      RaiseIdentifierNotFound(20171221195632,'MoveNext',Loop.StartExpr);
-@@ -27823,6 +27828,24 @@
+@@ -16883,6 +16893,24 @@
+     SpecMembersType.Members.Add(NewEl);
+     SpecializeElement(GenEl,NewEl);
+     end;
++  // pointers to member types declared after them
++  i:=0;
++  while i<FPendingSpecPointers.Count do
++    begin
++    NewEl:=TPasElement(FPendingSpecPointers[i]);
++    GenEl:=TPasElement(FPendingSpecPointers[i+1]);
++    if NewEl.Parent=SpecMembersType then
++      begin
++      FPendingSpecPointers.Delete(i+1);
++      FPendingSpecPointers.Delete(i);
++      TPasPointerType(NewEl).DestType:=TPasType(SpecMembersType.Members[
++        GenMembersType.Members.IndexOf(TPasPointerType(GenEl).DestType)]);
++      TPasPointerType(NewEl).DestType.AddRef{$IFDEF CheckPasTreeRefCount}('ResolveTypeReference'){$ENDIF};
++      FinishPointerType(TPasPointerType(NewEl));
++      end
++    else
++      inc(i,2);
++    end;
+ end;
+ 
+ procedure TPasResolver.SpecializeMembersImpl(GenericType,
+@@ -16921,7 +16949,7 @@
+       GenIntfProcScope:=TPasProcedureScope(GenIntfProc.CustomData);
+       GenImplProc:=GenIntfProcScope.ImplProc;
+       if GenImplProc=nil then
+-        RaiseNotYetImplemented(20190921221246,GenIntfProc);
++        continue; // the generic is in a unit read with InterfaceOnly: no body to specialize
+       if ImplParent=nil then
+         begin
+         // switch scope (e.g. unit implementation section)
+@@ -18125,6 +18153,17 @@
+ 
+ procedure TPasResolver.SpecializePointerType(GenEl, SpecEl: TPasPointerType);
+ begin
++  // a pointer to a member type of the generic declared after it (PData = ^TData):
++  // resolved when all members are specialized (SpecializeMembers)
++  if (GenEl.DestType<>nil) and (GenEl.Parent is TPasMembersType)
++      and (GenEl.DestType.Parent=GenEl.Parent)
++      and (TPasMembersType(GenEl.Parent).Members.IndexOf(GenEl.DestType)
++        >TPasMembersType(GenEl.Parent).Members.IndexOf(GenEl)) then
++    begin
++    FPendingSpecPointers.Add(SpecEl);
++    FPendingSpecPointers.Add(GenEl);
++    exit;
++    end;
+   SpecializeElType(GenEl,SpecEl,GenEl.DestType,SpecEl.DestType);
+   FinishPointerType(SpecEl);
+ end;
+@@ -20509,6 +20548,7 @@
+   inherited Create;
+   FDefaultScope:=TPasDefaultScope.Create;
+   FPendingForwardProcs:=TFPList.Create;
++  FPendingSpecPointers:=TFPList.Create;
+   FBaseTypeChar:={$ifdef FPC_HAS_CPSTRING}btAnsiChar{$else}btWideChar{$endif};
+   FBaseTypeString:={$ifdef FPC_HAS_CPSTRING}btAnsiString{$else}btUnicodeString{$endif};
+   FBaseTypeExtended:=btDouble;
+@@ -21692,6 +21732,7 @@
+   writeln('TPasResolver.Destroy FPendingForwards...');
+   {$ENDIF}
+   FreeAndNil(FPendingForwardProcs);
++  FreeAndNil(FPendingSpecPointers);
+   FreeAndNil(fExprEvaluator);
+   ClearBuiltInIdentifiers;
+   inherited Destroy;
+@@ -25688,6 +25729,11 @@
+       end;
+     if IsGenericTemplType(ParamResolved) then
+       exit(cGenericExact);
++    // ObjFPC passes a typed pointer to a var or out argument of type Pointer (GetMem(P, Size))
++    if (ParamResolved.BaseType=btPointer) and (ExprResolved.BaseType=btContext)
++        and (ExprResolved.LoTypeEl is TPasPointerType)
++        and not (msDelphi in CurrentParser.CurrentModeswitches) then
++      exit(cTypeConversion);
+ 
+     //writeln('TPasResolver.CheckParamCompatibility NeedVar ParamResolved=',GetResolverResultDbg(ParamResolved),' ExprResolved=',GetResolverResultDbg(ExprResolved));
+     if RaiseOnError then
+@@ -27823,6 +27869,24 @@
    Result:=-1;
  end;
  
@@ -67,7 +210,7 @@ in the FPC sources); see README.md.
  procedure TPasResolver.CheckUseAsType(aType: TPasElement; id: TMaxPrecInt;
    ErrorEl: TPasElement);
  begin
-@@ -27839,7 +27862,7 @@
+@@ -27839,7 +27903,7 @@
        begin
        // ref to generic type without specialization
        if not (msDelphi in CurrentParser.CurrentModeswitches)

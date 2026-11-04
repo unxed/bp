@@ -1,0 +1,60 @@
+A change of packages/fcl-passrc/src/pastree.pp of Free Pascal 3.2.2 (tag release_3_2_2), applied by get.sh.
+Licence of this patch: that of the patched file, the LGPL with the static linking exception of Free Pascal (COPYING.FPC
+in the FPC sources); see README.md.
+
+1. The management operators of a record (class operator Initialize, Finalize, AddRef, Copy) are operator types.
+2. TPasOperator.NameSuffix: an operator may have a procedure type (a management operator has no result).
+3. TPasOperator.CorrectName keeps the type of an operator implementation (class operator TMyRecord.Implicit).
+
+--- a/packages/fcl-passrc/src/pastree.pp
++++ b/packages/fcl-passrc/src/pastree.pp
+@@ -1158,7 +1158,8 @@
+     otBitwiseAnd, otbitwiseXor,
+     otLogicalAnd, otLogicalNot, otLogicalXor,
+     otRightShift,
+-    otEnumerator, otIn
++    otEnumerator, otIn,
++    otInitialize, otFinalize, otAddRef, otCopy
+     );
+   TOperatorTypes = set of TOperatorType;
+ 
+@@ -1740,13 +1741,13 @@
+            '>',':=','<>','<=','>=','**',
+            '><','Inc','Dec','mod','-','+','Or','div',
+            'shl','or','and','xor','and','not','xor',
+-           'shr','enumerator','in');
++           'shr','enumerator','in','Initialize','Finalize','AddRef','Copy');
+   OperatorNames : Array[TOperatorType] of string
+        =  ('','implicit','explicit','multiply','add','subtract','divide','lessthan','equal',
+            'greaterthan','assign','notequal','lessthanorequal','greaterthanorequal','power',
+            'symmetricaldifference','inc','dec','modulus','negative','positive','bitwiseor','intdivide',
+            'leftshift','logicalor','bitwiseand','bitwisexor','logicaland','logicalnot','logicalxor',
+-           'rightshift','enumerator','in');
++           'rightshift','enumerator','in','initialize','finalize','addref','copy');
+ 
+   AssignKindNames : Array[TAssignKind] of string = (':=','+=','-=','*=','/=' );
+ 
+@@ -2747,7 +2748,7 @@
+     Result:=Result+TPasArgument(ProcType.Args[i]).ArgType.Name;
+     end;
+   Result:=Result+')';
+-  if Assigned(TPasFunctionType(ProcType)) and
++  if (ProcType is TPasFunctionType) and
+      Assigned(TPasFunctionType(ProcType).ResultEl) and
+      Assigned(TPasFunctionType(ProcType).ResultEl.ResultType) then
+     Result:=Result+':'+TPasFunctionType(ProcType).ResultEl.ResultType.Name;
+@@ -2755,8 +2756,13 @@
+ 
+ procedure TPasOperator.CorrectName;
+ 
++var
++  DotPos: Integer;
++
+ begin
+-  Name:=OperatorNames[OperatorType]+NameSuffix;
++  // keep the type of an implementation (class operator TMyRecord.Implicit)
++  DotPos:=Pos('.',Name);
++  Name:=Copy(Name,1,DotPos)+OperatorNames[OperatorType]+NameSuffix;
+ end;
+ 
+ function TPasOperator.OldName(WithPath : Boolean): String;
