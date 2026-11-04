@@ -37,7 +37,8 @@ IMPLEMENTS = {"tinterfacedobject": "IUnknown", "tagregatedobject": "IUnknown"}
 IUNKNOWN = {"queryinterface", "_addref", "_release"}
 
 # Routines the typed bpvet declares as compiler magic.
-MAGIC = {"write", "writeln", "read", "readln", "halt", "randomize", "initialize", "finalize", "finalizearray"}
+MAGIC = {"write", "writeln", "read", "readln", "halt", "randomize", "initialize", "finalize", "finalizearray",
+         "setstring"}
 
 # String flavours other than AnsiString: an overload that needs one is left out when another overload of the same
 # routine does without, since the relaxed checks of the typed bpvet cannot choose between string flavours.
@@ -275,12 +276,13 @@ class Gen:
                 self.need_ref(u, p.get("VarType"))
 
     def members(self, u, d):
-        """The members of a class written in the stub: those named in the sources, and the accessors they need."""
+        """The members of a class written in the stub: those named in the sources, the default property (L[I] does not
+        name it), and the accessors they need."""
         fields = d.get("Fields", [])
         keep = []
         keepsym, keepid = set(), set()
         for m in fields:
-            if m.get("Type") == "prop" and m["Name"].lower() in self.idents:
+            if m.get("Type") == "prop" and (m["Name"].lower() in self.idents or "default" in m.get("Options", [])):
                 for acc in (m.get("Getter"), m.get("Setter")):
                     if acc:
                         keepsym.add(acc.get("SymId"))
@@ -292,6 +294,7 @@ class Gen:
             if t == "proc" and "operator" in m.get("Options", []):
                 continue
             if (m["Name"].lower() in self.idents or m.get("SymId") in keepsym and t in ("field", "var")
+                    or t == "prop" and "default" in m.get("Options", [])
                     or m.get("Id") in keepid and t == "proc"
                     or m["Name"].lower() in ("create", "destroy")
                     or m["Name"].lower() in IUNKNOWN and t == "proc"):
@@ -756,7 +759,7 @@ def main():
     g.run(rtl)
     os.makedirs(out, exist_ok=True)
     written = []
-    for name in sorted(g.want):
+    for name in sorted(set(g.want) | set(rtl)):  # a used unit is written even when none of its symbols is used
         u = units.get(name)
         if u is not None and name != "objpas":
             g.write_unit(u, out)

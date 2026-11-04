@@ -12,11 +12,9 @@ uses
 type
   TListBox = specialize TOwned<TStringList>;
 
-function Count(Box: TListBox): Integer;
-
 implementation
 
-function Count(const Box: TListBox): Integer;
+function Count(Box: TListBox): Integer;
 begin
   Result := Box.Get.Count;
 end;

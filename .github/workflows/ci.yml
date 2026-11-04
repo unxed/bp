@@ -16,13 +16,14 @@ jobs:
         run: python3 tools/text-policy.py
 
   # bpvet (tools/bpvet, SPEC §6): the linter for the rules the compiler cannot check. Its lint tests, and --strict over
-  # its own sources, safe/, ext/ and tests/ (a finding, or a file it cannot parse, fails the job).
+  # its own sources, safe/, ext/ and tests/ (a finding, or a file it cannot parse, fails the job). The typed mode
+  # (SPEC §20) resolves every module with the units it uses; ppudump (fp-utils) reads the RTL for its stubs.
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install Free Pascal
-        run: sudo apt-get update && sudo apt-get install -y fp-compiler fp-units-fcl
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler fp-units-fcl fp-utils
       - name: Build bpvet
         run: bash tools/bpvet/build.sh out/bpvet
       - name: Lint tests (tests/lint)
@@ -33,6 +34,8 @@ jobs:
         run: out/bpvet --strict -Fusafe -Fuext tests/safe tests/ext
       - name: bpvet --strict over safe/ and ext/
         run: out/bpvet --strict safe ext
+      - name: Typed mode over bp.pas, safe/, ext/ and tests/ (tests/typed.sh)
+        run: bash tests/typed.sh out/bpvet
 
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
   # the "binary is static, no libc" check, and runs on different distributions.

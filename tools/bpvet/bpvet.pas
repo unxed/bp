@@ -1,12 +1,17 @@
 { SPDX-License-Identifier: MIT }
 { bpvet: the linter of Better Pascal for the rules that the compiler cannot check (safe/SPEC.md §6).
-  Built by tools/bpvet/build.sh (FPC with fcl-passrc); it reads the sources only, no other unit is needed.
+  Built by tools/bpvet/build.sh (FPC with fcl-passrc); it reads the sources only, no other unit is needed (the typed
+  mode reads the RTL from declaration stubs).
 
-  usage: bpvet [--report|--strict] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...
+  usage: bpvet [--report|--strict] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...
     a directory is walked for *.pas, *.pp, *.lpr (include files are read through the modules that include them);
     -dNAME defines a symbol for conditional compilation, -FiDIR adds an include directory (as for fpc);
     -FuDIR adds a directory where rule S5 looks for the files of used units (their classes);
-    the target for conditional compilation is linux, x86_64.
+    the target for conditional compilation is linux, x86_64;
+    --typed resolves every file with the units it uses (bpvettyped.pas): the used units are looked up in the
+    --rtl directory (declaration stubs of the RTL, tools/bpvet/resolver/genstubs.py), the -Fu and -Fi directories
+    and the directory of the file; a file that does not resolve is reported as Fatal; -FaUNIT: a unit every file
+    uses without naming it (as for fpc);
   Messages are those of FPC, one line each, so that an IDE and a model read them as compiler messages:
     FILE(LINE,COL) Error: SAFE-Sxx <what is wrong>; <how to fix it>
   Modes (the migration modes of §6):
@@ -23,7 +28,7 @@ program bpvet;
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, Safe;
+  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, Safe;
 
 type
   TListBox = specialize TOwned<TStringList>;
@@ -31,7 +36,7 @@ type
 
 procedure Usage;
 begin
-  WriteLn('usage: bpvet [--report|--strict] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...');
+  WriteLn('usage: bpvet [--report|--strict] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...');
   WriteLn('  default: errors fail; --report: everything is a warning, exit code 0; --strict: warnings are errors');
 end;
 
@@ -78,24 +83,34 @@ end;
 
 var
   Mode: TVetMode = vmDefault;
-  Defines, IncludeDirs: TNames;
+  Defines, IncludeDirs, Implicit: TNames;
   Files: TListBox;
   Report: TVetReport;
   Src: TVetSource;
   Module: TPasModule;
-  A, Err: String;
+  A, Err, RtlDir: String;
+  Typed: Boolean = False;
   I, Errors, Warnings, Fatals: Integer;
 begin
   Files := TListBox.Own(TStringList.Create);
   Files.Get.Sorted := True;
   Files.Get.Duplicates := dupIgnore;
-  for I := 1 to ParamCount do
+  I := 1;
+  while I <= ParamCount do
   begin
     A := ParamStr(I);
+    Inc(I);
     if A = '--report' then
       Mode := vmReport
     else if A = '--strict' then
       Mode := vmStrict
+    else if A = '--typed' then
+      Typed := True
+    else if (A = '--rtl') and (I <= ParamCount) then
+    begin
+      RtlDir := ParamStr(I);
+      Inc(I);
+    end
     else if (A = '-h') or (A = '--help') then
     begin
       Usage;
@@ -103,6 +118,8 @@ begin
     end
     else if Copy(A, 1, 2) = '-d' then
       AddTo(Defines, Copy(A, 3, Length(A)))
+    else if Copy(A, 1, 3) = '-Fa' then
+      AddTo(Implicit, Copy(A, 4, Length(A)))
     else if Copy(A, 1, 3) = '-Fi' then
       AddTo(IncludeDirs, Copy(A, 4, Length(A)))
     else if Copy(A, 1, 3) = '-Fu' then
@@ -119,7 +136,7 @@ begin
     else
       AddFiles(A, Files.Get);
   end;
-  if Files.Get.Count = 0 then
+  if (Files.Get.Count = 0) or (Typed and (RtlDir = '')) then
   begin
     Usage;
     Halt(2);
@@ -137,6 +154,8 @@ begin
       Continue;
     VetRunRules(Src, Module, Report);
     Module.Release;
+    if Typed then
+      VetResolve(Files.Get[I], RtlDir, Defines, IncludeDirs, VetUnitDirs, Implicit, Report);
   end;
 
   Errors := 0;

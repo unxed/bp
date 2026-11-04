@@ -1,6 +1,6 @@
 // EXPECT: clean
 // UNSAFE-UNIT: fixture for S14 external-call write analysis
-{ S14: writes through assignment targets, calls, address-taking, loops, with, and nested routines count; exceptions are skipped. }
+{ S14: writes through assignment targets, calls, address-taking, with, and nested routines count; exceptions are skipped. }
 unit s14_var_ok;
 
 {$mode objfpc}{$H+}
@@ -30,15 +30,18 @@ procedure AssignIndex(var A: array of Integer);
 procedure AssignDeref(var P: PInt);
 procedure ThroughCall(var N: Integer);
 procedure ThroughAddress(var N: Integer);
-procedure ThroughFor(var N: Integer);
 procedure ThroughWith(var P: TPoint);
 procedure ThroughNested(var N: Integer);
 procedure ThroughUnsafe(var N: Integer);
 procedure Raw(var Buffer);
-// Declaration only: S14 skips routines without a body.
+// A declaration: S14 checks the body, which writes N.
 procedure DeclarationOnlyInput(var N: Integer);
 
 implementation
+
+procedure Keep(const P: Pointer);
+begin
+end;
 
 procedure AssignValue(var N: Integer);
 begin
@@ -74,13 +77,7 @@ end;
 procedure ThroughAddress(var N: Integer);
 begin
   // UNSAFE: address-taking is deliberately treated as a write by S14.
-  @N;
-end;
-
-procedure ThroughFor(var N: Integer);
-begin
-  for N := 1 to 2 do
-    ;
+  Keep(@N);
 end;
 
 procedure ThroughWith(var P: TPoint);
@@ -111,6 +108,11 @@ end;
 
 procedure Raw(var Buffer);
 begin
+end;
+
+procedure DeclarationOnlyInput(var N: Integer);
+begin
+  N := 0;
 end;
 
 end.
