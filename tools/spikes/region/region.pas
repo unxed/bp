@@ -31,6 +31,50 @@ type
     class operator Copy(constref Src: TRegion; var Dst: TRegion);
   end;
 
+  { for R in Scope do begin ... end: a region for one block (SPEC §20, concept v2). The region is created by the first
+    MoveNext (FPC copies the enumerator before it) and released by the second; Exit and exceptions release it when the
+    routine finalizes the loop; S17 forbids Break out of it. R is the depth of the regions of the goroutine. }
+  TScope = record
+  private
+    D: Pointer;
+    N: Integer;
+  public
+    function MoveNext: Boolean;
+    function GetCurrent: Integer;
+    property Current: Integer read GetCurrent;
+    class operator Initialize(var S: TScope);
+    class operator Finalize(var S: TScope);
+    class operator Copy(constref Src: TScope; var Dst: TScope);
+  end;
+
+  TScopes = record
+    function GetEnumerator: TScope;
+  end;
+
+function Scope: TScopes;
+
+type
+  { for Line in Each(Lines) do ...: a region per iteration (as for scopes in Goose): each MoveNext resets it. }
+  TEachString = record
+  private
+    D: Pointer;
+    Items: array of String;
+    I: SizeInt;
+    function GetCurrent: String;
+  public
+    function MoveNext: Boolean;
+    property Current: String read GetCurrent;
+    function GetEnumerator: TEachString;
+    class operator Initialize(var S: TEachString);
+    class operator Finalize(var S: TEachString);
+    class operator Copy(constref Src: TEachString; var Dst: TEachString);
+  end;
+
+function Each(const Lines: array of String): TEachString;
+{ For the tests: the bytes taken by the blocks of the current region. }
+function CurrentRegionUsed: SizeUInt;
+
+type
   { A class whose objects live in the current region. }
   TRegionObject = class
   public
@@ -48,6 +92,35 @@ type
       Len: SizeInt;
       Chunks: array[0..47] of PT;
     end;
+  public type
+    { for P in A: a pointer to each element in place; the bounds are checked once per chunk }
+    TEnum = record
+    private
+      Cur, Stop: PT;
+      Data: PData;
+      Chunk: Integer;
+      Left: SizeInt;
+      function NextChunk: Boolean;
+    public
+      function MoveNext: Boolean; inline;
+      property Current: PT read Cur;
+    end;
+    { for C in A.Chunks: the elements a chunk at a time, C.Data[0..C.Count-1] (a plain array loop inside) }
+    TChunk = record
+      Data: PT;
+      Count: SizeInt;
+    end;
+    TChunkEnum = record
+    private
+      Cur: TChunk;
+      Data: PData;
+      Chunk: Integer;
+      Left: SizeInt;
+    public
+      function MoveNext: Boolean;
+      property Current: TChunk read Cur;
+      function GetEnumerator: TChunkEnum;
+    end;
   private
     P: PData;
     function GetItem(I: SizeInt): T;
@@ -58,6 +131,8 @@ type
     function Len: SizeInt; inline;
     function At(I: SizeInt): PT; inline;
     property Items[I: SizeInt]: T read GetItem write SetItem; default;
+    function GetEnumerator: TEnum;
+    function Chunks: TChunkEnum;
   end;
 
 { For the tests: counters of the management operators of TRegion and of released regions. }
@@ -230,6 +305,145 @@ begin
   Inc(RegionReleases);
 end;
 
+procedure ScopeRelease(var S: TScope);
+var
+  R: TRegion;
+begin
+  R.D := S.D;
+  S.D := nil;
+  R.Release;
+end;
+
+function TScope.MoveNext: Boolean;
+var
+  R: TRegion;
+begin
+  Inc(N);
+  if N = 1 then
+  begin
+    R := TRegion.Create;
+    D := R.D;
+    R.D := nil;
+    Exit(True);
+  end;
+  if D <> nil then
+    ScopeRelease(Self);
+  Result := False;
+end;
+
+function TScope.GetCurrent: Integer;
+begin
+  Result := CurrentRegionDepth;
+end;
+
+class operator TScope.Initialize(var S: TScope);
+begin
+  S.D := nil;
+  S.N := 0;
+end;
+
+class operator TScope.Finalize(var S: TScope);
+begin
+  if S.D <> nil then
+    ScopeRelease(S);
+end;
+
+class operator TScope.Copy(constref Src: TScope; var Dst: TScope);
+begin
+  if Src.D <> nil then
+    raise ERegion.Create('SAFE: a TScope is copied after its region was created');
+  Dst.N := Src.N;
+end;
+
+function TScopes.GetEnumerator: TScope;
+begin
+  Result.N := 0;
+end;
+
+function Scope: TScopes;
+begin
+end;
+
+function CurrentRegionUsed: SizeUInt;
+var
+  R: TRegion;
+begin
+  R.D := Current;
+  Result := R.Used;
+  R.D := nil;
+end;
+
+function Each(const Lines: array of String): TEachString;
+var
+  K: SizeInt;
+begin
+  SetLength(Result.Items, Length(Lines));
+  for K := 0 to High(Lines) do
+    Result.Items[K] := Lines[K];
+  Result.I := -1;
+end;
+
+function TEachString.GetEnumerator: TEachString;
+begin
+  Result := Self;
+end;
+
+function TEachString.GetCurrent: String;
+begin
+  Result := Items[I];
+end;
+
+function TEachString.MoveNext: Boolean;
+var
+  R: TRegion;
+begin
+  Inc(I);
+  if D = nil then
+  begin
+    R := TRegion.Create;
+    D := R.D;
+  end
+  else
+  begin
+    R.D := D;
+    R.Reset;  // the region of the iteration before
+  end;
+  R.D := nil;
+  Result := I <= High(Items);
+  if not Result then
+  begin
+    R.D := D;
+    D := nil;
+    R.Release;
+  end;
+end;
+
+class operator TEachString.Initialize(var S: TEachString);
+begin
+  S.D := nil;
+  S.I := -1;
+end;
+
+class operator TEachString.Finalize(var S: TEachString);
+var
+  R: TRegion;
+begin
+  if S.D <> nil then
+  begin
+    R.D := S.D;
+    S.D := nil;
+    R.Release;
+  end;
+end;
+
+class operator TEachString.Copy(constref Src: TEachString; var Dst: TEachString);
+begin
+  if Src.D <> nil then
+    raise ERegion.Create('SAFE: a TEachString is copied after its region was created');
+  Dst.Items := Src.Items;
+  Dst.I := Src.I;
+end;
+
 function TRegion.Used: SizeUInt;
 var
   B: PBlock;
@@ -337,6 +551,62 @@ begin
   end;
   Inc(P^.Len);
   At(Result)^ := V;
+end;
+
+function TGrowArray.GetEnumerator: TEnum;
+begin
+  Result.Cur := nil;
+  Result.Stop := nil;
+  Result.Data := P;
+  Result.Chunk := 0;
+  Result.Left := P^.Len;
+end;
+
+function TGrowArray.TEnum.MoveNext: Boolean;
+begin
+  Inc(Cur);
+  Result := (Cur < Stop) or NextChunk;
+end;
+
+function TGrowArray.TEnum.NextChunk: Boolean;
+var
+  N: SizeInt;
+begin
+  if Left <= 0 then
+    Exit(False);
+  N := SizeInt(1) shl (Chunk + ChunkLog2);
+  if N > Left then
+    N := Left;
+  Cur := Data^.Chunks[Chunk];
+  Stop := Cur + N;
+  Dec(Left, N);
+  Inc(Chunk);
+  Result := True;
+end;
+
+function TGrowArray.Chunks: TChunkEnum;
+begin
+  Result.Data := P;
+  Result.Chunk := 0;
+  Result.Left := P^.Len;
+end;
+
+function TGrowArray.TChunkEnum.GetEnumerator: TChunkEnum;
+begin
+  Result := Self;
+end;
+
+function TGrowArray.TChunkEnum.MoveNext: Boolean;
+begin
+  if Left <= 0 then
+    Exit(False);
+  Cur.Count := SizeInt(1) shl (Chunk + ChunkLog2);
+  if Cur.Count > Left then
+    Cur.Count := Left;
+  Cur.Data := Data^.Chunks[Chunk];
+  Dec(Left, Cur.Count);
+  Inc(Chunk);
+  Result := True;
 end;
 
 function TGrowArray.GetItem(I: SizeInt): T;
