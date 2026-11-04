@@ -1,0 +1,18 @@
+A change of packages/fcl-passrc/src/pparser.pp of Free Pascal 3.2.2 (tag release_3_2_2), applied by get.sh.
+Licence of this patch: that of the patched file, the LGPL with the static linking exception of Free Pascal (COPYING.FPC
+in the FPC sources); see README.md.
+
+1. TPasParser.ParseSimpleType: String[N] (a short string) is a type in any place, a variable or a field too, also when
+   the resolver is used (po_ResolveStandardTypes); 3.2.2 accepts it there only without the resolver.
+
+--- a/packages/fcl-passrc/src/pparser.pp
++++ b/packages/fcl-passrc/src/pparser.pp
+@@ -1585,7 +1585,7 @@
+       K:=stkAlias;
+       UnGetToken;
+       end
+-    else if IsFull and (CurToken=tkSquaredBraceOpen) then
++    else if (IsFull or (LowerCase(Name)='string')) and (CurToken=tkSquaredBraceOpen) then
+       begin
+       if LowerCase(Name)='string' then // Type A = String[12]; shortstring
+         K:=stkString

@@ -5,6 +5,7 @@
 unit s04_proc_ok;
 
 {$mode objfpc}{$H+}
+{$modeswitch nestedprocvars}
 
 interface
 
@@ -20,6 +21,7 @@ type
 
   TCallback = procedure;
   TMethodCallback = procedure of object;
+  TNestedCallback = procedure is nested;
 
 procedure Tick;
 procedure Twice; overload;
@@ -53,6 +55,11 @@ begin
   M();
 end;
 
+procedure CallNested(const P: TNestedCallback);
+begin
+  P();
+end;
+
 procedure RunAll(const C: TCounter);
 
   procedure Local;
@@ -62,7 +69,8 @@ procedure RunAll(const C: TCounter);
 
 begin
   Call(@Tick, @C.Hit);
-  Call(@Local, @ C . Hit);
+  CallNested(@Local);
+  Call(@Tick, @ C . Hit);
   Call(@Twice, @C.Hit);
 end;
 

@@ -49,6 +49,8 @@ function VetParse(const Src: TVetSource; const Defines, IncludeDirs: array of St
 function VetLine(const Src: TVetSource; const ARow: Integer): String;
 { The 1-based column of the identifier Word in Line (a whole word, any letter case); 1 when it is not there. }
 function VetWordColumn(const Line, Word: String): Integer;
+{ A file resolver that reads the sources as VetParse does (with "nostackframe;" blanked); the caller owns it. }
+function VetNewFileResolver: TFileResolver;
 { Prints the findings in the given mode and counts them by the severity they were printed with. }
 procedure VetPrint(const Report: TVetReport; const Mode: TVetMode; var Errors, Warnings, Fatals: Integer);
 
@@ -256,6 +258,12 @@ begin
     except
       Result := nil;
     end;
+end;
+
+function VetNewFileResolver: TFileResolver;
+begin
+  // UNSAFE: the caller owns the result
+  Result := TVetFileResolver.Create;
 end;
 
 function VetWordColumn(const Line, Word: String): Integer;

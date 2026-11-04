@@ -1075,6 +1075,28 @@ Verdict: **it works, with three conditions.**
 - **Found on the way:** `for V in Ch` over a channel uses a record enumerator, which the resolver of 3.2.2 rejects
   ("expected result class"); this needs a second small fix or a class enumerator.
 
+### The typed `bpvet` (step 6 of #108, 2026-11-04)
+
+`bpvet --typed --rtl DIR` resolves every checked file with the units it uses (`tools/bpvet/bpvettyped.pas`); a file that
+does not resolve is a Fatal with the position. The conditions of Spike 1 are met as follows.
+
+- **The resolver is patched at build time.** The owner's decision: the repository keeps only the patches
+  (`tools/bpvet/resolver/*.patch`, under the licence of `fcl-passrc`); `resolver/get.sh` takes `pasresolver.pp`,
+  `pparser.pp` and `fcl-passrc.inc` of FPC 3.2.2 (from the installed FPC sources, else from the release tag), checks their
+  SHA-256 and applies the patches; `build.sh` builds `bpvet` with the result. Three changes: the bare name of a generic in
+  its own method, a record enumerator, and `String[N]` in a variable or a field (3.2.2 parses it only in a type
+  declaration when the resolver is on). FPC main already has all three, so no ticket is needed; the patches go when
+  `bpvet` moves to the next FPC release.
+- **The stubs are generated.** `resolver/genstubs.py OUT SRC...` writes the RTL stubs from `ppudump -Fj` of the installed
+  units (fp-utils): only the closure of what the sources name, so one run for the checked tree gives 13 units and a few
+  hundred symbols. The used units are found in the stub directory first, then in `-Fu`, `-Fi` and the directory of the
+  file; `-FaUNIT` adds an implicit unit, as for `fpc`.
+- **The resolver only resolves**, as in Spike 1 (permissive casts, compiler magic with any arguments).
+- **CI** (`tests/typed.sh`, job `lint`): every module of `bp.pas`, `safe/`, `ext/` and `tests/` resolves; the only files that
+  do not are the seven compile tests that must fail. The output of the rules is unchanged (`tests/lint.sh`). On the way
+  the typed mode found three lint tests that FPC itself rejects (a nested procedure passed as a plain procedure, a
+  `var` parameter as a loop counter, a declaration with a different parameter mode); they were made valid Pascal.
+
 ### Spike 3 result: GC roots from the stack of the goroutine (2026-11-04, FPC 3.2.2)
 
 A prototype collector (`tools/spikes/gcroots/`, run by CI on x86_64, aarch64 and i386 at -O1 and -O2): a heap per thread
