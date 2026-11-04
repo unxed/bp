@@ -285,7 +285,7 @@ var
     It is not freed: the process ends after the last check, and the teardown of the trees and the data of
     fcl-passrc with many units read crashes in ClearResolveDataList (a record of the data list is already reused);
     skipping it also saves the walk over every tree at exit. }
-  // UNSAFE: lives until the process ends, freed by the OS
+  // borrow: the process owns it until it ends; the OS frees it
   Shared: TVetSession = nil;
 
 function VetSession(const RtlDir: String; const Defines, IncludeDirs, UnitDirs: array of String): TVetSession;
