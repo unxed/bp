@@ -5,6 +5,18 @@
 > unsafe code is built only where it is declared (`// UNSAFE:`, `// borrow:`, `// root:`). The guarantees of Better
 > Pascal are the guarantees of `bp build`; a cached check takes about 30 ms.
 
+**How it compares** (built with `bp build`; measured 2026-11-04, details in unxed/bp#108 and `safe/SPEC.md` §20):
+
+| | Rust | Go | Goose | Zig | Mojo |
+|---|---|---|---|---|---|
+| Memory safety | close: ownership, regions and borrows checked before every build | on par, and without a collector: memory is freed deterministically (regions, owners) | on par | better: Zig does not check a use after free at compile time | close |
+| Convenience | better: no marks inside a unit, `bpvet --fix` writes them on the interface | close; the GC style is as simple | on par: regions per block and per iteration (`for R in Scope`) | better: the allocator is implicit (the current region) | close |
+| Build speed | much better: ~30 ms check + `fpc` | on par | unknown | on par or better | likely better |
+| Array iteration | on par (`for C in A.Chunks` is as fast as a plain array) | on par | on par | on par | on par |
+| Ecosystem | comparable: every FPC package and Lazarus can be used as is, as unchecked units (like C libraries in Rust or Zig), and moved to the bp dialect step by step | comparable | larger | larger | larger |
+
+The Lazarus LCL is not yet tested with `bp build`.
+
 Free Pascal as one would want it by default: safe memory, UTF-8 everywhere, goroutines.
 No FPC fork and no compiler options: a single unit `BP` gives all of it.
 
