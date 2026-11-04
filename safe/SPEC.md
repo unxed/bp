@@ -47,7 +47,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | CI: "no INTERP/NEEDED" check, Alpine/Debian/Ubuntu 16.04/CentOS 7 in containers, i386 and aarch64 under qemu | **implemented** (`.github/workflows/ci.yml`) | §18 |
 | Support for `object` (Turbo Pascal) | **plan** | §19 |
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
-| Region style (an idea from Goose): `TRegion`, `TGrowArray<T>`, `TRef<T>`, zero cost in a release build | **design (plan)** | §20 |
+| Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **design (plan)** | §20 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGc<T>`, a heap per goroutine, reference counting + a cycle collector | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
 
@@ -75,9 +75,10 @@ DATA AND LIFETIME                      (chosen by data structure, not by project
   4. Many objects with the same fate  → TArena: A := TArena.Create; X := A.Adopt(TFoo.Create) as TFoo
   5. COM interfaces (TInterfacedObject) — a ready-made Shared; hold the object ONLY through the interface.
   PLAN (§20, not implemented yet; do not write it until §0 status says so):
-  6. Flat data of one step (a request, a frame, a pass) → TRegion + TGrowArray<T>/TRef<T>: freed at once, zero cost
+  6. Data of one step (a request, a frame, a pass)   → TRegion; N := TNode.Create (TNode = class(TRegionObject)),
+     TGrowArray<T>: freed at once, zero cost
   7. A graph with cycles where no owner is natural      → TGc<TFoo>: collected, a heap per goroutine
-  Styles mix in one program. Between styles only values are copied; TRef, borrows and TGc never cross
+  Styles mix in one program. Between styles only values are copied; region objects, borrows and TGc never cross
   into another style, a task field, a channel or a global (S18).
 
 REFERENCES
@@ -245,7 +246,7 @@ The price is one atomic increment on creation and on `Move`. That is cheap.
 | back reference, cache, subscriber | `TWeak<T>` | does not own; `TryLock` fails safely if the object is gone |
 | tree/graph/AST/parse results | `TArena` | all at once: `FreeAll` or the arena leaving its scope |
 | an OS resource | a wrapper class with a destructor + `TOwned` | RAII: the destructor closes the handle |
-| flat data of one step: buffers, parse tables, intermediate arrays (plan, §20) | `TRegion` + `TGrowArray<T>`/`TRef<T>` | all at once when the region leaves its scope: one store |
+| data of one step: buffers, parse tables, intermediate objects (plan, §20) | `TRegion` + `TRegionObject` classes + `TGrowArray<T>` | all at once when the region leaves its scope: one store (+ finalizers only for types with strings) |
 | a graph with cycles, no natural owner (plan, §20) | `TGc<T>` | acyclic garbage at once (counter), cycles by the collector of the goroutine |
 
 Inside an arena objects refer to each other with raw references marked `// borrow: arena`.
@@ -408,7 +409,7 @@ System.GetMem(Buf, Len);
 | Exhaustive `case`, `const` parameters | `bpvet` S13; S14 errors on copy-heavy by-value parameters and warns on other by-value parameters not changed by the body and unused `var` parameters | H11 |
 | Range and overflow checks are not switched off in safe code | programmer | H12 |
 | Turbo Pascal style `object` code | not covered (§19) | H13 |
-| A `TRef`/`TGrowArray` element does not outlive its region | plan: `bpvet` S17 (static, zero cost); `SAFE_DEBUG` region epoch R12 as a second net | §20 |
+| A region object or a `TGrowArray` element does not outlive its region | plan: `bpvet` S17 (static, zero cost); `SAFE_DEBUG` R12 (released pages lose access) as a second net | §20 |
 | A `TGc` object is never freed while reachable; cycles are collected | plan: `TGc` runtime + `bpvet` S18 (a `TGc` stays in its goroutine) | §20 |
 
 We do not claim this is Rust. We claim: in safe code there is no **syntactic**
@@ -958,7 +959,7 @@ or above the parameter suppresses its S14 finding.
 | v0.5.1 | §2 aligned with v0.5: a matrix of verified targets on v0.5 code (i386 and aarch64 without libc pass all tests without switches); `test_threads` is skipped on DOS |
 | v0.5.2 | §0 "What actually exists and what is only a plan so far"; §19 (Turbo Pascal style code) |
 | v0.6 | Better Pascal: the safe layer (`safe/`, `unit Safe`) and the ext layer (`ext/`: UTF-8, goroutines, `BPThreads`); `unit BP` gives both |
-| v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the GC style `TGc<T>` (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
+| v0.6.1 (design) | §20 memory styles: several safe styles in one program, the region style from Goose with the root analysis S17, the current region (the Goose scope made implicit), the GC style `TGc<T>` (a heap per goroutine), style boundaries S18 and `// BP-STYLES:`; §18: the GC decision reconsidered |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1007,16 +1008,16 @@ style, flat data uses the region style, and the two meet only through copied val
 | values | `record`, `String`, `TArray<T>` | as in FPC | automatically | the compiler |
 | owner | `TOwned`, `TShared`, `TWeak` | one atomic counter | owner leaves its scope / last reference | runtime construction + `bpvet` S5, S10, S15 |
 | arena | `TArena`, `TArenaRef` | a list of objects | `FreeAll` / scope exit | runtime (R10) + `bpvet` S17 (plan) |
-| region (from Goose) | `TRegion`, `TGrowArray<T>`, `TRef<T>` | **zero** in a release build: a bump pointer, release is one store | the region leaves its scope | `bpvet` S17 (static); `SAFE_DEBUG` R12 as a second net |
+| region (from Goose) | `TRegion`, `TRegionObject`, `TGrowArray<T>` | **zero** in a release build: a bump pointer, release is one store (+ finalizers only for types with managed fields) | the region leaves its scope | `bpvet` S17 (static); `SAFE_DEBUG` R12 as a second net |
 | GC | `TGc<T>` | a non-atomic counter + a collector pass per goroutine | acyclic garbage at once, cycles by the collector | runtime construction + `bpvet` S18 |
 
 **The decision tree** (the same as §0, the first that fits wins): a value → values; one owner → `TOwned`; several owners →
-`TShared` + `TWeak`; flat data that dies together at the end of a step (a request, a frame, a compiler pass) → region; class
+`TShared` + `TWeak`; data that dies together at the end of a step (a request, a frame, a compiler pass) → region; class
 objects with one fate → arena; a graph with cycles and no natural owner → GC. An LLM that does not know what to choose takes
 the earlier branch: a wrong early choice is a compile or lint error, never a memory error.
 
-**Style boundaries (S18).** Between styles only values are copied (`record`, `String`, `TArray<T>`, `Copy`). A `TRef`,
-an element of a `TGrowArray`, a borrow and a `TGc` never go into a place of another style (a field of a class owned by
+**Style boundaries (S18).** Between styles only values are copied (`record`, `String`, `TArray<T>`, `Copy`). A region
+object, an element of a `TGrowArray`, a borrow and a `TGc` never go into a place of another style (a field of a class owned by
 `TOwned`/`TShared`, a global, a task field, a channel message). The rule is the same as S11 for tasks and generalizes it.
 
 **`// BP-STYLES:` allow-list.** A program file may restrict the styles of the whole program, for example
@@ -1055,47 +1056,133 @@ exchange only flat values. This gives the speed of manual memory without lifetim
 What Better Pascal takes: the bump region freed at once, the growable array that never moves, the root rule, results built in
 the caller's region, flat messages between goroutines (already S11 and `TChan`). What it does not take: a new language and
 compiler, the C backend, the static computation of the number of data stacks (here every region reserves its own range of
-addresses), the ban on dynamic dispatch (classes stay, in other styles).
+addresses), the ban on dynamic dispatch (classes and virtual methods work in the region style too, below).
 
 API sketch (names may change in the spike steps of the plan):
 
 ```pascal
 TRegion = record                          // a reserved range of addresses + a bump pointer; a managed record
-  class function Create(AReserve: SizeUInt = 0): TRegion; static; // 0 = the default of the target (below)
+  class function Create(AReserve: SizeUInt = 0): TRegion; static; // 0 = the default of the target (below);
+                                          // the new region becomes the current one of the goroutine
+  procedure Reset;                        // rewind to empty and keep the memory: one region per loop iteration
   procedure Release;                      // everything allocated in it, at once; also when it leaves its scope
 end;
 
-generic TGrowArray<T> = record            // grow-only, never moves: an element reference stays valid while it grows
-  class function Create(var R: TRegion): TGrowArray; static;
-  function Push(const V: T): SizeInt;     // index of the new element
-  function Len: SizeInt;
-  property Items[I: SizeInt]: T; default; // bounds checked (R2) as TSlice
+TRegionObject = class                     // a class whose objects live in the current region
+  class function NewInstance: TObject; override;  // a bump in the current region instead of the heap
+  procedure FreeInstance; override;                // nothing: the region frees its objects at once
 end;
 
-generic TRef<T> = record                  // a rooted reference to a record in a region; release build: a bare address
-  class function New(var R: TRegion): TRef; static;
+generic TGrowArray<T> = record            // grow-only, never moves: an element stays where it is while the array grows
+  class function Create: TGrowArray; static;                // in the current region (below)
+  class function Create(var R: TRegion): TGrowArray; static; // in a region named explicitly
+  function Push(const V: T): SizeInt;     // index of the new element
+  function Len: SizeInt;
+  function At(I: SizeInt): PT;            // in-place access: A.At(I).X := 1 (needs {$modeswitch autoderef}, below)
+  property Items[I: SizeInt]: T; default; // read and write by value: A[I] := V; bounds checked (R2) as TSlice
 end;
 ```
 
-- **Flat records only (S17a).** A type placed in a region has no managed fields (`String`, dynamic arrays, interfaces,
-  `TOwned`...): releasing a region is one store and runs no finalizers. Text in a region is bytes in a `TGrowArray<Byte>`.
-  A later step may allow managed fields at the cost of a finalizer list for those types only.
-- **Access syntax: an open question for a spike.** A `TRef` must give read and write access to the fields of the record
-  without a copy and without a raw pointer in safe code. Candidates: a typed result of `Get` dereferenced as `R.Get^.X`
-  with an S4 exception only for `TRef`; `{$modeswitch autoderef}`; a property. The spike measures and picks one.
+**Objects in a region are ordinary classes.** A single value in a region is an object of a class that descends from
+`TRegionObject`: `N := TNode.Create` allocates it in the current region (the class overrides `NewInstance`), and `N.X`,
+methods, inheritance and virtual methods work as for any class. There is no reference wrapper, no `^`, no `.Get`: a class
+reference in Pascal already is an implicit reference with dot access, and the root analysis gives it a root. This also
+removes a limit of Goose: dynamic dispatch works in the region style. The price is the header of a class object (a VMT
+pointer, one machine word); bulk data without a header goes into a `TGrowArray` of records.
+
+- `TFoo.Create` of a region class is the allocation itself, so S6 does not ask for an owner; `Own/Share/Adopt` of a region
+  object raises `ESafety` R16 (one `is` check at `Own`, not at access), and `bpvet` reports it statically.
+- A region class has no destructor (S17a): the region never calls `Destroy`. What must be closed is held by `TOwned` +
+  `TDefer` in another style.
+
+**Elements of a `TGrowArray` in place.** `A.At(I)` returns a typed pointer, and with `{$modeswitch autoderef}` in the
+module the call reads like a field access: `A.At(I).X := 42`, `WriteLn(A.At(I).Name)`. The module of the user never writes
+`^`; the pointer type cannot be named there without `^`, so it cannot be stored (S4 still applies), and S17 roots the result
+in the array. The modeswitch is needed in each module that does in-place access (it is per module in FPC; verified on FPC
+3.2.2); `bpvet` suggests it when it is missing. Without it the array is used by value: `R := A[I]; ...; A[I] := R`. An array
+of region objects (`TGrowArray<TNode>`) needs no modeswitch: `A[I].X := 1` goes through the class reference.
+
+**Strings and other managed fields are allowed.** A region object or a record in a `TGrowArray` may hold `String`, dynamic
+arrays, interfaces, `TOwned`. At allocation the region checks, at compile time for a record (`IsManagedType`) and through the
+class RTTI for an object, whether the type has managed fields; only such allocations go into a finalizer list of the
+region, and `Release`/`Reset` finalizes them (`CleanupInstance` for an object, `FinalizeArray` for the used part of an array)
+before the one store that frees the memory. So:
+
+- flat data stays at zero cost: release is one store, as in Goose;
+- a type with strings pays exactly what its strings cost anyway (they live in the ordinary heap with a counter), plus one
+  list entry per object or per array, not per element;
+- a `String` read out of a region object is an ordinary counted copy (`S := N.Name`): it outlives the region safely, and the
+  root analysis has nothing to check for it; strings never need a root.
+
+For text that must not touch the heap at all, a later step may add a region string (bytes in the region + a length,
+compared and converted to `String` through operators); this is an optimisation, not a requirement of the style.
+
+The prototype of all three (a region class with `NewInstance`, `At(I).X` with `autoderef`, finalization of strings at
+release) was compiled and run on FPC 3.2.2 on 2026-11-04: objects are placed one after another in the region, and `heaptrc`
+reports 0 unfreed blocks after the release.
+
+**The current region (the Goose scope, made implicit).** In Goose a scope is a region and the compiler picks where a value
+goes; nobody passes a region around. Better Pascal gets close to that without a new syntax:
+
+- Every goroutine has a stack of regions (a threadvar). `TRegion.Create` pushes the region, leaving its scope or `Release`
+  pops it. Regions are strictly nested, as the scopes of Goose are; releasing a region that is not the innermost one raises
+  `ESafety` R14 (one comparison at `Release`, not at access).
+- `TFoo.Create` of a region class and `TGrowArray.Create` without an argument allocate in the **current** region: the
+  innermost one of the goroutine. With none, they raise `ESafety` R15; `bpvet` reports it statically where it can.
+- **A routine that declares no `TRegion` allocates in the region of its caller.** This is how a result is "built in the
+  caller's destination" in Goose: no region parameter, no copy.
+
+  ```pascal
+  type
+    TFields = class(TRegionObject)
+      Key, Value: String;
+    end;
+
+  function ParseLine(const S: String): TFields;  // no region here: the result lives in the caller's region
+  begin
+    Result := TFields.Create;
+    ...
+  end;
+
+  procedure ProcessFile(const Name: String);
+  var Scratch: TRegion; Fields: TFields; Line: String;
+  begin
+    Scratch := TRegion.Create;              // the scope of ProcessFile is now a region
+    for Line in ReadLines(Name) do
+    begin
+      Fields := ParseLine(Line);            // allocated in Scratch, rooted in Scratch
+      Emit(Fields.Key, Fields.Value);
+      Scratch.Reset;                        // one region per iteration, as `for` scopes in Goose
+    end;
+  end;                                      // Scratch is released here
+  ```
+
+- A routine that needs scratch memory of its own declares a `TRegion`; what it returns to the caller is then allocated
+  explicitly in the caller's region (`Create(var R)` with a region parameter, rule 4 below) or in a nested routine called
+  before the local region is created. FPC 3.2 has no block-scoped variables, so the scope of a region is a routine; a loop
+  uses `Reset` or a nested routine per iteration.
+- Cost: pushing and popping at `Create`/`Release`, one threadvar read per allocation (`BPThreads` finds threadvars by the
+  stack pointer); nothing at access.
+- The explicit form `Create(var R)` stays for the cases where the current region is not the right one; S17 treats both
+  forms alike.
+
 - **Reservation and graceful degradation.** On x86_64 and aarch64 a region reserves a large range (`mmap` with no access,
   committed as it grows; `VirtualAlloc` on Windows) and growth is a bump. On i386, DOS and other small address spaces the
   default reservation is small and fixed (given to `Create`); growing past it raises `ESafety` R11 rather than moving data.
   Programs keep working; only the limit differs.
 - **Goroutines.** A region belongs to one goroutine; S18 keeps its references there; data leaves through a channel by value.
 
-**Root analysis (S17), the core of the style.** The root of a `TRef`, of a `TGrowArray` and of a reference to one of its
-elements is the `TRegion` variable or parameter it was made from. The rules:
+**Root analysis (S17), the core of the style.** The root of a region object, of a `TGrowArray` and of the result of its
+`At` is the `TRegion` variable or parameter it was made in. An allocation in the current region is rooted in the
+innermost `TRegion` of the routine created before it; in a routine without one, in the caller's current region: such a
+value may be returned, and at the call site it is rooted in the caller's innermost region (so a call inside an inner region
+cannot be stored into a variable of an outer one). The rules:
 
 1. A rooted value is stored only where it lives no longer than its root: a local of the same or an inner scope, or a field
-   of a record that is itself in the same region.
-2. It is never stored into a global, a field of a class, a task field, a channel or another style (S18).
-3. `Release` of a region, or the end of its scope, while a value rooted in it is used later in the routine is an error.
+   of an object or a record that is itself in the same region.
+2. It is never stored into a global, a field of a class of another style, a task field, a channel or another style (S18).
+3. `Release` or `Reset` of a region, or the end of its scope, while a value rooted in it is used later in the routine is an
+   error.
 4. A routine that takes one region parameter and returns a rooted value roots the result in that parameter: the result is
    built in the caller's region. With several region parameters the routine names the root with `// root: <parameter>`
    on its header line. The signature is the contract; bodies of other routines are not read (modularity).
@@ -1104,8 +1191,9 @@ elements is the `TRegion` variable or parameter it was made from. The rules:
 The same engine also checks `// borrow: arena` references against their arena (H3 statically), and the borrow-escape part
 of S5 (H1) may move onto it: a borrow of `Owner.Get` is a value rooted in `Owner`.
 
-`SAFE_DEBUG` keeps a second net for errors of `bpvet` itself: a region has an epoch, a `TRef` keeps the epoch it was made
-in, and an access after `Release` raises `ESafety` R12. In a release build the epoch does not exist.
+`SAFE_DEBUG` keeps a second net for errors of `bpvet` itself, with no code at access: a released region is not reused, its
+pages lose all access (`mprotect`), so a use after `Release`/`Reset` stops with `EAccessViolation` at once (R12) instead of
+reading memory of another object. A release build reuses the memory.
 
 ### GC style
 
@@ -1138,8 +1226,11 @@ collected, and a `TGc` never leaves its goroutine.
 
 | Code | Meaning |
 |---|---|
-| S17 | root analysis of the region style: S17a flat region types, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena` |
+| S17 | root analysis of the region style: S17a no destructor in a region class, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena` |
 | S18 | style boundaries: rooted values and `TGc` stay in their style and goroutine; the `// BP-STYLES:` allow-list; a destructor in a `TGc` class |
 | R11 | a region or a `TGrowArray` grows past a fixed reservation (small address spaces) |
-| R12 | `SAFE_DEBUG`: access through a `TRef` after its region was released |
+| R12 | `SAFE_DEBUG`: access to a released region (its pages lose access: `EAccessViolation`) |
 | R13 | `SAFE_DEBUG`: a `TGc` used on another goroutine |
+| R14 | `Release` of a region that is not the innermost one of the goroutine (regions are nested) |
+| R15 | an allocation in the current region when the goroutine has no region |
+| R16 | `Own/Share/Adopt` of a region object (it belongs to its region) |
