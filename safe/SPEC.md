@@ -1165,6 +1165,18 @@ Verdict: **it works; one form was missing and is added to rule 4 (below).**
   destructor), S17d (`// borrow: arena`), allocation in an explicit region (`Create(var R)`, not in the spike). Lint tests:
   `tests/lint/s17_*.pas`.
 
+### S17 v2 (concept v2 of #108, 2026-11-04)
+
+- **`// root:` is inferred inside a module:** the names a routine keeps values of the caller's current region in (`Self`,
+  parameters, `^local` of the enclosing routine for a nested one) grow by a fixpoint over the bodies of the module, and
+  calls are checked with them. Only an exported routine writes its marks (a contract for other units); a missing one is
+  an error, and `bpvet --typed --fix` appends it to the header. The calculator (`tests/lint/s17_calc_ok.pas`) now passes
+  with **0 marks** (3 in the early S17).
+- **Holes closed:** a nested routine that keeps values of the current region in locals of its parent is not taken as a
+  procedure value (`s17_callback_bad`); a direct call sets the roots of those locals to the current region of the call; a
+  `var`/`out` argument that is not a local is a store of a value of the current region (`s17_varfield_bad`).
+- **A `TRegion` is a local of a routine:** a global, a threadvar or a field is an error (`s17_global_region_bad`).
+
 ### Spike 3 result: GC roots from the stack of the goroutine (2026-11-04, FPC 3.2.2)
 
 A prototype collector (`tools/spikes/gcroots/`, run by CI on x86_64, aarch64 and i386 at -O1 and -O2): a heap per thread
