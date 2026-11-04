@@ -1075,6 +1075,53 @@ Verdict: **it works, with three conditions.**
 - **Found on the way:** `for V in Ch` over a channel uses a record enumerator, which the resolver of 3.2.2 rejects
   ("expected result class"); this needs a second small fix or a class enumerator.
 
+### Spike 3 result: GC roots from the stack of the goroutine (2026-11-04, FPC 3.2.2)
+
+A prototype collector (`tools/spikes/gcroots/`, run by CI on x86_64, aarch64 and i386 at -O1 and -O2): a heap per thread
+(`TGcObject.NewInstance`), roots from a conservative scan of `[Sptr, SafeStackHigh)` after the callee-saved registers are
+written to the stack, edges from the field table of the VMT, mark and sweep. Verdict: **it works on all three targets.**
+
+- An object held only by a local survives, and so does an object held **only in one callee-saved register** (its other copy
+  is masked, so the scan cannot see it there); a masked-only object is collected. Built without the register spill, the
+  register check fails at -O1 (`r15` on x86_64): the spill is needed, and with it the scan is enough.
+- 500 cycles of 2 and a ring of 1000 are collected once unreferenced, in the main thread and in a goroutine; the edges are
+  read from the field table on all three targets (aarch64 aligns the entries).
+- `BPThreads.SafeStackHigh` gives the end of the stack of the current thread (the region of a thread; `argv` for the main
+  thread), so the range is exact.
+- **Found: garbage can live as long as a stale word.** On i386 at -O2 a ring dropped by `R := nil` stayed alive: an old
+  copy of its address was still in a slot of the same live frame. This is the known price of conservative roots: never a
+  live object freed, but an unreferenced one may wait until the frame that held it returns. So `GcCollect` frees "what no
+  live frame can still see", not "what the program no longer names"; a test or `SafeCheckNoLeaks` must drop references in
+  a routine that has returned. Open for the concept: whether this is acceptable as the documented rule of the GC style.
+
+### Spike 2 result: the region style (2026-11-04, FPC 3.2.2)
+
+A prototype (`tools/spikes/region/`, run by CI on x86_64, aarch64 and i386 at -O1 and -O2) of `TRegion`, `TRegionObject`
+and `TGrowArray<T>`. Verdict: **the surface of §20 works as designed**, and one part of the design can be simpler.
+
+- `R := TRegion.Create` with management operators (`Initialize`, `Finalize`, `Copy`): the region is released exactly once,
+  when its variable leaves its scope, and the result of `Create` is never copied (FPC builds it in place). A `Copy` operator
+  that raises catches an accidental second owner.
+- `N := TNode.Create` of a `TRegionObject` class: objects lie one after another (32 bytes apart for a small class),
+  `N.Next.X := 5` works through ordinary class references, `Free` releases nothing. Strings in objects and in array
+  elements are finalized at `Release` (a string held 102 times is back to 1), and the heap does not grow over the run.
+- `A.At(I).X := 42` with `{$modeswitch autoderef}` writes in place; `A[I]` reads by value; an array of region objects needs
+  no modeswitch (`A[I].X := 7`).
+- The current region: a routine without a `TRegion` allocates its result in the caller's region; regions nest; R14 and R15
+  are raised; `Reset` in a loop keeps the region small (peak 60 KiB over 100 rounds of 1000 objects); a goroutine starts
+  with no region and has a stack of its own.
+- **Simpler than planned: no reserved range of addresses.** The prototype needs no `mmap` reservation at all: a region is a
+  bump pointer in a list of blocks that double in size, and a `TGrowArray` keeps its elements in chunks of 16, 32, 64, ...
+  elements (the chunk of an index is its highest bit). Nothing ever moves, and growth is limited only by memory, so the
+  same code runs on x86_64, i386 and DOS and R11 is not needed. 10^6 elements of 8 bytes took 16 MiB of region (the doubling
+  of chunks and of blocks). Open for the concept: drop the reservation and R11.
+- **Cost of `At`:** in a tight loop of 2·10^7 reads, `A.At(I).X` took about 3 times as long as `D[I].X` on a dynamic array
+  (63 against 18 ms at -O2 on x86_64: the bounds check and the highest-bit lookup); under qemu 3 times on aarch64 and 7
+  times on i386, where `BsrQWord` is a 64-bit routine (a lookup of the width of `SizeUInt` is the fix). Open for the concept: a `for P in A`
+  enumerator that walks chunk by chunk (the speed of a plain array), and whether `At` keeps its bounds check in release.
+- A `TGrowArray` is a record that holds one pointer to its header in the region, so a copy of the record refers to the same
+  array: no value-copy surprise.
+
 ### Region style (an idea from Goose)
 
 [Goose](https://github.com/aardappel/goose) (Wouter van Oortmerssen) has no general heap: memory is the stack, static data
