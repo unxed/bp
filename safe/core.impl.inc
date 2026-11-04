@@ -26,8 +26,8 @@ begin
   SafeLockLives;
   L.NextLive := GLives;
   if GLives <> nil then
-    GLives.PrevLive := L;
-  GLives := L;
+    GLives.PrevLive := L; // UNSAFE: under SafeLockLives
+  GLives := L; // UNSAFE: under SafeLockLives
   L.Listed := True;
   SafeUnlockLives;
 end;
@@ -38,7 +38,7 @@ begin
   if L.PrevLive <> nil then
     L.PrevLive.NextLive := L.NextLive
   else
-    GLives := L.NextLive;
+    GLives := L.NextLive; // UNSAFE: under SafeLockLives
   if L.NextLive <> nil then
     L.NextLive.PrevLive := L.PrevLive;
   L.PrevLive := nil;

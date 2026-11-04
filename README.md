@@ -35,7 +35,7 @@ No FPC fork and no compiler options: a single unit `BP` gives all of it.
 
 ```pascal
 program Hello;
-uses BP, SysUtils;   // BP goes FIRST in the program (it installs the thread manager before SysUtils)
+uses BP;   // BP goes FIRST in the program (it installs the thread manager before any other unit)
 begin
   WriteLn('Hello, world 😀', CPLength('aё😀'));
 end.
@@ -62,6 +62,11 @@ not use `BP` (a unit inserted with `-Fa`).
 Linux builds are static and need no libc by default; `-dSAFE_LIBC` switches to libc (`cwstring`, `cthreads`), needed only for
 FFI with C libraries. `-dSAFE_NO_UTF8` turns off the UTF-8 defaults. The specification: [`safe/SPEC.md`](safe/SPEC.md).
 
+**Dependencies** ([`safe/SPEC.md` §15](safe/SPEC.md), Go modules with git as the registry): write `require
+github.com/acme/json v1.4.0` into `deps.txt` next to the program, run `tools/bp get` (it writes `deps.lock` with the commit
+of each version), then `tools/bp build FILE.pas` finds the units; `tools/bp vendor` copies them into `vendor/`. A library
+is a git repository with a tag `vX.Y.Z` and a `deps.txt` with its `module` line; this repository is `github.com/unxed/bp`.
+
 ## Layout
 
 | Path | What it is | Depends on |
@@ -75,6 +80,7 @@ FFI with C libraries. `-dSAFE_NO_UTF8` turns off the UTF-8 defaults. The specifi
 
 `tests/run.sh all` builds every test with no compiler options except the unit paths: the safe layer twice (with `Safe` and
 with `BP`), the ext layer with `BP`, `ext/fpc-utf8`, and checks that `bp.pas` includes every file of `unit Safe`.
+The Pascal examples of the documents are compiled and linted by `tools/doctest.py` in CI.
 
 ## Licences
 
