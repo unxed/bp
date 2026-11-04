@@ -4,6 +4,8 @@ in the FPC sources); see README.md.
 
 1. TPasParser.ParseSimpleType: String[N] (a short string) is a type in any place, a variable or a field too, also when
    the resolver is used (po_ResolveStandardTypes); 3.2.2 accepts it there only without the resolver.
+2. A named operator of a record (class operator Implicit) is not taken for "type.operator".
+3. A management operator (class operator Initialize(var R: TRec)) has a procedure type: no result.
 
 --- a/packages/fcl-passrc/src/pparser.pp
 +++ b/packages/fcl-passrc/src/pparser.pp
@@ -16,3 +18,34 @@ in the FPC sources); see README.md.
        begin
        if LowerCase(Name)='string' then // Type A = String[12]; shortstring
          K:=stkString
+@@ -5299,6 +5299,7 @@
+         end;
+       end;
+     ptOperator,ptClassOperator:
++      if Element is TPasFunctionType then // a management operator has no result
+       begin
+       NextToken;
+       ResultEl:=TPasFunctionType(Element).ResultEl;
+@@ -6614,7 +6615,9 @@
+             OT:=TPasOperator.TokenToOperatorType(CurTokenText)
+           else
+             OT:=TPasOperator.NameToOperatorType(CurTokenString);
+-          end;
++          end
++        else
++          OperatorTypeName:=''; // class operator Implicit: a name, not a type
+         end;
+       if (ot=otUnknown) then
+         ParseExc(nErrUnknownOperatorType,SErrUnknownOperatorType,[CurTokenString]);
+@@ -6656,7 +6659,10 @@
+     case ProcType of
+     ptFunction, ptClassFunction, ptOperator, ptClassOperator, ptAnonymousFunction:
+       begin
+-      Result.ProcType := CreateFunctionType('', 'Result', Result, False, CurTokenPos);
++      if (ProcType in [ptOperator, ptClassOperator]) and (OT in [otInitialize, otFinalize, otAddRef, otCopy]) then
++        Result.ProcType := TPasProcedureType(CreateElement(TPasProcedureType, '', Result))
++      else
++        Result.ProcType := CreateFunctionType('', 'Result', Result, False, CurTokenPos);
+       if (ProcType in [ptOperator, ptClassOperator]) then
+         begin
+         TPasOperator(Result).TokenBased:=IsTokenBased;

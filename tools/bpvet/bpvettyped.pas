@@ -28,6 +28,8 @@ type
   TVetResolver = class(TPasResolver)
   private
     FFileName: String;
+    FFailed: Boolean; // did not resolve: not used again
+    FUsed: Boolean;   // read as a used unit (its interface only): the session gives it to every module that uses it
     FSession: TVetSession; // borrow: the session that holds this resolver
     FFiles: specialize TOwned<TFileResolver>;
     FScanner: specialize TOwned<TPascalScanner>;
@@ -53,8 +55,8 @@ type
   public
     Hub: specialize TOwned<TPasResolverHub>;
     Modules: specialize TOwned<TObjectList>;  // of TVetResolver, owned
-    SearchDirs, Defines: array of String;
-    UnitError: String;                        // the first failure of a used unit
+    SearchDirs, Defines: array of String;     // the last search directory: that of the checked file
+    UnitError: String;                        // the first failure of a used unit in the current check
     function FindFile(const AName: String): String;
     function Loaded(const AName: String): TVetResolver;
   end;
@@ -65,7 +67,7 @@ const
   { compiler magic with variable arguments: accepted with any arguments }
   MagicProcs: array[0..9] of String = ('Write', 'WriteLn', 'Read', 'ReadLn', 'Halt', 'Randomize', 'Initialize',
     'Finalize', 'FinalizeArray', 'SetString');
-  MagicFuncs: array[0..5] of String = ('SizeOf', 'IsManagedType', 'Abs', 'Random', 'Trunc', 'Round');
+  MagicFuncs: array[0..4] of String = ('SizeOf', 'IsManagedType', 'Abs', 'Trunc', 'Round');
   TargetDefines: array[0..6] of String = ('FPC', 'LINUX', 'UNIX', 'CPUX86_64', 'CPU64', 'ENDIAN_LITTLE',
     'FPC_HAS_FEATURE_DYNARRAYS');
 
@@ -96,7 +98,7 @@ begin
   for I := 0 to Modules.Get.Count - 1 do
   begin
     R := TVetResolver(Modules.Get[I]);
-    if CompareText(ChangeFileExt(ExtractFileName(R.FFileName), ''), AName) = 0 then
+    if R.FUsed and not R.FFailed and (CompareText(ChangeFileExt(ExtractFileName(R.FFileName), ''), AName) = 0) then
       Exit(R);
   end;
   Result := nil;
@@ -251,6 +253,8 @@ begin
   R := TVetResolver.Create(FSession, F);
   FSession.Modules.Get.Add(R);
   R.Parser.Options := R.Parser.Options + [po_StopOnUnitInterface];
+  R.FUsed := True;
+  R.InterfaceOnly := True; // the implementation of a used unit is not read: rules use its interface only
   if CompareText(AName, 'system') = 0 then
     R.Parser.ImplicitUses.Clear;
   M := nil;
@@ -260,8 +264,11 @@ begin
     R.Parser.ParseUnit(M);
   except
     on E: Exception do
+    begin
+      R.FFailed := True;
       if FSession.UnitError = '' then
         FSession.UnitError := Format('%s: %s', [F, E.Message]);
+    end;
   end;
   Result := M;
 end;
@@ -273,42 +280,61 @@ begin
   VetAdd(Report, FileName, ARow, ACol, vsFatal, '', 'bpvet cannot resolve this file: ' + Msg);
 end;
 
+var
+  { One session for the whole run: a used unit is read once (safe/SPEC.md §16, the tools are as fast as the compiler).
+    The options are those of the first call; bpvet passes the same ones for every file. }
+  Shared: TSessionBox;
+
+function VetSession(const RtlDir: String; const Defines, IncludeDirs, UnitDirs: array of String): TVetSession;
+var
+  I, N: Integer;
+  S: TVetSession;
+begin
+  if Shared.IsEmpty then
+  begin
+    Shared := TSessionBox.Own(TVetSession.Create);
+    S := Shared.Get;
+    S.Hub := specialize TOwned<TPasResolverHub>.Own(TPasResolverHub.Create(nil));
+    S.Modules := specialize TOwned<TObjectList>.Own(TObjectList.Create(True));
+    SetLength(S.SearchDirs, 2 + Length(UnitDirs) + Length(IncludeDirs));
+    N := 0;
+    S.SearchDirs[N] := RtlDir;
+    Inc(N);
+    for I := 0 to High(UnitDirs) do
+    begin
+      S.SearchDirs[N] := UnitDirs[I];
+      Inc(N);
+    end;
+    for I := 0 to High(IncludeDirs) do
+    begin
+      S.SearchDirs[N] := IncludeDirs[I];
+      Inc(N);
+    end;
+    SetLength(S.Defines, Length(Defines));
+    for I := 0 to High(Defines) do
+      S.Defines[I] := Defines[I];
+  end;
+  Result := Shared.Get;
+end;
+
 function VetResolve(const FileName, RtlDir: String; const Defines, IncludeDirs, UnitDirs, Implicit: array of String;
   var Report: TVetReport): Boolean;
 var
-  S: TSessionBox;
+  S: TVetSession;
   Main, R: TVetResolver;
   M: TPasModule;
   Sec: TPasSection;
-  I, N: Integer;
+  I: Integer;
   Found: Boolean;
   El: TPasElement;
 begin
   Result := False;
-  S := TSessionBox.Own(TVetSession.Create);
-  S.Get.Hub := specialize TOwned<TPasResolverHub>.Own(TPasResolverHub.Create(nil));
-  S.Get.Modules := specialize TOwned<TObjectList>.Own(TObjectList.Create(True));
-  SetLength(S.Get.SearchDirs, 2 + Length(UnitDirs) + Length(IncludeDirs));
-  N := 0;
-  S.Get.SearchDirs[N] := RtlDir;
-  Inc(N);
-  for I := 0 to High(UnitDirs) do
-  begin
-    S.Get.SearchDirs[N] := UnitDirs[I];
-    Inc(N);
-  end;
-  for I := 0 to High(IncludeDirs) do
-  begin
-    S.Get.SearchDirs[N] := IncludeDirs[I];
-    Inc(N);
-  end;
-  S.Get.SearchDirs[N] := ExtractFileDir(ExpandFileName(FileName));
-  SetLength(S.Get.Defines, Length(Defines));
-  for I := 0 to High(Defines) do
-    S.Get.Defines[I] := Defines[I];
+  S := VetSession(RtlDir, Defines, IncludeDirs, UnitDirs);
+  S.SearchDirs[High(S.SearchDirs)] := ExtractFileDir(ExpandFileName(FileName));
+  S.UnitError := '';
   // UNSAFE: the session list owns the resolver (TObjectList with OwnsObjects)
-  Main := TVetResolver.Create(S.Get, FileName);
-  S.Get.Modules.Get.Add(Main);
+  Main := TVetResolver.Create(S, FileName);
+  S.Modules.Get.Add(Main);
   for I := 0 to High(Implicit) do
     if CompareText(Implicit[I], ChangeFileExt(ExtractFileName(FileName), '')) <> 0 then
       Main.Parser.ImplicitUses.Add(Implicit[I]);
@@ -317,10 +343,10 @@ begin
     Main.Parser.ParseMain(M);
     repeat
       Found := False;
-      for I := 0 to S.Get.Modules.Get.Count - 1 do
+      for I := 0 to S.Modules.Get.Count - 1 do
       begin
-        R := TVetResolver(S.Get.Modules.Get[I]);
-        if R.Parser.CanParseContinue(Sec) and ((R = Main) or (Sec = nil)) then
+        R := TVetResolver(S.Modules.Get[I]);
+        if not R.FFailed and R.Parser.CanParseContinue(Sec) and ((R = Main) or (Sec = nil)) then
         begin
           Found := True;
           R.Parser.ParseContinue;
@@ -343,11 +369,19 @@ begin
     on E: Exception do
       AddFatal(Report, Main.FScanner.Get.CurFilename, Main.FScanner.Get.CurRow, 1, E.ClassName + ': ' + E.Message);
   end;
-  if Result and (S.Get.UnitError <> '') then
+  if Result and (S.UnitError <> '') then
   begin
-    AddFatal(Report, FileName, 1, 1, 'a used unit: ' + S.Get.UnitError);
+    AddFatal(Report, FileName, 1, 1, 'a used unit: ' + S.UnitError);
     Result := False;
   end;
+  if not Result then
+    // the main module and every unit left unfinished by the failure are not used again
+    for I := 0 to S.Modules.Get.Count - 1 do
+    begin
+      R := TVetResolver(S.Modules.Get[I]);
+      if (R = Main) or (R.Parser.CurModule <> nil) then
+        R.FFailed := True;
+    end;
 end;
 
 end.
