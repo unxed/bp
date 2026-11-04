@@ -1,6 +1,6 @@
-// EXPECT: warn SAFE-S21
-{ S21: a reserved word with an upper-case letter. }
-unit s21_bad;
+// EXPECT: warn SAFE-S22
+{ S22: a reserved word with an upper-case letter. }
+unit s22_bad;
 
 {$mode objfpc}{$H+}
 

@@ -1,7 +1,7 @@
 // EXPECT: clean
-{ S20 and S21 (safe/SPEC.md §0): the header names the file (letter case aside), every reserved word is in lower case;
+{ S21 and S22 (safe/SPEC.md §0): the header names the file (letter case aside), every reserved word is in lower case;
   a reserved word in a comment, a string or an asm block, an &escaped identifier and String are not checked. }
-unit S20_OK;
+unit S21_OK;
 
 {$mode objfpc}{$H+}
 

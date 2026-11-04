@@ -23,7 +23,7 @@
   does not parse and is reported as Fatal; give the library name as a constant (const LibC = 'c').
   The directive nostackframe, which that parser does not know, is skipped (bpvetcore.pas, TVetLineReader).
   Rules: S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16 (bpvetrules.pas); S17 (bpvets17.pas, typed);
-  S20, S21 (bpvetstyle.pas, over the text, before the parse). --fix writes the fixes of S17, S20 and S21 into the files. }
+  S21, S22 (bpvetstyle.pas, over the text, before the parse). --fix writes the fixes of S17, S21 and S22 into the files. }
 program bpvet;
 
 {$mode objfpc}{$H+}

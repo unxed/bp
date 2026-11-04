@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tools/bp (safe/SPEC.md §16): bp fix writes the missing header of a program from its file name (S20); then the
+# tools/bp (safe/SPEC.md §16): bp fix writes the missing header of a program from its file name (S21); then the
 # program in the region style is checked, built and runs; a program with a use after Release is not built. Needs ppudump (fp-utils) for the stubs.
 # usage: tests/bp.sh
 set -u

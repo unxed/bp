@@ -1,7 +1,7 @@
 { SPDX-License-Identifier: MIT }
 { The rules of bpvet over the text of a file, before it is parsed (safe/SPEC.md §6, the style of §0):
-    S20  the header: a file starts with program/unit/library/package and the name of the file;
-    S21  reserved words are written in lower case.
+    S21  the header: a file starts with program/unit/library/package and the name of the file;
+    S22  reserved words are written in lower case.
   Both are fixed in place by --fix (StyleFix). }
 unit BpvetStyle;
 
@@ -13,15 +13,15 @@ uses
   SysUtils, Classes, BpvetCore, Safe;
 
 var
-  { --fix of bpvet: S20 writes the header, S21 lowers the reserved words; the file is rewritten and Src changes too }
+  { --fix of bpvet: S21 writes the header, S22 lowers the reserved words; the file is rewritten and Src changes too }
   StyleFix: Boolean = False;
 
-{ S20: the name of a program or unit has one source, the name of its file (safe/SPEC.md §0).
+{ S21: the name of a program or unit has one source, the name of its file (safe/SPEC.md §0).
     Error    the file has no header: program for a file without interface, unit for one with it (--fix inserts
              "program Name;" or "unit Name;" before the first token);
     Error    the name in the header is not the name of the file (letter case aside; --fix writes the name of the file).
     A file whose name is not an identifier (dots allowed, as in unit names) is reported without a fix.
-  S21: reserved words in lower case (safe/SPEC.md §0).
+  S22: reserved words in lower case (safe/SPEC.md §0).
     Warning  a reserved word with an upper-case letter (Begin, END); --fix lowers it. string is not checked: it is
              written as the type it names (String). Comments, strings, &escaped identifiers and the bodies of
              asm blocks are skipped. }
@@ -222,7 +222,7 @@ begin
   Want := FileModuleName(Src.FileName);
   First := Next(S);
 
-  { S21 over every token; the header is checked after the walk, so that the columns of S21 stay those of the file }
+  { S22 over every token; the header is checked after the walk, so that the columns of S22 stay those of the file }
   T := First;
   while T.Text <> '' do
   begin
@@ -237,7 +237,7 @@ begin
           InAsm := True;
         if T.Text <> LowerCase(T.Text) then
         begin
-          VetAdd(Report, Src.FileName, T.Row, T.Col, vsWarning, 'S21', Format('the reserved word "%s" is not in lower ' +
+          VetAdd(Report, Src.FileName, T.Row, T.Col, vsWarning, 'S22', Format('the reserved word "%s" is not in lower ' +
             'case; write "%s" (bpvet --fix does it)', [T.Text, LowerCase(T.Text)]));
           if StyleFix then
           begin
@@ -249,7 +249,7 @@ begin
     T := Next(S);
   end;
 
-  { S20 }
+  { S21 }
   Kind := LowerCase(First.Text);
   if First.Ident and ((Kind = 'program') or (Kind = 'unit') or (Kind = 'library') or (Kind = 'package')) then
   begin
@@ -268,7 +268,7 @@ begin
     end;
     if (Want <> '') and not SameText(Name, Want) then
     begin
-      VetAdd(Report, Src.FileName, NameTok.Row, NameTok.Col, vsError, 'S20', Format('the %s is named "%s", its file ' +
+      VetAdd(Report, Src.FileName, NameTok.Row, NameTok.Col, vsError, 'S21', Format('the %s is named "%s", its file ' +
         '"%s": the name of a %s is the name of its file; write "%s %s" (bpvet --fix does it)', [Kind, Name,
         ExtractFileName(Src.FileName), Kind, Kind, Want]));
       if StyleFix and (NameTok.Row = Last.Row) then
@@ -285,12 +285,12 @@ begin
     else
       Kind := 'program';
     if Want = '' then
-      VetAdd(Report, Src.FileName, First.Row, First.Col, vsError, 'S20', Format('the file has no header, and its ' +
+      VetAdd(Report, Src.FileName, First.Row, First.Col, vsError, 'S21', Format('the file has no header, and its ' +
         'name "%s" is not an identifier; rename the file and write "%s <the name of the file>;" first',
         [ExtractFileName(Src.FileName), Kind]))
     else
     begin
-      VetAdd(Report, Src.FileName, First.Row, First.Col, vsError, 'S20', Format('the file has no header; write ' +
+      VetAdd(Report, Src.FileName, First.Row, First.Col, vsError, 'S21', Format('the file has no header; write ' +
         '"%s %s;" first: the name of a %s is the name of its file (bpvet --fix does it)', [Kind, Want, Kind]));
       if StyleFix then
       begin
