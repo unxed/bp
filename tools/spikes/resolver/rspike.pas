@@ -17,6 +17,8 @@ type
     function AnyCompat(Proc: TResElDataBuiltInProc; Expr: TPasExpr; RaiseOnError: boolean): integer;
     procedure SizeResult(Proc: TResElDataBuiltInProc; Params: TParamsExpr; out ResolvedEl: TPasResolverResult);
     procedure FinishAny(Proc: TResElDataBuiltInProc; Params: TParamsExpr);
+    function CopyCompat(Proc: TResElDataBuiltInProc; Expr: TPasExpr; RaiseOnError: boolean): integer;
+    procedure CopyResult(Proc: TResElDataBuiltInProc; Params: TParamsExpr; out ResolvedEl: TPasResolverResult);
     procedure AddCompilerMagic;
     function CheckTypeCastRes(const FromResolved, ToResolved: TPasResolverResult; ErrorEl: TPasElement; RaiseOnError: boolean): integer; override;
     function CheckAssignCompatibilityCustom(const LHS, RHS: TPasResolverResult; ErrorEl: TPasElement; RaiseOnIncompatible: boolean; var Handled: boolean): integer; override;
@@ -73,6 +75,22 @@ begin
   for I := 0 to Length(Params.Params) - 1 do FinishCallArgAccess(Params.Params[I], rraRead);
 end;
 
+function TEngine.CopyCompat(Proc: TResElDataBuiltInProc; Expr: TPasExpr; RaiseOnError: boolean): integer;
+var R: TPasResolverResult;
+begin
+  // Copy of a string is a compiler procedure of FPC, Copy of a dynamic array the built-in of the resolver
+  ComputeElement(TParamsExpr(Expr).Params[0], R, []);
+  if R.BaseType in btAllStrings then Result := AnyCompat(Proc, Expr, RaiseOnError)
+  else Result := BI_CopyArray_OnGetCallCompatibility(Proc, Expr, RaiseOnError);
+end;
+
+procedure TEngine.CopyResult(Proc: TResElDataBuiltInProc; Params: TParamsExpr; out ResolvedEl: TPasResolverResult);
+begin
+  ComputeElement(Params.Params[0], ResolvedEl, []);
+  if ResolvedEl.BaseType in btAllStrings then ResolvedEl.Flags := [rrfReadable]
+  else BI_CopyArray_OnGetCallResult(Proc, Params, ResolvedEl);
+end;
+
 procedure TEngine.AddCompilerMagic;
 const Procs: array[0..8] of String = ('Write', 'WriteLn', 'Read', 'ReadLn', 'Halt', 'Randomize', 'Initialize', 'Finalize', 'FinalizeArray');
 const Funcs: array[0..5] of String = ('SizeOf', 'IsManagedType', 'Abs', 'Random', 'Trunc', 'Round');
@@ -80,6 +98,8 @@ var N: String;
 begin
   for N in Procs do AddBuiltInProc(N, N + '(any)', @AnyCompat, nil, nil, @FinishAny, bfCustom, [bipfCanBeStatement]);
   for N in Funcs do AddBuiltInProc(N, N + '(any): SizeInt', @AnyCompat, @SizeResult, nil, @FinishAny);
+  AddBuiltInProc('Copy', 'function Copy(const StringOrArray; Start, Count: SizeInt): StringOrArray', @CopyCompat,
+    @CopyResult, nil, nil, bfCopyArray);
 end;
 
 function TEngine.CheckTypeCastRes(const FromResolved, ToResolved: TPasResolverResult; ErrorEl: TPasElement; RaiseOnError: boolean): integer;
@@ -101,7 +121,7 @@ procedure SetupEngine(E: TEngine);
 var I: Integer;
 begin
   E.Hub := Hub;
-  E.AddObjFPCBuiltInIdentifiers;
+  E.AddObjFPCBuiltInIdentifiers(btAllFPCTypes, bfAllStandardProcs - [bfCopyArray]);
   E.AddCompilerMagic;
   E.Resolver := TFileResolver.Create;
   for I := 0 to Paths.Count - 1 do E.Resolver.AddIncludePath(Paths[I]);

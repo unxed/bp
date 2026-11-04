@@ -29,6 +29,21 @@ Word SmallInt LongWord LongInt QWord Int64 Comp Pointer File Text Variant""".spl
 ALWAYS = {"system": {"tobject", "tclass", "iunknown", "iinterface", "tinterfacedobject", "tguid", "tvarrec", "hresult",
                      "pchar", "pansichar", "pwidechar", "sizeint", "sizeuint", "ptrint", "ptruint", "integer"}}
 
+# Generic types: ppudump 3.2.2 does not write their type parameters, so they are declared here.
+GENERICS = {"system": ["generic TArray<T> = array of T;"]}
+
+# Interfaces a class implements: ppudump 3.2.2 does not write them.
+IMPLEMENTS = {"tinterfacedobject": "IUnknown", "tagregatedobject": "IUnknown"}
+IUNKNOWN = {"queryinterface", "_addref", "_release"}
+
+# Routines the typed bpvet declares as compiler magic.
+MAGIC = {"write", "writeln", "read", "readln", "halt", "randomize", "initialize", "finalize", "finalizearray"}
+
+# String flavours other than AnsiString: an overload that needs one is left out when another overload of the same
+# routine does without, since the relaxed checks of the typed bpvet cannot choose between string flavours.
+OTHER_STRINGS = re.compile(r":\s*(?:const\s+)?(?:ShortString|UnicodeString|WideString|WideChar|Variant|UCS4String|"
+                           r"PWideChar|PUnicodeChar|UnicodeChar|String\[)", re.I)
+
 KEYWORDS = {"and", "array", "as", "asm", "begin", "case", "class", "const", "constructor", "destructor", "div", "do",
             "downto", "else", "end", "except", "exports", "file", "finalization", "finally", "for", "function", "goto",
             "if", "implementation", "in", "inherited", "initialization", "inline", "interface", "is", "label",
@@ -278,7 +293,8 @@ class Gen:
                 continue
             if (m["Name"].lower() in self.idents or m.get("SymId") in keepsym and t in ("field", "var")
                     or m.get("Id") in keepid and t == "proc"
-                    or m["Name"].lower() in ("create", "destroy")):
+                    or m["Name"].lower() in ("create", "destroy")
+                    or m["Name"].lower() in IUNKNOWN and t == "proc"):
                 keep.append(m)
         return keep
 
@@ -319,19 +335,24 @@ class Gen:
     def tname(self, unit, ref, ctx=None):
         """The text of a type reference."""
         u, d = self.deref(unit, ref)
-        if d is None:
-            return None
+        if d is not None and d.get("Type") == "file" and d.get("FileType", "").lower() == "text":
+            return "Text"
+        if d is None or d.get("Type") == "file":
+            return None     # fcl-passrc 3.2.2 has no typed or untyped files: a declaration that needs one is left out
         if self.top_named(u, d):
-            if u.name != unit.name and u.name != "system" and d["Name"].lower() not in BUILTIN:
+            if u.name != unit.name and u.name not in ("system", "objpas") and d["Name"].lower() not in BUILTIN:
                 return "%s.%s" % (u.title, d["Name"])
             return d["Name"]
-        if is_named(d) and d.get("Type") in ("ord", "float", "string", "variant", "file"):
+        if is_named(d) and d.get("Type") in ("ord", "float", "string", "variant"):
             return d["Name"]
         return self.texpr(u, d, ctx)
 
     def texpr(self, u, d, ctx=None):
         t = d.get("Type")
         if t == "ptr":
+            pu, pd = self.deref(u, d.get("Ptr"))
+            if pd is None or pd.get("OrdType") == "void":
+                return "Pointer"
             n = self.tname(u, d.get("Ptr"))
             return "^%s" % n if n and re.fullmatch(r"[\w.]+", n) else "Pointer"
         if t == "array":
@@ -348,14 +369,15 @@ class Gen:
             n = self.tname(u, d.get("Ref"))
             return "class of %s" % n if n else None
         if t == "proctype":
-            return self.signature(u, d, None, ctx="type")
+            # fcl-passrc takes a procedure type only in a type declaration; elsewhere it stands as Pointer.
+            return self.signature(u, d, None, ctx="type") if ctx == "decl" else "Pointer"
         if t == "enum":
             return self.enumtext(d)
         if t == "string":
             return {"short": "String[%d]" % d.get("Len", 255), "ansi": "AnsiString", "wide": "WideString",
                     "unicode": "UnicodeString"}.get(d.get("StrType"), "String")
         if t == "ord":
-            if d.get("OrdType") == "bool":
+            if d.get("OrdType") in ("bool", "pasbool"):
                 return "Boolean"
             return "%d..%d" % (d.get("Low", 0), d.get("High", 0))
         if t == "float":
@@ -409,7 +431,7 @@ class Gen:
             kind = "constructor"
         elif "destructor" in opts:
             kind = "destructor"
-        elif "function" in opts:
+        elif "function" in opts or "procedure" not in opts and not self.isvoid(u, d.get("RetType")):
             kind = "function"
         else:
             kind = "procedure"
@@ -427,16 +449,22 @@ class Gen:
             head = "class " + head
         return head
 
+    def isvoid(self, u, ref):
+        _, d = self.deref(u, ref)
+        return d is None or d.get("OrdType") == "void"
+
     def constval(self, u, c, typeref=None):
         if c is None:
             return None
         vt, v = c.get("ValType"), c.get("Value")
         tu, td = self.deref(u, c.get("TypeRef") or typeref)
         if vt == "int":
-            if td is not None and td.get("Type") == "ord" and td.get("OrdType") == "bool":
+            if td is not None and td.get("Type") == "ord" and td.get("OrdType") in ("bool", "pasbool"):
                 return "True" if v else "False"
             if td is not None and td.get("Type") == "ord" and td.get("OrdType") in ("char", "uchar", "widechar"):
                 return "#%d" % v
+            if td is not None and td.get("Type") == "ptr":
+                return "nil" if v == 0 else "PTRCONST"
             if td is not None and td.get("Type") == "enum":
                 for el in td.get("Elements", []):
                     if el.get("Value") == v:
@@ -453,55 +481,19 @@ class Gen:
     # -- writing a unit
 
     def write_unit(self, u, out):
-        want = self.want.get(u.name, set())
-        types, consts, vars_, procs, bodies = [], [], [], [], []
-        classes = []
-        done = set()
-        for name in sorted(want):
-            for e in u.byname.get(name, []):
-                t = e.get("Type")
-                key = (t, e.get("Id"), name)
-                if key in done:
-                    continue
-                done.add(key)
-                if u.name == "system" and name in BUILTIN:
-                    continue
-                if t == "type":
-                    tn = self.tname(u, e.get("Ref"))
-                    if tn and tn.lower() != name:
-                        types.append((e, "%s = %s;" % (e["Name"], tn)))
-                elif t == "const":
-                    v = self.constval(u, e)
-                    if v is not None:
-                        consts.append("%s = %s;" % (e["Name"], v))
-                elif t == "var":
-                    tn = self.tname(u, e.get("VarType"))
-                    if tn:
-                        vars_.append("%s: %s;" % (e["Name"], tn))
-                elif t == "proc":
-                    if "operator" in e.get("Options", []):
-                        continue
-                    s = self.signature(u, e, e["Name"])
-                    if s:
-                        procs.append("%s; overload; external;" % s)
-                elif t == "obj":
-                    text = self.classtext(u, e, bodies)
-                    if text:
-                        classes.append(e["Name"])
-                        types.append((e, text))
-                elif t == "rec":
-                    types.append((e, self.rectext(u, e)))
-                elif t in ("ord", "float", "string", "variant"):
-                    if not (u.name == "system"):
-                        tx = self.texpr(u, e)
-                        if tx:
-                            types.append((e, "%s = %s;" % (e["Name"], tx)))
-                elif t in ("ptr", "array", "set", "classref", "proctype", "enum"):
-                    tx = self.texpr(u, e)
-                    if tx:
-                        types.append((e, "%s = %s;" % (e["Name"], tx)))
-        types = self.order(u, types)
-        uses = sorted({self.units.get(n).title for n in self.ref_units(u)} - {u.title, "System"}, key=str.lower)
+        p = self.parts(u)
+        if u.name == "system" and self.units.get("objpas") is not None:
+            # objfpc mode sees System through objpas (Integer = LongInt, MaxInt, ...): one stub holds both.
+            o = self.parts(self.units.get("objpas"))
+            over = {n.lower() for n in o["names"]}
+            for k in ("types", "consts", "vars", "procs"):
+                p[k] = [x for x in p[k] if self.declname(x) not in over] + o[k]
+            p["classes"] += o["classes"]
+            p["bodies"] += o["bodies"]
+            p["uses"] = sorted(set(p["uses"]) | set(o["uses"]) - {"objpas"}, key=str.lower)
+        types = p["types"]
+        uses = p["uses"]
+        consts, vars_, procs, bodies, classes = p["consts"], p["vars"], p["procs"], p["bodies"], p["classes"]
         w = []
         w.append("{ Generated by tools/bpvet/resolver/genstubs.py from %s.ppu: a declaration stub for the typed"
                  " bpvet. }" % u.name)
@@ -510,8 +502,10 @@ class Gen:
         w.append("interface")
         if uses:
             w.append("uses %s;" % ", ".join(uses))
-        if types:
+        generics = GENERICS.get(u.name, [])
+        if types or generics:
             w.append("type")
+            w.extend("  " + g for g in generics)
             for c in classes:
                 w.append("  %s = class;" % c)
             for _, tx in types:
@@ -523,6 +517,8 @@ class Gen:
             w.append("var")
             w.extend("  " + v for v in vars_)
         w.extend(procs)
+        if procs and not (types or consts or vars_):
+            pass
         w.append("implementation")
         w.extend(bodies)
         w.append("end.")
@@ -534,6 +530,83 @@ class Gen:
                 text = text.replace("  %s = class;\n" % m.group(1), "  %s = interface;\n" % m.group(1), 1)
         with open(os.path.join(out, u.name + ".pp"), "w") as f:
             f.write(text)
+
+    def parts(self, u):
+        want = self.want.get(u.name, set())
+        types, consts, vars_, procs, bodies = [], [], [], [], []
+        classes = []
+        done = set()
+        for name in sorted(want):
+            for e in u.byname.get(name, []):
+                t = e.get("Type")
+                key = (t, e.get("Id"), name)
+                if key in done:
+                    continue
+                done.add(key)
+                if u.name in ("system", "objpas") and (name in BUILTIN or name in ("true", "false")):
+                    continue
+                if t == "type":
+                    tn = self.tname(u, e.get("Ref"))
+                    if tn and tn.lower() != name:
+                        types.append((e, "%s = %s;" % (e["Name"], tn)))
+                elif t == "const":
+                    v = self.constval(u, e)
+                    if v == "PTRCONST":
+                        # fcl-passrc 3.2.2 does not evaluate Pointer(-1): a typed constant has the same type
+                        consts.append("%s: Pointer = nil;" % e["Name"])
+                    elif v is not None:
+                        consts.append("%s = %s;" % (e["Name"], v))
+                elif t == "var":
+                    tn = self.tname(u, e.get("VarType"))
+                    if tn:
+                        vars_.append("%s: %s;" % (e["Name"], tn))
+                elif t == "proc":
+                    if "operator" in e.get("Options", []):
+                        continue
+                    s = self.signature(u, e, e["Name"])
+                    if s and name not in MAGIC:
+                        procs.append("%s; overload; external;" % s)
+                elif t == "obj":
+                    text = self.classtext(u, e, bodies)
+                    if text:
+                        classes.append(e["Name"])
+                        types.append((e, text))
+                elif t == "rec":
+                    types.append((e, self.rectext(u, e)))
+                elif t in ("ord", "float", "string", "variant"):
+                    if name not in BUILTIN and not e["Name"].startswith("$"):
+                        tx = self.texpr(u, e)
+                        if tx:
+                            types.append((e, "%s = %s;" % (e["Name"], tx)))
+                elif t in ("ptr", "array", "set", "classref", "proctype", "enum"):
+                    tx = self.texpr(u, e, "decl")
+                    if tx:
+                        types.append((e, "%s = %s;" % (e["Name"], tx)))
+        types = self.order(u, types)
+        procs = self.prune(procs)
+        uses = sorted({self.units.get(n).title for n in self.ref_units(u)} - {u.title, "System", "objpas"},
+                      key=str.lower)
+        return {"types": types, "consts": consts, "vars": vars_, "procs": procs, "bodies": bodies,
+                "classes": classes, "uses": uses, "names": list(want)}
+
+    def prune(self, procs):
+        groups = {}
+        for p in procs:
+            groups.setdefault(self.declname(p), []).append(p)
+        out = []
+        for p in procs:
+            g = groups[self.declname(p)]
+            plain = [q for q in g if not OTHER_STRINGS.search(q)]
+            if plain and p not in plain:
+                continue
+            out.append(p)
+        return out
+
+    @staticmethod
+    def declname(x):
+        text = x[1] if isinstance(x, tuple) else x
+        m = re.match(r"\s*(?:class\s+)?(?:function|procedure)?\s*&?(\w+)", text)
+        return m.group(1).lower() if m else ""
 
     def ref_units(self, u):
         names = set()
@@ -571,8 +644,9 @@ class Gen:
             return None
         anc = self.tname(u, d.get("Ancestor")) if d.get("Ancestor") else None
         head = "%s = %s" % (d["Name"], "interface" if kind == "dispinterface" else kind)
-        if anc:
-            head += "(%s)" % anc
+        intf = IMPLEMENTS.get(d["Name"].lower())
+        if anc or intf:
+            head += "(%s)" % ", ".join(x for x in (anc or "TObject", intf) if x)
         lines = [head]
         if kind == "interface" and d.get("IID"):
             lines.append("  ['%s']" % d["IID"])
@@ -684,7 +758,7 @@ def main():
     written = []
     for name in sorted(g.want):
         u = units.get(name)
-        if u is not None:
+        if u is not None and name != "objpas":
             g.write_unit(u, out)
             written.append(name)
     print("genstubs: %d units, %d symbols: %s" % (len(written), sum(len(v) for v in g.want.values()),
