@@ -880,6 +880,28 @@ what is already shipped with FPC (verified: `ptop`, `fpdoc`, `data2inc`, `bin2ob
 `sp` is written in Safe Pascal itself as a single file (dependencies are downloaded in parallel by goroutines §14):
 the tool also serves as an example project.
 
+### The tools are as fast as the compiler (a rule)
+
+FPC builds a module in milliseconds, and that is a reason to choose Pascal. A tool of Better Pascal that runs on every build
+or save (`bpvet` in every mode, `--fix`, `sp fmt`, the stub generator, the steps of `sp build` and `sp test`) must not take
+it away. Go (`go vet` on the build cache), ruff (a cache by file content, written in Rust for speed) and rust-analyzer
+(incremental queries) show what users now expect; a linter that makes the build feel slow is turned off.
+
+- **Budget.** On a whole project a tool takes no longer than `fpc` takes to build it from nothing; after an edit, no longer
+  than `fpc` takes to rebuild: a few milliseconds for a changed module, close to nothing for an unchanged one.
+- **Cached by content.** The result for a file is kept under the hash of its text, of the interfaces of the units it uses
+  (what a `.ppu` records), of the options and of the version of the tool; an unchanged file is not checked again. The cache
+  lives outside the repository (`${XDG_CACHE_HOME:-~/.cache}`), as the stub generator already keeps its `ppudump` output by
+  the hash of each `.ppu`.
+- **Work done once.** The typed mode resolves the interface of a unit once per run, not once per file that uses it, and
+  keeps it across runs as FPC keeps a `.ppu`. Independent files are checked in parallel.
+- **Measured.** CI prints the time of each tool on this repository next to the time of `fpc`; a tool over its budget is a
+  bug, as a wrong finding is.
+
+Today (2026-11-04, 114 files, 6.8k lines, one core): `bpvet` 0.13 s (`fpc` builds `tests/safe/test_safe.pas` in 0.14 s),
+the stub generator 0.3 s with a warm cache. The typed mode takes 2.4 s because it parses the used units again for every
+file: over the budget, and the next thing to fix in it.
+
 ### Fuzzing almost for free
 
 In C a fuzzer needs sanitizers, otherwise memory corruption goes unnoticed. In Safe Pascal a memory error is already
