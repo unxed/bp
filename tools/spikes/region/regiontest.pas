@@ -225,6 +225,10 @@ end;
 
 procedure BlockScopes;
 var
+  Lines: array of String;
+  Line: String;
+  Count: Integer;
+  Peak: SizeUInt;
   R, I, J, Inside: Integer;
   N: TNode;
   Raised: Boolean;
@@ -251,6 +255,22 @@ begin
     on E: Exception do Raised := True;
   end;
   Check(Raised and (CurrentRegionDepth = 0), 'for R in Scope: an exception in the block releases its region');
+  SetLength(Lines, 200);
+  for I := 0 to High(Lines) do
+    Lines[I] := IntToStr(I);
+  Count := 0;
+  Peak := 0;
+  for Line in Each(Lines) do
+  begin
+    for J := 1 to 1000 do
+      N := TNode.Create;
+    N.X := Length(Line);
+    Inc(Count);
+    if CurrentRegionUsed > Peak then
+      Peak := CurrentRegionUsed;
+  end;
+  Check((Count = 200) and (CurrentRegionDepth = 0) and (Peak < 256 * 1024), 'for Line in Each(Lines): a region per '
+    + 'iteration (peak ' + IntToStr(Peak div 1024) + ' KiB over 200 rounds of 1000 objects)');
 end;
 
 procedure ResetLoop;

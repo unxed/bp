@@ -54,6 +54,27 @@ type
 function Scope: TScopes;
 
 type
+  { for Line in Each(Lines) do ...: a region per iteration (as for scopes in Goose): each MoveNext resets it. }
+  TEachString = record
+  private
+    D: Pointer;
+    Items: array of String;
+    I: SizeInt;
+    function GetCurrent: String;
+  public
+    function MoveNext: Boolean;
+    property Current: String read GetCurrent;
+    function GetEnumerator: TEachString;
+    class operator Initialize(var S: TEachString);
+    class operator Finalize(var S: TEachString);
+    class operator Copy(constref Src: TEachString; var Dst: TEachString);
+  end;
+
+function Each(const Lines: array of String): TEachString;
+{ For the tests: the bytes taken by the blocks of the current region. }
+function CurrentRegionUsed: SizeUInt;
+
+type
   { A class whose objects live in the current region. }
   TRegionObject = class
   public
@@ -341,6 +362,86 @@ end;
 
 function Scope: TScopes;
 begin
+end;
+
+function CurrentRegionUsed: SizeUInt;
+var
+  R: TRegion;
+begin
+  R.D := Current;
+  Result := R.Used;
+  R.D := nil;
+end;
+
+function Each(const Lines: array of String): TEachString;
+var
+  K: SizeInt;
+begin
+  SetLength(Result.Items, Length(Lines));
+  for K := 0 to High(Lines) do
+    Result.Items[K] := Lines[K];
+  Result.I := -1;
+end;
+
+function TEachString.GetEnumerator: TEachString;
+begin
+  Result := Self;
+end;
+
+function TEachString.GetCurrent: String;
+begin
+  Result := Items[I];
+end;
+
+function TEachString.MoveNext: Boolean;
+var
+  R: TRegion;
+begin
+  Inc(I);
+  if D = nil then
+  begin
+    R := TRegion.Create;
+    D := R.D;
+  end
+  else
+  begin
+    R.D := D;
+    R.Reset;  // the region of the iteration before
+  end;
+  R.D := nil;
+  Result := I <= High(Items);
+  if not Result then
+  begin
+    R.D := D;
+    D := nil;
+    R.Release;
+  end;
+end;
+
+class operator TEachString.Initialize(var S: TEachString);
+begin
+  S.D := nil;
+  S.I := -1;
+end;
+
+class operator TEachString.Finalize(var S: TEachString);
+var
+  R: TRegion;
+begin
+  if S.D <> nil then
+  begin
+    R.D := S.D;
+    S.D := nil;
+    R.Release;
+  end;
+end;
+
+class operator TEachString.Copy(constref Src: TEachString; var Dst: TEachString);
+begin
+  if Src.D <> nil then
+    raise ERegion.Create('SAFE: a TEachString is copied after its region was created');
+  Dst.Items := Src.Items;
+  Dst.I := Src.I;
 end;
 
 function TRegion.Used: SizeUInt;
