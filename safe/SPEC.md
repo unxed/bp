@@ -1321,7 +1321,10 @@ N := TNode.Create;  N.Next := TNode.Create;  N.Next.X := 1;   // nobody frees an
   frame, and by the life of the goroutine, whose whole heap is dropped when it exits (no GC reference leaves it, S18), so
   nothing can leak past a goroutine. The one real risk is a long loop in a long-lived frame (the main loop of a server)
   holding an old address of a large graph; the idiom is the same as for regions: the work of one iteration goes into a
-  nested routine.
+  nested routine. Prior art: D scans its whole heap conservatively too, and its known trouble is false pointers from heap
+  data into large blocks, worst on 32-bit; here the heap is precise and only the stack of one goroutine is conservative,
+  so the words that can hold garbage are few and short-lived (JavaScriptCore and Mono SGen accept the same for their
+  stacks).
 - **Mark and sweep, objects never move** (conservative roots require it). A collection starts when the heap has grown by a
   factor since the last one (like `GOGC` in Go, 100% by default) or on `GcCollect`.
 - **Where a GC reference may live (S18):** a local, a parameter, a result, a published field of a GC object, an item of a GC
