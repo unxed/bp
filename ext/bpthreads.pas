@@ -47,6 +47,9 @@ uses
 
 { How many threads are alive now (for tests). }
 function SafeRawThreadCount: LongInt;
+{ The end of the stack of the current thread (the first address above it): a conservative scan of the stack covers
+  [Sptr, SafeStackHigh). }
+function SafeStackHigh: PtrUInt;
 {$else}
   {$ifdef unix}
 uses
@@ -129,6 +132,17 @@ begin
     Result := @MainThread
   else
     Result := PRawThread(SP and not (RegionSize - 1));
+end;
+
+function SafeStackHigh: PtrUInt;
+var
+  T: PRawThread;
+begin
+  T := CurThread;
+  if T = @MainThread then
+    Result := MainHigh
+  else
+    Result := PtrUInt(T) + RegionSize;
 end;
 
 function RawGetCurrentThreadId: TThreadID;
