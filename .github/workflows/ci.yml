@@ -41,6 +41,8 @@ jobs:
         run: out/bpvet --strict safe ext
       - name: Typed mode over bp.pas, safe/, ext/ and tests/ (tests/typed.sh)
         run: bash tests/typed.sh out/bpvet
+      - name: tools/bp build checks before it compiles (tests/bp.sh)
+        run: bash tests/bp.sh
 
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
   # the "binary is static, no libc" check, and runs on different distributions.
