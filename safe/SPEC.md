@@ -53,6 +53,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **design (plan)** | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
+| Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
 | An uninitialized local class reference, function result or `out` parameter (H17) | **open**: FPC warns, `bp build` does not fail on it | §8, §22.9 |
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **open**: not checked yet; §0 says how to avoid them | §8, §21.2 |
 
@@ -425,6 +426,9 @@ System.GetMem(Buf, Len);
 | Turbo Pascal style `object` code | not covered (§19) | H13 |
 | A region object or a `TGrowArray` element does not outlive its region | plan: `bpvet` S17 (static, zero cost); `SAFE_DEBUG` R12 (released pages lose access) as a second net | §20 |
 | A GC object is never freed while reachable; cycles are collected | plan: the collector + `bpvet` S18 (where a GC reference may live, it stays in its goroutine) | §20 |
+| A class cast is checked (`as`); no cast from a pointer or an integer to a reference | programmer; plan: `bpvet` S24 (`--fix` writes `as`) | H17 |
+| No untyped parameter, no variable typecast to an array or a record, no `absolute` outside unsafe | programmer; plan: `bpvet` S25 | H18 |
+| A variable is initialised before it is read | FPC warns; plan: `bp build` adds `-Sew`, the warning is an error | H19 |
 
 We do not claim this is Rust. We claim: in safe code there is no **syntactic**
 way to make the typical memory errors, and the remaining holes are listed above.
@@ -447,7 +451,7 @@ compensating check, and accepted risks are listed with a reason.
 | H6 | shared task fields; `TryLock` race | `bpvet` S11: a class, interface or named pointer field of a task is an error | `bpvet` S11 + lock in the cell, stress test | 10 |
 | H7 | `.Destroy` | nothing | `bpvet` S3 | 4 |
 | H8 | `TFoo.Create` not owned; `ShortString` | R3 partly | `bpvet` S6, S9 | 5 |
-| H9 | `Safe` not last in `uses` | `bpvet` S7; a program with `BP` first: a warning | program header that keeps `BP` last | 2, 2b |
+| H9 | `Safe` not last in `uses` | `bpvet` S7; a program with `BP` first: a warning | `bp build` adds `-FaBPThreads`, so `BP` is last in the program file too and S7 is an error there (§24.3) | 2, 2b; §24 step 1 |
 | H10 | unmarked unsafe code, stray `external` | nothing | `bpvet` S8, S12 | 3 |
 | H11 | non-exhaustive `case`, missing `const` | `bpvet` S13; S14 errors on copy-heavy parameters and warns when other by-value parameters are not changed | `bpvet` S13, S14 | 11 |
 | H12 | `{$R-}` in safe code | the debug-build recommendation (§6) | rule `{$R+}{$Q+}` + `bpvet` warning | 12 |
@@ -455,6 +459,9 @@ compensating check, and accepted risks are listed with a reason.
 | H14 | a dynamic array shared by goroutines: `TChan.Send` keeps the same array (`FBuf[...] := V`), a `TArray` task field shares it with the caller | nothing (§0 says: move or `Copy`) | Send = move: the last use of a local or `Copy`; `SAFE_DEBUG` R17 at `Recv` | §21 step 2 |
 | H15 | a mutable object behind `TShared` used by two goroutines | nothing | Sync inferred: frozen after its constructors, else `// sync: <how>` on the class | §21 step 2 |
 | H16 | a global written while goroutines run | nothing | `static mut`: a unit global is written only in its initialization; what a task reaches does not name the globals of the program | §21 step 2 |
+| H17 | an unchecked class cast: `TB(O).Y[100]` on an object that is a `TA` reads past it (§24.6) | nothing | `bpvet` S24: a downcast is `as`, `--fix` rewrites it; a cast from `Pointer` or an integer to a reference is S4 | §24 step 3 |
+| H18 | an untyped parameter with a variable typecast, `TBig(Buf)[N] := 1`, writes anywhere (§24.6); `absolute` | nothing | `bpvet` S25: unsafe outside a `// UNSAFE:` mark | §24 step 3 |
+| H19 | an uninitialised local of a class type is a garbage pointer: `var F: TFoo; WriteLn(F.X)` | FPC: a warning | `bp build` adds `-Sew` (0 warnings on the tests today, §24.6) | §24 step 2 |
 | H17 | an uninitialized local class reference, function result or `out` parameter: garbage, not nil | FPC warns, `bp build` does not fail | S21a: definite assignment in the typed `bpvet` | §22 step 0 |
 
 **H1. A borrow outlives its owner.**
@@ -1006,6 +1013,7 @@ or above the parameter suppresses its S14 finding.
 | v0.8 (design) | §22 final touches: what the users of Go, Rust, Zig, Swift, Kotlin, Gleam and Deno love and Better Pascal lacks (mostly tooling), each on something FPC already ships; what is not taken now and why |
 | v0.8.1 (design) | §22: interpolation on the existing syntax (`Fmt` + `--fix` + S20); nil as a guarantee (§22.9: H17 found, S21a-c); hot reload of routine bodies (§22.10) |
 | v0.9 (design) | §23 systems programming and the world of C: four profiles (S, U, H, F), bindings as tables of names bound at run time with no versioned import, the measurements on FPC binaries, kernels and drivers (hardware as types, inferred contexts) |
+| v0.10 (design) | §24 concept v4: one sentence for all lifetimes; marks of fact written by the machine, marks of intent by hand; `BP` last everywhere (`-FaBPThreads`, measured); what FPC 3.2 ships and the dialect had not used (nested procedure variables, type helpers, CORBA interfaces, all measured); `// raises:` inferred; the holes of §8 the table missed (an unchecked class cast, an untyped parameter, an uninitialised variable: H17–H19, S24, S25, `-Sew`); README rows for deploy, C, the standard library and models |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -2085,3 +2093,161 @@ read the object file of the changed unit, put its sections into new executable p
 the running program (the link map of its build), apply the few relocation types that FPC emits on the architecture, then
 write the jumps. A few hundred lines per architecture, Linux first. It is the last spike of §22.8, and it is done only if the
 fast restart proves not enough, for example for a text-mode program with a lot of state on the screen.
+
+## §24. Concept v4: one sentence, marks by the machine, what FPC already ships (design, plan)
+
+Status: design only; the facts below were measured on 2026-11-04 (FPC 3.2.2, x86_64, scratch programs of about ten
+lines each, built with `fpc -Cr -Co`; they become the compile and lint tests of the steps in §24.8). A fresh look at the
+whole concept after §21–§23, against the table of the README and against what the users of Rust, Go, Zig, Swift and
+Kotlin praise. Seven changes. Two of them shorten the concept, one removes its last exception, three take what FPC 3.2
+already ships and the dialect had not used, and one closes holes that the honest table of §8 did not list. Each one is
+small, and none adds a syntax.
+
+### 24.1 One sentence for all lifetimes
+
+Every memory rule of Better Pascal that is not "the compiler does it" is one sentence: **a reference never outlives its
+root.** What differs between the rules is only what the root is:
+
+| Reference | Root | Rule that checks it today |
+|---|---|---|
+| a parameter or a local of a class type (a borrow) | the call, or the owner it was read from (`Owner.Get`) | S5 |
+| a `TOwned` or `TShared` field | the object that holds the field; `TOwned` is moved, never copied | S5, S10 |
+| a region object, a `TGrowArray` element, a scope handle, a held object (`S.Hold`) | the region or the scope | S17 |
+| a `// borrow: arena` reference | the arena | S17d |
+| a component | its `Owner` (§21.4) | S6, S17 |
+| a task field, a channel message | the task: it may outlive the caller, so only a value or a moved owner has a root there | S11, S18 |
+| a GC object | the heap of its goroutine | S18 |
+| an interface value (§24.4) | the object behind it | S5 |
+| a nested procedure value (§24.4) | the frame of the routine it is nested in | S17 |
+
+Nothing changes in the checks. What changes is how they are explained: `bp explain` (§22.2) prints this sentence and the
+root of the reference first, and the rule number second; the REFERENCES block of §0 shrinks to the sentence and this
+table when the steps of §21 are done. `// borrow: <who owns it>` is the root written by hand where inference stops at the
+boundary of a unit, the same shape as `// root:`; when S5 moves onto the engine of S17 (§20), the mark becomes
+`// root: <owner>` and `bp fix` rewrites the old one.
+
+### 24.2 Marks of fact are written by the machine, marks of intent by hand
+
+Every mark of Better Pascal is one of two kinds, and the kinds are treated differently:
+
+| Kind | Marks | Who writes it |
+|---|---|---|
+| **fact**: something `bpvet` can compute from the code | the header from the file name (S21), reserved words in lower case (S22), `// root:` on exported routines (S17 v2), `// raises:` (§24.5), `{$modeswitch autoderef}` (§20), `{$modeswitch nestedprocvars}` and `{$modeswitch typehelpers}` (§24.4), the order of the fields of a GC class (S18), the `{$I}` lines of `// derive:` (§22.4), `as` for a class cast (§24.6) | `bp fix`; a human or a model never types it, and `bp build` names the fix when it is missing |
+| **intent**: something only the author knows | `// UNSAFE: <why>`, `// UNSAFE-UNIT: <why>`, `// borrow: <who>` (until §24.1), `// sync: <how>` (§21.2), `// keeps: <what>` (§22.3), `// context: irq` (§23), `// BP-STYLES:` (§20), `// derive:`, `// gen:` (§22.4) | the author, with a reason after the colon; found by grep and by the unsafe audit (§15) |
+
+The rule is what makes the concept short for a model: it writes plain Pascal, `bp fix` writes the facts, and §0 lists
+only the marks of intent. The analogue is `gofmt` and `goimports` in Go, where nobody formats by hand or writes an import
+line, extended to everything the typed `bpvet` can infer. A mark of fact that disagrees with the code is a finding with
+the fix, never a silent truth of its own.
+
+### 24.3 `BP` last everywhere: the program file is no exception
+
+The one exception of the header rule, "`BP` first in the program file, last in every unit" (§14, §18, H9), exists
+because the thread manager must be installed before `SysUtils` initializes, and it costs a warning of S7 and an
+`// UNSAFE:` mark on every test program. `fpc -Fa<unit>` inserts a unit at the start of the `uses` of a **program**
+(and only of a program, §2), which is exactly where the exception lives. Measured: `tests/ext/test_go.pas` with
+`uses SysUtils, BP;` built with `-FaBPThreads` passes all its tests (0 failed); built without the switch it stops with
+code 211 as §14 says. So:
+
+- `tools/bp build` adds `-FaBPThreads`; the rule becomes one line, **`BP` goes last in the `uses` of every module**, the
+  program file included; S7 reports a unit after `BP` in a program as an error, as it does in a unit, and the
+  `// UNSAFE:` marks on the test programs go.
+- With a bare `fpc` the user adds `-FaBPThreads` (one line of `fpc.cfg`), or keeps writing `BP` first: it still works.
+- H9 leaves the register; step 2b of unxed/bp#56 is answered.
+
+### 24.4 What FPC 3.2 already ships and the dialect has not used
+
+Three features of FPC 3.2.2 give what users of Swift, Kotlin and Go praise, with no new code in `BP` and no syntax of
+our own; each is a `{$modeswitch}` or a directive that `bp fix` writes, as it writes `autoderef` (§20). All three were
+run on 2026-11-04.
+
+- **Closures that cannot escape: `{$modeswitch nestedprocvars}`.** `type TVisit = procedure(X: Integer) is nested;` makes
+  a nested routine a value: `ForEach(A, @Add)` where `Add` is nested in the caller and writes the caller's local `Total`
+  (measured: `sum=10`). It captures the frame of the enclosing routine, so it is a borrow of that frame and has a root
+  (§24.1): passed down a call, never stored, never given to a task. S17 already rejects a nested routine kept as a
+  callback (`tests/lint/s17_callback_bad.pas`); S11 gains one line, a field of a nested procedure type in a task. These are the
+  non-escaping closures of Swift (its default) and the `FnMut` borrow of Rust, and they cover what §22.7 wanted closures
+  for inside a scope: `Filter`, `Map`, a comparator for `Sort`, `Retry(@Step)`, `WithLock(@Body)`. A goroutine still takes a
+  `TTask` (it may outlive the frame). The anonymous functions of FPC main add the escaping kind and the inline syntax, not
+  the capability.
+- **Extension methods: `{$modeswitch typehelpers}`.** A `type helper for String` adds methods to a type that is not a
+  class, as Kotlin extension functions and Swift extensions do. `SysUtils` already ships `TStringHelper`:
+  `S.Trim`, `S.Split([','])`, `S.StartsWith('a')`, `(42).ToString` work on the UTF-8 `String` of §3 with byte lengths
+  (measured: `S.Trim.Length` and `Length(S.Trim)` are both 20 for a Cyrillic text of 11 code points). `BP` adds one
+  helper with the code point view (`S.CPLength`, `for Ch in S.CodePoints`). Caveats: `Chars[I]` and `IndexOf` of
+  `TStringHelper` are byte based, as `S[I]` is (§3), and `ToUpper` of a non-ASCII text goes through the §3 limitation. This
+  is the same mechanism that poisons `.Free` (§6): a helper on `TObject`.
+- **Interfaces as borrows: `{$interfaces corba}`.** A CORBA interface is a plain reference with no counter: any class
+  implements it (`TConsole = class(TObject, IWriter)`, no `TInterfacedObject`), and passing it is a borrow (measured:
+  `Emit(C)` with `W: IWriter`, then `still alive`, then `destroyed` at the owner's `Free`). This is the interface of Go,
+  polymorphism without inheritance, and without the ownership entanglement of COM (R3, "hold the object only through the
+  interface", §0 item 5). Its root is the object behind it (§24.1), so an interface local is a borrow for S5 and an
+  interface field needs a root like any class field. `bp new` (§22.1) writes the directive into a new module; a COM
+  interface stays available for the code that needs it (`IInterface`, the LCL), and the typed `bpvet` tells the two
+  apart by the directive of the module. Caveat: `as` and `Supports` on a CORBA interface need a GUID in its declaration.
+
+### 24.5 Errors visible in the interface, without checked exceptions
+
+Zig's error sets and Rust's `Result` are loved for one thing: what can fail stands in the signature. Pascal exceptions
+hide it, and §16 keeps exceptions (`?` and `Result<T, E>` are not taken). The engine of §23 (a fixpoint over the call
+graph: which routines may allocate, block or raise) computes the set of exception classes a routine may raise: its
+`raise` statements and the sets of its callees, minus what its `except on E: X` handlers catch. Inside a module nothing
+is written; on an exported routine `bp fix` writes `// raises: EInOutError, EParseError`, a mark of fact (§24.2), and
+`bp explain` and `bp lsp` (§22.2) show it on a call. Nothing forces a caller to handle it: this is Zig's `!T` as
+documentation, not Java's checked exceptions. Two findings come with it: an `except` block with an empty body and no
+comment (an error swallowed, the `_ = err` of Go lints), and a `raise Exception.Create(...)` of the base class in a unit
+(a routine's errors should be a class of its own, so that `// raises:` says something).
+
+### 24.6 The holes the honest table of §8 missed
+
+Three programs that compile with `fpc -Cr -Co` without a warning and are memory-unsafe, found by reading §8 again:
+
+1. **An unchecked class cast.** `TB(O).Y[100]` where `O` holds a `TA` (the parent, without the array) read a word past
+   the object (measured: `1302401528`, garbage). `O as TB` raises `EInvalidCast` instead. **S24:** in safe code a class
+   typecast `TFoo(X)` to a descendant is written `X as TFoo` (`bp fix` rewrites it; the typed `bpvet` knows a downcast
+   from an upcast, which is free and stays); a cast from `Pointer` or from an integer to a class or a pointer is S4.
+2. **An untyped parameter with a variable typecast.** `procedure Poke(var Buf; N: Integer)` with `TBig(Buf)[N] := 1`
+   wrote 100000 bytes past a `Byte` (measured: runtime error 216; it could as well have been silent). **S25:** an untyped
+   `var`/`const`/`out` parameter, a variable typecast to an array or record type (`TBig(X)`) and the `absolute`
+   directive are unsafe outside a `// UNSAFE:` mark. `Hold(out V; Obj)` of §21.1 lives inside `BP`, unsafe inside with a
+   safe facade, as `TCResource` does.
+3. **An uninitialised variable.** `var F: TFoo; WriteLn(F.X)` dereferences a garbage pointer, not `nil`. FPC says
+   `Warning: Local variable "F" does not seem to be initialized` (and `Function result does not seem to be set` for a
+   result never assigned), and `-Sew` makes a warning an error. **`tools/bp build` adds `-Sew`:** the flow analysis of
+   the compiler itself does the check, and the whole test suite of this repository builds with it today with 0 warnings
+   (measured on `test_safe`, `test_sumtype`, `test_go`, `test_utf8`, `test_threads`). Caveat: a result assigned in one
+   branch only is not reported by FPC 3.2.2; it is `nil` or garbage at the use, and §22.7 covers the `nil` half.
+
+Two more rows of the same kind, cheaper: `with` (S17 cannot root a field without a base, §20; `bp fix` expands it, the
+CodeTools of Lazarus do that already), and `goto`/`label` (a style finding of S22's kind). The rows H17–H19 of §8 record
+the three holes until the steps close them.
+
+### 24.7 Against the other languages, once more
+
+| Loved in | Was in Better Pascal | After §24 |
+|---|---|---|
+| Swift non-escaping closures, Kotlin lambdas | "no closures in FPC 3.2" (§14, §22.7) | `nestedprocvars`: the non-escaping kind, today |
+| Kotlin and Swift extensions, Rust `impl` on a foreign type | not used | `typehelpers`, shipped by FPC |
+| Go interfaces | COM interfaces with ownership | `{$interfaces corba}`: an interface is a borrow |
+| Zig error sets, Rust `Result` in the signature | hidden exceptions | `// raises:` inferred and written |
+| Rust: no unchecked downcast, no `transmute` outside `unsafe`; Zig: no silent cast | not listed in §8 | S24, S25 |
+| Rust, Zig, Go: a read of an uninitialised variable does not compile | an FPC warning | `-Sew` in `bp build` |
+| `gofmt` and `goimports`: nobody writes what the machine can | `--fix` for five marks | the rule of §24.2 for every mark of fact |
+| Rust lifetimes explained as one idea | eight rules | one sentence and a table of roots (§24.1) |
+
+### 24.8 Plan by steps (cheapest first)
+
+One step is one PR from a fresh `main`, with a criterion of done.
+
+1. **`-FaBPThreads` in `tools/bp`;** S7 reports a unit after `BP` in a program as an error; the test programs lose their
+   `// UNSAFE:` on `uses`. *Done:* `tests/ext/compile/mf_s07_bp_first.pas` becomes an ok test; CI green in every mode.
+2. **`-Sew` in `tools/bp build`.** *Done:* a compile test `mf_uninit.pas` with an uninitialised local does not build;
+   the suite builds.
+3. **S24 and S25** in the typed `bpvet`, with `--fix` writing `as`. *Done:* ok/bad lint tests; H17 and H18 leave §8.
+4. **Nested procedure values:** S17 roots one in its frame; `bp fix` writes the modeswitch; `tests/` gets a `ForEach` and
+   a `Sort` with a nested comparator. *Done:* lint tests, the example builds with `bp build`.
+5. **The `String` helper of `BP`** (`CPLength`, `CodePoints`); `bp fix` writes `typehelpers`. *Done:* `test_utf8`.
+6. **CORBA interfaces:** S5 treats an interface local as a borrow and an interface field as a class field; `bp new`
+   writes the directive. *Done:* lint tests; §0 item 5 rewritten.
+7. **`// raises:`** on the engine of §23, the two findings of §24.5. *Done:* lint tests; `bp explain` shows the set.
+8. **§0 rewritten** around §24.1 and §24.2, after the steps of §21.7 that change the decision tree; not before.
