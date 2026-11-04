@@ -1115,11 +1115,12 @@ and `TGrowArray<T>`. Verdict: **the surface of §20 works as designed**, and one
   bump pointer in a list of blocks that double in size, and a `TGrowArray` keeps its elements in chunks of 16, 32, 64, ...
   elements (the chunk of an index is its highest bit). Nothing ever moves, and growth is limited only by memory, so the
   same code runs on x86_64, i386 and DOS and R11 is not needed. 10^6 elements of 8 bytes took 16 MiB of region (the doubling
-  of chunks and of blocks). Open for the concept: drop the reservation and R11.
+  of chunks and of blocks). Decided by the owner on 2026-11-04: no reservation, no R11 (below).
 - **Cost of `At`:** in a tight loop of 2·10^7 reads, `A.At(I).X` took about 3 times as long as `D[I].X` on a dynamic array
   (63 against 18 ms at -O2 on x86_64: the bounds check and the highest-bit lookup); under qemu 3 times on aarch64 and 7
-  times on i386, where `BsrQWord` is a 64-bit routine (a lookup of the width of `SizeUInt` is the fix). Open for the concept: a `for P in A`
-  enumerator that walks chunk by chunk (the speed of a plain array), and whether `At` keeps its bounds check in release.
+  times on i386, where `BsrQWord` is a 64-bit routine (a lookup of the width of `SizeUInt` is the fix). Decided by the
+  owner on 2026-11-04: `At` keeps its bounds check in release, and loops get the speed of a plain array from `for P in A`
+  (below).
 - A `TGrowArray` is a record that holds one pointer to its header in the region, so a copy of the record refers to the same
   array: no value-copy surprise.
 
@@ -1133,16 +1134,15 @@ exchange only flat values. This gives the speed of manual memory without lifetim
 
 What Better Pascal takes: the bump region freed at once, the growable array that never moves, the root rule, results built in
 the caller's region, flat messages between goroutines (already S11 and `TChan`). What it does not take: a new language and
-compiler, the C backend, the static computation of the number of data stacks (here every region reserves its own range of
-addresses), the ban on dynamic dispatch (classes and virtual methods work in the region style too, below).
+compiler, the C backend, the static computation of the number of data stacks (here every region grows by blocks of its
+own), the ban on dynamic dispatch (classes and virtual methods work in the region style too, below).
 
 API sketch (names may change in the spike steps of the plan):
 
 ```pascal
-TRegion = record                          // a reserved range of addresses + a bump pointer; a managed record
-  class function Create(AReserve: SizeUInt = 0): TRegion; static; // 0 = the default of the target (below);
-                                          // the new region becomes the current one of the goroutine
-  procedure Reset;                        // rewind to empty and keep the memory: one region per loop iteration
+TRegion = record                          // a bump pointer in blocks that double in size; a managed record
+  class function Create: TRegion; static; // the new region becomes the current one of the goroutine
+  procedure Reset;                        // rewind to empty, keep the largest block: one region per loop iteration
   procedure Release;                      // everything allocated in it, at once; also when it leaves its scope
 end;
 
@@ -1151,13 +1151,15 @@ TRegionObject = class                     // a class whose objects live in the c
   procedure FreeInstance; override;                // nothing: the region frees its objects at once
 end;
 
-generic TGrowArray<T> = record            // grow-only, never moves: an element stays where it is while the array grows
+generic TGrowArray<T> = record            // grow-only, never moves: chunks of 16, 32, 64, ... elements in the region
   class function Create: TGrowArray; static;                // in the current region (below)
   class function Create(var R: TRegion): TGrowArray; static; // in a region named explicitly
   function Push(const V: T): SizeInt;     // index of the new element
   function Len: SizeInt;
   function At(I: SizeInt): PT;            // in-place access: A.At(I).X := 1 (needs {$modeswitch autoderef}, below)
   property Items[I: SizeInt]: T; default; // read and write by value: A[I] := V; bounds checked (R2) as TSlice
+  function GetEnumerator: TEnumerator;    // for P in A: P is PT, chunk by chunk, no bounds check per element
+  function ToArray: specialize TArray<T>; // a contiguous copy (for TSlice, FFI)
 end;
 ```
 
@@ -1246,10 +1248,17 @@ goes; nobody passes a region around. Better Pascal gets close to that without a 
 - The explicit form `Create(var R)` stays for the cases where the current region is not the right one; S17 treats both
   forms alike.
 
-- **Reservation and graceful degradation.** On x86_64 and aarch64 a region reserves a large range (`mmap` with no access,
-  committed as it grows; `VirtualAlloc` on Windows) and growth is a bump. On i386, DOS and other small address spaces the
-  default reservation is small and fixed (given to `Create`); growing past it raises `ESafety` R11 rather than moving data.
-  Programs keep working; only the limit differs.
+- **No reserved range of addresses: the same on every target.** A region is a bump pointer in a list of blocks that double
+  in size (from 4 KiB); a block that is full is left as it is, and the next one is taken from the heap. `Reset` keeps the
+  largest block, so the next iteration of a loop usually allocates nothing (as `bump-scope` in Rust). A `TGrowArray` keeps
+  its elements in chunks of 16, 32, 64, ... elements; the chunk of an index is its highest bit (as `SegmentedList` in
+  Zig), found with a lookup of the width of `SizeUInt`. Nothing ever moves, growth is limited only by memory, and x86_64,
+  aarch64, i386 and DOS behave alike: no fixed limit, no R11, no `mmap` reservation (the earlier design). Verified by spike 2.
+- **Elements are not contiguous.** A `TGrowArray` cannot be passed as a `TSlice` or to FFI as one block; `ToArray` makes a
+  contiguous copy, and data that must be one block is a dynamic array (`TArray<T>`, `TSlice`). Zig makes the same trade.
+- **The cost of access.** `At(I)` and `A[I]` check the bounds in every build (R2, as `TSlice`, as Go and Rust do); in a
+  tight loop they cost about 3 times a plain array index (spike 2). `for P in A` walks chunk by chunk and gives the speed
+  of a plain array: the bounds are checked once per chunk, `P^.X` (or `P.X` with `autoderef`) is the element in place.
 - **Goroutines.** A region belongs to one goroutine; S18 keeps its references there; data leaves through a channel by value.
 
 **Root analysis (S17), the core of the style.** The root of a region object, of a `TGrowArray` and of the result of its
@@ -1271,8 +1280,8 @@ cannot be stored into a variable of an outer one). The rules:
 The same engine also checks `// borrow: arena` references against their arena (H3 statically), and the borrow-escape part
 of S5 (H1) may move onto it: a borrow of `Owner.Get` is a value rooted in `Owner`.
 
-`SAFE_DEBUG` keeps a second net for errors of `bpvet` itself, with no code at access: a released region is not reused, its
-pages lose all access (`mprotect`), so a use after `Release`/`Reset` stops with `EAccessViolation` at once (R12) instead of
+`SAFE_DEBUG` keeps a second net for errors of `bpvet` itself, with no code at access: the blocks of a region are taken by
+`mmap` in this build, a released block is not reused and its pages lose all access (`mprotect`), so a use after `Release`/`Reset` stops with `EAccessViolation` at once (R12) instead of
 reading memory of another object. A release build reuses the memory.
 
 ### GC style
@@ -1356,7 +1365,7 @@ by trial deletion, as in CPython). It needs no stack scan and frees acyclic garb
 |---|---|
 | S17 | root analysis of the region style: S17a no destructor in a region class, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena` |
 | S18 | style boundaries: rooted values and GC references stay in their style and goroutine; where a GC reference may live; reference fields first in a GC class (`--fix` reorders); a destructor in a GC class; `TWeak` or any other observer of the life of a GC object; the `// BP-STYLES:` allow-list |
-| R11 | a region or a `TGrowArray` grows past a fixed reservation (small address spaces) |
+| R11 | not used (it was a growth past a fixed reservation; regions and `TGrowArray` have no reservation, spike 2) |
 | R12 | `SAFE_DEBUG`: access to a released region (its pages lose access: `EAccessViolation`) |
 | R13 | `SAFE_DEBUG`: a GC object used on another goroutine |
 | R14 | `Release` of a region that is not the innermost one of the goroutine (regions are nested) |
