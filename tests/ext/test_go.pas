@@ -35,6 +35,26 @@ type
     procedure Run; override;
   end;
 
+  { Sends 1..FN over FOut with Select, or stops on Done. }
+  TSelSender = class(TTask)
+  private
+    FOut: TIntChan;
+    FN: Integer;
+  public
+    constructor Create(const AOut: TIntChan; const AN: Integer);
+    procedure Run; override;
+  end;
+
+  { Receives FN values with Select and sends their sum. }
+  TSelReceiver = class(TTask)
+  private
+    FIn, FSum: TIntChan;
+    FN: Integer;
+  public
+    constructor Create(const AIn, ASum: TIntChan; const AN: Integer);
+    procedure Run; override;
+  end;
+
 var
   Failed: Integer = 0;
   Counter: LongInt = 0;
@@ -78,6 +98,41 @@ begin
       1: Exit; // the group is cancelled
     end;
   until False;
+end;
+
+constructor TSelSender.Create(const AOut: TIntChan; const AN: Integer);
+begin
+  inherited Create;
+  FOut := AOut;
+  FN := AN;
+end;
+
+procedure TSelSender.Run;
+var
+  I: Integer;
+begin
+  for I := 1 to FN do
+    if Select([FOut.SendCase(I), Done.RecvCase]) = 1 then
+      Exit;
+end;
+
+constructor TSelReceiver.Create(const AIn, ASum: TIntChan; const AN: Integer);
+begin
+  inherited Create;
+  FIn := AIn;
+  FSum := ASum;
+  FN := AN;
+end;
+
+procedure TSelReceiver.Run;
+var
+  I, V, Sum: Integer;
+begin
+  Sum := 0;
+  for I := 1 to FN do
+    if Select([FIn.RecvCase(V)]) = 0 then
+      Inc(Sum, V);
+  FSum.Send(Sum);
 end;
 
 procedure Bump;
@@ -215,6 +270,70 @@ begin
   Check(Counter = 11, 'select: worker received values, then stopped on Done');
 end;
 
+procedure AtomicSelect;
+const
+  N = 2000;
+var
+  G: TGroup;
+  A, B, U, Sum: TIntChan;
+  V, W, I, Got, Picks0, Picks1: Integer;
+  Ok, Raised: Boolean;
+begin
+  // a send case into a buffer with room, then a receive case takes the value
+  A := TIntChan.Create(1);
+  B := TIntChan.Create(1);
+  Check(Select([A.SendCase(5), B.RecvCase(V)], 0) = 0, 'atomic select: a send case into a free buffer');
+  V := 0;
+  Check((Select([B.RecvCase(W), A.RecvCase(V)], 0) = 1) and (V = 5), 'atomic select: the receive case gets the value');
+  Check(Select([A.RecvCase(V), B.RecvCase(V)], 30) = -1, 'atomic select: timeout returns -1');
+  Check(Select([A.RecvCase(V)], 0) = -1, 'atomic select: TimeoutMs 0 does not wait');
+
+  // two ready cases: exactly one happens, and both are picked over many rounds
+  Picks0 := 0;
+  Picks1 := 0;
+  for I := 1 to 200 do
+  begin
+    A.Send(1);
+    B.Send(2);
+    case Select([A.RecvCase(V), B.RecvCase(W)]) of
+      0: if (V = 1) and B.TryRecv(W) and not A.TryRecv(V) then Inc(Picks0);
+      1: if (W = 2) and A.TryRecv(V) and not B.TryRecv(W) then Inc(Picks1);
+    end;
+  end;
+  Check((Picks0 > 0) and (Picks1 > 0) and (Picks0 + Picks1 = 200),
+    Format('atomic select: exactly one of two ready cases, picked at random (%d and %d of 200)', [Picks0, Picks1]));
+
+  // unbuffered: a send case and a receive case in two goroutines meet; every value arrives exactly once
+  U := TIntChan.Create;
+  Sum := TIntChan.Create(1);
+  G := TGroup.Create;
+  G.Go(TSelSender.Create(U, N));
+  G.Go(TSelReceiver.Create(U, Sum, N));
+  Sum.Recv(Got);
+  G.Wait;
+  Check(Got = N * (N + 1) div 2, Format('atomic select: unbuffered send and receive cases, sum %d', [Got]));
+
+  // a sender blocked in a send case stops on Done
+  G := TGroup.Create;
+  G.Go(TSelSender.Create(U, 1));
+  Sleep(20);
+  G.Cancel;
+  G.Wait;
+  Check(not U.TryRecv(V), 'atomic select: a cancelled send case sent nothing');
+
+  // closed: a receive case gets Ok = False, a send case raises R6
+  A.Close;
+  Ok := True;
+  Check((Select([A.RecvCase(V, Ok)], 0) = 0) and not Ok and (V = 0), 'atomic select: a closed channel gives Ok = False');
+  Raised := False;
+  try
+    Select([A.SendCase(1)]);
+  except
+    on ESafety do Raised := True;
+  end;
+  Check(Raised, 'atomic select: a send case into a closed channel raises R6');
+end;
+
 procedure Structured;
 var
   G: TGroup;
@@ -236,6 +355,7 @@ begin
   WriteLn('-- SharedArray'); SharedArray;
   WriteLn('-- Failure'); Failure;
   WriteLn('-- SelectAndCancel'); SelectAndCancel;
+  WriteLn('-- AtomicSelect'); AtomicSelect;
   WriteLn('-- Structured'); Structured;
   Check(Counter = 200, 'group: scope exit waits for all 200 tasks');
   try
