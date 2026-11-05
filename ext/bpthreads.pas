@@ -126,6 +126,9 @@ type
     RunNext: Pointer;      // a carrier: the goroutine (PRawThread) a goroutine on it woke last, run next (runnext of Go)
     Picks: PtrUInt;        // a carrier: picks so far (every 61st looks at the run queue first)
     Seen: PtrUInt;         // a carrier: Switches at the last tick of the monitor
+    QLock: LongInt;        // a carrier: the lock of its run queue
+    QCount: LongInt;       // a carrier: goroutines in its run queue (read without the lock by the others)
+    QHead, QTail: PRawThread; // a carrier: its run queue (the goroutines that ran on it made ready), FIFO
     Done: TSchedEvent;     // set when the goroutine ends (WaitForThreadTerminate)
   end;
 
