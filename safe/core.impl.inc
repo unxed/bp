@@ -209,7 +209,6 @@ type
 
 const
   SafeQPoisonSlots = 512;   // virtual methods of the poison VMT; a class with more has the rest unchecked
-  SafeQFillByte = $DE;
   SafeQBuckets = 1024;
   SafeQNodeVmt = 2 * SizeOf(System.Pointer) + 256;
 
@@ -218,6 +217,7 @@ var
   GQInstalled: Boolean = False;
   GQClosed: Boolean = False;       // the quarantine was flushed at exit: nothing is armed any more
   GQOld: TMemoryManager;
+  GQFill: Byte = $DE;              // the poison of the fields
   GQMaxObjects: SizeInt = 4096;
   GQMaxBytes: SizeInt = 16 * 1024 * 1024;
   GQRing: PSafeQArr = nil;
@@ -404,7 +404,7 @@ begin
       Inc(GQBytes, Size);
       W^[0] := SafeQPoisonFor(W^[0]);
       Tail := System.PByte(P) + SizeOf(PtrUInt);
-      System.FillChar(Tail^, Size - SizeOf(PtrUInt), SafeQFillByte);
+      System.FillChar(Tail^, Size - SizeOf(PtrUInt), GQFill);
       SafeQUnlock;
       Exit(Size);
     end;
@@ -483,6 +483,11 @@ begin
   SafeQUnlock;
   if SafeDebugChecks then
     SafeQuarantineEnsure;   // the tables are made now, not at the first free
+end;
+
+procedure SafeQuarantineSetFill(AFill: Byte);
+begin
+  GQFill := AFill;
 end;
 
 function SafeQuarantineCount: SizeInt;

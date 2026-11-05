@@ -86,6 +86,7 @@ procedure SafeCheckNoLeaks;
   before the objects are made (the quarantine is flushed when they change). SafeQuarantineFlush gives all of it back
   to the heap; it also runs at exit. }
 procedure SafeQuarantineSetLimits(MaxObjects, MaxBytes: SizeInt);
+procedure SafeQuarantineSetFill(AFill: Byte); // the byte of the poison; $DE by default
 function SafeQuarantineCount: SizeInt;
 procedure SafeQuarantineFlush;
 { Exceptions suppressed in deferred TDefer calls (see below). }

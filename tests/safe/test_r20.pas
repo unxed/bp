@@ -196,6 +196,20 @@ begin
   B.Reset;
 end;
 
+procedure FillIsConfigurable;
+var
+  B: TShapeBox;
+  S: TShape;
+begin
+  SafeQuarantineSetFill($5A);
+  B := TShapeBox.Own(TShape.Create('fill', 9));
+  S := B.Get;
+  B.Reset;
+  // UNSAFE: the test reads the freed instance on purpose
+  Check(System.PByte(S)[2 * SizeOf(System.Pointer)] = $5A, 'r20: the poison byte is configurable');
+  SafeQuarantineSetFill($DE);
+end;
+
 procedure ArenaIsQuarantined;
 var
   A: TArena;
@@ -277,6 +291,7 @@ begin
   ClassNameOfFreed;
   FieldsArePoisoned;
   SharedAndTiny;
+  FillIsConfigurable;
   ArenaIsQuarantined;
   HeldIsQuarantined;
   ChecksOff;
