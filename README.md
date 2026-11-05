@@ -6,6 +6,26 @@
 > Pascal are the guarantees of `bp build`; a cached check takes about 30 ms.
 > `bp run FILE.pas [args]` runs it (a file with `#!/usr/bin/env -S bp run` is a script), `bp new NAME` starts a project.
 
+**In numbers, against C, Rust, Go and Goose** (one machine, medians; the scripts and the verdicts:
+`tests/bench/size.sh` and `safe/SPEC.md` §25.5, `tests/bench/compare.sh` and §25.2, the plan: unxed/bp#181):
+
+| | Bp | C (gcc) | Rust | Go | Goose |
+|---|---|---|---|---|---|
+| Hello world, size | 1171 KiB; 697 KiB with smart linking (`-XX`); static, no libc | 14 KiB dynamic, 690 KiB static | 354 KiB stripped, dynamic | 1203 KiB | 54 KiB, dynamic |
+| Hello world, peak memory | **0.3 MiB** (with `-XX`), 0.7 MiB | 1.2 MiB dynamic, 0.6 MiB static | 1.8 MiB | 1.6 MiB | 1.5 MiB |
+| Hello world, start | **587 us** (with `-XX`) | 732 us dynamic, 445 us static | 1019 us | 1496 us | 904 us |
+| Rebuild of a program | 171 ms (the check and `fpc`) | 55 ms | 237 ms | 67 ms | 110 ms |
+| Run time, 4 programs (2026-11-05 baseline) | 1.4–2.6x of C | 1x | 1.05–1.75x | 1.13–2.07x | 0.16–1.24x |
+| Toolchain | 282 MiB with all units; no C compiler | | 1.2 GiB, needs a C linker | 97 MiB | 28 MiB, compiles through gcc |
+
+- **Ahead:** the memory of a program, the start (all but static C), one static file that runs on any Linux.
+- **Reaching:**
+  - the size: smart linking by default, and the Unicode collation table only on request, about 270 KiB for hello world;
+  - the rebuild: under 100 ms;
+  - the run time: the levers of §25.2;
+  - goroutines: M:N with `BP_MN=1`, and the memory manager of BP with `BP_HEAP=bp`, both off by default for now.
+- **Accepted as the niche:** a dynamic binary over glibc is smaller, but runs only where that glibc is.
+
 **How it compares** (built with `bp build`; measured 2026-11-04, details in unxed/bp#108 and `safe/SPEC.md` §20):
 
 | | Rust | Go | Goose | Zig | Mojo |
@@ -16,7 +36,7 @@
 | Array iteration | on par (`for C in A.Chunks` is as fast as a plain array) | on par | on par | on par | on par |
 | Ecosystem | comparable: every FPC package and Lazarus can be used as is, as unchecked units (like C libraries in Rust or Zig), and moved to the bp dialect step by step | comparable | larger | larger | larger |
 | Data races | behind for now: Rust checks `Send`/`Sync` in the compiler; `bp build` checks task fields (S11), but a dynamic array, a `TShared` object or a global shared by goroutines is not checked yet (`safe/SPEC.md` §21.2 closes it) | better in kind: a prohibition before the build, not a detector at run time (`-race`), with the same open cases | behind until §21.2: Goose passes only flat values | better: Zig does not check races | unknown |
-| Goroutines | behind in scale: one task is one OS thread, thousands of them (async Rust runs millions; plan: M:N, §21.3) | behind in scale, better in structure: a group waits for its tasks, the error of a task reaches `Wait` | unknown | unknown | unknown |
+| Goroutines | behind in scale by default: one task is one OS thread; with `BP_MN=1` goroutines run M:N on a few carriers (§21.3), not yet the default | behind in scale, better in structure: a group waits for its tasks, the error of a task reaches `Wait` | unknown | unknown | unknown |
 | Deploy | better: one static file without libc by default runs on any distribution (Rust links the glibc of the build machine unless a musl target is chosen) | on par: Go is static by default too | unknown | on par | unknown |
 | C and the host | behind until `safe/SPEC.md` §23: today `-dSAFE_LIBC` ties the binary to the build glibc, as Rust does; the plan binds host libraries at run time by name, with no versioned import | better in kind: no C toolchain in the build (cgo needs one); behind in breadth until §23 | unknown | behind: Zig ships libc headers for many versions and `zig cc` | unknown |
 | Standard library | larger: the FCL of FPC ships HTTP, JSON, XML, regular expressions, SQL, zip; Rust leaves them to crates | on par: the Go standard library is as broad | larger | larger: the Zig std is small and C libraries fill the gap | unknown |
