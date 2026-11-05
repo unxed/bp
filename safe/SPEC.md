@@ -183,7 +183,8 @@ FFI                                    (§13; like cgo)
 Take the best of Go (memory safety, code that is simple to write and for a model to generate, build speed,
 performance, goroutines, light dependencies) and replace the unpredictability of a collector with the determinism of
 owners and regions, in a way that needs no lifetime annotations written by hand: everything is to be inferred.
-The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
+Whether the reliability of Rust can be reached this way is an open question, and the project is a study of its
+feasibility. The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
 
 FPC already has almost everything: reference-counted strings with an encoding, dynamic arrays, records
 with automatic finalization, interfaces with an atomic counter, range checks,
@@ -1121,6 +1122,7 @@ or above the parameter suppresses its S14 finding.
 | v0.41.1 | §24.9 decided by the owner: the liveness until the last use for every *change* rule now, the codes kept, `// borrow:` stays intent, the quarantine R20 and the inferred freeing methods both, `// root:` a fact, H20 first (#207), `procedure of object` with the LCL, `M.Ref` one expression |
 | v0.42 | §24.4 extension methods (`typehelpers`): the dialect writes the modeswitch in the module; every rule of §6 checks the body of a helper method (`tests/lint/helper_*.pas`); S29: a helper for `TObject` must inherit `TSafeObjectHelper`, else `.Free` compiles again; a helper that reads a private member of the type it extends does not resolve in the typed mode; the rule card (§0) gets a block; the status rows of S13 (implemented) and of the speed (measured, §25.2, unxed/bp#181, #108) are corrected |
 | v0.44 | the philosophy of Better Pascal (§1, README): the simplicity of development of Go with the performance and reliability of Rust, the determinism of owners and regions instead of a collector; goroutine is the term of the project (§14); goroutines run M:N by default (`BP_MN=0`, `-dBP_1TO1` for 1:1), CI runs the 1:1 mode as the extra one |
+| v0.44.1 | the philosophy (§1, README): whether the reliability of Rust can be reached without lifetime annotations is an open question, and the project is a study of its feasibility; §24.9: the audit of `// UNSAFE:` matters most for generated code |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -3119,6 +3121,10 @@ The rule of §24.2 holds, and the model sorts the lifetime marks by it:
 | `// sync: <how>`, `// UNSAFE:`, `// UNSAFE-UNIT:`, `// keeps:`, `// BP-STYLES:` | **intent** | as in §24.2 |
 | `{$modeswitch nestedprocvars}`, `{$modeswitch autoderef}` | **fact** | `bp fix` writes them when the module uses the feature |
 | `{$interfaces corba}` | **default of `bp new`** | it changes the meaning of the interfaces of the module, so it is not inferred |
+
+The audit of the marks of intent matters most for generated code: a model that meets a finding of `bpvet` may answer
+it with `// UNSAFE:` instead of a fix, so the `// UNSAFE:` marks a change adds are what a review reads first, and the
+unsafe audit (§15) counts them.
 
 This changes one line of §24.1: `// borrow:` does not become `// root:`. A `// root:` is always a fact that `bpvet`
 checks against the code; a `// borrow:` is always a claim of the author. Two spellings for two kinds keep a fact from
