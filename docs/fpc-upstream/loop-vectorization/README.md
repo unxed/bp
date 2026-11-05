@@ -1,5 +1,7 @@
 x86_64: simple loops over arrays are not vectorized (Y[I] := Y[I] + A * X[I]: 1.9x slower than gcc -O3)
 
+Filed 2026-11-05 as https://gitlab.com/freepascal.org/fpc/source/-/issues/42043 (here: #192, part of #185).
+
 ## Summary
 
 FPC compiles a loop over arrays of `Double` one element per instruction (`mulsd`, `addsd`). gcc -O3 does two

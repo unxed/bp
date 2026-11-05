@@ -1,5 +1,7 @@
 x86_64: a record parameter passed in registers is stored to the stack on entry and read back on every use
 
+Filed 2026-11-05 as https://gitlab.com/freepascal.org/fpc/source/-/issues/42042 (here: #191, part of #185).
+
 ## Summary
 
 A `const` record of 16 bytes (a dynamic array and a `Cardinal`) is passed in two registers (`%rdi`, `%rsi`). The
