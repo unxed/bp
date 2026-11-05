@@ -210,9 +210,11 @@ sources() {
 }
 make_stubs() {
   local sh stubtargets=("${targets[@]}")
-  # the key: the identifiers and uses of the program (an edit that adds none keeps the stubs) and the name, size and
-  # time of every file of the unit path (BP and the modules change rarely, and a stat is cheaper than a read)
-  sh=$( { "$fpc" -iV; python3 "$root/tools/bpvet/resolver/genstubs.py" --key "${stubtargets[@]}"
+  # the key: the identifiers and uses of the program (bpvet --stubkey; an edit that adds none keeps the stubs), and the
+  # name, size and time of genstubs.py and of every file of the unit path (they change rarely, and a stat is cheaper
+  # than a read)
+  sh=$( { "$fpc" -iV; "$bpvet" --stubkey "${stubtargets[@]}"
+          stat -c '%n %s %Y' "$root/tools/bpvet/resolver/genstubs.py"
           for d in "$root" "${dirs[@]}"; do stat -c '%n %s %Y' "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true; done
         } | sha256sum | cut -c1-16)
   stubs=$cache/stubs-$sh
