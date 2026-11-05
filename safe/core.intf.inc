@@ -78,6 +78,16 @@ var
   the fields of the objects themselves (not in dynamic arrays or records on the heap that they point to). }
 function SafeLiveCount: LongInt;
 procedure SafeCheckNoLeaks;
+{ R20, the quarantine of freed class objects (debug checks only). With SafeDebugChecks on, an object that TOwned,
+  TShared, TArena or Hold destroys is not returned to the heap: its memory goes to a FIFO of at most MaxObjects objects
+  and MaxBytes bytes (the defaults are 4096 and 16 MiB; the oldest leaves when a bound is reached). Its VMT pointer is
+  replaced by a VMT whose every virtual method raises ESafety ('SAFE-R20', naming the class that was freed), and the
+  rest of the instance is filled with $DE. The checks are off by default: then nothing of this runs. The limits are set
+  before the objects are made (the quarantine is flushed when they change). SafeQuarantineFlush gives all of it back
+  to the heap; it also runs at exit. }
+procedure SafeQuarantineSetLimits(MaxObjects, MaxBytes: SizeInt);
+function SafeQuarantineCount: SizeInt;
+procedure SafeQuarantineFlush;
 { Exceptions suppressed in deferred TDefer calls (see below). }
 function SafeDeferFailures: LongInt;
 

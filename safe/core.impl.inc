@@ -177,6 +177,351 @@ begin
   raise ESafety.Create(Msg);
 end;
 
+{ ---------- R20: the quarantine of freed class objects (SAFE_DEBUG) ----------
+  The paths that destroy an object for the dialect (TSafeLife, TSafeArenaImpl.FreeAll, a held object of a region) call
+  SafeDestroyObject. With debug checks on it arms the address of the object, runs the destructor, and the
+  FreeMem(Pointer(Self)) that ends every destructor reaches a wrapper of the memory manager, which finds the address
+  armed and keeps the block: its VMT pointer becomes the poison VMT, the fields $DE, and the block waits in a ring.
+  The wrapper goes over the manager in use (the heap of BP, the heap of the RTL, heaptrc): it is installed on the
+  first owned object made with the checks on and only then, so a build with the checks off never has it. }
+type
+  PSafeQEntry = ^TSafeQEntry;
+  TSafeQEntry = record
+    P: PtrUInt;      // the block; 0 is an empty slot of the table of armed addresses
+    Orig: PtrUInt;   // the VMT of the class it had (the ring)
+    Size: SizeInt;   // the size of the instance
+  end;
+  TSafeQArr = array[0..(MaxInt div 64)] of TSafeQEntry;
+  PSafeQArr = ^TSafeQArr;
+  PSafeVmtWords = ^TSafeVmtWords;
+  TSafeVmtWords = array[0..(MaxInt div 64)] of PtrUInt;
+
+const
+  SafeQPoisonSlots = 1024;   // virtual methods of the poison VMT; a class with more has the rest unchecked
+  SafeQFillByte = $DE;
+  SafeQPoisonName: ShortString = 'TSafeFreedObject';
+
+var
+  GQLock: LongInt = 0;
+  GQInstalled: Boolean = False;
+  GQClosed: Boolean = False;       // the quarantine was flushed at exit: nothing is armed any more
+  GQOld: TMemoryManager;
+  GQMaxObjects: SizeInt = 4096;
+  GQMaxBytes: SizeInt = 16 * 1024 * 1024;
+  GQRing: PSafeQArr = nil;
+  GQCap: SizeInt = 0;
+  GQHead: SizeInt = 0;             // the oldest
+  GQCount: SizeInt = 0;
+  GQBytes: SizeInt = 0;
+  GQArmed: PSafeQArr = nil;        // open addressing, a power of two slots
+  GQArmedCap: SizeInt = 0;
+  GQArmedCount: SizeInt = 0;       // read without the lock by the wrapper: zero means nothing to look for
+  GQPoison: PSafeVmtWords = nil;
+
+{$push}{$R-}{$Q-}
+procedure SafeQLock;
+begin
+  while InterlockedCompareExchange(GQLock, 1, 0) <> 0 do
+    ThreadSwitch;
+end;
+
+procedure SafeQUnlock;
+begin
+  InterlockedExchange(GQLock, 0);
+end;
+
+function SafeQHash(P: PtrUInt): SizeInt;
+var
+  H: PtrUInt;
+begin
+  H := P shr 4;
+  Result := SizeInt((H xor (H shr 9) xor (H shr 17)) and PtrUInt(GQArmedCap - 1));
+end;
+
+{ Under the lock. }
+procedure SafeQArmedPut(P: PtrUInt; Size: SizeInt);
+var
+  I: SizeInt;
+begin
+  I := SafeQHash(P);
+  while GQArmed^[I].P <> 0 do
+  begin
+    if GQArmed^[I].P = P then
+      Break;
+    I := (I + 1) and (GQArmedCap - 1);
+  end;
+  if GQArmed^[I].P = 0 then
+    Inc(GQArmedCount);
+  GQArmed^[I].P := P;
+  GQArmed^[I].Size := Size;
+end;
+
+procedure SafeQArmedGrow;
+var
+  Old: PSafeQArr;
+  OldCap, I: SizeInt;
+begin
+  Old := GQArmed;
+  OldCap := GQArmedCap;
+  GQArmedCap := OldCap * 2;
+  GQArmed := GQOld.AllocMem(GQArmedCap * SizeOf(TSafeQEntry));
+  GQArmedCount := 0;
+  for I := 0 to OldCap - 1 do
+    if Old^[I].P <> 0 then
+      SafeQArmedPut(Old^[I].P, Old^[I].Size);
+  GQOld.FreeMem(Old);
+end;
+
+{ Under the lock: the slot of P, or -1. }
+function SafeQArmedFind(P: PtrUInt): SizeInt;
+var
+  I: SizeInt;
+begin
+  I := SafeQHash(P);
+  while GQArmed^[I].P <> 0 do
+  begin
+    if GQArmed^[I].P = P then
+      Exit(I);
+    I := (I + 1) and (GQArmedCap - 1);
+  end;
+  Result := -1;
+end;
+
+{ Under the lock: removes slot I and moves back the entries of its run that the hole would hide. }
+procedure SafeQArmedDelete(I: SizeInt);
+var
+  J, K: SizeInt;
+begin
+  J := I;
+  while True do
+  begin
+    J := (J + 1) and (GQArmedCap - 1);
+    if GQArmed^[J].P = 0 then
+      Break;
+    K := SafeQHash(GQArmed^[J].P);
+    if ((J > I) and ((K <= I) or (K > J))) or ((J < I) and ((K <= I) and (K > J))) then
+    begin
+      GQArmed^[I] := GQArmed^[J];
+      I := J;
+    end;
+  end;
+  GQArmed^[I].P := 0;
+  Dec(GQArmedCount);
+end;
+
+{ Every virtual method of the poison VMT. The object is the first argument, as for any method. }
+procedure SafeQTrap(Obj: System.Pointer);
+var
+  I: SizeInt;
+  Cls: String;
+begin
+  Cls := '';
+  SafeQLock;
+  for I := 0 to GQCount - 1 do
+    if GQRing^[(GQHead + I) mod GQCap].P = PtrUInt(Obj) then
+    begin
+      Cls := TClass(System.Pointer(GQRing^[(GQHead + I) mod GQCap].Orig)).ClassName;
+      Break;
+    end;
+  SafeQUnlock;
+  if Cls = '' then
+    SafeFail('SAFE-R20: a virtual method of an object that was freed (it has left the quarantine) is called')
+  else
+    SafeFail('SAFE-R20: a virtual method of a freed ' + Cls + ' is called (use after free or a second free)');
+end;
+
+{ Under the lock: the oldest block goes back to the heap. }
+procedure SafeQEvictOldest;
+var
+  E: PSafeQEntry;
+begin
+  E := @GQRing^[GQHead];
+  Dec(GQBytes, E^.Size);
+  GQOld.FreeMem(System.Pointer(E^.P));
+  GQHead := (GQHead + 1) mod GQCap;
+  Dec(GQCount);
+end;
+
+function SafeQFreeMem(P: System.Pointer): PtrUInt;
+var
+  I: SizeInt;
+  Size: SizeInt;
+  W: PSafeVmtWords;
+  Tail: System.PByte;
+  E: PSafeQEntry;
+begin
+  if (GQArmedCount <> 0) and (P <> nil) then
+  begin
+    SafeQLock;
+    I := SafeQArmedFind(PtrUInt(P));
+    if I >= 0 then
+    begin
+      Size := GQArmed^[I].Size;
+      SafeQArmedDelete(I);
+      W := PSafeVmtWords(P);
+      while (GQCount >= GQCap) or ((GQCount > 0) and (GQBytes + Size > GQMaxBytes)) do
+        SafeQEvictOldest;
+      E := @GQRing^[(GQHead + GQCount) mod GQCap];
+      E^.P := PtrUInt(P);
+      E^.Orig := W^[0];
+      E^.Size := Size;
+      Inc(GQCount);
+      Inc(GQBytes, Size);
+      W^[0] := PtrUInt(GQPoison);
+      Tail := System.PByte(P) + SizeOf(PtrUInt);
+      System.FillChar(Tail^, Size - SizeOf(PtrUInt), SafeQFillByte);
+      SafeQUnlock;
+      Exit(Size);
+    end;
+    SafeQUnlock;
+  end;
+  Result := GQOld.FreeMem(P);
+end;
+
+function SafeQFreeMemSize(P: System.Pointer; Size: PtrUInt): PtrUInt;
+begin
+  Result := SafeQFreeMem(P);   // the size is the manager's to know; the RTL heap and the heap of BP both ignore it
+end;
+
+procedure SafeQuarantineFlush;
+begin
+  SafeQLock;
+  while GQCount > 0 do
+    SafeQEvictOldest;
+  SafeQUnlock;
+end;
+
+procedure SafeQuarantineExit;
+begin
+  SafeQuarantineFlush;
+  SafeQLock;
+  GQClosed := True;   // the manager stays installed for the rest of the exit; nothing is armed from now on
+  SafeQUnlock;
+end;
+
+{ Allocates the ring (under the lock). }
+procedure SafeQAllocRing;
+begin
+  GQCap := GQMaxObjects;
+  if GQCap < 1 then
+    GQCap := 1;
+  GQRing := GQOld.AllocMem(GQCap * SizeOf(TSafeQEntry));
+  GQHead := 0;
+  GQCount := 0;
+  GQBytes := 0;
+end;
+
+procedure SafeQuarantineSetLimits(MaxObjects, MaxBytes: SizeInt);
+begin
+  SafeQuarantineFlush;
+  SafeQLock;
+  GQMaxObjects := MaxObjects;
+  GQMaxBytes := MaxBytes;
+  if GQRing <> nil then
+  begin
+    GQOld.FreeMem(GQRing);
+    SafeQAllocRing;
+  end;
+  SafeQUnlock;
+end;
+
+function SafeQuarantineCount: SizeInt;
+begin
+  Result := GQCount;
+end;
+
+{ Installs the wrapper once. Debug checks only; the first owned object calls it, so it is in place before the
+  program starts its threads. }
+procedure SafeQuarantineEnsure;
+var
+  M: TMemoryManager;
+  Base: PSafeVmtWords;
+  I: SizeInt;
+begin
+  if GQInstalled then
+    Exit;
+  SafeQLock;
+  if not GQInstalled then
+  begin
+    GetMemoryManager(GQOld);
+    SafeQAllocRing;
+    GQArmedCap := 256;
+    GQArmed := GQOld.AllocMem(GQArmedCap * SizeOf(TSafeQEntry));
+    // the poison VMT: the header of TObject without a parent, a name of its own, and a trap in every slot
+    Base := PSafeVmtWords(System.Pointer(TObject));
+    GQPoison := GQOld.AllocMem(vmtMethodStart + SafeQPoisonSlots * SizeOf(CodePointer));
+    System.Move(Base^, GQPoison^, vmtMethodStart);
+    GQPoison^[vmtInstanceSize div SizeOf(PtrUInt)] := SizeOf(PtrUInt);
+    GQPoison^[vmtInstanceSize div SizeOf(PtrUInt) + 1] := PtrUInt(-SizeInt(SizeOf(PtrUInt)));
+    for I := vmtParent div SizeOf(PtrUInt) to vmtMsgStrPtr div SizeOf(PtrUInt) do
+      GQPoison^[I] := 0;
+    GQPoison^[vmtClassName div SizeOf(PtrUInt)] := PtrUInt(@SafeQPoisonName);
+    for I := vmtMethodStart div SizeOf(PtrUInt) to vmtMethodStart div SizeOf(PtrUInt) + SafeQPoisonSlots - 1 do
+      GQPoison^[I] := PtrUInt(@SafeQTrap);
+    M := GQOld;
+    M.FreeMem := @SafeQFreeMem;
+    M.FreememSize := @SafeQFreeMemSize;
+    SetMemoryManager(M);
+    AddExitProc(@SafeQuarantineExit);
+    GQInstalled := True;
+  end;
+  SafeQUnlock;
+end;
+
+{ Arms the address of O for its destruction; False when the object is not to be kept (already freed, or the
+  quarantine is closed). }
+function SafeQArm(O: TObject): Boolean;
+begin
+  SafeQuarantineEnsure;
+  Result := False;
+  if PtrUInt(O.ClassType) = PtrUInt(GQPoison) then
+    Exit;
+  SafeQLock;
+  if not GQClosed then
+  begin
+    if (GQArmedCount + 1) * 2 > GQArmedCap then
+      SafeQArmedGrow;
+    SafeQArmedPut(PtrUInt(O), O.InstanceSize);
+    Result := True;
+  end;
+  SafeQUnlock;
+end;
+
+procedure SafeQDisarm(O: TObject);
+var
+  I: SizeInt;
+begin
+  SafeQLock;
+  I := SafeQArmedFind(PtrUInt(O));
+  if I >= 0 then
+    SafeQArmedDelete(I);
+  SafeQUnlock;
+end;
+{$pop}
+
+procedure SafeDestroyQuarantined(O: TObject);
+begin
+  if not SafeQArm(O) then
+  begin
+    O.Destroy;
+    Exit;
+  end;
+  try
+    O.Destroy;
+  finally
+    SafeQDisarm(O);
+  end;
+end;
+
+{ The destruction of an owned object: the destructor, and with debug checks on, the quarantine (R20). }
+procedure SafeDestroyObject(O: TObject);
+begin
+  if SafeDebugChecks then
+    SafeDestroyQuarantined(O)
+  else
+    O.Destroy; // Free is shadowed by a helper here
+end;
+
 function SafeDynArrayRefs(const P: Pointer): SizeInt;
 begin
   if P = nil then
@@ -197,7 +542,10 @@ begin
   Result := TSafeLife.Create;
   Result.Obj := AObj;
   if SafeDebugChecks then
+  begin
+    SafeQuarantineEnsure;
     SafeListLife(Result);
+  end;
   InterlockedIncrement(GLive);
 end;
 
@@ -213,7 +561,7 @@ begin
   Obj := nil;
   if O <> nil then
   begin
-    O.Destroy; // Free is shadowed by a helper here
+    SafeDestroyObject(O);
     InterlockedDecrement(GLive);
   end;
   CellRef := nil;
@@ -306,7 +654,7 @@ begin
   begin
     O := Items[I];
     Items[I] := nil;
-    O.Destroy;
+    SafeDestroyObject(O);
     InterlockedDecrement(GLive);
   end;
   Count := 0;

@@ -182,7 +182,7 @@ begin
       sfkHeld:
         try
           // UNSAFE: the region is the only owner of a held object (Hold); nothing uses it after the scope (S17)
-          TObject(E.P).Destroy;
+          SafeDestroyObject(TObject(E.P));
         except
           InterlockedIncrement(GDeferFailures);
           // FPC skips the end of a destructor that raised, FreeInstance included: the memory is freed here
