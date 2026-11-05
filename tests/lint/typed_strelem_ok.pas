@@ -10,7 +10,7 @@ interface
 uses
   Classes, Safe;
 
-procedure Exchange(const Stream: TStream; var S: String);
+procedure Exchange(const Stream: TStream; var S: String);  // raises: EReadError, EWriteError
 
 implementation
 

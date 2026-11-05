@@ -32,15 +32,17 @@
   S11m, S11s, S19 (bpvetrace.pas, typed); S24, S25 (bpvetcast.pas, typed); S26a, S26b (bpvetnil.pas, typed);
   S6 and S17 of the calls of Hold of a scope or a region, S5, S6 and S17 of the tree of TComponent, S27 (bpvethold.pas,
   typed); S28, a view of a String does not outlive it (bpvets28.pas, typed); H20 of S17, a nested routine writes the
-  local of its parent bound to its const parameter (bpveth20.pas, typed);
-  S21, S22 (bpvetstyle.pas, over the text, before the parse). --fix writes the fixes of S17, S21, S22 and S24 into the files. }
+  local of its parent bound to its const parameter (bpveth20.pas, typed); S30, the // raises: marks (bpvetraise.pas,
+  typed);
+  S21, S22 (bpvetstyle.pas, over the text, before the parse). --fix writes the fixes of S17, S21, S22, S24 and S30 into
+  the files. }
 program bpvet;
 
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, BpvetS17, BpvetStyle, BpvetCast, BpvetKey, BpvetCache,
-  Safe;
+  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, BpvetS17, BpvetStyle, BpvetCast, BpvetRaise, BpvetKey,
+  BpvetCache, Safe;
 
 type
   TListBox = specialize TOwned<TStringList>;
@@ -173,6 +175,7 @@ begin
       Fixing := True;
       S17Fix := True;
       CastFix := True;
+      RaiseFix := True;
       StyleFix := True;
     end
     else if (A = '--rtl') and (I <= ParamCount) then

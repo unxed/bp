@@ -1,0 +1,68 @@
+{ The input of the --fix test of tests/lint.sh (it is copied to raises_fix.pas next to raises_lib): S30 writes a
+  missing mark at the end of the header line, or above a header that would grow past 120 characters; it rewrites a
+  wrong list and removes the mark of a routine that raises nothing. }
+unit raises_fix;
+
+{$mode objfpc}{$H+}
+
+interface
+
+uses
+  SysUtils, raises_lib, Safe;
+
+type
+  EFix = class(Exception);
+
+  TReader = class
+  public
+    procedure Open(const Name: String);
+  end;
+
+function Missing(const S: String): Integer;
+function MissingWithAVeryLongNameAndManyParameters(const Source, Target: String; const Count, Limit: Integer): Integer;
+function Wrong(const S: String): Integer;  // raises: EFix
+function Stale(const S: String): Integer;  // raises: EFix, EParse
+// raises: EFix
+procedure Gone;
+procedure Commented;  // raises: EFix // a comment after the mark stays
+
+implementation
+
+procedure TReader.Open(const Name: String);
+begin
+  if Name = '' then
+    raise EFix.Create('no name');
+end;
+
+function Missing(const S: String): Integer;
+begin
+  Result := LibParse(S) + StrToInt(S);
+end;
+
+function MissingWithAVeryLongNameAndManyParameters(const Source, Target: String; const Count, Limit: Integer): Integer;
+begin
+  if Count > Limit then
+    raise EFix.Create(Source + Target);
+  Result := Count;
+end;
+
+function Wrong(const S: String): Integer;
+begin
+  Result := LibParse(S);
+end;
+
+function Stale(const S: String): Integer;
+begin
+  Result := Length(S);
+end;
+
+procedure Gone;
+begin
+end;
+
+procedure Commented;
+begin
+  LibCheck(False);
+end;
+
+end.

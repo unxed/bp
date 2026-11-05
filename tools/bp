@@ -7,8 +7,8 @@
 #                                              builds into the cache (skipped when the sources are unchanged) and runs;
 #                                              the exit code is the one of the program; --watch runs it again on a save
 #        tools/bp fix [fpc options] FILE.pas   writes what bpvet --fix knows (the header from the file name, lower-case
-#                                                reserved words, // root: marks, `as` for class downcasts) and lists
-#                                                the rest; nothing is built
+#                                                reserved words, // root: and // raises: marks, `as` for class
+#                                                downcasts) and lists the rest; nothing is built
 #        tools/bp new NAME                     a new project: NAME/NAME.pas, deps.txt, tests/test_NAME.pas, README.md
 #        tools/bp get [DIR]      resolves the require lines of DIR/deps.txt (default: the current directory) by MVS
 #                                over git tags vX.Y.Z and writes DIR/deps.lock, one "path version commit" per module
