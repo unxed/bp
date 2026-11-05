@@ -4,6 +4,8 @@
   mode reads the RTL from declaration stubs).
 
   usage: bpvet [--report|--strict] [--fix] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...
+         bpvet --stubkey FILE|DIR...   the text the RTL stubs of FILE|DIR depend on (bpvetkey.pas), for tools/bp
+         bpvet --buildkey SALT FILE|DIR... -- STAT...   the key of the stubs and the key of the check (bpvetkey.pas)
     a directory is walked for *.pas, *.pp, *.lpr (include files are read through the modules that include them);
     -dNAME defines a symbol for conditional compilation, -FiDIR adds an include directory (as for fpc);
     -FuDIR adds a directory where rule S5 looks for the files of used units (their classes);
@@ -32,7 +34,7 @@ program bpvet;
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, BpvetS17, BpvetStyle, BpvetCast, Safe;
+  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, BpvetS17, BpvetStyle, BpvetCast, BpvetKey, Safe;
 
 type
   TListBox = specialize TOwned<TStringList>;
@@ -95,7 +97,33 @@ var
   A, Err, RtlDir: String;
   Typed: Boolean = False;
   I, Errors, Warnings, Fatals: Integer;
+  KeyPaths, StatPaths: TKeyPaths;
+  N: Integer;
 begin
+  if (ParamCount >= 1) and (ParamStr(1) = '--stubkey') then
+  begin
+    SetLength(KeyPaths, ParamCount - 1);
+    for I := 2 to ParamCount do
+      KeyPaths[I - 2] := ParamStr(I);
+    PrintStubKey(KeyPaths);
+    Halt(0);
+  end;
+  if (ParamCount >= 2) and (ParamStr(1) = '--buildkey') then
+  begin
+    N := 3;
+    while (N <= ParamCount) and (ParamStr(N) <> '--') do
+      Inc(N);
+    SetLength(KeyPaths, N - 3);
+    for I := 3 to N - 1 do
+      KeyPaths[I - 3] := ParamStr(I);
+    SetLength(StatPaths, 0);
+    if N < ParamCount then
+      SetLength(StatPaths, ParamCount - N);
+    for I := N + 1 to ParamCount do
+      StatPaths[I - N - 1] := ParamStr(I);
+    PrintBuildKeys(ParamStr(2), KeyPaths, StatPaths);
+    Halt(0);
+  end;
   Files := TListBox.Own(TStringList.Create);
   Files.Get.Sorted := True;
   Files.Get.Duplicates := dupIgnore;

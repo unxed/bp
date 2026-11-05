@@ -22,7 +22,7 @@ interface
 uses
   BPThreads, // the thread manager (goroutines); first in uses, so it is installed before the other units
   {$ifdef SAFE_PORTABLE}
-  unicodeducet, fpwidestring, // Unicode without libc; unicodeducet first: fpwidestring needs its collation table at startup
+  fpwidestring, // Unicode without libc; the collation of Unicode only on request: `unicodeducet` before BP in the uses
   {$else}
   {$if defined(unix) and not defined(SAFE_NO_CWSTRING)}cwstring,{$endif} // UTF-8 <-> UTF-16 and letter case through libc
   {$endif}

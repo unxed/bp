@@ -62,6 +62,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **checked** by the typed `bpvet` (`tools/bp build`): S11m, S11s, S19; `SAFE_DEBUG` R17 at `Send` | §8, §21.2 |
 | Class casts and untyped parameters (H17, H18): an unchecked downcast, `TBig(Buf)[N]` over a `var Buf`, `absolute` | **checked** by the typed `bpvet` (`tools/bp build`): S24 (`--fix` writes `as`), S25 | §8, §24.6 |
 | Speed competitive with C, Rust, Go and Goose on the same algorithm | **goal**, not measured yet; the order of the work: §25 | §25.2 |
+| Competitive size, memory, start and build time (#181) | **measured** (`tests/bench/size.sh`), verdicts and levers in §25.5 | §25.5 |
 
 ---
 
@@ -1081,12 +1082,14 @@ or above the parameter suppresses its S14 finding.
 | v0.29 | §21.3, §25.2 step 6: per-carrier run queues (a yield and a goroutine pushed out of "next" stay on the carrier; an idle carrier steals half of a queue); 64 goroutines that yield take 93 ms instead of 574 ms on 4 carriers |
 | v0.30 (design) | §25.4 a memory manager of BP: a cache per carrier, pages of one size class with a local free list and one for other threads, abandoned pages adopted, the start of a goroutine without `InitThread`; the spike: a tree of 8191 goroutines 286 ms → 32 ms on one carrier |
 | v0.31 | §25.4 step 1: the memory manager of BP (`ext/bpheap.inc`, `BP_HEAP=bp`): segments of 4 MiB, pages of 64 KiB, 72 size classes, a cache per carrier and per thread, frees from other threads by an atomic list, a pool of the caches of ended threads; 2M live blocks 444 → 145 ns per block, a tree of 8191 goroutines 404 → 80 ms on 4 carriers |
+| v0.32 (report) | §25.5 competitive on every dimension, step 1 (#181): `tests/bench/size.sh` (hello world in Bp, C, Rust, Go and Goose: build, rebuild, size, RSS, start); verdicts: size — reach (smart linking 1171 → 697 KiB, the collation table on request); memory — ahead (0.3 MiB); start — ahead of all but static C; build — reach (a rebuild 171 ms, target under 100 ms) |
+| v0.33 | §25.5 size and build: `BP` no longer uses `unicodeducet` (strings compare by code point unless the program uses it; hello world 1199 → 781 KiB, with `-XX` 697 → 288 KiB); `bpvet --buildkey` gives both keys of `tools/bp` in one run, and `tools/bp` starts fewer processes: a rebuild after an edit 176 → 144 ms |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
 
-- **The default on Linux is a static binary without libc**: strings — `fpwidestring` + `unicodeducet` (Unicode in Pascal, case and sorting work even with `LANG=C`), threads — `ext/bpthreads.pas` (an FPC thread manager on `clone` + `futex` + `mmap`, like the Go runtime). One file works on any distribution: verified on an Ubuntu host (glibc) and in an Alpine 3.20 chroot (musl); a libc build does not run on Alpine at all.
+- **The default on Linux is a static binary without libc**: strings — `fpwidestring` (Unicode in Pascal; the letter case works even with `LANG=C`, and strings compare by code point, as in C, Go and Rust; a program that wants the order of the Unicode collation in `AnsiCompareStr` and its kin puts `unicodeducet` before `BP` in its uses, about 410 KiB more, §25.5), threads — `ext/bpthreads.pas` (an FPC thread manager on `clone` + `futex` + `mmap`, like the Go runtime). One file works on any distribution: verified on an Ubuntu host (glibc) and in an Alpine 3.20 chroot (musl); a libc build does not run on Alpine at all.
 - **A program with goroutines**: `uses ..., BP;` last, as in every unit; `tools/bp build` adds `-FaBPThreads` (instead of `cthreads`) on all targets (§24.3).
 - **`-dSAFE_LIBC`** (an analogue of cgo): `cwstring` + `cthreads`; needed only for FFI with C libraries. If libc is loaded and the switch is absent, the first `BeginThread` stops the program with an explanation (code 232) rather than giving a silent race (`tests/ext/compile/mf_libc_guard.pas`).
 - Verified (FPC 3.2.2, cross-compilers built from the official sources): x86_64 natively and in Alpine; i386 natively and under qemu-i386; aarch64 under qemu-aarch64 — `test_safe`, `test_go`, `test_threads` (1500 tasks: heap, strings, exceptions, recursive locks, `TThread`, events) — 0 failures, 10 repeats without crashes.
@@ -2722,7 +2725,8 @@ written in the style of the dialect (regions where they fit, `const` parameters,
 the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measurement. The work, in the order of §25.1:
 
 - **Measure first (step 3).** A suite in `tests/bench/` of small programs written the same way in each language:
-  - an allocation-heavy tree (binary trees: the region style against `malloc`, `Box` and the Go collector);
+  - an allocation-heavy tree (binary trees, in two tiers: one heap block per node, and an arena per tree; the tiers are
+    never mixed, see the audit below);
   - floating point (n-body);
   - integers and arrays (fannkuch);
   - strings (a word count over a file);
@@ -2760,6 +2764,10 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   | fannkuch | 0.303 s (1.37x) | 0.221 s (1.00x) | 0.238 s (1.07x) | 0.244 s (1.10x) | 0.252 s (1.13x) | 0.280 s (1.24x) |
   | word count | 0.560 s (2.61x) | 0.214 s (1.00x) | 0.244 s (1.14x) | 0.376 s (1.75x) | 0.357 s (1.66x) | 0.204 s (0.86x) |
 
+  The binary trees row of this baseline mixes allocation styles (the Bp region and the Goose array against `malloc`,
+  `Box` and the collector): its ratios are withdrawn, and the tiers of the audit below replace them. The other three
+  rows stand (the n-body and fannkuch indices were equalised and measured again, below).
+
   The sizes: binary trees of depth 16 (14,985,902 nodes made, walked and dropped); n-body with 5 bodies and 5,000,000
   steps; fannkuch with n = 10; a word count over a generated text of 4,000,000 words (28 MB, 30,000 different words).
   Each program prints one line and the script stops on a difference. The machine is a laptop that other work shares:
@@ -2767,7 +2775,7 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
 
   How each language writes the program:
 
-  - **Binary trees.** Bp uses the **region style**: the nodes are `TRegionObject`s, a loop of trees has one `TRegion`
+  - **Binary trees (the baseline, before the tiers).** Bp uses the **region style**: the nodes are `TRegionObject`s, a loop of trees has one `TRegion`
     that is `Reset` after each walk, and the long-lived tree has a region of its own. `BP` does not export the region
     yet, so the program uses the unit `Region` of `tools/spikes/region` (spike 2), as `examples/httpd` does. C calls
     `malloc` and `free` for every node, Rust owns the nodes with `Box`, Go lets its collector free them (it also uses
@@ -2791,11 +2799,96 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
 
   What the numbers say, for step 6 to check (no cause is diagnosed here): Bp is 1.4-1.9x of C on binary trees, n-body
   and fannkuch, where the code generator of FPC and the region allocator are the candidates, and 2.6x on the word
-  count, where a `String` per word (a reference count and a heap block) is the candidate. Go is the slowest on binary
-  trees. Bp is slower than C on all four, and nowhere by an order of magnitude: the goal of this section is not met yet.
-  Goose is ahead of C on binary trees by a factor of six (0.16x: a bump allocator and no per-node `free`), level with C
-  on n-body (0.98x), 1.24x on fannkuch and 0.86x on the word count (no copy of a word). Bp in the region style takes
-  1.43x of C on binary trees, about nine times the time of Goose; step 6 looks for the reason.
+  count, where a `String` per word (a reference count and a heap block) is the candidate. Bp is slower than C on all
+  four, and nowhere by an order of magnitude: the goal of this section is not met yet. Goose is level with C on n-body
+  (0.98x), 1.24x on fannkuch and 0.86x on the word count (no copy of a word). The binary trees sentences of the first
+  run (Goose six times faster than C, Go the slowest, Bp 1.43x of C and nine times Goose) compared allocation styles,
+  not languages, and are withdrawn; the tiers below hold the numbers.
+
+  **Like for like (the rule, 2026-11-05).** A benchmark compares the same algorithm, data layout, allocation style,
+  checks and linking in each language. A program that differs in any of these is a separate tier with its own row,
+  never mixed into one ratio. Binary trees and the word count have two tiers each:
+  - `bintrees`: one heap block per node; `bintrees_arena`: the nodes of a tree in one arena (the audit below);
+  - `wordcount`: each word is a slice of the text, with no allocation;
+  - `wordcount_owned`: each word is an owned string (Bp `String`, C `malloc`, Rust `String`, Go `string`; Goose has
+    no such tier, n/a).
+
+  First numbers (3 runs, a busy machine), ratio to gcc:
+
+  | tier | Bp | clang | Rust | Go | Goose |
+  |---|---|---|---|---|---|
+  | slices | 2.16x | 1.03x | 1.97x | 1.65x | 1.28x |
+  | owned | 1.75x | 0.82x | 1.35x | 1.10x | n/a |
+
+  The 2.6x of the baseline mixed a Bp `String` per word with raw C pointers; that verdict is withdrawn. C keeps a table
+  of its own (FNV-1a, open addressing), while Rust, Go and Goose use their standard maps; this is noted, not equalised.
+
+  **The audit of the other programs (2026-11-05).** Each program was read in all five languages. Every mismatch found,
+  and what was done:
+
+  1. **Allocation style (binary trees): fixed with two tiers.** The row mixed the Bp region and the Goose array (a bump
+     allocator, no per-node `free`) with C `malloc` and `free`, Rust `Box` and the Go collector. Now:
+     - `bintrees`, one heap block per node: Bp a plain class object freed by `Drop` (the construction and the
+       destructor call carry `// UNSAFE:` and `// borrow:` marks, as the dialect asks for hand-owned objects), C
+       `malloc`/`free`, Rust `Box`, Go the collector; Goose n/a (it has no heap of single blocks).
+     - `bintrees_arena`, the nodes of a tree in one arena that goes at once, with one layout: one array of nodes and
+       4-byte index links in every language. Bp a dynamic array of records, Goose the grow-only array (as before),
+       C, Rust and Go
+       (`realloc` doubling, `Vec`, `append`; the layout of the Goose version). A loop of trees clears the array and
+       keeps its buffer, as the Bp loop resets one region. Goose makes a new array per tree (the style of the
+       language), which is not equalised.
+     - `bintrees_region`, Bp only: the nodes as objects of a region (`TRegionObject`, 32 bytes with the VMT pointer
+       and two pointers), the program that was the arena row before. It shows the cost of the region style against
+       the same algorithm in a plain array.
+     - Layouts that still differ: in the heap tier every node is 16 bytes of data plus the header of the
+       allocator (Bp: the RTL heap; `BP_HEAP=bp` gave the same time within 10% in one check).
+     - Numbers (5 runs, a busy machine), ratio to gcc of the same tier:
+
+       | tier | Bp | gcc | clang | Rust | Go | Goose |
+       |---|---|---|---|---|---|---|
+       | heap, one block per node | 1.023 s (2.24x) | 0.456 s (1.00x) | 0.581 s (1.27x) | 0.489 s (1.07x) | 0.980 s (2.14x) | n/a |
+       | arena (one array, 4-byte links) | 0.135 s (1.67x) | 0.080 s (1.00x) | 0.091 s (1.13x) | 0.093 s (1.14x) | 0.125 s (1.55x) | 0.075 s (0.93x) |
+       | region of objects, Bp only | 0.262 s (3.3x) | n/a | n/a | n/a | n/a | n/a |
+
+     - Verdicts withdrawn or changed: "Goose is six times faster than C" was the allocation style: Goose is level with
+       C in the same style (0.90x). "The region takes 0.57x of C" compared a bump with `malloc`.
+       - With the layout of the others (a dynamic array of records, 4-byte links), Bp is 1.67x of C, level with Go
+         (1.55x).
+       - The region of objects takes twice that: 0.26 s, 3.3x of C. So did a `TGrowArray` with `Int32` links
+         (0.28 s). The cost is in the object model and in the access of `TGrowArray`, not in the arena.
+       - These two are levers of step 6: the construction of a `TRegionObject` (a virtual `NewInstance` and
+         `AfterConstruction` per node) and the element access of `TGrowArray`.
+       - With a heap block per node, Bp is 2.2x of C, level with Go (2.1x); Rust (`Box`) is level with C.
+  2. **Checks: noted, not equalised.** What each build keeps:
+     - Bp `tools/bp build --release -O2`: no `-Cr` (range), no `-Co` (overflow), no stack check. Plain arrays,
+       `Bodies[I]` and `P[I]` have no check at run time. The checks R1–R4 of the runtime guard `TOwned.Get`,
+       `TSlice` and the like, not these arrays. The `bpvet` check is at build time and costs nothing at run time.
+     - C: none (`-O2`, no sanitizer).
+     - Rust `-O`: bounds checks on, overflow checks off. Go: bounds and nil checks, overflow wraps. Goose
+       `build -O2`: bounds checks kept where its elimination cannot prove them (`--bce-lines`: n-body 48 of 48 elided,
+       fannkuch 11 of 19, the arena binary trees none to check), signed overflow wraps.
+     - So Rust, Go and Goose pay for bounds checks that Bp and C do not. A debug build of Bp at `-O2` (`-Cr -Co`)
+       shows the size of that: n-body 0.64 s against 0.67 s (no change), fannkuch 0.62 s against 0.31 s (twice), the
+       arena binary trees 0.47 s against 0.28 s (1.7x). The table cells of Bp are the unchecked build; read the cells of
+       Rust, Go and Goose as "with bounds checks" and the cells of Bp and C as "without". No column for a checked
+       Bp: it is a debug build, not a release one.
+  3. **Integer and float widths: fixed where plain.**
+     - Floats: 64 bits everywhere (`Double`, `double`, `f64`, `float64`, `f64`); no `Extended` in a hot path
+       (`Dt = Double(0.001)` since #162). The line of n-body is equal in all five.
+     - Indices (n-body, fannkuch): Rust (`usize`), Go (`int`) and Goose (`i64`) index with 64 bits, Bp (`Integer`) and C
+       (`int`) with 32. Now the indices are `SizeInt` in Bp and `long` in C. The speed did not change within the noise
+       (7 runs: n-body Bp 1.42x → 1.48x of C, fannkuch 1.30x → 1.32x), so the verdicts of the baseline stand.
+     - Elements and counts: `Integer`, `int`, `i32`, `int32` for the permutation and the flip counts. The Goose
+       version counted flips in `i64`; it is `i32` now (fannkuch 1.20x → 1.06x of C in the later run: partly noise).
+     - Counters of the outer loop (`Steps`, `Depth`) and the depth in binary trees stay as each language writes them
+       (32 bits in Bp, C and Rust, 64 in Go and Goose); they are not in the hot code.
+     - The sums are `Int64`, `long long`, `i64`, `int64` in all.
+  4. **I/O: confirmed equal.** The four programs print one line at the end (`WriteLn`, `printf`, `println!`,
+     `fmt.Println`, `print`), so the cost of the output is a single write in each and is not in the numbers. The word
+     count reads one file in full; it was not changed.
+  5. **Static against dynamic linking: new rows in §25.5.** Hello world is now compared static with static and
+     dynamic with dynamic; the speed programs are all dynamic over glibc except Go and Bp, which are static, and the
+     difference is not in a hot loop.
 
   Found on the way and fixed since (#162, #163): the typed `bpvet` refused `Round(X)`, `Trunc(X)`, a literal above the
   Int64 range (`QWord($CBF29CE484222325)`), `QWord($CBF29CE4) or $84222325` and a unit with a dot in its name
@@ -2813,7 +2906,8 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     `SafeRegionAlloc` and `InitInstance` behind calls. Now `TRegionObject.Create` has no such frame (the region frees
     the object), `NewInstance` bumps in place, keeps the answer per class in a cache of 256 words, and for a class
     without managed fields or interfaces writes the VMT and zeroes the fields itself: 13 ns. Binary trees: 0.656 s →
-    0.255 s, 0.57x of C (gcc 0.446 s in the same run) and 3.5x of Goose (0.072 s; was about nine times). The tree kept
+    0.255 s, 0.57x of C (gcc 0.446 s in the same run, `malloc` per node: not a like-for-like ratio, see the tiers below)
+    and 3.5x of Goose (0.072 s; was about nine times; both are arenas). The tree kept
     in a `TGrowArray` with `Int32` links instead of objects takes 0.28 s, so the rest is not the object model; a
     node of 32 bytes against 8 in Goose (two 4-byte self-relative links) is the next candidate. The baseline table
     above keeps its numbers;
@@ -3040,3 +3134,132 @@ were built with `-O2`, under M:N, and each number is the median of 5 runs on 4 c
 - A free on another carrier costs the same as the channel that carries the block.
 - The check: `tests/run.sh` in all the modes, `test_go`, `test_threads` and `test_heap` 114 times under `BP_PROCS` 1, 2, 3
   and 8 and 15 seeds of the scheduler, and `tests/examples.sh` under `BP_HEAP=bp BP_MN=1`: no failure.
+
+### 25.5 Competitive on every dimension: size, memory, start, build (report, 2026-11-05)
+
+Issue #181 measures the numbers by which a language is chosen besides the run time of §25.2, and gives each a verdict:
+**reach or beat** (a lever with a target), **accept** (a compromise that defines the niche, with its reason) or
+**already ahead**. Step 1 measures dimensions 2–6 on the smallest program; step 2 adds the run time of channels,
+`httpd` and goroutines (dimensions 1 and 7).
+
+`tests/bench/size.sh` builds hello world (`tests/bench/suite/hello/`) in each language and prints one table:
+
+- the time of a clean build and of a rebuild with the object directory kept (medians of 3);
+- the size as built and stripped, and whether the binary is static;
+- the peak RSS (median of 5);
+- the start: the mean wall time of one run of 1000, by `tests/bench/spawn.c` (`posix_spawn` and `waitpid`, no shell).
+
+Machine: Intel Core i5-6300U, 4 logical CPUs, Linux 6.8. Compilers: fpc 3.2.2, gcc 13.3, rustc 1.85.1, go 1.22.2, Goose
+runtime 4d3da949e563.
+
+| variant | build | rebuild | size | stripped | linked | peak RSS | start |
+|---|---|---|---|---|---|---|---|
+| Bp (`tools/bp build --release -O2`) | 330 ms | 171 ms | 1171 KiB | 1171 KiB | static, no libc | 0.7 MiB | 653 us |
+| Bp with `-XX -CX` (smart linking) | 316 ms | 166 ms | 697 KiB | 697 KiB | static, no libc | 0.3 MiB | 587 us |
+| Bp with `SysUtils` and `Format` | 335 ms | 188 ms | 1175 KiB | 1175 KiB | static, no libc | 0.8 MiB | 663 us |
+| C, gcc -O2 | 57 ms | 55 ms | 15.5 KiB | 14.1 KiB | dynamic, glibc | 1.2 MiB | 732 us |
+| C, gcc -O2 -static | 113 ms | 105 ms | 767 KiB | 690 KiB | static, glibc | 0.6 MiB | 445 us |
+| Rust, rustc -O | 233 ms | 237 ms | 3881 KiB | 354 KiB | dynamic, glibc | 1.8 MiB | 1019 us |
+| Rust, opt-level=z, panic=abort, LTO, strip | 4062 ms | 4054 ms | 310 KiB | 310 KiB | dynamic, glibc | 1.7 MiB | 1023 us |
+| Go, go build | 69 ms | 67 ms | 1849 KiB | 1203 KiB | static | 1.6 MiB | 1496 us |
+| Go, -ldflags="-s -w" | 72 ms | 65 ms | 1204 KiB | 1203 KiB | static | 1.5 MiB | 1493 us |
+| Goose, build -O2 (over gcc) | 118 ms | 110 ms | 64 KiB | 54 KiB | dynamic, glibc | 1.5 MiB | 904 us |
+
+The verdicts:
+
+- **Binary size: reach or beat.** The link map of the `-XX` binary (697 KiB) shows where the bytes are: the collation
+  table of Unicode (`unicodeducet`) 427 KiB, the Unicode data (`unicodedata`, the letter case) 131 KiB, `System` 53
+  KiB, `SysUtils` 33 KiB, `BPThreads` 21 KiB. Two levers:
+  1. `tools/bp build --release` links with `-XX -CX`: 1171 → 697 KiB, measured, and the RSS 0.7 → 0.3 MiB.
+  2. The collation table only in a program that asks for it. Without a collation, `fpwidestring` compares strings by
+     code point (it falls back to the old string manager), so only the order of `AnsiCompareStr` and its kin changes.
+     The link map gives about 270 KiB for hello world: below static C (690 KiB) and Go (1203 KiB).
+     Done in v0.33: `BP` no longer uses `unicodeducet`; hello world 1199 → 781 KiB, with `-XX` 697 → 288 KiB.
+
+  A dynamic binary over glibc (C 14 KiB, Goose 54 KiB, Rust 310–354 KiB) is smaller, but only runs where that glibc is.
+  A static binary without libc that runs on any Linux is the niche (§18), and it is **accepted**.
+- **Memory: already ahead, among the static ones.** 0.3 MiB of peak RSS with `-XX`, the least of all: static C 0.6,
+  Goose 0.7, Rust 0.8, Go 1.3–1.6. The 1.7 MiB of Rust above is its dynamic binary, not the same kind (the table
+  below holds the rows of one kind). The dynamic Bp is behind (2.1 MiB, below).
+- **Start: ahead of all but static C, among the static ones.** 587 us with `-XX` against 445 us for static C, 732 us
+  for dynamic C, 904 us for Goose, 1019 us for Rust and 1493 us for Go. The gap of 0.14 ms to static C is the
+  initialization of the units; it is measured again after the two size levers, which remove the largest one. Static
+  against static, see the next list: Bp with `-XX` 552 us, static Goose 613 us, static Rust 672 us. The dynamic Bp is
+  behind (1.6 ms).
+- **Build time: reach.** A rebuild takes 171 ms against 55–110 ms for C, Go and Goose (Rust 237 ms). It splits into
+  110 ms of fpc and 60 ms of `tools/bp` (the check of `bpvet`). Of the 110 ms, 40 ms is the link and 70 ms is the
+  compile; a program without `BP` compiles in 40 ms, so 30 ms is the loading of the units of BP. The target: a rebuild
+  under 100 ms. The levers:
+  - the check of an unchanged file from the cache of `bpvet`;
+  - fewer units loaded by a program that does not use them.
+
+  A clean build (330 ms) also compiles `BP` and `BPThreads`; it happens once per object directory.
+- **The rebuild after an edit (measured later the same day).** The rebuild column above is a build with no change, so
+  the check came from its cache. `size.sh` now adds a comment line to a copy of the source before each rebuild.
+  - With an edit, `tools/bp` ran `genstubs.py` again, because the RTL stubs were keyed on the whole text of the program:
+    about 450 ms of a 530 ms rebuild of hello world.
+  - The stubs are now keyed on the identifiers and the `uses` of the program (`genstubs.py --key`) and on a `stat` of
+    the unit path, and a passed check is cached with its output.
+  - A rebuild after an edit, on a busy machine: Bp 289 ms (530 before), gcc 66 ms, Go 230 ms.
+  - Still to do, toward the target of under 100 ms and the level of C: the key without a run of Python, the link
+    (`ld` takes about 50 ms; gold, lld and `-Xi` are to be measured on a quiet machine), and the units of BP that a
+    program does not use.
+- **The rebuild, v0.33 (a quiet machine, hello world with an edit, median of 11).** 176 → 144 ms.
+  - `tools/bp` before `fpc`: 48 → 17 ms. Both keys (of the stubs and of the check) come from one run of
+    `bpvet --buildkey` (2 ms) instead of the chains of `stat`, `find`, `cat` and `sha256sum`; the hash of the sources of
+    `bpvet` is kept with a `stat` of them; the paths and the time come from bash, not from `dirname`, `basename`,
+    `mktemp` and `date`. After `fpc`: 10 → 7 ms.
+  - `fpc` takes 118 ms: 72 ms of compile (loading 21 units, about 60 ms) and 46 ms of `ld` on 3.8 MB of objects.
+  - The linkers: FPC on Linux runs `ld.bfd` (a `-XP` prefix or `-FD` with `-Xd` gives it another one). gold does not
+    take the linker script of FPC (`link.res`); lld takes it with `-b elf64-x86-64` removed, but starts in 19 ms
+    against 2.5 ms of `ld.bfd`, so it is slower on hello world (60 against 48 ms); `-Xi` still runs `ld.bfd` on
+    x86_64-linux. `--gc-sections` (with `-XX -CX`) takes `ld` from 46 to 37 ms. The link stays with `ld.bfd`.
+  - What remains: the loading of the units (fewer units for a program that does not use them) and the link of the
+    whole of `System` and `SysUtils`; on another machine FPC main compiles a hello world without `BP` in 36 ms and
+    links it in 23 ms.
+- **What a build needs: level, ahead of Rust.**
+  - FPC with all its units is 282 MiB, and a build needs binutils (`ld`), not a C compiler or libc headers.
+  - Go is 97 MiB. Rust is 1.2 GiB and links with a C compiler. Goose is 28 MiB and compiles through gcc.
+
+**Like for like: static against static, dynamic against dynamic (2026-11-05).** The table above set a static Bp
+beside a dynamic Rust, Goose and C. `tests/bench/size.sh` now builds each kind in each language where it can:
+
+- static: Bp (`bp`, `bp-xx`), C `-static`, Rust `-C target-feature=+crt-static` (a static glibc; the target
+  `x86_64-unknown-linux-musl` is not installed on the machine, so `rust-musl` is n/a there and runs where it is), Go
+  (`go build`, static by default), Goose with `gcc -static` (a wrapper given as `GOOSE_CC`);
+- dynamic over glibc: Bp with `-dSAFE_LIBC` (`bp-libc`, the mode of an FFI to C, §18), C, Rust, Goose, and Go with
+  `CGO_ENABLED=1 go build -ldflags=-linkmode=external` (`go-dyn`).
+
+Machine and compilers as above, `N=1000`, a machine that other work shared (read the times to 10–20%):
+
+| variant | kind | build | rebuild | size | stripped | peak RSS | start |
+|---|---|---|---|---|---|---|---|
+| Bp `bp-xx` | static, no libc | 388 ms | 242 ms | 697 KiB | 697 KiB | 0.3 MiB | 552 us |
+| Bp `bp` | static, no libc | 402 ms | 239 ms | 1175 KiB | 1175 KiB | 0.7 MiB | 682 us |
+| C `-static` | static, glibc | 108 ms | 115 ms | 767 KiB | 690 KiB | 0.6 MiB | 467 us |
+| Rust `+crt-static` | static, glibc | 463 ms | 424 ms | 4909 KiB | 1295 KiB | 0.8 MiB | 672 us |
+| Go | static | 73 ms | 204 ms | 1849 KiB | 1203 KiB | 1.3 MiB | 1562 us |
+| Goose over `gcc -static` | static, glibc | 215 ms | 208 ms | 1061 KiB | 959 KiB | 0.7 MiB | 613 us |
+| Bp `bp-libc` | dynamic, glibc | 349 ms | 292 ms | 571 KiB | 571 KiB | 2.1 MiB | 1578 us |
+| C | dynamic, glibc | 57 ms | 54 ms | 15.5 KiB | 14.1 KiB | 1.2 MiB | 834 us |
+| Rust | dynamic, glibc | 276 ms | 265 ms | 3881 KiB | 354 KiB | 1.8 MiB | 1136 us |
+| Go `go-dyn` | dynamic, glibc | 84 ms | 503 ms | 1839 KiB | 1225 KiB | 3.0 MiB | 2800 us |
+| Goose | dynamic, glibc | 124 ms | 117 ms | 64 KiB | 54 KiB | 1.5 MiB | 955 us |
+
+What changes in the verdicts:
+
+- **Size, static against static: level with C, ahead of the rest.** Bp with `-XX` (697 KiB) equals static C
+  (690 KiB stripped) and is below static Goose (959 KiB), Go (1203 KiB) and static Rust (1295 KiB stripped, 4909 KiB
+  as built). The plain `bp` (1175 KiB) is level with Go. The verdict (reach; accept the static niche) stands, and
+  the lever of the collation table keeps its target (about 270 KiB, below all of them).
+- **Size, dynamic against dynamic: behind.** Bp with libc is 571 KiB against 14 KiB (C), 54 KiB (Goose) and 354 KiB
+  (Rust stripped); only Go with an external link (1225 KiB) is larger. The earlier sentence that a dynamic binary
+  "is smaller" held for the other languages and not for Bp.
+- **Memory: ahead among the static ones** (0.3 MiB against 0.6–1.3), **behind among the dynamic ones** (2.1 MiB
+  against 1.2–1.8, ahead of Go only).
+- **Start: ahead of all but static C among the static ones** (552 us against 467, 613, 672 and 1562 us), **behind
+  among the dynamic ones** (1578 us against 834 us for C, 955 us for Goose, 1136 us for Rust; Go 2800 us). Nothing
+  here says why the libc mode of Bp starts 1 ms later and takes 0.9 MiB more than the static one; the lead is
+  `cwstring` and the thread manager of `-dSAFE_LIBC`, to be measured with `strace` and `ltrace`.
+- **Build time:** a rebuild of Bp (240–290 ms) stays the target of the section; static C, Go and Goose are 55–205 ms,
+  Rust 265 ms (the static link of Rust and the external link of Go cost more than their default builds).

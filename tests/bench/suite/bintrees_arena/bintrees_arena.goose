@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Benchmark suite (tests/bench/compare.sh): binary trees, the Goose version (the same trees as bintrees.pas,
-// bintrees.c, bintrees.rs and bintrees.go). The nodes of one tree are the elements of one grow-only array with 4-byte
+// Benchmark suite (tests/bench/compare.sh): binary trees, the Goose version (the arena tier, the same trees as
+// bintrees_arena.pas, .c, .rs and .go). The nodes of one tree are the elements of one grow-only array with 4-byte
 // self-relative links, the style of the language; the array belongs to a scope, so dropping the tree is the end of
 // that scope (a pointer store, no walk).
 // Output: one line, the number of nodes counted.

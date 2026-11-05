@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # The benchmark suite of Better Pascal against C, Rust, Go and Goose (safe/SPEC.md §25.2; report only, no thresholds).
 # Four programs, each written the same way in each language (tests/bench/suite/NAME/NAME.{pas,c,rs,go,goose}): binary trees
-# (allocation), n-body (floating point), fannkuch (integers and arrays), a word count (strings). Every program prints
+# (allocation) in two tiers, n-body (floating point), fannkuch (integers and arrays), a word count (strings) in two tiers.
+# A tier is one allocation style, compared only with the same style (SPEC §25.2, like for like):
+#   bintrees: one heap block per node (Bp class object, C malloc, Rust Box, Go collector)
+#   bintrees_arena: the nodes of a tree in one arena, dropped at once (Bp region, Goose array, and C, Rust, Go with an
+#     array of 4-byte index links)
+#   wordcount: each word a slice of the text, no allocation;  wordcount_owned: each word an owned string
+# A language with no source of a tier shows n/a. Every program prints
 # one line, a checksum, and the script checks that all languages print the same line.
 # Builds (release, same machine):  Bp: tools/bp build --release -O2     C: gcc -O2 and clang -O2
 #                                  Rust: rustc -O                      Go: go build
@@ -9,7 +15,7 @@
 # Each binary is run RUNS times; the cell is the median wall time and the ratio to C (gcc). The output is a Markdown
 # table with the machine and the compiler versions. A missing toolchain makes its column "n/a".
 # usage: tests/bench/compare.sh [out-dir]
-# environment: RUNS (5)   LANGS ("bp gcc clang rust go goose")   PROGS ("bintrees nbody fannkuch wordcount")
+# environment: RUNS (5)   LANGS ("bp gcc clang rust go goose")   PROGS ("bintrees bintrees_arena bintrees_region nbody fannkuch wordcount wordcount_owned")
 #              WORDS (4000000: the length of the text of the word count)   FPC (fpc)
 #              GOOSE (goose on PATH, else ~/.local/opt/goose-v2026.3/goose: the Goose compiler)
 # The exit code is 1 when a build fails or the checksums differ; a missing toolchain is not a failure.
@@ -21,7 +27,7 @@ suite=$here/suite
 out=${1:-$(mktemp -d)}
 RUNS=${RUNS:-5}
 LANGS=${LANGS:-"bp gcc clang rust go goose"}
-PROGS=${PROGS:-"bintrees nbody fannkuch wordcount"}
+PROGS=${PROGS:-"bintrees bintrees_arena bintrees_region nbody fannkuch wordcount wordcount_owned"}
 WORDS=${WORDS:-4000000}
 FPC=${FPC:-fpc}
 if [ -z "${GOOSE:-}" ]; then
@@ -81,7 +87,7 @@ now_us() { local t=$EPOCHREALTIME; echo "${t/./}"; }
 # once LANG PROG: one timed run; appends the microseconds to samples[PROG,LANG]; ok[PROG,LANG] is the printed line
 once() {
   local l=$1 p=$2 d=$out/$2 args=() t0 t1
-  [ "$p" = wordcount ] && args=("$out/text.txt")
+  [[ $p == wordcount* ]] && args=("$out/text.txt")
   t0=$(now_us)
   "$d/$l" ${args[@]+"${args[@]}"} > "$d/out-$l.txt" 2> "$d/err-$l.txt" || { ok[$p,$l]="exit code $?"; return 1; }
   t1=$(now_us)
@@ -102,8 +108,10 @@ done
 
 echo "== build" >&2
 for p in $PROGS; do
-  [ "$p" = wordcount ] && ! have awk && continue
+  [[ $p == wordcount* ]] && ! have awk && continue
   for l in ${active[@]+"${active[@]}"}; do
+    declare -A ext=([bp]=pas [gcc]=c [clang]=c [rust]=rs [go]=go [goose]=goose)
+    [ -f "$suite/$p/$p.${ext[$l]}" ] || continue
     if build "$l" "$p"; then ok[$p,$l]=built; else
       echo "build of $p ($l) failed; see $out/$p/build-$l.log" >&2
       sed 's/^/    /' "$out/$p/build-$l.log" | tail -n 15 >&2
@@ -113,7 +121,7 @@ for p in $PROGS; do
   done
 done
 
-if [[ " $PROGS " == *" wordcount "* ]] && have awk; then
+if [[ " $PROGS " == *" wordcount"* ]] && have awk; then
   echo "== text of the word count ($WORDS words)" >&2
   [ -s "$out/text.txt" ] && [ "$(cat "$out/text.words" 2> /dev/null)" = "$WORDS" ] \
     || { awk -v words="$WORDS" -f "$suite/wordcount/gen.awk" > "$out/text.txt" && echo "$WORDS" > "$out/text.words"; }
