@@ -55,7 +55,8 @@ procedure VetCheckS3(const Src: TVetSource; const Module: TPasModule; var Report
              Not calls: constructor TFoo.Create, class function TFoo.Create, inherited Create. The value types of
              Safe and BP (TArena, TChan, TGroup, TDefer, and a type of the module = specialize TChan<...>) are
              records, not objects, so their Create is not a finding. bpvet has no types: an object that goes
-             into an interface reference needs the // UNSAFE: mark. }
+             into an interface reference needs the // UNSAFE: mark. The typed mode drops the finding of
+             TFoo.Create(AOwner) of a TComponent descendant with an owner (bpvethold.pas, safe/SPEC.md §21.4). }
 procedure VetCheckS6(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S9: legacy string types (safe/SPEC.md §6, register H8). A module marked // UNSAFE-UNIT: is not checked.
@@ -80,7 +81,8 @@ procedure VetCheckS9(const Src: TVetSource; const Module: TPasModule; var Report
     fcl-passrc 3.2.2 parses them (for pas2js).
     The classes known are those of the module, S5ClassTypes, and the classes declared in the interface of the units
     it uses whose files lie next to it (name.pas in the same directory, read as text) or in a directory given to
-    bpvet with -FuDIR. }
+    bpvet with -FuDIR. The typed mode drops the finding of a published field of a TComponent descendant whose type
+    is a TComponent descendant (bpvethold.pas, safe/SPEC.md §21.4). }
 procedure VetCheckS5(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 { S15: no TShared cycles (safe/SPEC.md §6, register H2). A module marked // UNSAFE-UNIT: is not checked.
