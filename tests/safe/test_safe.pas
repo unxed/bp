@@ -94,13 +94,21 @@ end;
 procedure OwnedAccidentalCopy;
 var
   A, C: TProbeBox;
+  Debug: Boolean;
 begin
-  A := TProbeBox.Own(TProbe.Create('c'));
-  C := A; // UNSAFE: contract violation (S10), but memory must remain intact
-  A.Reset;
-  Check(Log = '', 'owned: copy keeps object alive');
-  C.Reset;
-  Check(Log = '~c', 'owned: destroyed exactly once');
+  // the release behaviour: a SAFE_DEBUG build catches this copy (R9), OwnedCopyCaughtInDebug tests that
+  Debug := SafeDebugChecks;
+  SafeDebugChecks := False; // UNSAFE: one goroutine runs the tests
+  try
+    A := TProbeBox.Own(TProbe.Create('c'));
+    C := A; // UNSAFE: contract violation (S10), but memory must remain intact
+    A.Reset;
+    Check(Log = '', 'owned: copy keeps object alive');
+    C.Reset;
+    Check(Log = '~c', 'owned: destroyed exactly once');
+  finally
+    SafeDebugChecks := Debug; // UNSAFE: one goroutine runs the tests
+  end;
 end;
 
 procedure OwnedCopyCaughtInDebug;
