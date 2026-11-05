@@ -2956,8 +2956,10 @@ slow path uses spin locks only.
 - **Address space.** A reservation of `PROT_NONE` with `MAP_NORESERVE` (64 GiB on 64 bits; on i386, 4 MiB at a time),
   cut into segments of 4 MiB aligned to their size. A block finds its segment by a mask, and the header of the segment
   describes its pages. Whether a block is ours is a range check against the few reservations.
-- **Size classes.** About 48 classes up to 32 KiB, with at most 12.5% lost to rounding. A page of 64 KiB holds blocks of
-  one class. A larger block is a run of pages in a segment; a block over 2 MiB is a segment of its own.
+- **Size classes.** 72 classes up to 32 KiB: steps of 16 bytes up to 128, then eight steps per doubling, so at most
+  12.5% is lost to rounding. A page of 64 KiB holds blocks of one class, handed out from its start as they are needed
+  (the RTL cuts a chunk into blocks at once and so touches all of it). A larger block is a run of pages in a segment; a
+  block over 63 pages is a run of whole segments.
 - **The cache.**
   - One cache per carrier, and one per OS thread that is not a goroutine (the main thread, a 1:1 thread). It is found
     from `CurThread`: a goroutine uses the cache of its carrier.
@@ -2971,8 +2973,9 @@ slow path uses spin locks only.
   - It belongs to another cache: push onto its list from other threads with a compare-and-swap. A goroutine moved to
     another carrier by stealing frees this way.
   - A page that becomes empty and is not current goes back to its segment.
-- **The end of an OS thread.** Its pages with live blocks are abandoned, with no owner. A free into them still works;
-  another cache adopts such a page when it needs one of that class. Carriers never end.
+- **The end of an OS thread.** Its cache goes to a pool with all its pages, and the next OS thread takes it. Meanwhile a
+  free into those pages works as from any other thread, and the next owner collects it. Carriers never end. (The
+  design first gave the pages away one by one; a cache in a pool is simpler and keeps the pages warm.)
 - **Memory back to the kernel.**
   - Under M:N, the monitor gives back each tick the pages that were already free at the tick before (`madvise`, a
     contiguous run in one call), as it does for regions (§21.3).
@@ -2998,10 +3001,11 @@ slow path uses spin locks only.
 
 **The plan:**
 
-1. Segments, pages, size classes, caches with local frees; installed as above. Measured against the RTL on one thread
-   (the pair and the 2,000,000 live blocks of the table), with `tests/run.sh` passing.
-2. Frees from other threads, and abandoned and adopted pages. The stress of `test_go` and `test_threads` (`BP_PROCS` 1,
-   2, 3 and 8, the seeds) and a probe that sends blocks over channels between carriers.
+1. Segments, pages, size classes, caches, frees from other threads and the pool of caches (`ext/bpheap.inc`), on with
+   `BP_HEAP=bp`; `tests/ext/test_heap.pas`, and the modes `heap` and `mnheap` of `tests/run.sh` in CI. Measured against
+   the RTL (step 1 result, below).
+2. The stress under load: `test_go`, `test_threads` and `test_heap` under `BP_PROCS` 1, 2, 3 and 8 and the seeds in CI
+   for a while; the programs of `examples/` under the heap.
 3. The start of a goroutine without `InitThread`. The numbers of the spike are the target: 2 us on 4 carriers, and the
    tree of goroutines under 40 ms on one.
 4. Memory back to the kernel: the monitor under M:N, the bound without it. The memory of a parked goroutine should be

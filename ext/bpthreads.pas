@@ -129,6 +129,7 @@ type
     QLock: LongInt;        // a carrier: the lock of its run queue
     QCount: LongInt;       // a carrier: goroutines in its run queue (read without the lock by the others)
     QHead, QTail: PRawThread; // a carrier: its run queue (the goroutines that ran on it made ready), FIFO
+    Heap: Pointer;         // the cache of the memory manager of BP (bpheap.inc): of an OS thread, of a carrier
     Done: TSchedEvent;     // set when the goroutine ends (WaitForThreadTerminate)
   end;
 
@@ -437,6 +438,8 @@ end;
 
 { ---------- threads ---------- }
 
+procedure HeapRelease(T: PRawThread); forward;
+
 function RawThreadMain(Arg: Pointer): PtrInt; cdecl;
 var
   T: PRawThread;
@@ -447,6 +450,7 @@ begin
   InitThread(T^.StackLen);
   T^.ExitCode := T^.Fn(T^.Arg);
   DoneThread;
+  HeapRelease(T);
   if Counted then
     InterlockedDecrement(LiveThreads);
   Result := 0;
@@ -599,6 +603,7 @@ begin
 end;
 
 {$I bpsched.inc}
+{$I bpheap.inc}
 
 { ---------- installation ---------- }
 
@@ -687,6 +692,7 @@ begin
   TM.RTLEventWaitFor := @RawRTLEventWaitFor;
   TM.RTLEventWaitForTimeout := @RawRTLEventWaitForTimeout;
   SetThreadManager(TM);
+  HeapInstall;
 end;
 
 initialization

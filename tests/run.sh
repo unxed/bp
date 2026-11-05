@@ -17,7 +17,8 @@
 #   EXE          suffix of the binaries (.exe for -Twin64, which writes name.exe)
 #   SKIP         tests to skip ("test_ffi fpc-utf8")                NO_COMPILE_CHECKS=1 — without compile/*.pas
 #   MNMODES      the ext tests run again in each mode: "mn" (BP_MN=1, goroutines M:N), "seedN" (BP_SCHED_SEED=N:
-#                one carrier, a seeded order); e.g. "mn seed1 seed2 seed3" (SPEC §21.3)
+#                one carrier, a seeded order), "heap" (BP_HEAP=bp, the memory manager of BP, SPEC §25.4), "mnheap"
+#                (both); e.g. "mn seed1 seed2 seed3" (SPEC §21.3)
 set -u
 FPC=${FPC:-fpc}
 FPCOPTS=${FPCOPTS:-}
@@ -67,6 +68,8 @@ run_layer() {
           case "$m" in
             mn) BP_MN=1 timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
             seed*) BP_SCHED_SEED=${m#seed} timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
+            heap) BP_HEAP=bp timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
+            mnheap) BP_MN=1 BP_HEAP=bp timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
           esac
         done
       fi
