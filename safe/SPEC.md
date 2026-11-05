@@ -1085,6 +1085,7 @@ or above the parameter suppresses its S14 finding.
 | v0.32 (report) | §25.5 competitive on every dimension, step 1 (#181): `tests/bench/size.sh` (hello world in Bp, C, Rust, Go and Goose: build, rebuild, size, RSS, start); verdicts: size — reach (smart linking 1171 → 697 KiB, the collation table on request); memory — ahead (0.3 MiB); start — ahead of all but static C; build — reach (a rebuild 171 ms, target under 100 ms) |
 | v0.33 | §25.5 size and build: `BP` no longer uses `unicodeducet` (strings compare by code point unless the program uses it; hello world 1199 → 781 KiB, with `-XX` 697 → 288 KiB); `bpvet --buildkey` gives both keys of `tools/bp` in one run, and `tools/bp` starts fewer processes: a rebuild after an edit 176 → 144 ms |
 | v0.34 | §25.5: `tools/bp` keeps the units of each kind of build in a directory of its own (a release build linked the `BP` of a debug build when that came first: 34–36% slower in the region and word count programs); `--release` adds `-XX -CX` (smart linking, hello world 288 KiB) |
+| v0.35 (report) | §25.5 a project of many files (`tests/bench/project.sh`, 20 modules, 17326 lines): a clean build Bp 658 ms, Rust 1583, gcc 2599, Go 6085; a rebuild after an edit of one file Bp 493 ms, gcc 263, Go 316 (the check of every file by `bpvet` is the long pole; the lever: a check cache per file) |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -3211,8 +3212,8 @@ The verdicts:
   - a small program: gcc. On hello world gcc rebuilds after an edit in 66 ms and Go in 204–230 ms (single runs on a
     busy machine), so C is the one to reach there (`tests/bench/size.sh`);
   - a project of many files: Go. There Go builds much faster than C (no headers to read again in every file, a
-    package compiled once and kept in its cache), so the long-run target is Go. This needs a benchmark of a project
-    beside hello world: the same project in Bp, C, Go, Rust and Goose, and a rebuild after an edit of one file.
+    package compiled once and kept in its cache), so the long-run target is Go. `tests/bench/project.sh` measures it (the
+    last item of this section): a rebuild of a project of 20 files, Bp 493 ms, gcc 263 ms, Go 316 ms.
 
   The levers:
   - the check of an unchanged file from the cache of `bpvet`;
@@ -3312,3 +3313,29 @@ What changes in the verdicts:
   `cwstring` and the thread manager of `-dSAFE_LIBC`, to be measured with `strace` and `ltrace`.
 - **Build time:** a rebuild of Bp (240–290 ms) stays the target of the section; static C, Go and Goose are 55–205 ms,
   Rust 265 ms (the static link of Rust and the external link of Go cost more than their default builds).
+- **A project of many files (v0.35, `tests/bench/project.sh`).** The same program of 20 modules of 40 functions in
+  each language (`tests/bench/suite/project/gen.py`: Bp units, a `.c` and a `.h` per module with `make -j`, a Go
+  package per module, one Rust crate of a module per file, Goose files under one root), 17326 lines of Pascal; a
+  clean build (median of 3, the project written anew so no cache holds it) and a rebuild after an edit of the body of
+  one function of the last module (median of 5). Each binary prints the same sum. A quiet machine at the start:
+
+  | variant | clean build | rebuild after an edit |
+  |---|---|---|
+  | Bp `bp build --release -O2` | 658 ms | 493 ms |
+  | Bp `bp build` (`-Cr -Co`) | 579 ms | 506 ms |
+  | C, gcc `-O2`, `make -j4` | 2599 ms | 263 ms |
+  | Go `go build` | 6085 ms | 316 ms |
+  | Rust `cargo build --release` | 1583 ms | 1494 ms |
+  | Rust `cargo build` (incremental) | 1149 ms | 449 ms |
+  | Goose `-O2` | 15133 ms | 14111 ms |
+
+  - A clean build: Bp is the fastest, 2.4x ahead of Rust and 4x of gcc (which reads the headers of the C library
+    again in every file); Go builds its standard library into an empty cache first.
+  - A rebuild: Bp 493 ms against 263 ms (gcc) and 316 ms (Go), level with an incremental Rust; the target is Go.
+    The cause is the check: `bpvet` reads and checks all 21 files again after an edit of one (0.6–0.9 s alone on a
+    busy machine), while `fpc` compiles the one unit and the program and links (0.3–0.6 s) at the same time. The
+    lever is a check cache per file: a file is checked again only when it or the interface of a unit it uses
+    changed.
+  - fpc compares the time of a source with the one in its `.ppu` to the second: an edit within the second of the last
+    build, at the same size, is not compiled again. `project.sh` waits a second before an edit (not timed); a user
+    who saves and builds within one second is not likely, but `tools/bp` could add a check by content.
