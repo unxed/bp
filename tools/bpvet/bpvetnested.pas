@@ -1,7 +1,7 @@
 { SPDX-License-Identifier: MIT }
 { bpvet: what the nested routines of a routine write and read of the variables around them, through the nested
   routines they call (transitively). S28 (bpvets28.pas) takes a call of a nested routine that writes the String of a
-  view as a write of it; H20 of S17 (bpvetsh20.pas) takes it as a write of a variable bound to a const parameter. }
+  view as a write of it; H20 of S17 (bpveth20.pas) takes it as a write of a variable bound to a const parameter. }
 unit BpvetNested;
 
 {$mode objfpc}{$H+}
