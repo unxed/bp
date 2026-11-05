@@ -49,7 +49,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Support for `object` (Turbo Pascal) | **plan** | §19 |
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
-| Strings and maps: `TStrSlice`, `Fields`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 in the typed `bpvet` | §25.3 |
+| Strings and maps: `TStrSlice`, `Fields`, `TStrView`, `FieldViews`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 and S28 (a view does not outlive its `String`) in the typed `bpvet` | §25.3 |
 | A memory manager of BP: a cache per carrier, pages of one size class, frees from other threads by an atomic list, the start of a goroutine without `InitThread` | **step 1 implemented, tests, CI, on by default since v0.38** (`ext/bpheap.inc`, `BP_HEAP=rtl` for the heap of the RTL; `test_heap`, modes `rtlheap` and `mnrtlheap`); the start without `InitThread` is **design** (step 3) | §25.4 |
 | Vector kernels: unit `BPVec` (`Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays of numbers), SSE2 on x86_64 and Pascal elsewhere | **implemented, tests, CI** (`ext/bpvec.pas`, `test_vec`) | §25.2 |
 | The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
@@ -390,6 +390,7 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S26a | definite assignment (H19): a class reference that FPC does not zero, read or returned before it is assigned | `bpvet` S26a (typed, `tools/bpvet/bpvetnil.pas`): an error on the first read of a local of a class or class-of type that is not assigned on every path before it, and on the end of a routine (or an `Exit`) where its result or an `out` parameter of such a type is not assigned on every path; branches are joined, a `while` or `for` body may not run (a `for` with constant bounds in its direction runs), a handler of `try...except` and a `finally` block start from the state before `try`; a `var` argument, `@F`, a name used by a nested routine and `asm` count as assignments; what `-Sew` already catches is reported too (`tests/lint/s26a_bad.pas`, `s26a_out_bad.pas`, `s26a_result_bad.pas`, `s26a_finally_bad.pas`, `s26a_ok.pas`); `// UNSAFE: <why>` on the line or above |
 | S26b | a class whose instance is larger than 64 KiB: a field of a nil reference past the unmapped first pages would not fault | `bpvet` S26b (typed): an error on a class of the module whose fields with those of its ancestors, counted from below (no alignment, no variant parts), exceed 65536 bytes; a large buffer goes into a dynamic array (`s26b_bad.pas`, `s26b_ok.pas`) |
 | S27 | the place of a value of a `TMap` kept: `P := M.Ref(K, D)` points into the slots of the map, which the next change of the map moves | `bpvet` S27 (typed, `bpvethold.pas`): an error on a call of `Ref` of a specialization of `TMap` that is not dereferenced at once (`Inc(M.Ref(K, 0)^)` is the form); `// UNSAFE: <why>` on the line or above (`tests/lint/s27_bad.pas`, `s27_ok.pas`) |
+| S28 | a `TStrView` (a part of a `String` without a reference, §25.3) outlives its `String`, or the `String` is written while a view of it lives | `bpvet` S28 (typed): an error on a view of a `String` that is not a local variable or a `const` parameter of the routine; on a view, or a value holding one (a record, an array, a `TMap` of views), put in a field, a global, a result, a `var`/`out` parameter, a task or an object; on a write to the `String` (`:=`, `S[I] :=`, `SetLength`, `Insert`, `Delete`, a `var` argument) after the first view of it in the routine (in the whole body of a loop that makes one); a function that returns a view names its `String` parameter with `// root: S`; `// UNSAFE: <why>` on the line or above (`tests/lint/s28_bad.pas`, `s28_ok.pas`). `SAFE_DEBUG` is the second net: there a view holds its `String` |
 | S21 | a file without a `program`/`unit`/`library`/`package` header, or a header whose name is not the name of the file (two sources of one name) | `bpvet` S21 (`bpvetstyle.pas`, over the text before the parse): an error; the name is compared without letter case (`unit Region` in `region.pas`); a file without a header is a `unit` when it has `interface`, else a `program`; `bpvet --fix` / `tools/bp fix` inserts the header before the first token or writes the name of the file into it; a file whose name is not an identifier (dots allowed) is reported without a fix (`tests/lint/s21_none_bad.pas`, `s21_name_bad.pas`, `s21_ok.pas`) |
 | S22 | a reserved word with an upper-case letter (`Begin`, `END`): the style of Better Pascal is lower case, upper case is the style of the 1980s and stands out in the text | `bpvet` S22: a warning (an error with `--strict`, so in `tools/bp build`); `--fix` lowers the word; comments, strings, `&escaped` identifiers and the bodies of `asm` blocks are skipped; `string` is not checked, it is written as the type it names (`String`); directives (`override`, `virtual`) are not reserved words and are not checked (`tests/lint/s22_bad.pas`) |
 
@@ -1091,6 +1092,7 @@ or above the parameter suppresses its S14 finding.
 | v0.37 | §25.3 the word count 0.47 → 0.43 s: the hash, the comparison of slices and the probe of `TMap` inlined, the last bytes of a key read at once; where the rest of the gap is (a managed slice) and why the region of objects is 3.3x (the protocol of a constructor) |
 | v0.38 | §25.4 the memory manager of BP on by default (`BP_HEAP=rtl` for the RTL heap): runs grown in place, a freed run of 1 MiB or more back to the kernel but for the last one; peak memory below the RTL heap on the arena and region tiers, a buffer of 1–3 MB in a loop 15–18 times faster |
 | v0.39 | §25.2 unit `BPVec` (#197): `Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays in SSE2 on x86_64, the same loops in Pascal elsewhere; `Axpy` of `Double` 1.74 → 0.73 s on 2G elements (gcc -O3 0.77 s) |
+| v0.40 | §25.3 `TStrView` (a part of a `String` without a reference: 16 bytes, not managed), `StrView`, `FieldViews`, keys of `TMap`; S28 in the typed `bpvet` (the `String` of a view is a local or a `const` parameter, not written after the first view, a view does not leave the routine); `SAFE_DEBUG`: a view holds its `String`; the hash of every key reads no byte past it; the word count of the suite on views: about 1.8x → 1.3x of C |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -2793,7 +2795,7 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     (`Pull(Bodies[I], Bodies[J])`), the same operations in the same order; the baseline above was measured with
     `Bodies[I].VX` written out in the loop.
   - **Word count.** Bp (since v0.25, §25.3) counts the words as `TStrSlice` values of the text (`for W in Fields(Text)`,
-    no copy of a word) in a `TMap` of unit `BP`, one lookup per word (`Inc(Counts.Ref(W, 0)^)`); the baseline above was
+    no copy of a word; `TStrView` values with `FieldViews` since v0.40) in a `TMap` of unit `BP`, one lookup per word (`Inc(Counts.Ref(W, 0)^)`); the baseline above was
     measured with a `String` of every word (`Copy`) and a table of its own (FNV-1a of 32 bits, open addressing).
     C counts the words in place in a table of the same kind. Rust and Go slice the text without copying and use their
     standard maps. Goose reads the text into one buffer and counts in its standard `dictionary` keyed by slices of that
@@ -3018,6 +3020,17 @@ end;
 function StrSlice(const S: String): TStrSlice;   // all of S
 function Fields(const S: String): TFields;       // for W in Fields(S): the runs of bytes above the space
 
+TStrView = record                          // a part of a String without a reference to it (v0.40): 16 bytes, not managed
+  function Sub(AStart, ALen: SizeInt): TStrView; // 1-based as Copy (R2)
+  function Len: SizeInt;
+  function ToString: String;               // a copy of the bytes: the way to keep a word
+  function Equals(const S: String): Boolean;
+  property Items[I: SizeInt]: Char; default; // 1-based (R2)
+  class operator =(const A, B: TStrView): Boolean;
+end;
+function StrView(const S: String): TStrView;       // all of S
+function FieldViews(const S: String): TViewFields; // for W in FieldViews(S): the words as views
+
 generic TMap<K, V> = record                // a copy refers to the same map (Go, TSlice); made by Create or the first write
   function Ref(const Key: K; const Default: V): PV;  // the place of the value, added with Default: Inc(M.Ref(W, 0)^)
   procedure Put(const Key: K; const Value: V);
@@ -3035,8 +3048,16 @@ end;
 - **A slice holds its text.** `TStrSlice` keeps a reference to the whole `String` (24 bytes: the `String`, the start,
   the length), so a slice, and a map whose keys are slices, keeps the text alive, as in Go; a write to the `String`
   variable later makes a new `String` (copy on write) and the slice does not see it. Nothing to check, the price is the
-  memory of the text. A slice without the reference would need a borrow rule of its own in `bpvet` (the text outlives
-  the slice and is not written meanwhile) and is not worth it: the measured cost of the reference is in the line below.
+  memory of the text. A slice is the type for a word that outlives its text or goes to another goroutine.
+- **A view does not (v0.40).** `TStrView` is a pointer and a length, 16 bytes, not managed: a copy is two words (no
+  `fpc_copy` in `for-in`) and an entry of a `TMap<TStrView, V>` is 32 bytes (40 with a slice). It is valid while its
+  `String` is not changed, and S28 of the typed `bpvet` proves it before the build, as Rust does for `&str` and Goose for
+  a slice of an array: the `String` is a local variable or a `const` parameter of the routine, it is not written after
+  the first view of it in the routine (v1 is conservative: a narrower rule, until the last use of a view, may come
+  later), and a view, or a value that holds one (a map of views), does not leave the routine: not in a field, a global,
+  a result, a task or an object. It goes down as a `const` parameter; a function that returns a view names its `String`
+  with `// root: S`. `W.ToString` copies a word that must stay. `SAFE_DEBUG` is the second net: there a view holds its
+  `String` (the layout of a slice), so a case `bpvet` missed reads the old bytes, not freed memory.
 - **The map.** Open addressing with linear probing, the hash in the entry (`Hash`, `Key`, `Value`), at most half
   full, the slot from the top bits of the hash; deletion moves the entries after the hole back, so there are no
   tombstones. The hash of a key is `MapHash` (overloads for `String`, `TStrSlice`, `Int64`, `QWord`, `Pointer`; a
@@ -3063,16 +3084,19 @@ end;
   each 0.13 s (C 0.08 s); with the map 0.37 s (C 0.21 s, all of it); `for W in Fields` adds the 0.08 s of
   `fpc_copy`. Two changes, the output the same:
   - the hash: `MapHash` of a slice and `SafeHashBytes` are inlined, and the last bytes of a key are read as one
-    word, masked, when the `String` has eight more bytes (little-endian targets; a `String` key keeps the loop of
-    bytes, and a test checks that every slice of 0 to 20 bytes has the hash of a `String` of its bytes): 0.13 → 0.11 s;
+    word, masked, when the `String` has eight more bytes: 0.13 → 0.11 s. Since v0.40 the last 1–7 bytes of every key
+    (`String`, slice, view) are read as two overlapping words of four, or as the first, the middle and the last byte,
+    never past the key: within 3% of the masked word, and a test checks that every slice and view of 0 to 20 bytes has
+    the hash of a `String` of its bytes;
   - the comparison: `TStrSlice.=` and `SafeSameBytes` are inlined, and so is `Find` into `Ref`: no call is left in
     a probe. The word count: 0.47 → 0.43 s (C 0.21-0.22 s on the same runs).
   - Not a lever: a table at most a quarter full (0.40 s against 0.37 s: a larger table misses the cache more), and
     the slots taken through one pointer in `Find` (the same time).
   - What is left is in the type: a `TStrSlice` holds a `String`, so it is a managed record. Its copy in `for-in` goes
     through the type information (0.08 s), and an entry of the map is 40 bytes against 24 of C (the hand-written
-    table: 0.05 s of the difference). Both need a slice without the reference: a decision of design (a view valid
-    only in its loop, with a borrow rule in `bpvet`), not a change of code.
+    table: 0.05 s of the difference). Both need a slice without the reference: `TStrView` with S28 (v0.40, above).
+    The word count of the suite on views (median of 9, a busy machine): slices 452–507 ms, views 326–366 ms, C 252–262
+    ms, so 1.8–1.9x of C becomes about 1.3x.
 - **The region of objects (gprof, v0.37).** 85% of the time is the construction of a node: the constructor, the
   virtual `NewInstance` (the bump itself) and the virtual `AfterConstruction` that FPC calls for every object, about
   12 ns against the 1-2 ns of a bump in C; the walk of the tree is 4%. A copy of the current region in a global

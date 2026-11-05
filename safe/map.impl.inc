@@ -9,35 +9,32 @@ const
 
 {$push}{$Q-}{$R-} // the hashes multiply modulo 2^64 by design
 
-{ Eight bytes at a time; the slot of a map is the top bits of the result, which the last multiplication mixes. }
-function SafeHashBytes(P: System.PByte; N, Avail: SizeInt): QWord;
+{ Eight bytes at a time, then the last 1-7 bytes as two overlapping words of four, or as the first, the middle and the
+  last byte: no byte past the key is read. The slot of a map is the top bits of the result, which the last
+  multiplication mixes. }
+function SafeHashBytes(P: System.PByte; N: SizeInt): QWord;
 var
   H, W: QWord;
-  I, J: SizeInt;
+  I, R: SizeInt;
 begin
   H := QWord(N) * SafeHashMul;
   I := 0;
   while I + 8 <= N do
   begin
-    // UNSAFE: reads eight bytes of the key at once; P points into a String of at least N bytes
+    // UNSAFE: reads eight bytes of the key at once; P points to at least N bytes
     W := PSafeQWordAt(P + I)^.V;
     H := (H xor W) * SafeHashMul;
     H := H xor (H shr 29);
     Inc(I, 8);
   end;
-  if I < N then
+  R := N - I;
+  if R > 0 then
   begin
-    {$ifdef ENDIAN_LITTLE}
-    if Avail - I >= 8 then
-      // UNSAFE: eight bytes of the String at once, the ones past the key masked off; Avail bytes from P are its own
-      W := PSafeQWordAt(P + I)^.V and (High(QWord) shr (8 * (8 - (N - I))))
+    if R >= 4 then
+      // UNSAFE: the first and the last four bytes of the tail; they overlap when R < 8
+      W := QWord(PSafeDWordAt(P + I)^.V) or (QWord(PSafeDWordAt(P + N - 4)^.V) shl 32)
     else
-    {$endif}
-    begin
-      W := 0;
-      for J := 0 to N - I - 1 do
-        W := W or (QWord(P[I + J]) shl (8 * J));
-    end;
+      W := QWord(P[I]) or (QWord(P[I + R div 2]) shl 8) or (QWord(P[N - 1]) shl 16);
     H := (H xor W) * SafeHashMul;
     H := H xor (H shr 29);
   end;
@@ -67,56 +64,32 @@ end;
 
 function MapHash(const K: TStrSlice): QWord;
 begin
-  Result := SafeHashBytes(System.PByte(System.Pointer(K.FStr)) + K.FStart, K.FLen, Length(K.FStr) - K.FStart);
+  Result := SafeHashBytes(System.PByte(System.Pointer(K.FStr)) + K.FStart, K.FLen);
 end;
-
-{$ifdef SPIKE_EXACT}
-type
-  TSpikeDWordAt = packed record
-    V: Cardinal;
-  end;
-  PSpikeDWordAt = ^TSpikeDWordAt;
-
-{$push}{$Q-}{$R-}
-{ the tail of 1..7 bytes read without a byte past the key: two overlapping 4-byte words, or three bytes }
-function SpikeHashExact(P: System.PByte; N: SizeInt): QWord;
-var
-  H, W: QWord;
-  I, R: SizeInt;
-begin
-  H := QWord(N) * SafeHashMul;
-  I := 0;
-  while I + 8 <= N do
-  begin
-    W := PSafeQWordAt(P + I)^.V;
-    H := (H xor W) * SafeHashMul;
-    H := H xor (H shr 29);
-    Inc(I, 8);
-  end;
-  R := N - I;
-  if R > 0 then
-  begin
-    if R >= 4 then
-      W := QWord(PSpikeDWordAt(P + I)^.V) or (QWord(PSpikeDWordAt(P + N - 4)^.V) shl 32)
-    else
-      W := QWord(P[I]) or (QWord(P[I + R div 2]) shl 8) or (QWord(P[N - 1]) shl 16);
-    H := (H xor W) * SafeHashMul;
-    H := H xor (H shr 29);
-  end;
-  Result := (H * SafeHashMul) or 1;
-end;
-{$pop}
-{$endif}
 
 function MapHash(const K: TStrView): QWord;
 begin
-  {$ifdef SPIKE_EXACT}
-  Result := SpikeHashExact(System.PByte(K.FP), K.FLen);
-  {$else}{$ifdef SPIKE_OVERREAD}
-  Result := SafeHashBytes(System.PByte(K.FP), K.FLen, K.FLen + 8);
-  {$else}
-  Result := SafeHashBytes(System.PByte(K.FP), K.FLen, K.FLen);
-  {$endif}{$endif}
+  Result := SafeHashBytes(System.PByte(K.FP), K.FLen);
+end;
+
+{ ---------- TStrView ---------- }
+
+function StrView(const S: String): TStrView;
+begin
+  Result.FP := System.PChar(System.Pointer(S));
+  Result.FLen := Length(S);
+  {$ifdef SAFE_DEBUG}
+  Result.FKeep := S;
+  {$endif}
+end;
+
+function TStrView.Sub(AStart, ALen: SizeInt): TStrView;
+begin
+  if (AStart < 1) or (ALen < 0) or (AStart - 1 > FLen - ALen) then
+    SafeFail(Format('SAFE-R2: TStrView.Sub(%d, %d) out of bounds, length %d', [AStart, ALen, FLen]));
+  Result := Self;
+  Result.FP := FP + (AStart - 1);
+  Result.FLen := ALen;
 end;
 
 function TStrView.Len: SizeInt;
@@ -129,10 +102,29 @@ begin
   SetString(Result, FP, FLen);
 end;
 
+function TStrView.GetItem(I: SizeInt): Char;
+begin
+  if (I < 1) or (I > FLen) then
+    SafeFail(Format('SAFE-R2: TStrView index %d out of bounds, length %d', [I, FLen]));
+  Result := FP[I - 1];
+end;
+
+function TStrView.Equals(const S: String): Boolean;
+begin
+  Result := (FLen = Length(S)) and SafeSameBytes(System.PByte(FP), System.PByte(System.Pointer(S)), FLen);
+end;
+
 class operator TStrView.=(const A, B: TStrView): Boolean;
 begin
   Result := (A.FLen = B.FLen) and SafeSameBytes(System.PByte(A.FP), System.PByte(B.FP), A.FLen);
 end;
+
+class operator TStrView.<>(const A, B: TStrView): Boolean;
+begin
+  Result := not (A = B);
+end;
+
+{ ---------- FieldViews ---------- }
 
 function FieldViews(const S: String): TViewFields;
 begin
@@ -146,7 +138,7 @@ begin
   Result := Self;
 end;
 
-function TViewFields.MoveNext: Boolean;
+function TViewFields.Next(var W: TStrView): Boolean;
 var
   P: System.PChar;
   N, I, Start: SizeInt;
@@ -161,13 +153,22 @@ begin
     Inc(I);
   FPos := I;
   Result := I > Start;
-  FCur.FP := P + Start;
-  FCur.FLen := I - Start;
+  W.FP := P + Start;
+  W.FLen := I - Start;
+  {$ifdef SAFE_DEBUG}
+  if System.Pointer(W.FKeep) <> System.Pointer(FText) then
+    W.FKeep := FText;
+  {$endif}
+end;
+
+function TViewFields.MoveNext: Boolean;
+begin
+  Result := Next(FCur);
 end;
 
 function MapHash(const K: String): QWord;
 begin
-  Result := SafeHashBytes(System.PByte(System.Pointer(K)), Length(K), Length(K));
+  Result := SafeHashBytes(System.PByte(System.Pointer(K)), Length(K));
 end;
 
 function MapHash(const K: Int64): QWord;

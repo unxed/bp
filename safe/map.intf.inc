@@ -5,18 +5,23 @@
   alive while a slice of it does. StrSlice(S) is the slice of all of S (a String does not convert by itself yet: the typed
   bpvet does not read an implicit operator of a record), W.Equals(S) compares with a String. A change of the String variable later makes a new String (copy on write), so a slice
   never sees it. Fields(S) are the words of S: the runs of bytes above the space.
+  TStrView is a part of a String without a reference to it (16 bytes, not managed): copied as two words, an entry of a
+  TMap<TStrView, V> is 32 bytes. StrView(S) and FieldViews(S) make views; W.ToString copies a word to keep. A view is
+  valid while its String is not changed, and bpvet S28 checks it: the String is a local variable or a const parameter,
+  it is not written after the first view of it, and a view (or a map of views) does not leave the routine.
   TMap<K, V> is a hash map with open addressing (linear probing, the hash kept in the entry), for keys of the types that
-  MapHash takes: String, TStrSlice, the integers, Pointer. A copy of a TMap refers to the same map, as in Go and as
+  MapHash takes: String, TStrSlice, TStrView, the integers, Pointer. A copy of a TMap refers to the same map, as in Go and as
   TSlice does; a map is made by Create or by its first write.
       Inc(Counts.Ref(W, 0)^);          // one lookup: the place of the value of W, added with 0 when W is new
       Counts[StrSlice('a')] := 5;       // N := Counts[W] of a key that is not there raises ESafety (R18)
       for P in Counts do ... P.Key ... P.Value ...  // a change of the map in the loop raises ESafety (R19)
   The checks:
-    R2   a TStrSlice index or Sub out of range;
+    R2   a TStrSlice or TStrView index or Sub out of range;
     R18  M[K] of a key that is not in the map (Get(K, Default) and TryGet do not raise);
     R19  a change of the map while for P in M walks it;
     S27  (bpvet) the result of Ref is used at once: M.Ref(K, D)^ in the statement that calls it, never kept, because the
-         next change of the map may move it. }
+         next change of the map may move it;
+    S28  (bpvet) a TStrView does not outlive its String, and the String is not written while views of it live. }
 type
   { eight bytes at any address: a packed record is read without an alignment fault on every target }
   TSafeQWordAt = packed record
@@ -24,12 +29,16 @@ type
   end;
   // UNSAFE: the hash and the comparison of keys read eight bytes of a String at once
   PSafeQWordAt = ^TSafeQWordAt;
+  TSafeDWordAt = packed record
+    V: Cardinal;
+  end;
+  // UNSAFE: the hash reads the last bytes of a key as two words of four
+  PSafeDWordAt = ^TSafeDWordAt;
 
 { The same N bytes at P and Q, eight at a time; for TStrSlice and TMap, in the interface to be inlined there. }
 function SafeSameBytes(P, Q: System.PByte; N: SizeInt): Boolean; inline;
-{ The hash of the N bytes at P, of which Avail (at least N) may be read: with eight to spare the last bytes are read
-  at once. For MapHash, in the interface to be inlined there. }
-function SafeHashBytes(P: System.PByte; N, Avail: SizeInt): QWord; inline;
+{ The hash of the N bytes at P; no byte past them is read. For MapHash, in the interface to be inlined there. }
+function SafeHashBytes(P: System.PByte; N: SizeInt): QWord; inline;
 
 type
   { ---------- TStrSlice ---------- }
@@ -69,29 +78,40 @@ type
 function Fields(const S: String): TFields;
 
 type
-  { SPIKE: a view of bytes of a String without a reference to it (16 bytes, not managed) }
+  { ---------- TStrView ---------- }
   TStrView = record
   private
-    FP: System.PChar;
+    FP: System.PChar;     // the first byte, in the String the view was made of
     FLen: SizeInt;
+    {$ifdef SAFE_DEBUG}
+    FKeep: String;        // the second net: a debug build holds the String, so a view S28 missed reads the old bytes
+    {$endif}
+    function GetItem(I: SizeInt): Char;
   public
+    function Sub(AStart, ALen: SizeInt): TStrView;  // a part of this view, 1-based as Copy (R2)
     function Len: SizeInt; inline;
-    function ToString: String;
+    function ToString: String;                       // a copy of the bytes: the way to keep a word
+    function Equals(const S: String): Boolean;       // the same bytes as S
+    property Items[I: SizeInt]: Char read GetItem; default; // 1-based as a String (R2)
     class operator =(const A, B: TStrView): Boolean; inline;
+    class operator <>(const A, B: TStrView): Boolean;
   end;
 
+  { for W in FieldViews(S): the words of S, each a TStrView; while F.Next(W) is the same loop }
   TViewFields = record
   private
     FText: String;
-    FPos: SizeInt;
+    FPos: SizeInt;        // 0-based: where the search for the next word starts
     FCur: TStrView;
   public
     function GetEnumerator: TViewFields;
     function MoveNext: Boolean; inline;
+    function Next(var W: TStrView): Boolean; inline;
     property Current: TStrView read FCur;
   end;
 
-function FieldViews(const S: String): TViewFields;
+function StrView(const S: String): TStrView;         // the view of all of S
+function FieldViews(const S: String): TViewFields;  // the words of S: the runs of bytes above the space
 function StrSlice(const S: String): TStrSlice; // the slice of all of S: TStrSlice.Make(S)
 
 { the hash of a key of a TMap; equal keys have equal hashes, and a String has the hash of the slice of all of it }

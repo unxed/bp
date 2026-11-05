@@ -1,6 +1,6 @@
 { SPDX-License-Identifier: MIT }
-{ Runtime tests of the strings and maps (safe/map.*.inc, SPEC §25.3): TStrSlice, Fields, MapHash, TMap<K, V>, R2, R18,
-  R19. Exit code = number of failed checks. }
+{ Runtime tests of the strings and maps (safe/map.*.inc, SPEC §25.3): TStrSlice, Fields, TStrView, FieldViews, MapHash,
+  TMap<K, V>, R2, R18, R19. Exit code = number of failed checks. }
 program test_map;
 
 {$mode objfpc}{$H+}
@@ -10,6 +10,7 @@ uses
 
 type
   TCounts = specialize TMap<TStrSlice, Int64>;
+  TViewCounts = specialize TMap<TStrView, Int64>;
   TNames = specialize TMap<String, String>;
   TInts = specialize TMap<Int64, Int64>;
 
@@ -54,7 +55,7 @@ begin
   Check(A = B, 'StrSlice(S) is the slice of all of S');
   Check(MapHash(A) = MapHash(String('world')), 'a slice and a String with the same bytes have the same hash');
   Check(MapHash(TStrSlice.Make(S, 1, 0)) = MapHash(String('')), 'an empty slice has the hash of the empty String');
-  // the hash of a slice reads its last bytes at once when the String has eight more; the hash stays that of the bytes
+  // the hash reads the last 1-7 bytes of a key as two overlapping words of four or as three bytes, never past the key
   T := 'the quick brown fox jumps over the lazy dog';
   Same := True;
   for I := 1 to Length(T) do
@@ -138,6 +139,83 @@ begin
     Got := Got + W.ToString;
   end;
   Check((N = 3) and (Got = 'abbccc'), 'Fields.Next(W): the same words without a for-in loop');
+end;
+
+{ ---------- TStrView ---------- }
+
+procedure Views;
+var
+  S, T, U: String;
+  A, B: TStrView;
+  I, L: Integer;
+  Same: Boolean;
+begin
+  S := 'hello world';
+  A := StrView(S).Sub(7, 5);
+  U := 'a world';
+  B := StrView(U).Sub(3, 5);
+  Check((A.Len = 5) and (A.ToString = 'world') and (A[1] = 'w') and (A[5] = 'd'), 'TStrView.Sub, Len, ToString, Items');
+  Check(A = B, 'two views of different Strings with the same bytes are equal');
+  Check(A.Equals('world') and not A.Equals('worlds') and (A <> StrView(S)), 'TStrView.Equals and <>');
+  Check(MapHash(A) = MapHash(String('world')), 'a view and a String with the same bytes have the same hash');
+  Check(MapHash(StrView(S).Sub(1, 0)) = MapHash(String('')), 'an empty view has the hash of the empty String');
+  T := 'the quick brown fox jumps over the lazy dog';
+  Same := True;
+  for I := 1 to Length(T) do
+    for L := 0 to 20 do
+      if I + L - 1 <= Length(T) then
+        Same := Same and (MapHash(StrView(T).Sub(I, L)) = MapHash(Copy(T, I, L)))
+          and (MapHash(StrView(T).Sub(I, L)) = MapHash(TStrSlice.Make(T, I, L)));
+  Check(Same, 'every view of 0 to 20 bytes at every place has the hash of a String and of a slice of its bytes');
+end;
+
+procedure ViewR2;
+var
+  S, Msg: String;
+  A: TStrView;
+  C: Char;
+begin
+  S := 'abc';
+  A := StrView(S);
+  C := #0;
+  Msg := '';
+  try
+    C := A[4];
+  except
+    on E: ESafety do Msg := E.Message;
+  end;
+  Check(Pos('SAFE-R2', Msg) > 0, 'R2: TStrView index past the end raises ESafety');
+  Msg := '';
+  try
+    A := A.Sub(2, 3);
+  except
+    on E: ESafety do Msg := E.Message;
+  end;
+  Check((Pos('SAFE-R2', Msg) > 0) and (C = #0), 'R2: TStrView.Sub past the end raises ESafety');
+end;
+
+procedure ViewWords;
+var
+  Text, Got: String;
+  W: TStrView;
+  F: TViewFields;
+  M: TViewCounts;
+  N: Integer;
+begin
+  Text := '  one two'#9'three'#10#10'two  one two ';
+  Got := '';
+  for W in FieldViews(Text) do
+    Got := Got + '[' + W.ToString + ']';
+  Check(Got = '[one][two][three][two][one][two]', 'FieldViews: the runs of bytes above the space (' + Got + ')');
+  N := 0;
+  F := FieldViews(Text);
+  while F.Next(W) do
+    Inc(N);
+  Check(N = 6, 'FieldViews.Next(W): the same words without a for-in loop');
+  for W in FieldViews(Text) do
+    Inc(M.Ref(W, 0)^);
+  Check((M.Count = 3) and (M[StrView(Text).Sub(7, 3)] = 3) and (M.Get(StrView(Text).Sub(3, 3), 0) = 2),
+    'a map of views counts the words');
 end;
 
 { ---------- TMap ---------- }
@@ -294,6 +372,9 @@ begin
   SliceHolds;
   SliceR2;
   FieldsWords;
+  Views;
+  ViewR2;
+  ViewWords;
   MapBasics;
   MapRef;
   MapShared;
