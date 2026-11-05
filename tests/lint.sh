@@ -63,19 +63,22 @@ args=
 check "$deep/s03_ok.pas" "" 0 "" ""
 check "$deep/s03_bad.pas" "" 1 Error SAFE-S3
 rm -rf "$long"
-# --fix writes `as` for the downcasts of S24: tests/lint/s24_fix.src becomes s24_fix.expected, and the result is clean
-fixdir=$(mktemp -d)
-cp "$here/lint/s24_fix.src" "$fixdir/s24_fix.pas"
+# --fix: tests/lint/NAME.src becomes NAME.expected, and the result is clean. s24_fix: `as` for the downcasts of S24;
+# raises_fix: the // raises: marks of S30 (it uses raises_lib, copied next to it)
 args=$(sed -n '2s#^// ARGS: ##p' "$here/lint/s24_bad.pas"); args=${args//@root@/$root}; args=${args//@rtl@/$rtl}
-"$bpvet" --fix $args "$fixdir/s24_fix.pas" >/dev/null
-if diff -u "$here/lint/s24_fix.expected" "$fixdir/s24_fix.pas" >/dev/null; then
-  echo "ok   s24_fix.src --fix: rewritten to s24_fix.expected"
-else
-  echo "FAIL s24_fix.src --fix: the result differs from s24_fix.expected:"
-  diff -u "$here/lint/s24_fix.expected" "$fixdir/s24_fix.pas"
-  fail=1
-fi
-args=$(sed -n '2s#^// ARGS: ##p' "$here/lint/s24_bad.pas"); args=${args//@root@/$root}; args=${args//@rtl@/$rtl}
-check "$fixdir/s24_fix.pas" --strict 0 "" ""
-rm -rf "$fixdir"
+for name in s24_fix raises_fix; do
+  fixdir=$(mktemp -d)
+  cp "$here/lint/$name.src" "$fixdir/$name.pas"
+  cp "$here/lint/raises_lib.pas" "$fixdir/"
+  "$bpvet" --fix $args "$fixdir/$name.pas" >/dev/null
+  if diff -u "$here/lint/$name.expected" "$fixdir/$name.pas" >/dev/null; then
+    echo "ok   $name.src --fix: rewritten to $name.expected"
+  else
+    echo "FAIL $name.src --fix: the result differs from $name.expected:"
+    diff -u "$here/lint/$name.expected" "$fixdir/$name.pas"
+    fail=1
+  fi
+  check "$fixdir/$name.pas" --strict 0 "" ""
+  rm -rf "$fixdir"
+done
 exit $fail

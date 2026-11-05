@@ -27,7 +27,7 @@ function Looped(const N: Integer): Integer;
 procedure Fill(var F: TFoo);
 function ByVar: Integer;
 function Nested: Integer;
-function Raised(const C: Boolean): TFoo;
+function Raised(const C: Boolean): TFoo;  // raises: Exception
 
 implementation
 
