@@ -36,8 +36,10 @@ end;
 
 procedure Slices;
 var
-  S: String;
+  S, T: String;
   A, B: TStrSlice;
+  I, L: Integer;
+  Same: Boolean;
 begin
   S := 'hello, world';
   A := TStrSlice.Make(S, 8, 5);
@@ -52,6 +54,15 @@ begin
   Check(A = B, 'StrSlice(S) is the slice of all of S');
   Check(MapHash(A) = MapHash(String('world')), 'a slice and a String with the same bytes have the same hash');
   Check(MapHash(TStrSlice.Make(S, 1, 0)) = MapHash(String('')), 'an empty slice has the hash of the empty String');
+  // the hash of a slice reads its last bytes at once when the String has eight more; the hash stays that of the bytes
+  T := 'the quick brown fox jumps over the lazy dog';
+  Same := True;
+  for I := 1 to Length(T) do
+    for L := 0 to 20 do
+      if I + L - 1 <= Length(T) then
+        Same := Same and (MapHash(TStrSlice.Make(T, I, L)) = MapHash(Copy(T, I, L)))
+          and (MapHash(TStrSlice.Make(T, I, L)) = MapHash(StrSlice(Copy(T, I, L))));
+  Check(Same, 'every slice of 0 to 20 bytes at every place has the hash of a String of its bytes');
 end;
 
 { a slice holds its String: the bytes stay while the variable it came from changes }

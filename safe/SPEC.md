@@ -1085,8 +1085,9 @@ or above the parameter suppresses its S14 finding.
 | v0.32 (report) | §25.5 competitive on every dimension, step 1 (#181): `tests/bench/size.sh` (hello world in Bp, C, Rust, Go and Goose: build, rebuild, size, RSS, start); verdicts: size — reach (smart linking 1171 → 697 KiB, the collation table on request); memory — ahead (0.3 MiB); start — ahead of all but static C; build — reach (a rebuild 171 ms, target under 100 ms) |
 | v0.33 | §25.5 size and build: `BP` no longer uses `unicodeducet` (strings compare by code point unless the program uses it; hello world 1199 → 781 KiB, with `-XX` 697 → 288 KiB); `bpvet --buildkey` gives both keys of `tools/bp` in one run, and `tools/bp` starts fewer processes: a rebuild after an edit 176 → 144 ms |
 | v0.34 | §25.5: `tools/bp` keeps the units of each kind of build in a directory of its own (a release build linked the `BP` of a debug build when that came first: 34–36% slower in the region and word count programs); `--release` adds `-XX -CX` (smart linking, hello world 288 KiB) |
-| v0.36 | §25.5 the check cache per file (`bpvet --cache`, `tools/bp`): a rebuild of the project of 20 files after an edit 493 → 248 ms (gcc 260, Go 349); §25.2 the toolchain policy: Bp builds on the releases of FPC, not on main |
 | v0.35 (report) | §25.5 a project of many files (`tests/bench/project.sh`, 20 modules, 17326 lines): a clean build Bp 658 ms, Rust 1583, gcc 2599, Go 6085; a rebuild after an edit of one file Bp 493 ms, gcc 263, Go 316 (the check of every file by `bpvet` is the long pole; the lever: a check cache per file) |
+| v0.36 | §25.5 the check cache per file (`bpvet --cache`, `tools/bp`): a rebuild of the project of 20 files after an edit 493 → 248 ms (gcc 260, Go 349); §25.2 the toolchain policy: Bp builds on the releases of FPC, not on main |
+| v0.37 | §25.3 the word count 0.47 → 0.43 s: the hash, the comparison of slices and the probe of `TMap` inlined, the last bytes of a key read at once; where the rest of the gap is (a managed slice) and why the region of objects is 3.3x (the protocol of a constructor) |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -3025,6 +3026,27 @@ end;
   of each word through the type information of FPC (`fpc_copy`: 0.08-0.1 s here); `while F.Next(W)` writes the
   fields of `W` in place and takes 0.37 s. The rest of the gap to C is the code of FPC: the same table written by hand
   in Pascal takes 0.27-0.33 s.
+- **Where the time goes, and the first levers (v0.37, a busy machine, median of 5–7).** The parts, each a program of
+  its own over the same text: reading it 0.01 s; the words with `while F.Next(W)` 0.08 s (C 0.07 s); with a hash of
+  each 0.13 s (C 0.08 s); with the map 0.37 s (C 0.21 s, all of it); `for W in Fields` adds the 0.08 s of
+  `fpc_copy`. Two changes, the output the same:
+  - the hash: `MapHash` of a slice and `SafeHashBytes` are inlined, and the last bytes of a key are read as one
+    word, masked, when the `String` has eight more bytes (little-endian targets; a `String` key keeps the loop of
+    bytes, and a test checks that every slice of 0 to 20 bytes has the hash of a `String` of its bytes): 0.13 → 0.11 s;
+  - the comparison: `TStrSlice.=` and `SafeSameBytes` are inlined, and so is `Find` into `Ref`: no call is left in
+    a probe. The word count: 0.47 → 0.43 s (C 0.21-0.22 s on the same runs).
+  - Not a lever: a table at most a quarter full (0.40 s against 0.37 s: a larger table misses the cache more), and
+    the slots taken through one pointer in `Find` (the same time).
+  - What is left is in the type: a `TStrSlice` holds a `String`, so it is a managed record. Its copy in `for-in` goes
+    through the type information (0.08 s), and an entry of the map is 40 bytes against 24 of C (the hand-written
+    table: 0.05 s of the difference). Both need a slice without the reference: a decision of design (a view valid
+    only in its loop, with a borrow rule in `bpvet`), not a change of code.
+- **The region of objects (gprof, v0.37).** 85% of the time is the construction of a node: the constructor, the
+  virtual `NewInstance` (the bump itself) and the virtual `AfterConstruction` that FPC calls for every object, about
+  12 ns against the 1-2 ns of a bump in C; the walk of the tree is 4%. A copy of the current region in a global
+  while the program has one thread (no call through the thread manager for the threadvar) gave nothing (0.27 s
+  both). The lever is an allocation of a region object without the protocol of a constructor, a change of the API
+  (a decision of design); the arena tier (`TGrowArray` of records, 1.67x of C) is the fast form meanwhile.
 
 ### 25.4 A memory manager of BP (design, 2026-11-05)
 

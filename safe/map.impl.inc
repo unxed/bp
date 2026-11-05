@@ -7,17 +7,10 @@
 const
   SafeHashMul = QWord($9E3779B97F4A7C15); // 2^64 divided by the golden ratio, odd
 
-type
-  { eight bytes at any address: a packed record is read without an alignment fault on every target }
-  TSafeQWordAt = packed record
-    V: QWord;
-  end;
-  PSafeQWordAt = ^TSafeQWordAt;
-
 {$push}{$Q-}{$R-} // the hashes multiply modulo 2^64 by design
 
 { Eight bytes at a time; the slot of a map is the top bits of the result, which the last multiplication mixes. }
-function SafeHashBytes(P: System.PByte; N: SizeInt): QWord;
+function SafeHashBytes(P: System.PByte; N, Avail: SizeInt): QWord;
 var
   H, W: QWord;
   I, J: SizeInt;
@@ -34,9 +27,17 @@ begin
   end;
   if I < N then
   begin
-    W := 0;
-    for J := 0 to N - I - 1 do
-      W := W or (QWord(P[I + J]) shl (8 * J));
+    {$ifdef ENDIAN_LITTLE}
+    if Avail - I >= 8 then
+      // UNSAFE: eight bytes of the String at once, the ones past the key masked off; Avail bytes from P are its own
+      W := PSafeQWordAt(P + I)^.V and (High(QWord) shr (8 * (8 - (N - I))))
+    else
+    {$endif}
+    begin
+      W := 0;
+      for J := 0 to N - I - 1 do
+        W := W or (QWord(P[I + J]) shl (8 * J));
+    end;
     H := (H xor W) * SafeHashMul;
     H := H xor (H shr 29);
   end;
@@ -66,12 +67,12 @@ end;
 
 function MapHash(const K: TStrSlice): QWord;
 begin
-  Result := SafeHashBytes(System.PByte(System.Pointer(K.FStr)) + K.FStart, K.FLen);
+  Result := SafeHashBytes(System.PByte(System.Pointer(K.FStr)) + K.FStart, K.FLen, Length(K.FStr) - K.FStart);
 end;
 
 function MapHash(const K: String): QWord;
 begin
-  Result := SafeHashBytes(System.PByte(System.Pointer(K)), Length(K));
+  Result := SafeHashBytes(System.PByte(System.Pointer(K)), Length(K), Length(K));
 end;
 
 function MapHash(const K: Int64): QWord;
