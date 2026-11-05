@@ -8,10 +8,11 @@ leaves "in progress" after every job has finished) and prints a line whenever th
 - Every job succeeded: exit 0; with --merge the PR is merged (gh pr merge --merge --delete-branch) first.
 - A job failed in its own steps (a build or a test): exit 1 at once, with the end of the failed log.
 - A job failed on the runner (cancelled, timed out, or failed in an install step), waits for a runner longer than
-  QUEUE minutes, or hangs in a step: the run is cancelled at once and its failed jobs started again, up to RERUNS
+  QUEUE minutes (3 times QUEUE while another job of the run runs: the runners are busy with other PRs, a restart
+  only puts the job at the end of the queue), or hangs in a step: the run is cancelled at once and its failed jobs started again, up to RERUNS
   times; one more such failure is exit 1. A step hangs when it runs longer than 3 times the same step of the last
   successful run of the workflow plus 2 minutes; an install step (a name that starts with "Install", where a slow apt
-  mirror stalls: 15 s as a rule, 13 and 20 minutes when it stalled) after STALL minutes at most.
+  mirror stalls: 15 s as a rule, 3 minutes on a slow mirror, 13 and 20 minutes when it stalled) after STALL minutes.
 - A PR that conflicts with its base is exit 3 at once (merge the base in and push): GitHub starts no run for it, and
   an older run cannot be merged.
 - No run for the head commit: a new head commit (a push during the wait) is followed; no run after a minute
@@ -92,7 +93,7 @@ def hung(job, base):
         b = base.get((job["name"], s["name"]))
         limit = 3 * b + 120 if b is not None else None
         if s["name"].startswith("Install"):
-            limit = STALL if limit is None else min(limit, STALL)
+            limit = STALL  # apt: 15 s as a rule, 3 min on a slow mirror is not a hang, 13-20 min is
         if limit is not None and age(s["started_at"]) > limit:
             return "%s (%d s, the limit %d s)" % (s["name"], age(s["started_at"]), limit)
     return None
@@ -183,7 +184,11 @@ def main():
                 base = baseline(repo, run)
             except (RuntimeError, KeyError, ValueError):
                 base = {}
-        stuck = [j for j in jobs if j["status"] in ("queued", "waiting", "pending") and age(j["created_at"]) > QUEUE]
+        # while a job of the run runs, the runners work and a queued job waits for a free one (several PRs at once):
+        # a restart would only put it at the end of the queue, so it is stuck after 3 times QUEUE only
+        busy = any(j["status"] == "in_progress" for j in jobs)
+        stuck = [j for j in jobs if j["status"] in ("queued", "waiting", "pending")
+                 and age(j["created_at"]) > (3 * QUEUE if busy else QUEUE)]
         hangs = {j["name"]: hung(j, base) for j in jobs if j["status"] == "in_progress"}
         hangs = {k: v for k, v in hangs.items() if v}
         done = jobs and all(j["status"] == "completed" for j in jobs)
