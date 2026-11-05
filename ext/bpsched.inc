@@ -79,11 +79,11 @@ end;
 
 { ---------- the switch ----------
   SchedSwitch(Save, Next): pushes the callee-saved registers and the FPU control words on the current stack, stores the
-  stack pointer to Save^, loads Next as the stack pointer, restores what was saved there and returns into the code
+  stack pointer to Save, loads Next as the stack pointer, restores what was saved there and returns into the code
   that saved it (or, for a new goroutine, into GoEntry: see InitialFrame). }
 
 {$if defined(cpux86_64)}
-procedure SchedSwitch(Save: PPointer; Next: Pointer); assembler; nostackframe;
+procedure SchedSwitch(var Save: Pointer; Next: Pointer); assembler; nostackframe;
 asm
   // rdi = Save, rsi = Next; callee-saved: rbx, rbp, r12-r15 (System V), MXCSR and the x87 control word
   pushq  %rbp
@@ -118,7 +118,7 @@ asm
   addq   $8, %rsp
 end;
 {$elseif defined(cpui386)}
-procedure SchedSwitch(Save: PPointer; Next: Pointer); assembler; nostackframe;
+procedure SchedSwitch(var Save: Pointer; Next: Pointer); assembler; nostackframe;
 asm
   // eax = Save, edx = Next (the register convention of FPC); callee-saved: ebx, esi, edi, ebp, the x87 control word
   pushl  %ebp
@@ -146,7 +146,7 @@ asm
   addl   $4, %esp
 end;
 {$elseif defined(cpuaarch64)}
-procedure SchedSwitch(Save: PPointer; Next: Pointer); assembler; nostackframe;
+procedure SchedSwitch(var Save: Pointer; Next: Pointer); assembler; nostackframe;
 asm
   // x0 = Save, x1 = Next; callee-saved: x19-x28, x29 (frame), x30 (link), d8-d15 (AAPCS64), FPCR
   sub    sp, sp, #176
@@ -190,28 +190,32 @@ procedure GoEntry; forward;
 
 { The stack of a new goroutine as SchedSwitch leaves it: zero registers, the FPU words of the thread that starts it,
   and the return address GoEntry placed so that GoEntry starts with the alignment of a called routine. }
+type
+  TFrameWords = array[0..21] of PtrUInt;   // the largest frame: aarch64, 176 bytes
+  PFrameWords = ^TFrameWords;
+
 function InitialFrame(Top: PtrUInt; Fpu: PtrUInt): Pointer;
 var
-  W: PPtrUInt;
+  W: PFrameWords;
 begin
   {$if defined(cpux86_64)}
   // [Top-8] a zero return address, [Top-16] GoEntry, rbp ... r15, the FPU words: rsp = 8 mod 16 at the entry
-  W := PPtrUInt(Top - 72);
+  W := PFrameWords(Top - 72);
   System.FillChar(W^, 72, 0);
-  W[0] := Fpu;
-  W[7] := PtrUInt(@GoEntry);
+  W^[0] := Fpu;
+  W^[7] := PtrUInt(@GoEntry);
   {$elseif defined(cpui386)}
   // [Top-4] a zero return address, [Top-8] GoEntry, ebp ... edi, the x87 word: esp = 12 mod 16 at the entry
-  W := PPtrUInt(Top - 28);
+  W := PFrameWords(Top - 28);
   System.FillChar(W^, 28, 0);
-  W[0] := Fpu;
-  W[5] := PtrUInt(@GoEntry);
+  W^[0] := Fpu;
+  W^[5] := PtrUInt(@GoEntry);
   {$elseif defined(cpuaarch64)}
   // 176 bytes: x30 (at 88) is GoEntry, FPCR at 160; sp = Top (16-aligned) at the entry
-  W := PPtrUInt(Top - 176);
+  W := PFrameWords(Top - 176);
   System.FillChar(W^, 176, 0);
-  W[11] := PtrUInt(@GoEntry);
-  W[20] := Fpu;
+  W^[11] := PtrUInt(@GoEntry);
+  W^[20] := Fpu;
   {$endif}
   Result := W;
 end;
@@ -480,7 +484,7 @@ end;
 { On the goroutine G: give the carrier back; the carrier does G^.After. }
 procedure ToCarrier(G: PRawThread); inline;
 begin
-  SchedSwitch(@G^.SP, G^.Carrier^.SP);
+  SchedSwitch(G^.SP, G^.Carrier^.SP);
 end;
 
 procedure GreenYield(G: PRawThread);
@@ -496,7 +500,7 @@ var
 begin
   G^.Carrier := C;
   Inc(C^.Switches);
-  SchedSwitch(@C^.SP, G^.SP);
+  SchedSwitch(C^.SP, G^.SP);
   case G^.After of
     AfterYield:
       begin
