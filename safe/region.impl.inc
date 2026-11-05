@@ -11,10 +11,18 @@ type
     Size: SizeUInt;
   end;
 
+  TSafeRegionFinKind = (
+    sfkClean,                 // an object of the region with managed fields: CleanupInstance
+    sfkArray,                 // Count elements of the type Info at P: FinalizeArray
+    sfkHeld,                  // an object on the heap (Hold): Destroy
+    sfkDefer);                // an action (Defer): Proc
+
   TSafeRegionFinalizer = record
+    Kind: TSafeRegionFinKind;
     P: System.Pointer;
-    Info: System.Pointer;     // the type info of an element of an array; nil for an object
+    Info: System.Pointer;     // the type info of an element of an array
     Count: SizeInt;           // the elements of an array
+    Proc: TSafeDeferProc;
   end;
 
   PSafeRegionCell = ^TSafeRegionCell; // the layout of TRegion
@@ -97,30 +105,97 @@ begin
   Inc(D^.Cur, Size);
 end;
 
-procedure SafeRegionAddFinalizer(Region, P, Info: System.Pointer; Count: SizeInt);
-var
-  D: PSafeRegionData;
+{ A new entry of the finalizer list of D; the caller fills it. }
+function SafeRegionNewEntry(D: PSafeRegionData; const Kind: TSafeRegionFinKind): SizeInt;
 begin
-  D := PSafeRegionData(Region);
   if D^.FinCount = Length(D^.Fin) then
     SetLength(D^.Fin, 2 * D^.FinCount + 8);
-  D^.Fin[D^.FinCount].P := P;
-  D^.Fin[D^.FinCount].Info := Info;
-  D^.Fin[D^.FinCount].Count := Count;
+  Result := D^.FinCount;
+  D^.Fin[Result] := Default(TSafeRegionFinalizer);
+  D^.Fin[Result].Kind := Kind;
   Inc(D^.FinCount);
 end;
 
-procedure SafeRegionFinalize(D: PSafeRegionData);
+procedure SafeRegionAddFinalizer(Region, P, Info: System.Pointer; Count: SizeInt);
 var
   I: SizeInt;
 begin
-  // the newest first: a later object may refer to an earlier one
-  for I := D^.FinCount - 1 downto 0 do
-    if D^.Fin[I].Info = nil then
-      TObject(D^.Fin[I].P).CleanupInstance
-    else
-      FinalizeArray(D^.Fin[I].P, D^.Fin[I].Info, D^.Fin[I].Count);
-  D^.FinCount := 0;
+  if Info = nil then
+    I := SafeRegionNewEntry(PSafeRegionData(Region), sfkClean)
+  else
+    I := SafeRegionNewEntry(PSafeRegionData(Region), sfkArray);
+  PSafeRegionData(Region)^.Fin[I].P := P;
+  PSafeRegionData(Region)^.Fin[I].Info := Info;
+  PSafeRegionData(Region)^.Fin[I].Count := Count;
+end;
+
+{ Hold: Obj is destroyed when the region D is reset or released; V := Obj. Who: the name in a message. }
+procedure SafeRegionHold(D: PSafeRegionData; out V: TObject; Obj: TObject; const Who: String);
+var
+  I: SizeInt;
+begin
+  V := nil;
+  if Obj = nil then
+    Exit;
+  if Obj is TRegionObject then
+    SafeFail('SAFE-R16: ' + Who + '.Hold(' + Obj.ClassName + '): an object of a region belongs to its region');
+  if (D = nil) or (Obj is TInterfacedObject) then
+  begin
+    // UNSAFE: nobody else owns the new object yet: it does not outlive the failed call
+    Obj.Destroy;
+    if D = nil then
+      SafeFail('SAFE-R15: ' + Who + '.Hold in a region that is released (or a handle that has none)');
+    SafeFail('SAFE-R3: ' + Who + '.Hold of a TInterfacedObject: it is owned by its interface refcount; hold it '
+      + 'through an interface');
+  end;
+  I := SafeRegionNewEntry(D, sfkHeld);
+  D^.Fin[I].P := Obj;
+  V := Obj;
+end;
+
+procedure SafeRegionDefer(D: PSafeRegionData; const AProc: TSafeDeferProc; const Who: String);
+var
+  I: SizeInt;
+begin
+  if D = nil then
+    SafeFail('SAFE-R15: ' + Who + '.Defer in a region that is released (or a handle that has none)');
+  I := SafeRegionNewEntry(D, sfkDefer);
+  D^.Fin[I].Proc := AProc;
+end;
+
+{ Runs the finalizer list of D, the newest entry first: a later object may refer to an earlier one. An exception in a
+  destructor or a deferred action is counted (as in TDefer) and the rest still runs; an entry added while the list runs
+  (by a destructor or an action) runs too. }
+procedure SafeRegionFinalize(D: PSafeRegionData);
+var
+  E: TSafeRegionFinalizer;
+begin
+  while D^.FinCount > 0 do
+  begin
+    Dec(D^.FinCount);
+    E := D^.Fin[D^.FinCount];
+    case E.Kind of
+      sfkClean:
+        TObject(E.P).CleanupInstance;
+      sfkArray:
+        FinalizeArray(E.P, E.Info, E.Count);
+      sfkHeld:
+        try
+          // UNSAFE: the region is the only owner of a held object (Hold); nothing uses it after the scope (S17)
+          TObject(E.P).Destroy;
+        except
+          InterlockedIncrement(GDeferFailures);
+          // FPC skips the end of a destructor that raised, FreeInstance included: the memory is freed here
+          TObject(E.P).FreeInstance;
+        end;
+      sfkDefer:
+        try
+          E.Proc();
+        except
+          InterlockedIncrement(GDeferFailures);
+        end;
+    end;
+  end;
 end;
 
 { Frees the blocks of D; Keep: the newest (largest) one stays, empty, for the next round. }
@@ -213,6 +288,17 @@ begin
   D := nil;
   GRegionCurrent := N^.Outer;
   SafeRegionDrop(N);
+end;
+
+procedure TRegion.Hold(out V; Obj: TObject);
+begin
+  // UNSAFE: V is a variable of a class type (the typed bpvet checks it): its memory is a class reference
+  SafeRegionHold(PSafeRegionData(D), TObject(V), Obj, 'TRegion');
+end;
+
+procedure TRegion.Defer(AProc: TSafeDeferProc);
+begin
+  SafeRegionDefer(PSafeRegionData(D), AProc, 'TRegion');
 end;
 
 function TRegion.Used: SizeUInt;
@@ -332,9 +418,35 @@ begin
   Result := False;
 end;
 
-function TScope.GetCurrent: Integer;
+function TScope.GetCurrent: TScopeRef;
 begin
-  Result := CurrentRegionDepth;
+  Result.D := D;
+end;
+
+{ ---------- TScopeRef ---------- }
+
+procedure TScopeRef.Hold(out V; Obj: TObject);
+begin
+  // UNSAFE: V is a variable of a class type (the typed bpvet checks it): its memory is a class reference
+  SafeRegionHold(PSafeRegionData(D), TObject(V), Obj, 'Scope');
+end;
+
+procedure TScopeRef.Defer(AProc: TSafeDeferProc);
+begin
+  SafeRegionDefer(PSafeRegionData(D), AProc, 'Scope');
+end;
+
+function TScopeRef.Depth: Integer;
+var
+  N: PSafeRegionData;
+begin
+  Result := 0;
+  N := PSafeRegionData(D);
+  while N <> nil do
+  begin
+    Inc(Result);
+    N := N^.Outer;
+  end;
 end;
 
 class operator TScope.Initialize(var S: TScope);

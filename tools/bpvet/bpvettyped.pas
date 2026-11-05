@@ -12,7 +12,7 @@ interface
 
 uses
   SysUtils, Classes, Contnrs, PasTree, PScanner, PParser, PasResolveEval, PasResolver, BpvetCore, BpvetS17, BpvetRace, BpvetNil,
-  BpvetCast, Safe;
+  BpvetCast, BpvetHold, Safe;
 
 { Resolves the module of Src and checks it with S17 (bpvets17.pas): True when it and every unit it uses resolve;
   otherwise a fatal with the position is in Report. UnitDirs are searched for the used units after RtlDir (the stubs), then the directory of the file.
@@ -398,6 +398,7 @@ begin
     VetCheckRaces(Src, M, Main, Report);
     VetCheckNil(Src, M, Main, Report);
     VetCheckCasts(Src, M, Main, Report);
+    VetCheckHold(Src, M, Main, Report);
   end;
   if not Result then
     // the main module and every unit left unfinished by the failure are not used again

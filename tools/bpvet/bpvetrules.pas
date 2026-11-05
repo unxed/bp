@@ -797,10 +797,11 @@ begin
 end;
 
 { True when the text before Start (the class name of a Create call) hands the new object to an owner:
-  ...Own( ...Share( ...Adopt( ...Go( or raise. }
+  ...Own( ...Share( ...Adopt( ...Go( or raise, or a later argument of ...Hold(V, (the typed mode checks the
+  shape of the call, bpvethold.pas). }
 function S6Owned(const L: String; const Start: Integer): Boolean;
 var
-  K, B: Integer;
+  K, B, Depth: Integer;
   W: String;
 begin
   K := Start - 1;
@@ -808,6 +809,33 @@ begin
     Dec(K);
   if K < 1 then
     Exit(False);
+  if L[K] = ',' then
+  begin
+    // back to the opening parenthesis of the call the argument belongs to
+    Depth := 0;
+    Dec(K);
+    while K >= 1 do
+    begin
+      if L[K] = ')' then
+        Inc(Depth)
+      else if L[K] = '(' then
+      begin
+        if Depth = 0 then
+          Break;
+        Dec(Depth);
+      end;
+      Dec(K);
+    end;
+    if K < 1 then
+      Exit(False);
+    Dec(K);
+    while (K >= 1) and (L[K] = ' ') do
+      Dec(K);
+    B := K;
+    while (B >= 1) and IsWordChar(L[B]) do
+      Dec(B);
+    Exit(Copy(L, B + 1, K - B) = 'hold');
+  end;
   if L[K] = '(' then
   begin
     Dec(K);
@@ -888,7 +916,8 @@ begin
     if not Covered and not IsMarkComment(Tail) then
       VetAdd(Report, Src.FileName, I + 1, Col, vsError, 'S6',
         'a new object that nobody owns: pass TFoo.Create at once to TOwned.Own, TShared.Share, TArena.Adopt, '
-        + 'TGroup.Go or raise, or put a comment // UNSAFE: <who owns it> on the line above (safe/SPEC.md, section 6)');
+        + 'TGroup.Go, Hold of a scope or a region (S.Hold(V, TFoo.Create)) or raise, or put a comment '
+        + '// UNSAFE: <who owns it> on the line above (safe/SPEC.md, section 6)');
   end;
 end;
 

@@ -12,13 +12,33 @@
     R12  SAFE_DEBUG on unix: each block is pages of its own, and Reset/Release take all access away from them (they are
          never reused), so a use of a released region stops at once with EAccessViolation;
     R14  Release of a region that is not the innermost one of the goroutine;
-    R15  an allocation in the current region when the goroutine has none;
-    R16  Own/Share/Adopt of a region object (it belongs to its region).
+    R15  an allocation in the current region when the goroutine has none; Hold or Defer of a released region;
+    R16  Own/Share/Adopt/Hold of a region object (it belongs to its region).
   Strings and other managed fields are allowed: only types with managed fields go into the finalizer list of the
-  region (one entry per object or per chunk of an array), and Reset/Release finalize them. }
+  region (one entry per object or per chunk of an array), and Reset/Release finalize them.
+
+  The same list holds what a scope undoes when it ends (SPEC §21.1): a held object (Hold: Destroy is called) and a
+  deferred action (Defer). Reset and Release run the whole list, the newest entry first; an exception in a destructor
+  or a deferred action is counted (SafeDeferFailures, SafeCheckNoLeaks) and the rest of the list still runs. }
 
 type
   { ---------- API (SPEC §20) ---------- }
+
+  { A handle of a region: the loop variable of for S in Scope. A pointer, no ownership; bpvet (S17) keeps it inside
+    the block of its loop.
+      S.Hold(Lines, TStringList.Create);  // Lines := the new object; Lines.Destroy runs when the scope ends
+      S.Defer(@Term.Restore);             // runs when the scope ends, an exception included
+    The typed bpvet checks every Hold (S6, S17): V is a plain local of a class type, Obj a constructor call of that
+    class or of a descendant, and V neither escapes nor is read after the scope. }
+  TScopeRef = record
+  private
+    D: System.Pointer;    // the data of the region; nil for a handle that was never given one
+  public
+    // UNSAFE: V is any variable of a class type; the typed bpvet checks that it is a local of the class of Obj
+    procedure Hold(out V; Obj: TObject);
+    procedure Defer(AProc: TSafeDeferProc);
+    function Depth: Integer; // the number of regions of the goroutine up to this one (1: the outermost)
+  end;
 
   { A region of the current goroutine. A managed record: it is released when its variable leaves its scope; a copy
     raises ESafety (a region has one owner), except the move of a result of Create that has allocated nothing yet.
@@ -31,6 +51,10 @@ type
     procedure Reset;      // everything allocated in it, at once; keeps the largest block for the next round
     procedure Release;    // everything allocated in it, at once, and the region itself (R14 if it is not innermost)
     function Used: SizeUInt; // the bytes of its blocks
+    { as TScopeRef.Hold and Defer; the entries run on Reset and on Release (R15 on a released region) }
+    // UNSAFE: V is any variable of a class type; the typed bpvet checks that it is a local of the class of Obj
+    procedure Hold(out V; Obj: TObject);
+    procedure Defer(AProc: TSafeDeferProc);
     class operator Initialize(var R: TRegion);
     class operator Finalize(var R: TRegion);
     class operator Copy(constref Src: TRegion; var Dst: TRegion);
@@ -38,16 +62,16 @@ type
 
   { for R in Scope do begin ... end: a region for one block. The region is made by the first MoveNext (FPC copies the
     enumerator before it) and released by the second; Exit and exceptions release it when the routine finalizes the
-    loop. S17 forbids Break out of it (the region would be released late, out of order). R is the depth of the regions
-    of the goroutine. }
+    loop. S17 forbids Break out of it (the region would be released late, out of order). R is a handle of the region
+    (TScopeRef: R.Hold, R.Defer, R.Depth). }
   TScope = record
   private
     D: System.Pointer;
     N: Integer;
-    function GetCurrent: Integer;
+    function GetCurrent: TScopeRef;
   public
     function MoveNext: Boolean;
-    property Current: Integer read GetCurrent;
+    property Current: TScopeRef read GetCurrent;
     class operator Initialize(var S: TScope);
     class operator Finalize(var S: TScope);
     class operator Copy(constref Src: TScope; var Dst: TScope);

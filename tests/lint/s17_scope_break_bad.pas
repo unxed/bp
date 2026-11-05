@@ -16,7 +16,8 @@ implementation
 
 procedure Run(const Lines: array of String);
 var
-  R, I: Integer;
+  R: TScopeRef;
+  I: Integer;
   Line: String;
 begin
   for R in Scope do
