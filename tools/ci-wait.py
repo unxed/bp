@@ -12,6 +12,10 @@ leaves "in progress" after every job has finished) and prints a line whenever th
   times; one more such failure is exit 1. A step hangs when it runs longer than 3 times the same step of the last
   successful run of the workflow plus 2 minutes; an install step (a name that starts with "Install", where a slow apt
   mirror stalls: 15 s as a rule, 13 and 20 minutes when it stalled) after STALL minutes at most.
+- A PR that conflicts with its base is exit 3 at once (merge the base in and push): GitHub starts no run for it, and
+  an older run cannot be merged.
+- No run for the head commit: a new head commit (a push during the wait) is followed; no run after a minute
+  is said once.
 - No result after LIMIT minutes in all: exit 2.
 - A call of gh that fails on the network (a timeout, no connection, a 5xx of the gateway) is made again after a pause,
   up to 8 times, so a short outage does not end the wait.
@@ -132,7 +136,10 @@ def main():
     pr, merge = sys.argv[1], "--merge" in sys.argv[2:]
     repo = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip()
     sha = gh("pr", "view", pr, "--json", "headRefOid", "-q", ".headRefOid").strip()
-    start, reruns, last, base = time.time(), 0, None, None
+    start, reruns, last, base, quiet = time.time(), 0, None, None, False
+    if json.loads(gh("pr", "view", pr, "--json", "mergeable"))["mergeable"] == "CONFLICTING":
+        say("ci-wait: the PR conflicts with its base: merge the base in and push")
+        sys.exit(3)
     texts = text_only(pr)
     if texts:
         say("ci-wait: the PR changes only texts: waiting only for the jobs that check texts")
@@ -145,6 +152,17 @@ def main():
             say("ci-wait: no CI run checks texts: nothing to wait for")
             merge_now(pr, merge)
         if not runs:
+            info = json.loads(gh("pr", "view", pr, "--json", "mergeable,headRefOid"))
+            if info["mergeable"] == "CONFLICTING":
+                say("ci-wait: the PR conflicts with its base, so no CI runs: merge the base in and push")
+                sys.exit(3)
+            if info["headRefOid"] != sha:
+                sha = info["headRefOid"]
+                say("ci-wait: a new head commit %s: waiting for its run" % sha[:7])
+                continue
+            if not quiet and time.time() - start > 60:
+                say("ci-wait: no run for %s after a minute yet" % sha[:7])
+                quiet = True
             time.sleep(POLL)
             continue
         run = max(runs, key=lambda r: (r["created_at"], r["run_attempt"]))
