@@ -2904,15 +2904,18 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   1. **The code generator and the optimizer of FPC 3.2.2.** N-body 1.36x, fannkuch 1.31x and the arena tier 1.63x,
      where the Pascal and the C do the same work in the same layout. Filed upstream: the address of an element of an
      array of records computed again for every field (fpc#42040, #186) and a 32-bit index copied before every use
-     (fpc#42041, #187). Being prepared: no vectorization of loops, and a register allocation that reloads and spills
-     values in hot loops (#185).
+     (fpc#42041, #187), a record parameter passed in registers stored to the stack and read back on every use
+     (fpc#42042, #191: one of the causes of the arena tier) and no vectorization of loops (fpc#42043, #192: a part of
+     n-body). Workarounds where they exist: a `var` parameter or a pointer to an element, `constref` for a record.
   2. **The heap.** The heap tier of binary trees (1.8–2.2x) is the RTL heap of FPC against the `malloc` of glibc. The
      memory manager of BP (§25.4, `BP_HEAP=bp`) is off by default for now.
   3. **The library of BP.** The word count (1.8–2.3x) is `TMap` and the strings of BP against the table C writes for
      itself; the region of objects (3.3x) is the construction of a `TRegionObject` and the access of `TGrowArray`.
      This is our own code to speed up (the levers below).
-  4. **The possible large lever: the LLVM back end of FPC main,** which would give 1 the optimizer of clang; it is
-     being measured (#185).
+  4. **The LLVM back end of FPC main: measured, not a lever for now (#185).** With LLVM 17 it removes the slow spots
+     of fpc#42040, fpc#42041 and fpc#42042 and does not vectorize either; on our programs n-body and the arena tier
+     are 5–20% faster (1.24x and 1.14x of gcc) and fannkuch 24% slower. It needs FPC main, a second toolchain and a
+     workaround in the link, so the tickets stay the way; it is to be measured again when a release of FPC has it.
 
 - **Then the levers the numbers point to (step 6),** each measured on its own:
   - the cost of reference counting (`String`, dynamic arrays, `TShared`): `const` parameters (S14) already avoid most of
