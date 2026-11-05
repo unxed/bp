@@ -49,6 +49,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Support for `object` (Turbo Pascal) | **plan** | §19 |
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
+| Strings and maps: `TStrSlice`, `Fields`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 in the typed `bpvet` | §25.3 |
 | The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
@@ -385,6 +386,7 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S25 | an untyped parameter, a typecast of one, `absolute` (H18): `procedure Poke(var Buf; N: Integer)` with `TBig(Buf)[N] := 1` writes anywhere | `bpvet` S25 (`bpvetcast.pas`, typed): an error on (1) a `var`, `const` or `out` parameter with no type, in a routine, a method (at its declaration in the class, not again at its implementation) or a procedure type of the module; (2) a typecast `T(X)`, to any type, of such a parameter (`TBig(Buf)[N]`, `Byte(Buf)`); (3) a variable declared with `absolute`, global or local. `// UNSAFE: <why>` on the line, on the comment lines above it or, for (1), above the routine drops the finding; it drops (2) only at the cast, since the mark on the parameter says why the parameter has no type, not that every use of it is right. A call of an RTL routine that takes an untyped parameter (`Move`, `FillChar`, `BlockRead`) is not S25: BP wraps or poisons those (S4); a facade in `BP` with an untyped parameter carries the mark and is safe to call. A `// UNSAFE-UNIT:` module is not checked (`tests/lint/s25_ok.pas`, `s25_param_bad.pas`, `s25_const_bad.pas`, `s25_proctype_bad.pas`, `s25_cast_bad.pas`, `s25_absolute_bad.pas`) |
 | S26a | definite assignment (H19): a class reference that FPC does not zero, read or returned before it is assigned | `bpvet` S26a (typed, `tools/bpvet/bpvetnil.pas`): an error on the first read of a local of a class or class-of type that is not assigned on every path before it, and on the end of a routine (or an `Exit`) where its result or an `out` parameter of such a type is not assigned on every path; branches are joined, a `while` or `for` body may not run (a `for` with constant bounds in its direction runs), a handler of `try...except` and a `finally` block start from the state before `try`; a `var` argument, `@F`, a name used by a nested routine and `asm` count as assignments; what `-Sew` already catches is reported too (`tests/lint/s26a_bad.pas`, `s26a_out_bad.pas`, `s26a_result_bad.pas`, `s26a_finally_bad.pas`, `s26a_ok.pas`); `// UNSAFE: <why>` on the line or above |
 | S26b | a class whose instance is larger than 64 KiB: a field of a nil reference past the unmapped first pages would not fault | `bpvet` S26b (typed): an error on a class of the module whose fields with those of its ancestors, counted from below (no alignment, no variant parts), exceed 65536 bytes; a large buffer goes into a dynamic array (`s26b_bad.pas`, `s26b_ok.pas`) |
+| S27 | the place of a value of a `TMap` kept: `P := M.Ref(K, D)` points into the slots of the map, which the next change of the map moves | `bpvet` S27 (typed, `bpvethold.pas`): an error on a call of `Ref` of a specialization of `TMap` that is not dereferenced at once (`Inc(M.Ref(K, 0)^)` is the form); `// UNSAFE: <why>` on the line or above (`tests/lint/s27_bad.pas`, `s27_ok.pas`) |
 | S21 | a file without a `program`/`unit`/`library`/`package` header, or a header whose name is not the name of the file (two sources of one name) | `bpvet` S21 (`bpvetstyle.pas`, over the text before the parse): an error; the name is compared without letter case (`unit Region` in `region.pas`); a file without a header is a `unit` when it has `interface`, else a `program`; `bpvet --fix` / `tools/bp fix` inserts the header before the first token or writes the name of the file into it; a file whose name is not an identifier (dots allowed) is reported without a fix (`tests/lint/s21_none_bad.pas`, `s21_name_bad.pas`, `s21_ok.pas`) |
 | S22 | a reserved word with an upper-case letter (`Begin`, `END`): the style of Better Pascal is lower case, upper case is the style of the 1980s and stands out in the text | `bpvet` S22: a warning (an error with `--strict`, so in `tools/bp build`); `--fix` lowers the word; comments, strings, `&escaped` identifiers and the bodies of `asm` blocks are skipped; `string` is not checked, it is written as the type it names (`String`); directives (`override`, `virtual`) are not reserved words and are not checked (`tests/lint/s22_bad.pas`) |
 
@@ -1071,6 +1073,7 @@ or above the parameter suppresses its S14 finding.
 | v0.22 | §21.3, §25.2 step 6: `runnext` in the M:N scheduler (a goroutine woken by a goroutine runs next on its carrier; every 61st pick serves the queue; the monitor moves a stuck place): a round trip on 4 carriers 12 us → 0.8 us |
 | v0.23 | §21.4 the `TComponent` owner (step 4 of §21.7): the typed `bpvet` drops S6 of `TFoo.Create(AOwner)` of a component class with an owner that is not `nil` and S5 of a `published` component field of a component class; S17 for `.Free`, `FreeAndNil`, `Own`, `Share`, `Adopt` and `Hold` of a component that its owner destroys (`bpvethold.pas`, `tests/lint/component_*.pas`) |
 | v0.24 | §25.2 step 6, the region allocator: `TRegionObject.Create` without the frame of a failed constructor, `NewInstance` bumps in place, caches per class, and writes the VMT and zeroed fields itself for a class without managed fields or interfaces: `TNode.Create` 36 ns → 13 ns, binary trees 0.656 s → 0.255 s (0.57x of C); the suite uses the region of unit `BP` |
+| v0.25 | §25.3 strings and maps: `TStrSlice` (a part of a `String` that holds it), `Fields`, `TMap<K, V>` (open addressing, `Ref(K, D)^` for one lookup, Go semantics of a copy) in units Safe and BP (`safe/map.*.inc`, `test_map`), R18, R19, S27; the word count of the suite over them: 0.56 s → 0.46 s (`while F.Next(W)`: 0.37 s) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1637,6 +1640,8 @@ by trial deletion, as in CPython). It needs no stack scan and frees acyclic garb
 | R15 | an allocation in the current region when the goroutine has no region; `Hold` or `Defer` of a released `TRegion` or of a `TScopeRef` without a region |
 | R16 | `Own/Share/Adopt/Hold` of a region object (it belongs to its region) |
 | R17 | `SAFE_DEBUG`: `TChan.Send` of a dynamic array that another variable also holds (the receiver would share it, H14) |
+| R18 | `M[K]` of a `TMap` when `K` is not in the map (`Get(K, Default)` and `TryGet` do not raise) |
+| R19 | a key added to or deleted from a `TMap` while `for P in M` walks it (a new value of a key that is there is allowed) |
 
 ## §21. Concept v3: fewer things, fewer holes (design, plan)
 
@@ -2711,12 +2716,13 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   - **N-body, fannkuch.** The same loops and the same order of operations in every language, so that the floating
     point results are equal bit for bit (the line holds the energies in millionths). Rust indexes with bounds checks,
     as written; Bp is built without them.
-  - **Word count.** Bp makes a `String` of every word (`Copy`) and counts in a table of its own (FNV-1a of 32 bits,
-    open addressing, a size fixed for this text), because `TDictionary` is not usable under the typed `bpvet` (below). C counts
-    the words in place in a table of the same kind. Rust and Go slice the text without copying and use their standard
-    maps. Goose reads the text into one buffer and counts in its standard `dictionary` keyed by slices of that buffer,
-    so it copies no word. The five are not the same work, which is the point of a strings item: it measures what the
-    natural program of each language costs.
+  - **Word count.** Bp (since v0.25, §25.3) counts the words as `TStrSlice` values of the text (`for W in Fields(Text)`,
+    no copy of a word) in a `TMap` of unit `BP`, one lookup per word (`Inc(Counts.Ref(W, 0)^)`); the baseline above was
+    measured with a `String` of every word (`Copy`) and a table of its own (FNV-1a of 32 bits, open addressing).
+    C counts the words in place in a table of the same kind. Rust and Go slice the text without copying and use their
+    standard maps. Goose reads the text into one buffer and counts in its standard `dictionary` keyed by slices of that
+    buffer, so it copies no word. The five are not the same work, which is the point of a strings item: it measures
+    what the natural program of each language costs.
   - **Binary trees, Goose.** The nodes of one tree are the elements of one grow-only array with 4-byte self-relative
     links; the array belongs to the scope of the call, so dropping the tree is the end of that scope, a pointer store.
     That is the region style of Bp in the language that has it by construction.
@@ -2739,7 +2745,7 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
 
 - **Then the levers the numbers point to (step 6),** each measured on its own:
   - the cost of reference counting (`String`, dynamic arrays, `TShared`): `const` parameters (S14) already avoid most of
-    it;
+    it; the word count: a slice and a map in unit `BP`, 0.56 s → 0.46 s (§25.3);
   - the region allocator (one bump per object, nothing at the end of a region): **done for `TRegionObject`**
     (2026-11-05). `N := TNode.Create` took 36 ns: 11 ns in the frame of the constructor (`TObject.Create` frees the
     object when a constructor raises), 9 ns in the walk of the parents for managed fields on every object, the rest in
@@ -2759,3 +2765,65 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     queues, a smaller first heap chunk of a goroutine.
 
   A lever that needs a compiler fork is out (§0: `bp` works over the stock `fpc`).
+
+### 25.3 Strings and maps for speed: `TStrSlice`, `Fields`, `TMap` (2026-11-05)
+
+The word count of §25.2 was 2.6x of C, and the natural program of FPC is slower still: `TDictionary<String, Int64>`
+with a `Copy` of every word takes 1.66 s (7.7x of C; `Generics.Collections` of FPC 3.2.2 does not even build under
+`-Sew`: its enumerators warn of abstract methods). Go, Rust and Goose count the words as slices of the text in their
+standard maps, with one lookup per update (`counts[w]++`, `*entry(w).or_insert(0) += 1`, `update(w, 0) { it += 1 }`).
+Better Pascal gets the same three pieces in units Safe and BP (`safe/map.*.inc`):
+
+```pascal
+TStrSlice = record                         // a part of a String; holds the String, as a slice of Go does
+  class function Make(const S: String; AStart, ALen: SizeInt): TStrSlice; static;  // 1-based as Copy (R2)
+  function Sub(AStart, ALen: SizeInt): TStrSlice;
+  function Len: SizeInt;
+  function ToString: String;               // a copy of the bytes
+  function Equals(const S: String): Boolean;
+  property Items[I: SizeInt]: Char; default; // 1-based (R2)
+  class operator =(const A, B: TStrSlice): Boolean;
+end;
+function StrSlice(const S: String): TStrSlice;   // all of S
+function Fields(const S: String): TFields;       // for W in Fields(S): the runs of bytes above the space
+
+generic TMap<K, V> = record                // a copy refers to the same map (Go, TSlice); made by Create or the first write
+  function Ref(const Key: K; const Default: V): PV;  // the place of the value, added with Default: Inc(M.Ref(W, 0)^)
+  procedure Put(const Key: K; const Value: V);
+  function TryGet(const Key: K; out Value: V): Boolean;
+  function Get(const Key: K; const Default: V): V;
+  function Has(const Key: K): Boolean;
+  function Delete(const Key: K): Boolean;
+  procedure Clear;
+  function Count: SizeInt;
+  property Items[const Key: K]: V; default;           // a read of a missing key: R18
+  // for P in M do ... P.Key ... P.Value ...           // a key added or deleted in the loop: R19
+end;
+```
+
+- **A slice holds its text.** `TStrSlice` keeps a reference to the whole `String` (24 bytes: the `String`, the start,
+  the length), so a slice, and a map whose keys are slices, keeps the text alive, as in Go; a write to the `String`
+  variable later makes a new `String` (copy on write) and the slice does not see it. Nothing to check, the price is the
+  memory of the text. A slice without the reference would need a borrow rule of its own in `bpvet` (the text outlives
+  the slice and is not written meanwhile) and is not worth it: the measured cost of the reference is in the line below.
+- **The map.** Open addressing with linear probing, the hash in the entry (`Hash`, `Key`, `Value`), at most half
+  full, the slot from the top bits of the hash; deletion moves the entries after the hole back, so there are no
+  tombstones. The hash of a key is `MapHash` (overloads for `String`, `TStrSlice`, `Int64`, `QWord`, `Pointer`; a
+  `String` and a slice of the same bytes have the same hash), found when the generic is specialized; a key of another
+  type is a compile error until it gets an overload. Eight bytes at a time, a multiplication by the 64-bit golden ratio
+  and a shift per word. Measured layouts on the word count (hand-written loops, C at 0.22 s): the hash in a 24-byte
+  entry 0.27 s, in a 40-byte entry 0.32 s, in a separate array 0.32 s, no hash in the entry 0.31 s; `CompareByte` took a
+  third of a lookup for words of a few bytes, so equal keys are compared eight bytes at a time in the unit.
+- **One lookup per update: `Ref`.** `Inc(M.Ref(W, 0)^)` is the entry API of Rust in Pascal. The place is valid until
+  the next change of the map, so S27 of the typed `bpvet` allows the call only dereferenced at once. The typed
+  resolver of FPC 3.2.2 takes `Inc(M.Ref(K, D)^)` and reads of `M.Ref(K, D)^`, not an assignment to it: `M.Put(K, V)`
+  is the form for that.
+- **Not there yet.** An implicit `String` → `TStrSlice` (`M['red']` for a map of slices) and `W = 'red'`: FPC takes a
+  `class operator :=` and a mixed `=`, the typed resolver of `bpvet` does not, so `StrSlice('red')` and `W.Equals('red')`
+  stand in until the resolver patch reads them. Keys of record types (a `MapHash` of the user's own type) wait for the
+  same kind of change.
+- **The result** (the machine of §25.2, 4,000,000 words, median of 5): the word count of the suite in this style 0.46 s
+  (it was 0.56 s with a `Copy` per word and a table of its own; C 0.22 s). `for W in Fields(Text)` copies the record
+  of each word through the type information of FPC (`fpc_copy`: 0.08-0.1 s here); `while F.Next(W)` writes the
+  fields of `W` in place and takes 0.37 s. The rest of the gap to C is the code of FPC: the same table written by hand
+  in Pascal takes 0.27-0.33 s.

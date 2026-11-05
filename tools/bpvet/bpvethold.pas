@@ -28,6 +28,9 @@
          else, and a published component field of a component class) is not destroyed by .Free or FreeAndNil (.Destroy
          is S3) and not given to Own, Share or Adopt, and an owned call is not the object of a Hold: the object would
          have two owners. Storing it in a field is allowed.
+  The same pass checks Ref of a TMap (safe/SPEC.md §25.3):
+    S27  M.Ref(K, D) is the place of a value in the slots of the map, which the next change of the map may move: the
+         call is dereferenced at once (M.Ref(K, D)^), never assigned, passed or kept.
   A finding with // UNSAFE: <why> on its line (or in a comment block right above) is not reported; a // UNSAFE-UNIT:
   module is not checked. }
 unit BpvetHold;
@@ -95,6 +98,7 @@ type
     procedure Twice(const At: TPasExpr; const Owner: String);
   public
     constructor Create(const ASrc: TVetSource; const AResolver: TPasResolver; const AModule: TPasModule);
+    function IsMapRef(const P: TParamsExpr): Boolean;
     procedure CheckProc(const P: TPasProcedure);
     procedure CheckDecls(const Decls: TPasDeclarations);
     procedure CollectFields(const L: TFPList);
@@ -871,6 +875,16 @@ begin
   end;
 end;
 
+{ P calls Ref of a specialization of TMap (the resolver names it TMap$G1 or TMap<...>) }
+function THold.IsMapRef(const P: TParamsExpr): Boolean;
+var
+  D: TPasElement;
+begin
+  D := Callee(P);
+  Result := (D is TPasProcedure) and SameText(D.Name, 'Ref') and (D.Parent is TPasRecordType)
+    and (SameText(Copy(D.Parent.Name, 1, 5), 'TMap<') or SameText(Copy(D.Parent.Name, 1, 5), 'TMap$'));
+end;
+
 procedure THold.CheckProc(const P: TPasProcedure);
 var
   I: Integer;
@@ -890,6 +904,10 @@ begin
     N := TPasElement(FBody.Get[I]);
     if (N is TParamsExpr) and IsHold(TParamsExpr(N), Recv) then
       Holds.Get.Add(N);
+    if (N is TParamsExpr) and IsMapRef(TParamsExpr(N))
+      and not ((N.Parent is TUnaryExpr) and (TUnaryExpr(N.Parent).OpCode = eopDeref)) then
+      Add(N, 'S27', 'the result of Ref of a TMap is kept: the next change of the map may move the place; use it at '
+        + 'once as M.Ref(K, D)^ (safe/SPEC.md, section 25.3)');
   end;
   for I := 0 to Holds.Get.Count - 1 do
   begin

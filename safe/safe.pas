@@ -6,6 +6,7 @@
   What the module does (and only this):
   - TOwned/TShared/TWeak/TSlice/TArena, TDefer, FFI (TCResource), leak counter (SPEC §4–5, §13);
   - the region style: TRegion, TRegionObject, TGrowArray<T> (SPEC §20);
+  - strings and maps: TStrSlice, Fields, TMap<K, V> (SPEC §25.3);
   - "poisons" dangerous primitives by name shadowing (SPEC §6): GetMem(...) in a module
     where Safe is last in uses will not compile. The full name (System.GetMem) is an explicit unsafe.
 
@@ -26,12 +27,14 @@ uses
 
 {$I core.intf.inc}
 {$I region.intf.inc}
+{$I map.intf.inc}
 {$I poison.intf.inc}
 
 implementation
 
 {$I core.impl.inc}
 {$I region.impl.inc}
+{$I map.impl.inc}
 {$I poison.impl.inc}
 
 end.
