@@ -7,10 +7,7 @@ program httpd;
 {$mode objfpc}{$H+}
 
 uses
-  // UNSAFE: BP goes first for the thread manager (ext/bpthreads.pas, SPEC §14); SysUtils after it shadows it,
-  // and the program does not free objects by hand (no FreeAndNil)
-  BP,
-  SysUtils, Classes, StrUtils, Types, BaseUnix, Sockets, SSockets, Region;
+  SysUtils, Classes, StrUtils, Types, BaseUnix, Sockets, SSockets, Region, BP;
 
 type
   TConns = specialize TChan<TSocket>;

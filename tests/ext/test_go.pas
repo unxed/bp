@@ -4,10 +4,7 @@ program test_go;
 {$mode objfpc}{$H+}
 
 uses
-  // UNSAFE: BP goes first for the thread manager (ext/bpthreads.pas, SPEC §14); SysUtils after it shadows it,
-  // and the program does not free objects by hand (no FreeAndNil)
-  BP,
-  SysUtils;
+  SysUtils, BP;
 
 type
   TIntChan = specialize TChan<Integer>;

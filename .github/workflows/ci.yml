@@ -64,14 +64,14 @@ jobs:
           LC_ALL: C.UTF-8
           OUT: ${{ github.workspace }}/out
         run: bash tests/run.sh
-      - name: Tests of the ext layer with the run-time checks of bp build (-Cr -Co; unxed/bp#146)
+      - name: Tests with the options of bp build (-Cr -Co -Sew; unxed/bp#146, SPEC §24.6)
         env:
           LANG: C.UTF-8
           LC_ALL: C.UTF-8
           OUT: ${{ runner.temp }}/out-checks
-          FPCOPTS: -Cr -Co
+          FPCOPTS: -Cr -Co -Sew
           NO_COMPILE_CHECKS: "1"
-        run: bash tests/run.sh ext
+        run: bash tests/run.sh
       - name: Spike 3 of unxed/bp#108, GC roots from the stack of the goroutine (tools/spikes/gcroots)
         run: bash tools/spikes/gcroots/run.sh
       - name: Spike 2 of unxed/bp#108, the region style (tools/spikes/region)

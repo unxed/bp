@@ -12,10 +12,8 @@ program bpget;
 
 {$mode objfpc}{$H+}
 
-// UNSAFE: BP goes first for the thread manager (SPEC §14); SysUtils, Classes and Process after it shadow it, and the
-// program does not free objects by hand (no FreeAndNil)
 uses
-  BP, SysUtils, Classes, Process;
+  SysUtils, Classes, Process, BP;
 
 type
   TNames = specialize TArray<String>;

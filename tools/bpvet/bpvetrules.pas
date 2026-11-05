@@ -20,9 +20,8 @@ procedure VetRunRules(const Src: TVetSource; const Module: TPasModule; var Repor
 
 { S7: Safe/BP is the last unit in scope of the module, so that its names shadow the poisoned routines (register H9).
     Error    a unit follows Safe/BP in the same uses clause;
-    Warning  the implementation uses come after Safe/BP of the interface (they shadow it in the implementation);
-    Warning  units follow BP that is first in the uses of a program (BP goes first there for the thread manager,
-             SPEC §14, and the units after it shadow it in the program file).
+    Warning  the implementation uses come after Safe/BP of the interface (they shadow it in the implementation).
+    A program is no exception: tools/bp build adds -FaBPThreads, which installs the thread manager first (SPEC §24.3).
     A warning is not reported when the uses unit it points at is marked // UNSAFE: <why> (a trailing comment on its
     line, or a comment line above it; blank lines, comment lines and the line with the word uses between them keep
     the mark): the shadowing is then a known, explained exception (safe/SPEC.md §7). An error has no mark: the unit
@@ -258,8 +257,7 @@ begin
   end;
 end;
 
-procedure CheckClause(const Src: TVetSource; const Clause: TPasUsesClause; const InProgram: Boolean;
-  var Report: TVetReport);
+procedure CheckClause(const Src: TVetSource; const Clause: TPasUsesClause; var Report: TVetReport);
 var
   Units: TUnitRefs;
   P: Integer;
@@ -271,19 +269,11 @@ begin
     Exit;
   Name := Units[P].Name;
   After := NamesFrom(Units, P + 1);
-  if InProgram and (P = 0) and SameText(Name, 'BP') then
-  begin
-    if not S7Marked(Src, Units[P]) then
-      AddAt(Src, Units[P], vsWarning, 'S7',
-      'the units after BP in the uses of the program (' + After + ') shadow it in this file, '
-      + 'so SysUtils.FreeAndNil compiles here; BP stays first for the thread manager (safe/SPEC.md, section 14): '
-      + 'keep the program file thin and put the code into units whose uses end with BP, or mark it '
-      + '// UNSAFE: <why> if the program file does need SysUtils', Report);
-  end
-  else
-    AddAt(Src, Units[P], vsError, 'S7',
-      Name + ' is not last in uses: ' + After + ' come after it and shadow the poisoned routines '
-      + '(SysUtils.FreeAndNil compiles); move ' + Name + ' to the end of this uses clause', Report);
+  AddAt(Src, Units[P], vsError, 'S7',
+    Name + ' is not last in uses: ' + After + ' come after it and shadow the poisoned routines '
+    + '(SysUtils.FreeAndNil compiles); move ' + Name + ' to the end of this uses clause (in a program too: '
+    + 'tools/bp build adds -FaBPThreads, which installs the thread manager first, safe/SPEC.md section 24.3)',
+    Report);
 end;
 
 procedure VetCheckS7(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
@@ -295,19 +285,19 @@ begin
   if Module is TPasProgram then
   begin
     if TPasProgram(Module).ProgramSection <> nil then
-      CheckClause(Src, TPasProgram(Module).ProgramSection.UsesClause, True, Report);
+      CheckClause(Src, TPasProgram(Module).ProgramSection.UsesClause, Report);
     Exit;
   end;
   if Module is TPasLibrary then
   begin
     if TPasLibrary(Module).LibrarySection <> nil then
-      CheckClause(Src, TPasLibrary(Module).LibrarySection.UsesClause, False, Report);
+      CheckClause(Src, TPasLibrary(Module).LibrarySection.UsesClause, Report);
     Exit;
   end;
   if Module.InterfaceSection <> nil then
-    CheckClause(Src, Module.InterfaceSection.UsesClause, False, Report);
+    CheckClause(Src, Module.InterfaceSection.UsesClause, Report);
   if Module.ImplementationSection <> nil then
-    CheckClause(Src, Module.ImplementationSection.UsesClause, False, Report);
+    CheckClause(Src, Module.ImplementationSection.UsesClause, Report);
   if (Module.InterfaceSection = nil) or (Module.ImplementationSection = nil) then
     Exit;
   Intf := Listed(Module.InterfaceSection.UsesClause);
