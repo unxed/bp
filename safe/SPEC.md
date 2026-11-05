@@ -2413,11 +2413,11 @@ a bug found by a program built with `bp build` goes ahead of the plan.
 
 | # | what | where | why here |
 |---|---|---|---|
-| — | **done:** the typed `bpvet` (S17 v2), S21/S22, `bp run`, `--watch`, `bp new`; Send and Sync (S11m, S11s, S19, R17); spike 4 (M:N switch, guard areas by default) | §20, §21.7 steps 1–2, §22.8 step 1 | |
-| 1 | **#146:** `Select` under `-Co` (done, #151); the false findings of the typed `bpvet`, stubs without `cdecl`, the crash on a long path (items 2–8); S4 on `@` of a record for the socket RTL and the note "a region per connection, not per request" (item 9, §13, §20) | unxed/bp#146 | the first real programs met them: every user meets them |
-| 2 | **The cheap holes of §8:** `-FaBPThreads` and `-Sew` in `tools/bp build` (done, #156); S26a and S26b (definite assignment, the size of a class; done); S24 and S25 (a checked class cast, untyped parameters: H17, H18) | §24.8 steps 1–3, §22.8 step 0 | claims made today must hold before new features; each is a small step on the typed `bpvet` that exists |
+| — | **done:** the typed `bpvet` (S17 v2), S21/S22, `bp run`, `--watch`, `bp new`; Send and Sync (S11m, S11s, S19, R17); spike 4 (M:N switch, guard areas by default); #146 (#151, #153–#155); the cheap holes of §8: `-FaBPThreads` and `-Sew` in `tools/bp build` (#156), S26a and S26b (#157, H19), S24 and S25 (#158, H17, H18) | §20, §21.7 steps 1–2, §22.8 steps 0–1, §24.8 steps 1–3 | |
+| 1 | — (the bugs of #146: done) | | |
+| 2 | — (the cheap holes of §8: done) | | |
 | 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and four languages, v0.16: the baseline is in §25.2; Goose, channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
-| 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
+| 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (in progress: the design is in §21.3, step 5 design; it is measured against the baseline of step 3) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
 | 5 | **The scope** (`Hold`, `Defer`) on the region runtime, then the `TComponent` owner | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
 | 6 | **The speed work** that the numbers of step 3 point to (§25.2) | §25.2 | after the runtime: it changes what is measured |
 | 7 | **The tools,** cheapest first: `bp explain`, S20 and `Fmt`, `bp test`, `--target`, `// derive:`, the profiler, `bp lsp`, the browser, S26c, hot reload | §22.8 steps 2–11 | each stands alone; the ones users ask for first go first |
