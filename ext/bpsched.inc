@@ -283,9 +283,115 @@ begin
   WakeIdle;
 end;
 
+{ G may run on the carrier C: into the run queue of C, which the other carriers steal from when they have nothing to
+  run. Only the carrier itself and the goroutines on it add to its queue, so its lock is rarely contended. }
+procedure PushLocal(C, G: PRawThread);
+begin
+  G^.Next := nil;
+  SpinLock(C^.QLock);
+  if C^.QTail = nil then
+    C^.QHead := G
+  else
+    C^.QTail^.Next := G;
+  C^.QTail := G;
+  Inc(C^.QCount);
+  SpinUnlock(C^.QLock);
+  WakeIdle;
+end;
+
+function PopLocal(C: PRawThread): PRawThread;
+begin
+  if C^.QCount = 0 then
+    Exit(nil);
+  SpinLock(C^.QLock);
+  Result := C^.QHead;
+  if Result <> nil then
+  begin
+    C^.QHead := Result^.Next;
+    if C^.QHead = nil then
+      C^.QTail := nil;
+    Dec(C^.QCount);
+  end;
+  SpinUnlock(C^.QLock);
+  if Result <> nil then
+    Result^.Next := nil;
+end;
+
+{ The goroutines in the run queues of the carriers (the monitor, the sleep of a carrier). }
+function LocalQueued: LongInt;
+var
+  K: LongInt;
+  V: PRawThread;
+begin
+  Result := 0;
+  for K := 0 to CarrierCount - 1 do
+  begin
+    V := CarrierList[K];
+    if V <> nil then
+      Inc(Result, V^.QCount);
+  end;
+end;
+
+{ C has nothing to run: the first half of the run queue of another carrier, the victims taken in turn from a place that
+  moves. The first goroutine taken is the result, the rest go into the queue of C. }
+function Steal(C: PRawThread): PRawThread;
+var
+  I, K, N, Taken: LongInt;
+  V, Last: PRawThread;
+begin
+  Result := nil;
+  N := CarrierCount;
+  if N > MaxCarriers then
+    N := MaxCarriers;
+  if N < 2 then
+    Exit;
+  K := LongInt(C^.Picks mod PtrUInt(N));
+  for I := 1 to N do
+  begin
+    K := (K + 1) mod N;
+    V := CarrierList[K];
+    if (V = nil) or (V = C) or (V^.QCount = 0) then
+      Continue;
+    SpinLock(V^.QLock);
+    Taken := (V^.QCount + 1) div 2;
+    if Taken > 0 then
+    begin
+      Result := V^.QHead;
+      Last := Result;
+      while Taken > 1 do
+      begin
+        Last := Last^.Next;
+        Dec(Taken);
+      end;
+      Taken := (V^.QCount + 1) div 2;
+      V^.QHead := Last^.Next;
+      if V^.QHead = nil then
+        V^.QTail := nil;
+      Dec(V^.QCount, Taken);
+    end;
+    SpinUnlock(V^.QLock);
+    if Result = nil then
+      Continue;
+    if Result <> Last then
+    begin
+      SpinLock(C^.QLock);
+      if C^.QTail = nil then
+        C^.QHead := Result^.Next
+      else
+        C^.QTail^.Next := Result^.Next;
+      C^.QTail := Last;
+      Last^.Next := nil;
+      Inc(C^.QCount, Taken - 1);
+      SpinUnlock(C^.QLock);
+    end;
+    Result^.Next := nil;
+    Exit;
+  end;
+end;
+
 { G may run. Woken by a goroutine, it runs next on the carrier of that goroutine, which will soon switch away (a waker
   usually blocks next: a channel round trip stays on one carrier, with no futex); the goroutine it pushes out of that
-  place goes into the run queue. Woken by anything else, it goes into the run queue. }
+  place goes into the run queue of that carrier. Woken by anything else, it goes into the shared run queue. }
 procedure Ready(G: PRawThread);
 var
   T, Old: PRawThread;
@@ -305,7 +411,7 @@ begin
   end;
   Old := PRawThread(InterlockedExchange(T^.Carrier^.RunNext, Pointer(G)));
   if Old <> nil then
-    ReadyQueued(Old);
+    PushLocal(T^.Carrier, Old);
 end;
 
 procedure AddTimer(G: PRawThread);
@@ -597,7 +703,10 @@ begin
     AfterYield:
       begin
         G^.After := AfterNone;
-        Ready(G);
+        if SeedMode then
+          Ready(G)
+        else
+          PushLocal(C, G);
       end;
     AfterPark:
       begin
@@ -696,6 +805,12 @@ begin
         Result := True;
         Break;
       end;
+      G := Steal(C);
+      if G <> nil then
+      begin
+        Result := True;
+        Break;
+      end;
       Seen := nil;
       SeenAt := -1;
       for K := 0 to CarrierCount - 1 do
@@ -730,7 +845,11 @@ begin
     if G = nil then
       G := PRawThread(InterlockedExchange(C^.RunNext, nil));
     if G = nil then
+      G := PopLocal(C);
+    if G = nil then
       G := TakeNext;
+    if G = nil then
+      G := Steal(C);
     if G <> nil then
     begin
       RunG(C, G);
@@ -747,7 +866,9 @@ begin
     end;
     Seq := IdleSeq;
     InterlockedIncrement(Idle);
-    if (RunCount = 0) and (C^.RunNext = nil) then
+    // Idle is published (a full barrier) before the queues are read; a carrier that adds to a queue reads Idle after
+    // its unlock (an exchange): one of the two sees the other
+    if (RunCount = 0) and (C^.RunNext = nil) and (LocalQueued = 0) then
     begin
       if TimerCount = 0 then
         Left := -1
@@ -785,7 +906,7 @@ end;
   call, a long loop), and the deadlock check. }
 function MonitorMain(P: Pointer): PtrInt;
 var
-  I, N, Strikes: LongInt;
+  I, N, Strikes, Queued: LongInt;
   Sum, Last: PtrUInt;
   C, G: PRawThread;
 begin
@@ -813,9 +934,10 @@ begin
         end;
         C^.Seen := C^.Switches;
       end;
-    if (RunCount > 0) and (Idle = 0) and (Sum = Last) then
+    Queued := RunCount + LocalQueued;
+    if (Queued > 0) and (Idle = 0) and (Sum = Last) then
       StartCarrier;
-    if (Live > 0) and (RunCount = 0) and (TimerCount = 0) and (Idle >= N) and (OsBlocked >= 1) and (Sum = Last) then
+    if (Live > 0) and (Queued = 0) and (TimerCount = 0) and (Idle >= N) and (OsBlocked >= 1) and (Sum = Last) then
     begin
       Inc(Strikes);
       if Strikes >= 2 then

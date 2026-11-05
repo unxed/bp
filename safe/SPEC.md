@@ -1077,6 +1077,7 @@ or above the parameter suppresses its S14 finding.
 | v0.26 | §25.2 step 6, n-body: FPC computes the address of an array element again after every store into the array; the pull of a pair as a routine with two `var` parameters takes it once: 0.832 s (1.91x of C) → 0.667 s (1.36x); `-O3`, `-O4` and the target CPU give nothing |
 | v0.27 | §21.3, §25.2 step 6: an idle carrier of the M:N scheduler spins a little before it sleeps (at most half of them; a goroutine made ready meanwhile wakes no sleeping carrier) and takes the place "next" of a busy carrier: the start of a goroutine 28 us → 17 us, a fan-out over a channel 400 → 320 ms |
 | v0.28 | §21.3, §25.2 step 6: the start of a goroutine: a freed region stays warm for the next goroutine and the monitor gives back the ones not taken at the next tick (no `madvise` at each end); the first heap chunk of a goroutine is one page; the start and end 17 us → 5 us on 4 carriers, a tree of 8191 goroutines 1.07 s → 0.43 s |
+| v0.29 | §21.3, §25.2 step 6: per-carrier run queues (a yield and a goroutine pushed out of "next" stay on the carrier; an idle carrier steals half of a queue); 64 goroutines that yield take 93 ms instead of 574 ms on 4 carriers |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -2008,6 +2009,24 @@ and `test_threads` passed 20 times each under `BP_PROCS` 1, 2, 3 and 8 and under
 
   Left of the start, per goroutine: `InitThread` and `DoneThread` of the RTL (the `mmap` and `munmap` of the heap chunk,
   `isatty` four times, `getrlimit`), the `mprotect` of a new region. Go takes 0.65 us on the tree.
+- **Per-carrier run queues (2026-11-05, §25.2 step 6).** A goroutine that yields, or that a goroutine pushes out of
+  the place "next", goes into the run queue of its carrier: a FIFO list under a spin lock of that carrier, which only
+  the carrier and its goroutines add to. Whatever else makes a goroutine ready (the main thread, an OS thread, the
+  timers, the monitor) and the whole seed mode use the shared queue. A carrier picks: the shared queue first at every
+  61st pick, then the place "next", its own queue, the shared queue, half of the queue of another carrier (the victims
+  in turn from a place that moves), then it spins (stealing too) and sleeps. Before it sleeps it reads all the queues
+  after it has published `Idle` with an atomic increment; a carrier that adds to a queue reads `Idle` after its unlock,
+  an exchange, so one of the two sees the other. The monitor counts the queued goroutines of all the queues (a carrier
+  more, the deadlock check). Medians of 5 runs on 4 logical CPUs:
+
+  | | shared queue | per-carrier queues |
+  |---|---|---|
+  | 64 goroutines that yield 20,000 times each, `BP_PROCS=1` | 298 ms | 297 ms |
+  | the same, 2 carriers | 377 ms | 119 ms |
+  | the same, 4 carriers | 574 ms | 93 ms |
+  | one producer and three workers over a buffered `TChan`, 4 carriers | 302 ms | 243 ms |
+
+  The start of a goroutine, the tree of goroutines and the round trip between two goroutines stay within the noise.
 - **The default stays 1:1** until CI has run under `MNMODES` for a while; then it flips (`-dSAFE_LIBC` stays 1:1).
 
 ### 21.4 The tree of `TComponent` is an owner
@@ -2811,8 +2830,9 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   - the M:N scheduler (§21.3, step 5 result): the woken goroutine runs next on the carrier of the waker (`runnext`:
     done, 12 us → 0.8 us per round trip on 4 carriers), an idle carrier spins a little before it sleeps (done: the start of
     a goroutine 28 us → 17 us, a fan-out over a channel a quarter faster, §21.3), warm regions and a heap chunk of one page
-    (done: the start of a goroutine 17 us → 5 us, a tree of goroutines 2.5 times faster, §21.3), a start without the
-    system calls of `InitThread`, per-carrier run queues.
+    (done: the start of a goroutine 17 us → 5 us, a tree of goroutines 2.5 times faster, §21.3), per-carrier run queues
+    (done: 64 goroutines that yield 6 times faster on 4 carriers, §21.3), a start without the system calls of
+    `InitThread` (it needs a memory manager of BP: the RTL 3.2.2 does not export the heap setup of a thread).
 
   A lever that needs a compiler fork is out (§0: `bp` works over the stock `fpc`).
 
