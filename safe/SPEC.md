@@ -50,6 +50,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
 | Strings and maps: `TStrSlice`, `Fields`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 in the typed `bpvet` | §25.3 |
+| A memory manager of BP: a cache per carrier, pages of one size class, frees from other threads by an atomic list, the start of a goroutine without `InitThread` | **design**, a spike (a tree of 8191 goroutines 286 ms → 32 ms on one carrier) | §25.4 |
 | The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
@@ -1078,6 +1079,7 @@ or above the parameter suppresses its S14 finding.
 | v0.27 | §21.3, §25.2 step 6: an idle carrier of the M:N scheduler spins a little before it sleeps (at most half of them; a goroutine made ready meanwhile wakes no sleeping carrier) and takes the place "next" of a busy carrier: the start of a goroutine 28 us → 17 us, a fan-out over a channel 400 → 320 ms |
 | v0.28 | §21.3, §25.2 step 6: the start of a goroutine: a freed region stays warm for the next goroutine and the monitor gives back the ones not taken at the next tick (no `madvise` at each end); the first heap chunk of a goroutine is one page; the start and end 17 us → 5 us on 4 carriers, a tree of 8191 goroutines 1.07 s → 0.43 s |
 | v0.29 | §21.3, §25.2 step 6: per-carrier run queues (a yield and a goroutine pushed out of "next" stay on the carrier; an idle carrier steals half of a queue); 64 goroutines that yield take 93 ms instead of 574 ms on 4 carriers |
+| v0.30 (design) | §25.4 a memory manager of BP: a cache per carrier, pages of one size class with a local free list and one for other threads, abandoned pages adopted, the start of a goroutine without `InitThread`; the spike: a tree of 8191 goroutines 286 ms → 32 ms on one carrier |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -2897,3 +2899,116 @@ end;
   of each word through the type information of FPC (`fpc_copy`: 0.08-0.1 s here); `while F.Next(W)` writes the
   fields of `W` in place and takes 0.37 s. The rest of the gap to C is the code of FPC: the same table written by hand
   in Pascal takes 0.27-0.33 s.
+
+### 25.4 A memory manager of BP (design, 2026-11-05)
+
+Status: design, with a spike behind its main number. The levers of §21.3 left the start of a goroutine at 5 us on 4
+carriers and 12-15 us on one, against 0.65 us in Go. What is left is the heap of the RTL:
+
+- `InitThread` sets up a heap per thread and opens stdio again: `isatty` four times and `getrlimit`. A system call
+  costs about 1.2 us on the machine of §25.2.
+- A goroutine that allocates maps its first heap chunk and unmaps it at the end (about 10 us). The `munmap` flushes
+  the TLB of every CPU that runs the process.
+- `InitHeapThread` is not visible outside unit `system` in FPC 3.2.2 (it does not link), so a start without
+  `InitThread` needs a heap that does not keep its state per thread. That heap is a memory manager of BP.
+
+**The spike** (a bump allocator that never frees, installed by `SetMemoryManager`, and a start of a goroutine that sets
+up the FPU, the exceptions, stdio from a template and the stack bounds, without `InitThread`) gives the floor:
+
+| | the RTL heap | no system call at the start |
+|---|---|---|
+| the start and the end of an empty goroutine, `BP_PROCS=1` | 12.6 us | 5.0 us |
+| the same, 4 carriers | 5.55 us | 2.0 us |
+| a tree of 8191 goroutines (each starts two and waits), `BP_PROCS=1` | 286 ms | 32 ms |
+
+The tree is 9 times faster: 3.9 us per goroutine, 6 times Go instead of 60. `strace` shows no system call per goroutine
+any more (only the futex of the main thread). The RTL heap itself is not slow on one thread: 19 ns for a small
+`GetMem`/`FreeMem` pair, and 2,000,000 live blocks take 116 ns each to allocate and 348 ns to free in random order,
+against 105 ns and 307 ns in glibc (the misses of the cache). So the goal is the start of a goroutine and its memory,
+not the speed of one thread; the new heap must only not be slower there.
+
+**What the allocators of the other runtimes do:**
+
+| allocator | the cache of the fast path | a block freed by another thread | memory back to the OS |
+|---|---|---|---|
+| Go | per P (a carrier): no lock, the P cannot change under the code (`acquirem`) | no `free`: the collector sweeps | a background scavenger |
+| tcmalloc (current) | per CPU, with restartable sequences of Linux | into the central lists | a background release |
+| mimalloc | per thread; pages of one size class with three free lists (free, local, other threads) | an atomic push onto the list of the page; the owner takes the list when it runs out | pages and segments, lazily |
+| snmalloc | per thread | batched into messages to the owner | lazily |
+| rpmalloc | per thread, spans of 64 KiB | an atomic deferred list per span | thresholds |
+| the RTL of FPC | per thread (`freelists`, a threadvar) | onto a wait list of the owner under one global lock (`heap_lock`) | at the end of the thread (`munmap`); the chunks of an ended thread are orphaned and adopted |
+
+A goroutine is not a thread. 100,000 goroutines with a heap each are 100,000 sets of half-used pages, which is what the
+RTL does now (one page per size class used per goroutine since §21.3). Go keeps the cache per carrier, and in BP
+that is cheaper still: a goroutine is never preempted, so between reading its carrier and the end of an allocation
+nothing can switch it away. No atomic and no restartable sequence are needed, provided the allocator never parks; its
+slow path uses spin locks only.
+
+**The design:**
+
+- **Where.** `ext/bpheap.inc`, included by `BPThreads` and installed in its initialization (first in every program,
+  `-FaBPThreads`), on Linux (x86_64, i386, aarch64, the targets of `BPThreads`).
+  - It is not installed when another manager is already set (`IsMemoryManagerSet`: `heaptrc` with `-gh`, `cmem`), with
+    `-dSAFE_LIBC` (libc threads), with `BP_HEAP=rtl` at run time, or with `-dBP_RTLHEAP` in the build.
+  - Then everything stays as it is, the start of a goroutine included.
+  - The blocks the RTL allocated before the install (2.4 KiB in a program that uses `SysUtils`, `Classes` and `BP`) are
+    recognized by their address, outside the reservations of BP, and go back to the old manager.
+- **Address space.** A reservation of `PROT_NONE` with `MAP_NORESERVE` (64 GiB on 64 bits; on i386, 4 MiB at a time),
+  cut into segments of 4 MiB aligned to their size. A block finds its segment by a mask, and the header of the segment
+  describes its pages. Whether a block is ours is a range check against the few reservations.
+- **Size classes.** About 48 classes up to 32 KiB, with at most 12.5% lost to rounding. A page of 64 KiB holds blocks of
+  one class. A larger block is a run of pages in a segment; a block over 2 MiB is a segment of its own.
+- **The cache.**
+  - One cache per carrier, and one per OS thread that is not a goroutine (the main thread, a 1:1 thread). It is found
+    from `CurThread`: a goroutine uses the cache of its carrier.
+  - A cache is a record taken from a pool, never mapped per thread, so a goroutine starts with no heap work at all.
+  - Per class, the cache has a current page and a list of pages with free blocks.
+- **The fast path.** Pop the free list of the current page of the class. When that list is empty, take the local list
+  of the page, then its list from other threads (an atomic exchange), then another page of the class, then an
+  abandoned page, then a new page.
+- **A free.** The block finds its page.
+  - The page belongs to this cache: push onto its local list, with no atomic.
+  - It belongs to another cache: push onto its list from other threads with a compare-and-swap. A goroutine moved to
+    another carrier by stealing frees this way.
+  - A page that becomes empty and is not current goes back to its segment.
+- **The end of an OS thread.** Its pages with live blocks are abandoned, with no owner. A free into them still works;
+  another cache adopts such a page when it needs one of that class. Carriers never end.
+- **Memory back to the kernel.**
+  - Under M:N, the monitor gives back each tick the pages that were already free at the tick before (`madvise`, a
+    contiguous run in one call), as it does for regions (§21.3).
+  - Without the monitor, the free pages above a bound go back at once.
+- **`AllocMem`, `ReAllocMem`, `MemSize`.** A new page is zero, and a reused block is cleared. A new size in the same
+  class stays in place. `MemSize` is the size of the class, as in the RTL.
+- **The counters.** Each cache counts what it allocated and what it freed. `GetFPCHeapStatus` sums all the caches, so
+  `CurrHeapUsed` is the heap of the process, not of the thread as in the RTL. The leak checks of the tests read it with
+  no other goroutine alive, and `SafeCheckNoLeaks` counts objects, so neither changes.
+- **The start of a goroutine.** It no longer calls `InitThread` and `DoneThread`; it does what they do, minus the heap,
+  from the exported routines of `system`.
+  - At the start: `SysResetFPU`, `SysInitFPU`, the thread procedures of the widestring manager, and `SysInitExceptions`.
+  - Stdio is copied from a template made once by `SysInitStdIO`, with the buffer pointers set to the copy. This drops
+    the four `isatty`.
+  - `StackLength` and `StackBottom` come from the region, with no `getrlimit`; `ThreadID` is set as before.
+  - At the end: `SysFlushStdIO`, then the widestring procedure.
+  - FPC main does the same steps in `InitThread` (checked), plus `MemoryManager.InitThread`, which this manager does
+    not set.
+- **A debug net.** With `SAFE_DEBUG`, a freed block is filled with a pattern, which is checked when the block is handed
+  out again. A write after a free then raises an error at the next allocation of that block, not a silent corruption.
+- **The GC style of §20.** Its heap per goroutine fits the same pages: pages owned by a goroutine instead of a carrier,
+  with mark bits. The sweep gives whole pages back to the segment.
+
+**The plan:**
+
+1. Segments, pages, size classes, caches with local frees; installed as above. Measured against the RTL on one thread
+   (the pair and the 2,000,000 live blocks of the table), with `tests/run.sh` passing.
+2. Frees from other threads, and abandoned and adopted pages. The stress of `test_go` and `test_threads` (`BP_PROCS` 1,
+   2, 3 and 8, the seeds) and a probe that sends blocks over channels between carriers.
+3. The start of a goroutine without `InitThread`. The numbers of the spike are the target: 2 us on 4 carriers, and the
+   tree of goroutines under 40 ms on one.
+4. Memory back to the kernel: the monitor under M:N, the bound without it. The memory of a parked goroutine should be
+   its 8 KiB record and one page of stack.
+5. The debug net under `SAFE_DEBUG`.
+
+Each step is measured, and the default flips only after CI has run under it, as with M:N. A lever found on the way and
+left for later: a buffered `TChan` of 256 takes about 1 us per item between two goroutines under M:N (1.4 us on 4
+carriers), against tens of nanoseconds in Go. The memory manager is not part of that cost: a block freed on the other
+side adds under 0.1 us.
