@@ -11,6 +11,17 @@ in the FPC sources); see README.md.
 6. InterfaceOnly (a used unit read up to its implementation): no section, method bodies or generic bodies are required.
 7. String[N] adds no identifier "string" to the scope: its string type is a sub type of the alias (A = String[3]), so
    two of them in one unit are not a duplicate and a later "string" still names the type of the system unit.
+8. String is AnsiString under {$H+} (and Char is AnsiChar): array of String and array of AnsiString are one type
+   (CheckElTypeCompatibility), and a String variable is accepted for a var or out AnsiString argument
+   (RunCommand of the Process unit takes one).
+9. TPasResolver.IsCharLiteral: a second # (#13#10) or another character that is no digit or letter ends the scan: the
+   literal is a string, not a char, so Pos(#13#10, S) does not match the Char overload too.
+10. Insert and Delete take a string variable as well as a dynamic array (Delete(S, 1, 1)); FPC has them as compiler
+    procedures, so the stubs of the RTL do not declare them.
+11. S[1] of a string variable can be passed to a var argument (Sock.Read(S[1], N), FillChar(S[1], N, 0)); the resolver
+    marks it assignable but not writable.
+12. A procedure whose calling convention is the default fits a procedure type with a declared one (and the other way
+    round): {$calling cdecl} is not read, and FPC itself checks the convention.
 
 --- a/packages/fcl-passrc/src/pasresolver.pp
 +++ b/packages/fcl-passrc/src/pasresolver.pp
@@ -73,7 +84,15 @@ in the FPC sources); see README.md.
            begin
            {$IFDEF VerbosePasResolver}
            writeln('TPasResolver.CheckPendingForwardProcs Proc.ParentPath=',Proc.PathName);
-@@ -14689,7 +14694,7 @@
+@@ -14640,6 +14645,7 @@
+       '0'..'9': i:=i*base+ord(Value[p])-ord('0');
+       'A'..'Z': i:=i*base+ord(Value[p])-ord('A')+10;
+       'a'..'z': i:=i*base+ord(Value[p])-ord('a')+10;
++      else exit; // a second # (#13#10) or a quote: not a single char
+       end;
+       inc(p);
+       end;
+@@ -14689,7 +14695,7 @@
  var
    LoTypeEl: TPasType;
    EnumeratorClass: TPasClassType;
@@ -82,7 +101,7 @@ in the FPC sources); see README.md.
    Getter, MoveNext, Current: TPasIdentifier;
    GetterFunc, MoveNextFunc: TPasFunction;
    ptm: TProcTypeModifier;
-@@ -14742,14 +14747,19 @@
+@@ -14742,14 +14748,19 @@
    if (ResultResolved.BaseType<>btContext) then
      RaiseContextXExpectedButYFound(20171221193749,'function GetEnumerator','result class',GetTypeDescription(ResultResolved),Loop.StartExpr);
    LoTypeEl:=ResultResolved.LoTypeEl;
@@ -107,7 +126,7 @@ in the FPC sources); see README.md.
    MoveNext:=EnumeratorScope.FindIdentifier('MoveNext');
    if MoveNext=nil then
      RaiseIdentifierNotFound(20171221195632,'MoveNext',Loop.StartExpr);
-@@ -16883,6 +16893,24 @@
+@@ -16883,6 +16894,24 @@
      SpecMembersType.Members.Add(NewEl);
      SpecializeElement(GenEl,NewEl);
      end;
@@ -132,7 +151,7 @@ in the FPC sources); see README.md.
  end;
  
  procedure TPasResolver.SpecializeMembersImpl(GenericType,
-@@ -16921,7 +16949,7 @@
+@@ -16921,7 +16950,7 @@
        GenIntfProcScope:=TPasProcedureScope(GenIntfProc.CustomData);
        GenImplProc:=GenIntfProcScope.ImplProc;
        if GenImplProc=nil then
@@ -141,7 +160,7 @@ in the FPC sources); see README.md.
        if ImplParent=nil then
          begin
          // switch scope (e.g. unit implementation section)
-@@ -18125,6 +18153,17 @@
+@@ -18125,6 +18154,17 @@
  
  procedure TPasResolver.SpecializePointerType(GenEl, SpecEl: TPasPointerType);
  begin
@@ -159,7 +178,57 @@ in the FPC sources); see README.md.
    SpecializeElType(GenEl,SpecEl,GenEl.DestType,SpecEl.DestType);
    FinishPointerType(SpecEl);
  end;
-@@ -20509,6 +20548,7 @@
+@@ -19915,14 +19955,23 @@
+       RaiseVarExpected(20170329171514,Param,ParamResolved.IdentEl);
+     exit;
+     end;
+-  if (ParamResolved.BaseType<>btContext)
+-      or not IsDynArray(ParamResolved.LoTypeEl) then
+-    exit(CheckRaiseTypeArgNo(20170329172024,2,Param,ParamResolved,'dynamic array',RaiseOnError));
+-  ArrType:=TPasArrayType(ParamResolved.LoTypeEl);
+-  ElType:=GetArrayElType(ArrType);
+-  ComputeElement(ElType,ElTypeResolved,[rcType]);
+-  if CheckAssignResCompatibility(ElTypeResolved,ItemResolved,ItemParam,RaiseOnError)=cIncompatible then
+-    exit(cIncompatible);
++  if ParamResolved.BaseType in btAllStrings then
++    begin
++    // Insert(Source: string; var S: string; Index: integer)
++    if not (ItemResolved.BaseType in btAllStringAndChars) then
++      exit(CheckRaiseTypeArgNo(20170329171401,1,ItemParam,ItemResolved,'string',RaiseOnError));
++    end
++  else
++    begin
++    if (ParamResolved.BaseType<>btContext)
++        or not IsDynArray(ParamResolved.LoTypeEl) then
++      exit(CheckRaiseTypeArgNo(20170329172024,2,Param,ParamResolved,'dynamic array',RaiseOnError));
++    ArrType:=TPasArrayType(ParamResolved.LoTypeEl);
++    ElType:=GetArrayElType(ArrType);
++    ComputeElement(ElType,ElTypeResolved,[rcType]);
++    if CheckAssignResCompatibility(ElTypeResolved,ItemResolved,ItemParam,RaiseOnError)=cIncompatible then
++      exit(cIncompatible);
++    end;
+ 
+   // check insert Index
+   Param:=Params.Params[2];
+@@ -19954,6 +20003,7 @@
+     // insert complex expression, e.g. insert([1],Arr,index)
+     // -> mark array and set literals
+     ComputeElement(Param1,ArrayResolved,[]);
++    if ArrayResolved.BaseType in btAllStrings then exit; // Insert(a+b,S,1)
+     if (ArrayResolved.BaseType<>btContext)
+         or not IsDynArray(ArrayResolved.LoTypeEl) then
+       RaiseNotYetImplemented(20180622144039,Param1);
+@@ -19989,7 +20039,8 @@
+     end;
+   if (ParamResolved.BaseType<>btContext)
+       or not IsDynArray(ParamResolved.LoTypeEl) then
+-    exit(CheckRaiseTypeArgNo(20170329173434,1,Param,ParamResolved,'dynamic array',RaiseOnError));
++    if not (ParamResolved.BaseType in btAllStrings) then // Delete(var S: string; Index, Count)
++      exit(CheckRaiseTypeArgNo(20170329173434,1,Param,ParamResolved,'dynamic array',RaiseOnError));
+ 
+   // check param Start
+   Param:=Params.Params[1];
+@@ -20509,6 +20560,7 @@
    inherited Create;
    FDefaultScope:=TPasDefaultScope.Create;
    FPendingForwardProcs:=TFPList.Create;
@@ -167,7 +236,7 @@ in the FPC sources); see README.md.
    FBaseTypeChar:={$ifdef FPC_HAS_CPSTRING}btAnsiChar{$else}btWideChar{$endif};
    FBaseTypeString:={$ifdef FPC_HAS_CPSTRING}btAnsiString{$else}btUnicodeString{$endif};
    FBaseTypeExtended:=btDouble;
-@@ -20647,7 +20687,9 @@
+@@ -20647,7 +20699,9 @@
        AddGenericTemplateType(TPasGenericTemplateType(El))
      else if AClass=TPasStringType then
        begin
@@ -178,7 +247,7 @@ in the FPC sources); see README.md.
        {$ifdef FPC_HAS_CPSTRING}
        if BaseTypes[btShortString]=nil then
        {$endif}
-@@ -21692,6 +21734,7 @@
+@@ -21692,6 +21746,7 @@
    writeln('TPasResolver.Destroy FPendingForwards...');
    {$ENDIF}
    FreeAndNil(FPendingForwardProcs);
@@ -186,7 +255,58 @@ in the FPC sources); see README.md.
    FreeAndNil(fExprEvaluator);
    ClearBuiltInIdentifiers;
    inherited Destroy;
-@@ -25688,6 +25731,11 @@
+@@ -23585,6 +23640,8 @@
+         and (Proc1.CallingConvention=ccSafeCall)
+         and (Proc2.CallingConvention=ccDefault) then
+       // ok
++    else if (Proc1.CallingConvention=ccDefault) or (Proc2.CallingConvention=ccDefault) then
++      // ok: {$calling cdecl} is not read, so a default convention may be a declared one; FPC checks it
+     else
+       begin
+       if RaiseOnIncompatible then
+@@ -23694,10 +23751,13 @@
+   else if IsGenericTemplType(Arg2Resolved) then
+     exit(cGenericExact);
+ 
+-  if (Arg1Resolved.BaseType<>Arg2Resolved.BaseType)
++  if (GetActualBaseType(Arg1Resolved.BaseType)<>GetActualBaseType(Arg2Resolved.BaseType))
+       or (Arg1Resolved.LoTypeEl=nil)
+       or (Arg2Resolved.LoTypeEl=nil) then
+     exit(cIncompatible);
++  // String is AnsiString under {$H+}, Char is AnsiChar: array of String = array of AnsiString
++  if Arg1Resolved.BaseType<>Arg2Resolved.BaseType then
++    exit(cAliasExact);
+ 
+   if ResolveAlias=prraSimple then
+     begin
+@@ -25078,7 +25138,14 @@
+ begin
+   Result:=false;
+   if [rrfReadable,rrfWritable]*ResolvedEl.Flags<>[rrfReadable,rrfWritable] then
+-    exit;
++    begin
++    // S[1] of a string variable can be passed to a var argument (FPC: WriteBuffer(S[1], N));
++    // the resolver marks it assignable only
++    if not ((rrfReadable in ResolvedEl.Flags) and (rrfAssignable in ResolvedEl.Flags)
++        and (ResolvedEl.BaseType in btAllChars) and (ResolvedEl.ExprEl is TParamsExpr)
++        and (ResolvedEl.IdentEl<>nil)) then
++      exit;
++    end;
+   if ResolvedEl.IdentEl=nil then
+     exit(true);
+ 
+@@ -25662,6 +25729,10 @@
+       end;
+     if (Param.ArgType=nil) then
+       exit(cExact); // untyped argument
++    // String is AnsiString under {$H+}, Char is AnsiChar: one type for a var argument
++    if (ParamResolved.BaseType<>ExprResolved.BaseType)
++        and (GetActualBaseType(ParamResolved.BaseType)=GetActualBaseType(ExprResolved.BaseType)) then
++      exit(cAliasExact);
+     if (ParamResolved.BaseType=ExprResolved.BaseType) then
+       begin
+       if msDelphi in CurrentParser.CurrentModeswitches then
+@@ -25688,6 +25759,11 @@
        end;
      if IsGenericTemplType(ParamResolved) then
        exit(cGenericExact);
@@ -198,7 +318,7 @@ in the FPC sources); see README.md.
  
      //writeln('TPasResolver.CheckParamCompatibility NeedVar ParamResolved=',GetResolverResultDbg(ParamResolved),' ExprResolved=',GetResolverResultDbg(ExprResolved));
      if RaiseOnError then
-@@ -27823,6 +27871,24 @@
+@@ -27823,6 +27899,24 @@
    Result:=-1;
  end;
  
@@ -223,7 +343,7 @@ in the FPC sources); see README.md.
  procedure TPasResolver.CheckUseAsType(aType: TPasElement; id: TMaxPrecInt;
    ErrorEl: TPasElement);
  begin
-@@ -27839,7 +27905,7 @@
+@@ -27839,7 +27933,7 @@
        begin
        // ref to generic type without specialization
        if not (msDelphi in CurrentParser.CurrentModeswitches)

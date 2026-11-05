@@ -14,3 +14,19 @@ FPC main has most of the changes; the rest are offered upstream when `bpvet` mov
 
 `genstubs.py OUT SRC...` writes the declaration stubs of the RTL that the typed mode reads (`bpvet --typed --rtl OUT`),
 from `ppudump -Fj` of the installed units (Debian, Ubuntu: fp-utils); its header says how.
+
+Items of `pasresolver.patch` that follow the rule of safe/SPEC.md §20 ("the resolver only resolves, FPC checks"), found
+by programs built with `tools/bp build` (unxed/bp#146); each is a construct FPC accepts:
+
+- `String` is `AnsiString` under `{$H+}` (`Char` is `AnsiChar`): `array of String` fits an open array of `AnsiString`, and
+  a `String` variable fits a `var` or `out` `AnsiString` (`RunCommand`).
+- `#13#10` is a string literal: `TPasResolver.IsCharLiteral` stops at a second `#` (it summed the digits to 1310 and
+  took a `WideChar`), so `Pos(#13#10, S)` does not match the `Char` overload as well.
+- `Insert` and `Delete` take a string variable; FPC has them as compiler procedures, so the stubs do not declare them.
+- `S[1]` of a string variable goes to a `var` argument (`Stream.ReadBuffer(S[1], N)`).
+- A procedure with the default calling convention fits a procedure type with a declared one: `{$calling cdecl}` is not
+  read. `genstubs.py` also gives the procedure types of the RTL their calling convention (`signalhandler_t` is `cdecl`),
+  and writes the default `[]` of a set parameter (`RunCommand(Exe, Args, S)`).
+
+`bpvet` reads a file through `TFileStreamLineReader`: the text file of Pascal holds a name of 255 characters, so a longer
+path (the cache of `bp run`) ended in an access violation.
