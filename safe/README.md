@@ -1,13 +1,14 @@
 # safe/ — Safe Pascal: memory safety
 
 Layer 1 of 3 in Better Pascal. Only what makes code memory-safe, and nothing more:
-`TOwned/TShared/TWeak/TSlice/TArena`, `TDefer`, FFI (`TCResource`), a leak counter and "poisoning"
+`TOwned/TShared/TWeak/TSlice/TArena`, the region style (`TRegion`, `TRegionObject`, `TGrowArray<T>`), `TDefer`, FFI (`TCResource`), a leak counter and "poisoning"
 of dangerous primitives (`GetMem`, `New`, `Move`, `FillChar`, `FreeAndNil`, `Obj.Free`...) by name shadowing.
 
 | File | What it is |
 |---|---|
 | `safe.pas` | `unit Safe`: pulls in this layer only; `uses ..., Safe;` goes last in the module |
 | `core.intf.inc`, `core.impl.inc` | ownership, slices, arena, defer, FFI; the same files are included by `unit BP` |
+| `region.intf.inc`, `region.impl.inc` | the region style (SPEC §20): `TRegion`, the current region, `Scope`, `Each`, `TRegionObject`, `TGrowArray<T>`, R2, R12, R14–R16 |
 | `poison.intf.inc`, `poison.impl.inc` | poisoned primitives and the `Free` helper; included last |
 | `SPEC.md` | the specification of Better Pascal (both layers); §0 is the rules card, §13 FFI, §14 goroutines, §15–16 plan |
 | `DN-ADOPTION.md` | plan for migrating DOS Navigator (`unxed/dn`) to Safe Pascal: stages S0–S10 |

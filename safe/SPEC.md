@@ -48,7 +48,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | CI: "no INTERP/NEEDED" check, Alpine/Debian/Ubuntu 16.04/CentOS 7 in containers, i386 and aarch64 under qemu | **implemented** (`.github/workflows/ci.yml`) | §18 |
 | Support for `object` (Turbo Pascal) | **plan** | §19 |
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
-| Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **design (plan)** | §20 |
+| Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
@@ -437,7 +437,7 @@ System.GetMem(Buf, Len);
 | Exhaustive `case`, `const` parameters | `bpvet` S13; S14 errors on copy-heavy by-value parameters and warns on other by-value parameters not changed by the body and unused `var` parameters | H11 |
 | Range and overflow checks are not switched off in safe code | programmer | H12 |
 | Turbo Pascal style `object` code | not covered (§19) | H13 |
-| A region object or a `TGrowArray` element does not outlive its region | plan: `bpvet` S17 (static, zero cost); `SAFE_DEBUG` R12 (released pages lose access) as a second net | §20 |
+| A region object or a `TGrowArray` element does not outlive its region | `bpvet` S17 in the typed mode (static, zero cost); `SAFE_DEBUG` R12 (released pages lose access, `test_region`) as a second net | §20 |
 | A GC object is never freed while reachable; cycles are collected | plan: the collector + `bpvet` S18 (where a GC reference may live, it stays in its goroutine) | §20 |
 | A class cast is checked (`as`); no cast from a pointer or an integer to a reference | the typed `bpvet`: S24 (`--fix` writes `as`), S4 for a pointer or an integer (§24.6) | H17 |
 | No untyped parameter, no variable typecast of one, no `absolute` outside unsafe | the typed `bpvet`: S25 (§24.6) | H18 |
@@ -1061,6 +1061,7 @@ or above the parameter suppresses its S14 finding.
 | v0.16 | §25.1 step 3: the benchmark suite `tests/bench/compare.sh` (binary trees, n-body, fannkuch, word count in Bp, C, Rust and Go; Goose not installed) and the baseline of §25.2; a non-failing CI step |
 | v0.17 | §21.3 step 5 result: the M:N runtime in `BPThreads` (`ext/bpsched.inc`) behind `BP_MN=1`, `BP_SCHED_SEED`, deadlock detection, `MNMODES` in `tests/run.sh` and CI; critical sections park goroutines in a table by address; the numbers against 1:1 |
 | v0.18 | §21.7 step 6: the atomic `Select` with send cases (`RecvCase`, `SendCase`), channels over queues of waiting cases (an unbuffered send ends when a receiver has the value); §14 updated |
+| v0.19 | §20 the region runtime (step 4 of #108): `safe/region.*.inc` in units Safe and BP, `test_region`, R2, R12 (`SAFE_DEBUG`), R14, R15, R16 at `Own`/`Share`/`Adopt`; `Reset` keeps the largest block, chunks in the region of the header, `Create` moves into a variable passed by reference |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1095,7 +1096,8 @@ The order (the RUP method: from simple to complex, atomic steps with tests, some
 
 ## §20. Memory styles: one language, several safe styles (design, plan)
 
-Status: design only, nothing of this section is implemented yet. The plan by steps: unxed/bp#108.
+Status: the region style is implemented (the runtime `safe/region.*.inc`, below "The region runtime"; S17 in the typed
+`bpvet`); the GC style and S18 are design. The plan by steps: unxed/bp#108.
 
 ### The principle
 
@@ -1335,6 +1337,42 @@ and `TGrowArray<T>`. Verdict: **the surface of §20 works as designed**, and one
   (below).
 - A `TGrowArray` is a record that holds one pointer to its header in the region, so a copy of the record refers to the same
   array: no value-copy surprise.
+
+### The region runtime (step 4 of #108, 2026-11-05)
+
+`safe/region.intf.inc` and `safe/region.impl.inc`, included by unit Safe and unit BP; `tests/safe/test_region.pas` runs
+with both, at the options of `bp build` too, and CI runs it once more with `SAFE_DEBUG` (R12). The API is that of spike 2:
+
+- `TRegion`: `Create` (the new region becomes the current one of the goroutine), `Reset`, `Release`, `Used`; released when
+  its variable leaves its scope; `CurrentRegionDepth` is the number of regions of the goroutine.
+- `for R in Scope do` (a region for a block), `for Line in Each(Lines)` and `for P in A.Each` (a region per iteration).
+- `TRegionObject`: `TFoo.Create` allocates in the current region; a finalizer only for a class with managed fields.
+- `TGrowArray<T>`: `Create` (in the current region), `Create(R)` (in the region `R`), `Push`, `Len`, `At`, `A[I]`,
+  `for P in A`, `for C in A.Chunks`, `for P in A.Each`; a finalizer per chunk only for a type with managed fields.
+- Errors are `ESafety`: R2 (an index of `At` and `A[I]`, in every build), R14, R15, R16 (`Own`, `Share`, `TArena.Adopt`
+  and so `TArenaRef.Adopt` of a region object: one `is` check next to the R3 check), R12 in `SAFE_DEBUG` on unix.
+
+What differs from the spike, and why:
+
+- **`Reset` keeps the largest block** (the newest), as this section says; the spike kept the first one (4 KiB), so every
+  round of a loop took its larger blocks from the heap again.
+- **The chunks of a `TGrowArray` go into the region of its header**, not into the current region at the time of `Push`:
+  a `Push` under an inner region (a `Scope`, an `Each`) no longer puts elements into memory the inner region frees.
+  This also gives the explicit form `Create(R)` of the sketch below for nothing.
+- **`R := TRegion.Create` works when `R` is passed by reference.** FPC builds the result of `Create` in the variable
+  itself only while the variable is not passed by reference anywhere in the routine (measured on FPC 3.2.2 at -O-, -O1,
+  -O2): with `Foo(R)` for a `var` or `constref` parameter it builds the result in a temporary and copies it. A region
+  that has allocated nothing yet therefore moves on a copy (the temporary is left empty); any other copy still raises.
+  The spike raised there, which made region parameters (rule 4 below) unusable.
+- **`R := TRegion.Create` of a variable that holds a region releases that one**; FPC does not finalize the variable before
+  it builds the result in it, so the spike left the old region on the stack of the goroutine for good.
+- The typed `bpvet` cannot dereference a pointer to a type parameter inside a generic method, so the runtime reads an
+  element through a one-field record (`PCell(At(I))^.V`); the API is unchanged (`A.At(I).X` with `autoderef`).
+- Not there yet: `ToArray` (a contiguous copy), the explicit region of a `TRegionObject`; the test counters of the spike
+  (`RegionCopies`, `RegionReleases`, `CurrentRegionUsed`) are not public: the test measures the heap.
+- The untyped pass of `bpvet` does not know the region style: it reports `TFoo.Create` of a region class under S6 and a
+  field of one under S5, which only the typed mode answers (step 7 of #108). `test_region` is an `UNSAFE-UNIT` for that
+  reason; outside the debug-only check it is clean in the typed mode.
 
 ### Region style (an idea from Goose)
 
@@ -1932,7 +1970,7 @@ data.
    stack switch; threadvars, exceptions and the heap work across switches. *Done:* CI green on x86_64, aarch64 and i386; the
    time of a switch, the memory of a goroutine, the goroutines per GiB, guard pages against `-Ct`; a verdict in §21.3.
    Independent of step 1. *Status:* **done** (§21.3, Spike 4 result): worth it; guard areas by default (the owner's decision, 2026-11-05).
-3. **The scope** on the region runtime (step 4 of unxed/bp#108): `Hold`, `Defer`, `TScopeRef`, `TArena` on the list; S6
+3. **The scope** on the region runtime (step 4 of unxed/bp#108, done: §20, "The region runtime"): `Hold`, `Defer`, `TScopeRef`, `TArena` on the list; S6
    accepts `Hold`, S17 roots it. *Done:* `test_region` covers the order of destruction, an exception in the scope and in a
    destructor; lint tests.
 4. **The `TComponent` owner** (S6 and a root kind of S17). *Done:* lint tests on a form-like unit (a stub `TComponent` is
@@ -2511,7 +2549,7 @@ a bug found by a program built with `bp build` goes ahead of the plan.
 | 2 | — (the cheap holes of §8: done) | | |
 | 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and four languages, v0.16: the baseline is in §25.2; Goose, channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
 | 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (done: the runtime is on with `BP_MN=1`, §21.3, step 5 result; the atomic `Select`, §14) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
-| 5 | **The scope** (`Hold`, `Defer`) on the region runtime, then the `TComponent` owner | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
+| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.19), then the `TComponent` owner | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
 | 6 | **The speed work** that the numbers of step 3 point to (§25.2) | §25.2 | after the runtime: it changes what is measured |
 | 7 | **The tools,** cheapest first: `bp explain`, S20 and `Fmt`, `bp test`, `--target`, `// derive:`, the profiler, `bp lsp`, the browser, S26c, hot reload | §22.8 steps 2–11 | each stands alone; the ones users ask for first go first |
 | 8 | **The language from FPC 3.2:** nested procedure values, the `String` helper, CORBA interfaces, `// raises:` | §24.8 steps 4–7 | after the runtime and S17, which they extend |
