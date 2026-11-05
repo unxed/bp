@@ -1,7 +1,7 @@
 // EXPECT: clean
-{ S28: a helper for TObject that inherits TSafeObjectHelper keeps the poisoned Free and adds methods; a helper for
+{ S29: a helper for TObject that inherits TSafeObjectHelper keeps the poisoned Free and adds methods; a helper for
   another class needs no mark; a helper for TObject that replaces the poison on purpose says why. }
-unit s28_ok;
+unit s29_ok;
 
 {$mode objfpc}{$H+}
 

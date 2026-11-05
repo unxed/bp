@@ -1,6 +1,6 @@
-// EXPECT: error SAFE-S28
-{ S28: a helper for a name that is TObject itself is a helper for TObject. }
-unit s28_alias_bad;
+// EXPECT: error SAFE-S29
+{ S29: a helper for a name that is TObject itself is a helper for TObject. }
+unit s29_alias_bad;
 
 {$mode objfpc}{$H+}
 

@@ -29,7 +29,7 @@ type
     without any options, and the explanation of the rule is the parameter's type name, which the
     compiler prints in the line "Found declaration: Free(const SAFE_S3_...)".
     In unsafe code use Obj.Destroy with // UNSAFE:. Limitation: another helper for TObject
-    declared after Safe will override this one; bpvet S28 reports it unless it inherits this helper. }
+    declared after Safe will override this one; bpvet S29 reports it unless it inherits this helper. }
   SAFE_S3_NoFree_UseTOwnedReset_or_UnsafeDestroy = record end;
   TSafeObjectHelper = class helper for TObject
   public

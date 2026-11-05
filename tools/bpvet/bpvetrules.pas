@@ -171,7 +171,7 @@ procedure VetCheckS14(const Src: TVetSource; const Module: TPasModule; var Repor
              may disable those compiler checks because R1-R4 remain active. }
 procedure VetCheckS16(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
-{ S28: a helper for TObject keeps the poisoned Free (safe/SPEC.md §6, §24.4). A module marked // UNSAFE-UNIT: is not
+{ S29: a helper for TObject keeps the poisoned Free (safe/SPEC.md §6, §24.4). A module marked // UNSAFE-UNIT: is not
   checked. FPC applies one helper per type, the last one declared; unit Safe (BP) declares TSafeObjectHelper, whose
   Free needs an argument that cannot be written, so Obj.Free does not compile. A second helper for TObject declared
   after it takes its place, and Free compiles again (measured, FPC 3.2.2).
@@ -180,7 +180,7 @@ procedure VetCheckS16(const Src: TVetSource; const Module: TPasModule; var Repor
              methods). A // UNSAFE: <why> comment on the line above or at the end of the line drops it.
   Helpers for any other type need no rule of their own: the other rules check their method bodies as they check any
   method, and the resolver of the typed mode refuses a helper that uses a private member of the type it extends. }
-procedure VetCheckS28(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+procedure VetCheckS29(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 
 implementation
 
@@ -2969,11 +2969,11 @@ begin
   end;
 end;
 
-{ S28 }
+{ S29 }
 
 type
   { Collects the helpers of a module and the names that stand for TObject itself. }
-  TS28Walker = class
+  TS29Walker = class
   public
     Helpers: array of TPasClassType;
     { ' name ' of the types of the module declared as T = TObject, in lower case }
@@ -2983,7 +2983,7 @@ type
   end;
 
 { The name of a type reference without its unit, in lower case. }
-function S28LastName(const T: TPasType): String;
+function S29LastName(const T: TPasType): String;
 begin
   Result := '';
   if T = nil then
@@ -2994,7 +2994,7 @@ begin
 end;
 
 // UNSAFE: the callback type TOnForEachPasElement of fcl-passrc takes a raw pointer
-procedure TS28Walker.Visit(El: TPasElement; Arg: System.Pointer);
+procedure TS29Walker.Visit(El: TPasElement; Arg: System.Pointer);
 var
   Target: String;
 begin
@@ -3005,38 +3005,38 @@ begin
   end
   else if (El.ClassType = TPasAliasType) and (El.Name <> '') then
   begin
-    Target := S28LastName(TPasAliasType(El).DestType);
+    Target := S29LastName(TPasAliasType(El).DestType);
     if (Target = 'tobject') or (Pos(' ' + Target + ' ', Aliases) > 0) then
       Aliases := Aliases + LowerCase(El.Name) + ' ';
   end;
 end;
 
-procedure VetCheckS28(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
+procedure VetCheckS29(const Src: TVetSource; const Module: TPasModule; var Report: TVetReport);
 var
-  W: specialize TOwned<TS28Walker>;
-  V: TS28Walker;
+  W: specialize TOwned<TS29Walker>;
+  V: TS29Walker;
   I: Integer;
   H: TPasClassType;
   Target: String;
 begin
   if IsUnsafeUnit(Src) then
     Exit;
-  W := specialize TOwned<TS28Walker>.Own(TS28Walker.Create);
+  W := specialize TOwned<TS29Walker>.Own(TS29Walker.Create);
   V := W.Get;
   V.Aliases := ' ';
   Module.ForEachCall(@V.Visit, nil);
   for I := 0 to High(V.Helpers) do
   begin
     H := V.Helpers[I];
-    Target := S28LastName(H.HelperForType);
+    Target := S29LastName(H.HelperForType);
     if (Target <> 'tobject') and (Pos(' ' + Target + ' ', V.Aliases) = 0) then
       Continue;
     // TSafeObjectHelper is the poison itself (safe/poison.intf.inc); a helper that inherits it keeps it
-    if SameText(H.Name, 'TSafeObjectHelper') or (S28LastName(H.AncestorType) = 'tsafeobjecthelper') then
+    if SameText(H.Name, 'TSafeObjectHelper') or (S29LastName(H.AncestorType) = 'tsafeobjecthelper') then
       Continue;
     if S5UnsafeMarked(Src, H.SourceLinenumber) then
       Continue;
-    AddAtElement(Src, H, vsError, 'S28',
+    AddAtElement(Src, H, vsError, 'S29',
       'the helper ' + H.Name + ' for TObject takes the place of TSafeObjectHelper, which makes Obj.Free a compile '
       + 'error (S3): FPC applies one helper per type, the last declared, and Free compiles again; inherit it '
       + '(class helper(TSafeObjectHelper) for TObject), or put a comment // UNSAFE: <why> on the line above '
@@ -3060,7 +3060,7 @@ begin
   VetCheckS13(Src, Module, Report);
   VetCheckS14(Src, Module, Report);
   VetCheckS16(Src, Module, Report);
-  VetCheckS28(Src, Module, Report);
+  VetCheckS29(Src, Module, Report);
 end;
 
 end.

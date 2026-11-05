@@ -6,7 +6,7 @@ type
   TNode = class
   end;
 
-  { a helper for TObject that inherits TSafeObjectHelper adds methods and keeps the poison of Free (S28 asks for it) }
+  { a helper for TObject that inherits TSafeObjectHelper adds methods and keeps the poison of Free (S29 asks for it) }
   TTagHelper = class helper(TSafeObjectHelper) for TObject
     function Tag: Integer;
   end;

@@ -1,7 +1,7 @@
-// EXPECT: error SAFE-S28
-{ S28: a class helper for TObject takes the place of the TSafeObjectHelper of Safe, so Obj.Free compiles again.
-  The file breaks S28 only: one finding. }
-unit s28_bad;
+// EXPECT: error SAFE-S29
+{ S29: a class helper for TObject takes the place of the TSafeObjectHelper of Safe, so Obj.Free compiles again.
+  The file breaks S29 only: one finding. }
+unit s29_bad;
 
 {$mode objfpc}{$H+}
 

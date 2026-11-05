@@ -1,6 +1,6 @@
-// EXPECT: error SAFE-S28
-{ S28: System.TObject is TObject. }
-unit s28_qualified_bad;
+// EXPECT: error SAFE-S29
+{ S29: System.TObject is TObject. }
+unit s29_qualified_bad;
 
 {$mode objfpc}{$H+}
 
