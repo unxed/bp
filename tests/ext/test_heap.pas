@@ -58,10 +58,7 @@ begin
   B := System.PByte(P);
   V := Byte(PtrUInt(P) shr 4) or 1;
   for I := 0 to Size - 1 do
-  begin
-    B^ := V;
-    Inc(B);
-  end;
+    B[I] := V;
 end;
 
 function Intact(P: System.Pointer; Size: PtrUInt): Boolean;
@@ -193,10 +190,7 @@ begin
   P := System.GetMem(8);
   B := System.PByte(P);
   for I := 0 to 7 do
-  begin
-    B^ := I + 1;
-    Inc(B);
-  end;
+    B[I] := I + 1;
   S := 8;
   while S < 3000000 do
   begin
@@ -219,29 +213,19 @@ end;
 { Bytes of a value from their index and K, so a block keeps them when it moves. }
 procedure Mark(P: System.Pointer; Size: PtrUInt; K: Byte);
 var
-  B: System.PByte;
   I: PtrUInt;
 begin
-  B := System.PByte(P);
   for I := 0 to Size - 1 do
-  begin
-    B^ := Byte(I * 7 + K);
-    Inc(B);
-  end;
+    System.PByte(P)[I] := Byte(I * 7 + K);
 end;
 
 function Marked(P: System.Pointer; Size: PtrUInt; K: Byte): Boolean;
 var
-  B: System.PByte;
   I: PtrUInt;
 begin
-  B := System.PByte(P);
   for I := 0 to Size - 1 do
-  begin
-    if B^ <> Byte(I * 7 + K) then
+    if System.PByte(P)[I] <> Byte(I * 7 + K) then
       Exit(False);
-    Inc(B);
-  end;
   Result := True;
 end;
 
