@@ -2898,6 +2898,21 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   real constant is `Extended` in FPC: `Dt = 0.001` made n-body print another energy than C, Rust and Go (the three
   agree) until it was written `Dt = Double(0.001)`.
 
+- **Why Bp is 1.3–2.2x of C (2026-11-05).** Bp is typed and compiled, with no collector: the class of C. The gap is
+  not in the language; on the same code it has four sources (ratios to gcc from the runs above and of 2026-11-05):
+  1. **The code generator and the optimizer of FPC 3.2.2.** N-body 1.36x, fannkuch 1.31x and the arena tier 1.63x,
+     where the Pascal and the C do the same work in the same layout. Filed upstream: the address of an element of an
+     array of records computed again for every field (fpc#42040, #186) and a 32-bit index copied before every use
+     (fpc#42041, #187). Being prepared: no vectorization of loops, and a register allocation that reloads and spills
+     values in hot loops (#185).
+  2. **The heap.** The heap tier of binary trees (1.8–2.2x) is the RTL heap of FPC against the `malloc` of glibc. The
+     memory manager of BP (§25.4, `BP_HEAP=bp`) is off by default for now.
+  3. **The library of BP.** The word count (1.8–2.3x) is `TMap` and the strings of BP against the table C writes for
+     itself; the region of objects (3.3x) is the construction of a `TRegionObject` and the access of `TGrowArray`.
+     This is our own code to speed up (the levers below).
+  4. **The possible large lever: the LLVM back end of FPC main,** which would give 1 the optimizer of clang; it is
+     being measured (#185).
+
 - **Then the levers the numbers point to (step 6),** each measured on its own:
   - the cost of reference counting (`String`, dynamic arrays, `TShared`): `const` parameters (S14) already avoid most of
     it; the word count: a slice and a map in unit `BP`, 0.56 s → 0.46 s (§25.3);
