@@ -7,14 +7,18 @@ Reads the jobs of the latest run for the head commit of PR (not the check summar
 leaves "in progress" after every job has finished) and prints a line whenever their state changes.
 - Every job succeeded: exit 0; with --merge the PR is merged (gh pr merge --merge --delete-branch) first.
 - A job failed in its own steps (a build or a test): exit 1 at once, with the end of the failed log.
-- A job failed on the runner (cancelled, timed out, or failed in an install step), or waits for a runner longer than
-  QUEUE minutes: the run is started again, once; a second such failure is exit 1.
+- A job failed on the runner (cancelled, timed out, or failed in an install step), waits for a runner longer than
+  QUEUE minutes, or hangs in a step: the run is cancelled at once and its failed jobs started again, up to RERUNS
+  times; one more such failure is exit 1. A step hangs when it runs longer than 3 times the same step of the last
+  successful run of the workflow plus 2 minutes; an install step (a name that starts with "Install", where a slow apt
+  mirror stalls: 15 s as a rule, 13 and 20 minutes when it stalled) after STALL minutes at most.
 - No result after LIMIT minutes in all: exit 2.
 - A call of gh that fails on the network (a timeout, no connection, a 5xx of the gateway) is made again after a pause,
   up to 8 times, so a short outage does not end the wait.
 - A PR that changes only texts (*.md, *.txt): only the jobs that check texts (a name with "text") are waited for; with
   none, it is merged at once.
-QUEUE (default 4) and LIMIT (default 30) are environment variables. Needs gh, logged in.
+QUEUE (default 4), STALL (default 4), RERUNS (default 2) and LIMIT (default 30) are environment variables. Needs gh,
+logged in.
 """
 import json
 import os
@@ -24,6 +28,8 @@ import time
 from datetime import datetime, timezone
 
 QUEUE = float(os.environ.get("QUEUE", "4")) * 60
+STALL = float(os.environ.get("STALL", "4")) * 60
+RERUNS = int(os.environ.get("RERUNS", "2"))
 LIMIT = float(os.environ.get("LIMIT", "30")) * 60
 POLL = 15
 
@@ -51,11 +57,41 @@ def api(path):
     return json.loads(gh("api", path))
 
 
+def when(stamp):
+    return datetime.strptime(stamp[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+
+
 def age(stamp):
     if not stamp:
         return 0
-    t = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    return (datetime.now(timezone.utc) - t).total_seconds()
+    return (datetime.now(timezone.utc) - when(stamp)).total_seconds()
+
+
+def baseline(repo, run):
+    """The seconds of each (job, step) that succeeded in the last successful run of the workflow of RUN."""
+    runs = api("repos/%s/actions/workflows/%d/runs?status=success&per_page=1" % (repo, run["workflow_id"]))
+    result = {}
+    for r in runs["workflow_runs"][:1]:
+        jobs = api("repos/%s/actions/runs/%d/attempts/%d/jobs?per_page=100" % (repo, r["id"], r["run_attempt"]))
+        for j in jobs["jobs"]:
+            for s in j.get("steps", []):
+                if s.get("conclusion") == "success" and s.get("started_at") and s.get("completed_at"):
+                    result[j["name"], s["name"]] = (when(s["completed_at"]) - when(s["started_at"])).total_seconds()
+    return result
+
+
+def hung(job, base):
+    """The step of a running job that runs far longer than it should, as "step (N s)", or None."""
+    for s in job.get("steps", []):
+        if s.get("status") != "in_progress" or not s.get("started_at"):
+            continue
+        b = base.get((job["name"], s["name"]))
+        limit = 3 * b + 120 if b is not None else None
+        if s["name"].startswith("Install"):
+            limit = STALL if limit is None else min(limit, STALL)
+        if limit is not None and age(s["started_at"]) > limit:
+            return "%s (%d s, the limit %d s)" % (s["name"], age(s["started_at"]), limit)
+    return None
 
 
 def say(msg):
@@ -96,7 +132,7 @@ def main():
     pr, merge = sys.argv[1], "--merge" in sys.argv[2:]
     repo = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip()
     sha = gh("pr", "view", pr, "--json", "headRefOid", "-q", ".headRefOid").strip()
-    start, reruns, last = time.time(), 0, None
+    start, reruns, last, base = time.time(), 0, None, None
     texts = text_only(pr)
     if texts:
         say("ci-wait: the PR changes only texts: waiting only for the jobs that check texts")
@@ -124,7 +160,14 @@ def main():
         if state != last:
             say("run %d attempt %d: %s" % (run["id"], run["run_attempt"], state or "(no jobs yet)"))
             last = state
+        if base is None:
+            try:
+                base = baseline(repo, run)
+            except (RuntimeError, KeyError, ValueError):
+                base = {}
         stuck = [j for j in jobs if j["status"] in ("queued", "waiting", "pending") and age(j["created_at"]) > QUEUE]
+        hangs = {j["name"]: hung(j, base) for j in jobs if j["status"] == "in_progress"}
+        hangs = {k: v for k, v in hangs.items() if v}
         done = jobs and all(j["status"] == "completed" for j in jobs)
         bad = [j for j in jobs if j["status"] == "completed" and j["conclusion"] not in ("success", "skipped")]
         real = [j for j in bad if not infra_failure(j)]
@@ -132,10 +175,14 @@ def main():
             say("ci-wait: FAILED: %s" % ", ".join(j["name"] for j in real))
             print(gh("run", "view", str(run["id"]), "--log-failed", check=False)[-4000:])
             sys.exit(1)
-        if stuck or (done and bad):
-            why = "waits for a runner" if stuck else "failed on the runner"
-            names = ", ".join(j["name"] for j in (stuck or bad))
-            if reruns >= 1:
+        if stuck or hangs or (done and bad):
+            if stuck:
+                why, names = "waits for a runner", ", ".join(j["name"] for j in stuck)
+            elif hangs:
+                why, names = "hangs", ", ".join("%s in %s" % kv for kv in hangs.items())
+            else:
+                why, names = "failed on the runner", ", ".join(j["name"] for j in bad)
+            if reruns >= RERUNS:
                 say("ci-wait: FAILED again (%s %s)" % (names, why))
                 sys.exit(1)
             say("ci-wait: %s %s: starting the run again" % (names, why))
