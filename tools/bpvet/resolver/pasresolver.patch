@@ -22,6 +22,8 @@ in the FPC sources); see README.md.
     marks it assignable but not writable.
 12. A procedure whose calling convention is the default fits a procedure type with a declared one (and the other way
     round): {$calling cdecl} is not read, and FPC itself checks the convention.
+13. A typecast of a value above the Int64 range (QWord($CBF29CE484222325)) is evaluated (EvalBaseTypeCast): QWord keeps
+    it, Int64 takes its bits, other types are not folded; it used to stop with "not yet implemented".
 
 --- a/packages/fcl-passrc/src/pasresolver.pp
 +++ b/packages/fcl-passrc/src/pasresolver.pp
@@ -126,7 +128,28 @@ in the FPC sources); see README.md.
    MoveNext:=EnumeratorScope.FindIdentifier('MoveNext');
    if MoveNext=nil then
      RaiseIdentifierNotFound(20171221195632,'MoveNext',Loop.StartExpr);
-@@ -16883,6 +16894,24 @@
+@@ -15603,6 +15614,20 @@
+         RaiseNotYetImplemented(20170624194308,Params);
+         end;
+       end;
++    revkUInt:
++      // a value above the Int64 range (QWord($CBF29CE484222325)): qword and int64 keep its bits, other types are not
++      // evaluated
++      if bt=btQWord then
++        begin
++        Result:=Value;
++        Value:=nil;
++        end
++      else if bt=btInt64 then
++        begin
++        {$R-}
++        Result:=TResEvalInt.CreateValue(TMaxPrecInt(TResEvalUInt(Value).UInt));
++        {$IFDEF RangeCheckOn}{$R+}{$ENDIF}
++        end;
+     revkFloat:
+       begin
+       Flo:=TResEvalFloat(Value).FloatValue;
+@@ -16883,6 +16908,24 @@
      SpecMembersType.Members.Add(NewEl);
      SpecializeElement(GenEl,NewEl);
      end;
@@ -151,7 +174,7 @@ in the FPC sources); see README.md.
  end;
  
  procedure TPasResolver.SpecializeMembersImpl(GenericType,
-@@ -16921,7 +16950,7 @@
+@@ -16921,7 +16964,7 @@
        GenIntfProcScope:=TPasProcedureScope(GenIntfProc.CustomData);
        GenImplProc:=GenIntfProcScope.ImplProc;
        if GenImplProc=nil then
@@ -160,7 +183,7 @@ in the FPC sources); see README.md.
        if ImplParent=nil then
          begin
          // switch scope (e.g. unit implementation section)
-@@ -18125,6 +18154,17 @@
+@@ -18125,6 +18168,17 @@
  
  procedure TPasResolver.SpecializePointerType(GenEl, SpecEl: TPasPointerType);
  begin
@@ -178,7 +201,7 @@ in the FPC sources); see README.md.
    SpecializeElType(GenEl,SpecEl,GenEl.DestType,SpecEl.DestType);
    FinishPointerType(SpecEl);
  end;
-@@ -19915,14 +19955,23 @@
+@@ -19915,14 +19969,23 @@
        RaiseVarExpected(20170329171514,Param,ParamResolved.IdentEl);
      exit;
      end;
@@ -210,7 +233,7 @@ in the FPC sources); see README.md.
  
    // check insert Index
    Param:=Params.Params[2];
-@@ -19954,6 +20003,7 @@
+@@ -19954,6 +20017,7 @@
      // insert complex expression, e.g. insert([1],Arr,index)
      // -> mark array and set literals
      ComputeElement(Param1,ArrayResolved,[]);
@@ -218,7 +241,7 @@ in the FPC sources); see README.md.
      if (ArrayResolved.BaseType<>btContext)
          or not IsDynArray(ArrayResolved.LoTypeEl) then
        RaiseNotYetImplemented(20180622144039,Param1);
-@@ -19989,7 +20039,8 @@
+@@ -19989,7 +20053,8 @@
      end;
    if (ParamResolved.BaseType<>btContext)
        or not IsDynArray(ParamResolved.LoTypeEl) then
@@ -228,7 +251,7 @@ in the FPC sources); see README.md.
  
    // check param Start
    Param:=Params.Params[1];
-@@ -20509,6 +20560,7 @@
+@@ -20509,6 +20574,7 @@
    inherited Create;
    FDefaultScope:=TPasDefaultScope.Create;
    FPendingForwardProcs:=TFPList.Create;
@@ -236,7 +259,7 @@ in the FPC sources); see README.md.
    FBaseTypeChar:={$ifdef FPC_HAS_CPSTRING}btAnsiChar{$else}btWideChar{$endif};
    FBaseTypeString:={$ifdef FPC_HAS_CPSTRING}btAnsiString{$else}btUnicodeString{$endif};
    FBaseTypeExtended:=btDouble;
-@@ -20647,7 +20699,9 @@
+@@ -20647,7 +20713,9 @@
        AddGenericTemplateType(TPasGenericTemplateType(El))
      else if AClass=TPasStringType then
        begin
@@ -247,7 +270,7 @@ in the FPC sources); see README.md.
        {$ifdef FPC_HAS_CPSTRING}
        if BaseTypes[btShortString]=nil then
        {$endif}
-@@ -21692,6 +21746,7 @@
+@@ -21692,6 +21760,7 @@
    writeln('TPasResolver.Destroy FPendingForwards...');
    {$ENDIF}
    FreeAndNil(FPendingForwardProcs);
@@ -255,7 +278,7 @@ in the FPC sources); see README.md.
    FreeAndNil(fExprEvaluator);
    ClearBuiltInIdentifiers;
    inherited Destroy;
-@@ -23585,6 +23640,8 @@
+@@ -23585,6 +23654,8 @@
          and (Proc1.CallingConvention=ccSafeCall)
          and (Proc2.CallingConvention=ccDefault) then
        // ok
@@ -264,7 +287,7 @@ in the FPC sources); see README.md.
      else
        begin
        if RaiseOnIncompatible then
-@@ -23694,10 +23751,13 @@
+@@ -23694,10 +23765,13 @@
    else if IsGenericTemplType(Arg2Resolved) then
      exit(cGenericExact);
  
@@ -279,7 +302,7 @@ in the FPC sources); see README.md.
  
    if ResolveAlias=prraSimple then
      begin
-@@ -25078,7 +25138,14 @@
+@@ -25078,7 +25152,14 @@
  begin
    Result:=false;
    if [rrfReadable,rrfWritable]*ResolvedEl.Flags<>[rrfReadable,rrfWritable] then
@@ -295,7 +318,7 @@ in the FPC sources); see README.md.
    if ResolvedEl.IdentEl=nil then
      exit(true);
  
-@@ -25662,6 +25729,10 @@
+@@ -25662,6 +25743,10 @@
        end;
      if (Param.ArgType=nil) then
        exit(cExact); // untyped argument
@@ -306,7 +329,7 @@ in the FPC sources); see README.md.
      if (ParamResolved.BaseType=ExprResolved.BaseType) then
        begin
        if msDelphi in CurrentParser.CurrentModeswitches then
-@@ -25688,6 +25759,11 @@
+@@ -25688,6 +25773,11 @@
        end;
      if IsGenericTemplType(ParamResolved) then
        exit(cGenericExact);
@@ -318,7 +341,7 @@ in the FPC sources); see README.md.
  
      //writeln('TPasResolver.CheckParamCompatibility NeedVar ParamResolved=',GetResolverResultDbg(ParamResolved),' ExprResolved=',GetResolverResultDbg(ExprResolved));
      if RaiseOnError then
-@@ -27823,6 +27899,24 @@
+@@ -27823,6 +27913,24 @@
    Result:=-1;
  end;
  
@@ -343,7 +366,7 @@ in the FPC sources); see README.md.
  procedure TPasResolver.CheckUseAsType(aType: TPasElement; id: TMaxPrecInt;
    ErrorEl: TPasElement);
  begin
-@@ -27839,7 +27933,7 @@
+@@ -27839,7 +27947,7 @@
        begin
        // ref to generic type without specialization
        if not (msDelphi in CurrentParser.CurrentModeswitches)

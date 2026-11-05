@@ -2,8 +2,8 @@
 
 `bpvet` reads types with `PasResolver` of `fcl-passrc` (safe/SPEC.md §20, "Spike 1 result"). The resolver, the parser and
 the tree of FPC 3.2.2 reject constructs that FPC itself accepts and that Better Pascal uses; `pastree.patch`,
-`pparser.patch` and `pasresolver.patch` change them (each patch header says what and why). The repository keeps only the
-patches: `get.sh OUT` takes the original files of FPC 3.2.2, checks their SHA-256, applies the patches and leaves the
+`pparser.patch`, `pasresolver.patch` and `pasresolveeval.patch` change them (each patch header says what and why). The
+repository keeps only the patches: `get.sh OUT` takes the original files of FPC 3.2.2, checks their SHA-256, applies the patches and leaves the
 result in `OUT`, from where `bpvet` is built (`-FuOUT -FiOUT`, `build.sh`).
 
 Licence: the patch and the patched file are under the licence of `fcl-passrc`, the LGPL with the static linking exception
@@ -27,6 +27,12 @@ by programs built with `tools/bp build` (unxed/bp#146); each is a construct FPC 
 - A procedure with the default calling convention fits a procedure type with a declared one: `{$calling cdecl}` is not
   read. `genstubs.py` also gives the procedure types of the RTL their calling convention (`signalhandler_t` is `cdecl`),
   and writes the default `[]` of a set parameter (`RunCommand(Exe, Args, S)`).
+
+The compiler-magic functions of the typed mode (`Round`, `Trunc`, `SizeOf`) are built-in procedures of
+`bpvettyped.pas` with an evaluator that gives "not a constant"; without one the resolver stopped with "not yet implemented: TParamsExpr" at any assignment of
+`Round(X)`. The constant folding of `QWord($CBF29CE484222325)` (a typecast of a value above `Int64`, item 13 of
+`pasresolver.patch`) and of `and`, `or`, `xor` between an `Int64` and a `QWord` value (`pasresolveeval.patch`) is
+patched the same way: the resolver stopped on them, FPC folds them.
 
 `bpvet` reads a file through `TFileStreamLineReader`: the text file of Pascal holds a name of 255 characters, so a longer
 path (the cache of `bp run`) ended in an access violation.

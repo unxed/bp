@@ -33,8 +33,142 @@ ALWAYS = {"system": {"tobject", "tclass", "iunknown", "iinterface", "tinterfaced
 # Calling conventions written after a procedure type (the default, register, is left out).
 CALLCONVS = {"cdecl", "stdcall", "safecall", "pascal"}
 
-# Generic types: ppudump 3.2.2 does not write their type parameters, so they are declared here.
-GENERICS = {"system": ["generic TArray<T> = array of T;"]}
+# Generic types: ppudump 3.2.2 does not write their type parameters (a generic class is an empty entry), so they are
+# declared here. A unit in GENERICS_ONLY is written from these declarations alone: its generic classes are all it holds
+# that a program uses. The classes have no bodies; a used unit is read up to its implementation.
+GENERICS = {
+    "system": ["generic TArray<T> = array of T;"],
+    "generics.collections": """
+TCollectionNotification = (cnAdded, cnRemoved, cnExtracted);
+generic TPair<TKey, TValue> = record
+  Key: TKey;
+  Value: TValue;
+end;
+generic TEnumerator<T> = class(TObject)
+private
+  function GetCurrent: T;
+public
+  function MoveNext: Boolean;
+  property Current: T read GetCurrent;
+end;
+generic TList<T> = class(TObject)
+private
+  function GetCount: SizeInt;
+  procedure SetCount(AValue: SizeInt);
+  function GetCapacity: SizeInt;
+  procedure SetCapacity(AValue: SizeInt);
+  function GetItem(AIndex: SizeInt): T;
+  procedure SetItem(AIndex: SizeInt; const AValue: T);
+public
+  constructor Create; overload;
+  constructor Create(ACapacity: SizeInt); overload;
+  destructor Destroy; override;
+  function Add(const AValue: T): SizeInt;
+  procedure AddRange(const AValues: array of T);
+  procedure Insert(AIndex: SizeInt; const AValue: T);
+  procedure Delete(AIndex: SizeInt);
+  procedure DeleteRange(AIndex, ACount: SizeInt);
+  function Remove(const AValue: T): SizeInt;
+  function Extract(const AValue: T): T;
+  function IndexOf(const AValue: T): SizeInt;
+  function LastIndexOf(const AValue: T): SizeInt;
+  function Contains(const AValue: T): Boolean;
+  procedure Clear;
+  procedure Exchange(AIndex1, AIndex2: SizeInt);
+  procedure Move(AIndex, ANewIndex: SizeInt);
+  procedure Reverse;
+  procedure Sort;
+  procedure TrimExcess;
+  function First: T;
+  function Last: T;
+  function ToArray: specialize TArray<T>;
+  function GetEnumerator: specialize TEnumerator<T>;
+  property Count: SizeInt read GetCount write SetCount;
+  property Capacity: SizeInt read GetCapacity write SetCapacity;
+  property Items[AIndex: SizeInt]: T read GetItem write SetItem; default;
+end;
+generic TObjectList<T: class> = class(specialize TList<T>)
+private
+  function GetOwnsObjects: Boolean;
+  procedure SetOwnsObjects(AValue: Boolean);
+public
+  constructor Create(AOwnsObjects: Boolean = True); overload;
+  property OwnsObjects: Boolean read GetOwnsObjects write SetOwnsObjects;
+end;
+generic TQueue<T> = class(TObject)
+private
+  function GetCount: SizeInt;
+public
+  constructor Create;
+  destructor Destroy; override;
+  procedure Enqueue(const AValue: T);
+  function Dequeue: T;
+  function Extract: T;
+  function Peek: T;
+  procedure Clear;
+  procedure TrimExcess;
+  function GetEnumerator: specialize TEnumerator<T>;
+  property Count: SizeInt read GetCount;
+end;
+generic TObjectQueue<T: class> = class(specialize TQueue<T>)
+public
+  constructor Create(AOwnsObjects: Boolean = True); overload;
+end;
+generic TStack<T> = class(TObject)
+private
+  function GetCount: SizeInt;
+public
+  constructor Create;
+  destructor Destroy; override;
+  procedure Push(const AValue: T);
+  function Pop: T;
+  function Extract: T;
+  function Peek: T;
+  procedure Clear;
+  procedure TrimExcess;
+  function GetEnumerator: specialize TEnumerator<T>;
+  property Count: SizeInt read GetCount;
+end;
+generic TObjectStack<T: class> = class(specialize TStack<T>)
+public
+  constructor Create(AOwnsObjects: Boolean = True); overload;
+end;
+generic TDictionary<TKey, TValue> = class(TObject)
+private
+  function GetCount: SizeInt;
+  function GetItem(const AKey: TKey): TValue;
+  procedure SetItem(const AKey: TKey; const AValue: TValue);
+public
+  constructor Create; overload;
+  constructor Create(ACapacity: SizeInt); overload;
+  destructor Destroy; override;
+  procedure Add(const AKey: TKey; const AValue: TValue);
+  procedure AddOrSetValue(const AKey: TKey; const AValue: TValue);
+  function TryGetValue(const AKey: TKey; out AValue: TValue): Boolean;
+  function ContainsKey(const AKey: TKey): Boolean;
+  function ContainsValue(const AValue: TValue): Boolean;
+  procedure Remove(const AKey: TKey);
+  function ExtractPair(const AKey: TKey): specialize TPair<TKey, TValue>;
+  procedure Clear;
+  procedure TrimExcess;
+  function ToArray: specialize TArray<specialize TPair<TKey, TValue>>;
+  function GetEnumerator: specialize TEnumerator<specialize TPair<TKey, TValue>>;
+  property Count: SizeInt read GetCount;
+  property Items[const AKey: TKey]: TValue read GetItem write SetItem; default;
+end;
+TDictionaryOwnership = (doOwnsKeys, doOwnsValues);
+TDictionaryOwnerships = set of TDictionaryOwnership;
+generic TObjectDictionary<TKey, TValue> = class(specialize TDictionary<TKey, TValue>)
+public
+  constructor Create(AOwnerships: TDictionaryOwnerships); overload;
+  constructor Create(AOwnerships: TDictionaryOwnerships; ACapacity: SizeInt); overload;
+end;
+""".strip().split("\n"),
+}
+GENERICS_ONLY = {"generics.collections"}
+# the name of each as the source writes it: the ppu of such a unit is not read (that of Generics.Collections holds every
+# specialization the RTL makes, ~10^5 definitions, and took 2 s to load)
+GENERICS_TITLES = {"generics.collections": "Generics.Collections"}
 
 # Interfaces a class implements: ppudump 3.2.2 does not write them.
 IMPLEMENTS = {"tinterfacedobject": "IUnknown", "tagregatedobject": "IUnknown"}
@@ -67,6 +201,7 @@ def die(msg):
 
 COMMENT = re.compile(r"\{[^}]*\}|\(\*.*?\*\)|//[^\n]*|'(?:[^']|'')*'", re.S)
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+UNITNAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*")  # a unit name may be dotted
 
 
 def scan_sources(dirs):
@@ -84,7 +219,7 @@ def scan_sources(dirs):
                 for m in re.finditer(r"\buses\b(.*?);", code, re.S | re.I):
                     for u in m.group(1).split(","):
                         u = re.sub(r"\bin\b.*", "", u, flags=re.S | re.I).strip()
-                        if IDENT.fullmatch(u):
+                        if UNITNAME.fullmatch(u):
                             uses.add(u.lower())
     return idents, uses
 
@@ -132,7 +267,10 @@ class Units:
         name = name.lower()
         if name not in self.loaded:
             path = self.find(name)
-            self.loaded[name] = Unit(name, self.dump(path)) if path else None
+            if path and name in GENERICS_ONLY:
+                self.loaded[name] = Unit(name, {"Name": GENERICS_TITLES[name], "Units": [], "Interface": []})
+            else:
+                self.loaded[name] = Unit(name, self.dump(path)) if path else None
         return self.loaded[name]
 
     def dump(self, path):
@@ -342,6 +480,8 @@ class Gen:
             if u is None:
                 continue
             self.want.setdefault(u.name, set())
+            if u.name in GENERICS_ONLY:
+                continue
             for name in u.byname:
                 if name in self.idents or name in ALWAYS.get(u.name, ()):
                     self.need(u, name)
@@ -546,7 +686,7 @@ class Gen:
         generics = GENERICS.get(u.name, [])
         if types or generics:
             w.append("type")
-            w.extend("  " + g for g in generics)
+            w.extend("  " + g for g in generics)  # a declaration per line, the lines of a class included
             for c in classes:
                 w.append("  %s = class;" % c)
             for _, tx in types:
@@ -785,7 +925,7 @@ class Gen:
             if n in stack:
                 return
             stack.add(n)
-            for dn in deps(names[n][0]):
+            for dn in sorted(deps(names[n][0])):  # a set: sorted, so the stub is the same on every run
                 if dn != n:
                     visit(dn, stack)
             stack.discard(n)
