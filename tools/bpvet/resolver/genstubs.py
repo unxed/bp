@@ -166,6 +166,9 @@ end;
 """.strip().split("\n"),
 }
 GENERICS_ONLY = {"generics.collections"}
+# the name of each as the source writes it: the ppu of such a unit is not read (that of Generics.Collections holds every
+# specialization the RTL makes, ~10^5 definitions, and took 2 s to load)
+GENERICS_TITLES = {"generics.collections": "Generics.Collections"}
 
 # Interfaces a class implements: ppudump 3.2.2 does not write them.
 IMPLEMENTS = {"tinterfacedobject": "IUnknown", "tagregatedobject": "IUnknown"}
@@ -264,7 +267,10 @@ class Units:
         name = name.lower()
         if name not in self.loaded:
             path = self.find(name)
-            self.loaded[name] = Unit(name, self.dump(path)) if path else None
+            if path and name in GENERICS_ONLY:
+                self.loaded[name] = Unit(name, {"Name": GENERICS_TITLES[name], "Units": [], "Interface": []})
+            else:
+                self.loaded[name] = Unit(name, self.dump(path)) if path else None
         return self.loaded[name]
 
     def dump(self, path):
@@ -919,7 +925,7 @@ class Gen:
             if n in stack:
                 return
             stack.add(n)
-            for dn in deps(names[n][0]):
+            for dn in sorted(deps(names[n][0])):  # a set: sorted, so the stub is the same on every run
                 if dn != n:
                     visit(dn, stack)
             stack.discard(n)
