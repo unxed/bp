@@ -219,19 +219,29 @@ end;
 { Bytes of a value from their index and K, so a block keeps them when it moves. }
 procedure Mark(P: System.Pointer; Size: PtrUInt; K: Byte);
 var
+  B: System.PByte;
   I: PtrUInt;
 begin
+  B := System.PByte(P);
   for I := 0 to Size - 1 do
-    System.PByte(P)[I] := Byte(I * 7 + K);
+  begin
+    B^ := Byte(I * 7 + K);
+    Inc(B);
+  end;
 end;
 
 function Marked(P: System.Pointer; Size: PtrUInt; K: Byte): Boolean;
 var
+  B: System.PByte;
   I: PtrUInt;
 begin
+  B := System.PByte(P);
   for I := 0 to Size - 1 do
-    if System.PByte(P)[I] <> Byte(I * 7 + K) then
+  begin
+    if B^ <> Byte(I * 7 + K) then
       Exit(False);
+    Inc(B);
+  end;
   Result := True;
 end;
 
