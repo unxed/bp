@@ -239,7 +239,10 @@ var
   Deadline, Now: QWord;
   Left: Integer;
 begin
-  Deadline := GetTickCount64 + QWord(TimeoutMs);
+  // no deadline without a timeout: GetTickCount64 + QWord(-1) would overflow under -Co (#146)
+  Deadline := 0;
+  if TimeoutMs >= 0 then
+    Deadline := GetTickCount64 + QWord(TimeoutMs);
   repeat
     // The check and the registration are under the lock of each channel: no wakeup is lost.
     for I := 0 to High(Chans) do
