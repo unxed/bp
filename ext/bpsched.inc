@@ -46,6 +46,7 @@ var
   Live: LongInt = 0;              // goroutines not ended
   Idle: LongInt = 0;              // carriers asleep
   IdleSeq: LongInt = 0;           // the futex word they sleep on
+  Spinning: LongInt = 0;          // carriers that look for work a little before they sleep (SpinForWork)
   Procs: LongInt = 1;             // carriers at the start
   CarrierList: array[0..MaxCarriers - 1] of PRawThread;
   CarrierCount: LongInt = 0;
@@ -249,7 +250,14 @@ end;
 
 procedure WakeIdle;
 begin
-  if Idle > 0 then
+  // the work was published before (a store under SchedLock or into a place "next"); a spinning carrier publishes
+  // Spinning before it reads the work, so one of the two sees the other: a full barrier between the store and the read
+  // (x86 has one in the exchange of the lock already)
+  {$if not (defined(cpux86_64) or defined(cpui386))}
+  ReadWriteBarrier;
+  {$endif}
+  // a spinning carrier takes the work and wakes the next one if more is left (CarrierMain)
+  if (Idle > 0) and (Spinning = 0) then
   begin
     InterlockedIncrement(IdleSeq);
     FutexWake(IdleSeq, 1);
@@ -587,6 +595,63 @@ begin
   end;
 end;
 
+{ A carrier with nothing to run looks for work a little before it sleeps: a goroutine made ready meanwhile then costs no
+  futex on either side. At most half of the carriers spin at once. It also takes the place "next" of another carrier
+  when the same goroutine waits there at two looks in a row (its carrier is busy with a long run). True: there is
+  work; G: a goroutine taken from another carrier, or nil when the work is in the run queue or in the place of C. }
+function SpinForWork(C: PRawThread; out G: PRawThread): Boolean;
+const
+  SpinRounds = 2000;  // measured (2026-11-05): 200 and 20000 gave no more; the start of a goroutine 28 us -> 17 us
+var
+  I, K: LongInt;
+  Seen, X: PRawThread;
+  SeenAt: LongInt;
+begin
+  Result := False;
+  G := nil;
+  if SeedMode then
+    Exit;
+  if InterlockedIncrement(Spinning) > (CarrierCount + 1) div 2 then
+  begin
+    InterlockedDecrement(Spinning);
+    Exit;
+  end;
+  Seen := nil;
+  SeenAt := -1;
+  for I := 1 to SpinRounds do
+  begin
+    ReadBarrier;
+    if (RunCount > 0) or (C^.RunNext <> nil) then
+    begin
+      Result := True;
+      Break;
+    end;
+    if I mod 64 = 0 then
+    begin
+      X := nil;
+      if (SeenAt >= 0) and (CarrierList[SeenAt]^.RunNext = Seen) then
+        X := PRawThread(InterlockedCompareExchange(CarrierList[SeenAt]^.RunNext, nil, Seen));
+      if (X <> nil) and (X = Seen) then
+      begin
+        G := X;
+        Result := True;
+        Break;
+      end;
+      Seen := nil;
+      SeenAt := -1;
+      for K := 0 to CarrierCount - 1 do
+        if (CarrierList[K] <> nil) and (CarrierList[K] <> C) and (CarrierList[K]^.RunNext <> nil) then
+        begin
+          Seen := CarrierList[K]^.RunNext;
+          SeenAt := K;
+          Break;
+        end;
+    end;
+  end;
+  InterlockedDecrement(Spinning);
+  ReadWriteBarrier; // Spinning is published before the carrier reads RunCount again on its way to sleep (WakeIdle)
+end;
+
 { The loop of a carrier (an OS thread); it never ends. }
 function CarrierMain(P: Pointer): PtrInt;
 var
@@ -610,6 +675,15 @@ begin
     if G <> nil then
     begin
       RunG(C, G);
+      Continue;
+    end;
+    if SpinForWork(C, G) then
+    begin
+      // the wakes skipped while this carrier spun: one more carrier for what is left
+      if RunCount > 1 then
+        WakeIdle;
+      if G <> nil then
+        RunG(C, G);
       Continue;
     end;
     Seq := IdleSeq;

@@ -10,6 +10,8 @@ leaves "in progress" after every job has finished) and prints a line whenever th
 - A job failed on the runner (cancelled, timed out, or failed in an install step), or waits for a runner longer than
   QUEUE minutes: the run is started again, once; a second such failure is exit 1.
 - No result after LIMIT minutes in all: exit 2.
+- A call of gh that fails on the network (a timeout, no connection, a 5xx of the gateway) is made again after a pause,
+  up to 8 times, so a short outage does not end the wait.
 - A PR that changes only texts (*.md, *.txt): only the jobs that check texts (a name with "text") are waited for; with
   none, it is merged at once.
 QUEUE (default 4) and LIMIT (default 30) are environment variables. Needs gh, logged in.
@@ -26,8 +28,20 @@ LIMIT = float(os.environ.get("LIMIT", "30")) * 60
 POLL = 15
 
 
+# the errors of the network, not of the request: the call is made again after a pause, up to NET_TRIES times
+NET_ERRORS = ("error connecting to api.github.com", "TLS handshake timeout", "i/o timeout", "connection reset",
+              "no such host", "HTTP 502", "HTTP 503", "HTTP 504")
+NET_TRIES = 8
+
+
 def gh(*args, check=True):
-    r = subprocess.run(["gh", *args], capture_output=True, text=True)
+    for n in range(NET_TRIES):
+        r = subprocess.run(["gh", *args], capture_output=True, text=True)
+        if r.returncode == 0 or not any(e in r.stderr for e in NET_ERRORS) or n == NET_TRIES - 1:
+            break
+        print("%s ci-wait: the network failed (%s): again in %d s"
+              % (time.strftime("%H:%M:%S"), r.stderr.strip().splitlines()[-1][:80], POLL), flush=True)
+        time.sleep(POLL)
     if check and r.returncode != 0:
         raise RuntimeError("gh %s: %s" % (" ".join(args), r.stderr.strip()))
     return r.stdout
