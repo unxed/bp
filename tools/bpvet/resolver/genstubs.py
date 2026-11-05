@@ -3,7 +3,8 @@
 
 genstubs.py OUT SRCDIR...
 
-The units are read from their .ppu with `ppudump -Fj` (fp-utils of the same FPC version as the units). Only the closure
+The units are read from their .ppu with `ppudump -Fj` (fp-utils of the same FPC version as the units; the plain dump
+adds the calling convention of the procedure types, which -Fj leaves out). Only the closure
 of what the sources in SRCDIR use is written: an interface symbol is a seed when its name occurs as an identifier in the
 sources, and every type a written declaration refers to is written too. A class keeps only the members whose names
 occur in the sources (and the accessors of the properties it keeps). Routines are `external`, methods get empty bodies.
@@ -28,6 +29,9 @@ Word SmallInt LongWord LongInt QWord Int64 Comp Pointer File Text Variant""".spl
 # Always written: the resolver needs them for implicit uses (the default ancestor, array of const, interfaces).
 ALWAYS = {"system": {"tobject", "tclass", "iunknown", "iinterface", "tinterfacedobject", "tguid", "tvarrec", "hresult",
                      "pchar", "pansichar", "pwidechar", "sizeint", "sizeuint", "ptrint", "ptruint", "integer"}}
+
+# Calling conventions written after a procedure type (the default, register, is left out).
+CALLCONVS = {"cdecl", "stdcall", "safecall", "pascal"}
 
 # Generic types: ppudump 3.2.2 does not write their type parameters, so they are declared here.
 GENERICS = {"system": ["generic TArray<T> = array of T;"]}
@@ -133,7 +137,7 @@ class Units:
 
     def dump(self, path):
         data = open(path, "rb").read()
-        key = hashlib.sha256(data).hexdigest()[:24]
+        key = hashlib.sha256(data + b"calls").hexdigest()[:24]
         cached = os.path.join(self.cache, key + ".json")
         if os.path.isfile(cached):
             return json.load(open(cached))
@@ -144,11 +148,40 @@ class Units:
             j = json.loads(text)[0]
         except (ValueError, IndexError):
             die("ppudump failed on %s: %s" % (path, r.stderr.strip()[:200]))
+        self.add_calls(j, path)
         os.makedirs(self.cache, exist_ok=True)
         with open(cached + ".tmp", "w") as f:
             json.dump(j, f)
         os.replace(cached + ".tmp", cached)
         return j
+
+    def add_calls(self, j, path):
+        """ppudump -Fj does not write the calling convention of a procedure type; the plain dump does: the key "Call"
+        of a proctype entry holds it (cdecl, stdcall, ...), so a handler declared cdecl matches a cdecl procedure type."""
+        text = subprocess.run([self.ppudump, path], capture_output=True, text=True).stdout
+        calls, cur, proctype = {}, None, False
+        for line in text.splitlines():
+            m = re.match(r"\*\* Definition Id (\d+) \*\*", line)
+            if m:
+                cur, proctype = int(m.group(1)), False
+            elif line.startswith("Procedural type"):
+                proctype = True
+            elif proctype and cur is not None:
+                m = re.match(r"\s*CallOption : (\w+)", line)
+                if m:
+                    calls[cur] = m.group(1).lower()
+                    cur = None
+
+        def walk(e):
+            if isinstance(e, dict):
+                if e.get("Type") == "proctype" and calls.get(e.get("Id")) in CALLCONVS:
+                    e["Call"] = calls[e["Id"]]
+                for v in e.values():
+                    walk(v)
+            elif isinstance(e, list):
+                for v in e:
+                    walk(v)
+        walk(j)
 
 
 class Unit:
@@ -448,6 +481,8 @@ class Gen:
             head += ": " + r
         if ctx == "type" and d.get("MethodPtr"):
             head += " of object"
+        if ctx == "type" and d.get("Call"):
+            head += "; " + d["Call"]
         if "classmethod" in opts and ctx != "type" and kind not in ("constructor", "destructor"):
             head = "class " + head
         return head
@@ -479,6 +514,9 @@ class Gen:
             return None if v is None else repr(float(v))
         if vt == "pointer":
             return "nil" if not v else "Pointer(%s)" % v
+        if vt == "set":
+            # only the empty set: the bit order of the others is not needed by the sources checked so far
+            return "[]" if isinstance(v, str) and "1" not in v else None
         return None
 
     # -- writing a unit

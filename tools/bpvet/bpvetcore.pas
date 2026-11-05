@@ -71,8 +71,9 @@ type
   { fcl-passrc 3.2.2 stops with a Fatal on the procedure directive nostackframe, which FPC accepts on an assembler
     routine (ext/bpthreads.pas). The parser reads every file and include file through this reader, and the reader
     blanks "nostackframe;" with spaces, so the rest of the module is parsed and checked and rows and columns stay
-    those of the file. The rules read the text of the file itself (TVetSource), not this one. }
-  TVetLineReader = class(TFileLineReader)
+    those of the file. The rules read the text of the file itself (TVetSource), not this one. The reader holds the file
+    in memory (TFileStreamLineReader): the text file of Pascal holds a name of 255 characters at most. }
+  TVetLineReader = class(TFileStreamLineReader)
   public
     function ReadLine: String; override;
   end;

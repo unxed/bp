@@ -52,4 +52,15 @@ for f in "$here"/lint/*.pas; do
     *) echo "FAIL $(basename "$f"): the first line is not // EXPECT: clean|error SAFE-Sx|warn SAFE-Sx"; fail=1 ;;
   esac
 done
+# A path of over 255 characters (#146): a Pascal text file holds a name of 255 at most, so the parser has to read the
+# file another way. The files are copies of two tests, one clean and one with a finding.
+long=$(mktemp -d)
+deep=$long
+while [ ${#deep} -lt 300 ]; do deep=$deep/0123456789abcdef0123456789abcdef; done
+mkdir -p "$deep"
+cp "$here/lint/s03_ok.pas" "$here/lint/s03_bad.pas" "$deep/"
+args=
+check "$deep/s03_ok.pas" "" 0 "" ""
+check "$deep/s03_bad.pas" "" 1 Error SAFE-S3
+rm -rf "$long"
 exit $fail
