@@ -834,7 +834,7 @@ passes into the task (fields, `Move`), and values come back through a channel.
 | a panic in a goroutine kills the process | error → group cancellation → `Wait` raises R7 with the original text | **better** |
 | `context.Context` | `G.Cancel`, `Done` (a closed channel) in `Select`, `Cancelled` | the same in meaning, without an extra parameter |
 | races are caught by `-race` | races are prevented by S11, S11m, S11s and S19: only values, moved arrays, channels, `TShared` of frozen or `// sync:` classes, `Move` go into a task, and globals are written in `initialization` | different: a prohibition instead of a detector (§21.2), with the `SAFE_DEBUG` net R17 at `Send` |
-| M:N scheduler, millions of goroutines | one task = one OS thread by default; M:N with `BP_MN=1` (§21.3) | worse: thousands, not millions (about 23 thousand goroutines per GiB under M:N, 44 KiB each); the default flips after the `runnext` lever (§25.1 step 6) |
+| M:N scheduler, millions of goroutines | one task = one OS thread by default; M:N with `BP_MN=1` (§21.3) | worse: thousands, not millions (about 23 thousand goroutines per GiB under M:N, 44 KiB each); a round trip between goroutines 0.8 us under M:N against 11 us under 1:1; the default flips after a period of CI under M:N |
 
 Design (we reuse the RTL, minimal custom code): a thread is `BeginThread`; a lock is `TRTLCriticalSection`;
 waiting is an `RTLEvent` (a binary semaphore). A channel has a buffer and two queues of waiting cases (`sudog` of the Go
@@ -1068,7 +1068,8 @@ or above the parameter suppresses its S14 finding.
 | v0.19 | §25.2: the Goose column of the suite (the four programs in Goose v2026.3, `goose build -O2`; the release is installed and cached by the CI job) and its numbers in the baseline |
 | v0.20 | §20 the region runtime (step 4 of #108): `safe/region.*.inc` in units Safe and BP, `test_region`, R2, R12 (`SAFE_DEBUG`), R14, R15, R16 at `Own`/`Share`/`Adopt`; `Reset` keeps the largest block, chunks in the region of the header, `Create` moves into a variable passed by reference |
 | v0.21 | §21.1 the scope (step 3 of §21.7): `Hold` and `Defer` of `TScopeRef` (`for S in Scope`, was an `Integer`) and of `TRegion` on the finalizer list of the region, newest first, failures counted in `SafeDeferFailures`; S6 accepts `Hold`; the typed `bpvet` checks every `Hold` (`bpvethold.pas`: S6 for the shape, S17 for escapes and reads after the scope); R15, R16 and R3 at `Hold` |
-| v0.22 | §21.4 the `TComponent` owner (step 4 of §21.7): the typed `bpvet` drops S6 of `TFoo.Create(AOwner)` of a component class with an owner that is not `nil` and S5 of a `published` component field of a component class; S17 for `.Free`, `FreeAndNil`, `Own`, `Share`, `Adopt` and `Hold` of a component that its owner destroys (`bpvethold.pas`, `tests/lint/component_*.pas`) |
+| v0.22 | §21.3, §25.2 step 6: `runnext` in the M:N scheduler (a goroutine woken by a goroutine runs next on its carrier; every 61st pick serves the queue; the monitor moves a stuck place): a round trip on 4 carriers 12 us → 0.8 us |
+| v0.23 | §21.4 the `TComponent` owner (step 4 of §21.7): the typed `bpvet` drops S6 of `TFoo.Create(AOwner)` of a component class with an owner that is not `nil` and S5 of a `published` component field of a component class; S17 for `.Free`, `FreeAndNil`, `Own`, `Share`, `Adopt` and `Hold` of a component that its owner destroys (`bpvethold.pas`, `tests/lint/component_*.pas`) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1958,8 +1959,13 @@ and `test_threads` passed 20 times each under `BP_PROCS` 1, 2, 3 and 8 and under
   runs the woken goroutine next on the carrier of the waker (`runnext`) and lets an idle carrier spin a little before
   it sleeps; both are levers of §25.1 step 6, measured first. The memory is the first heap chunk of the RTL per thread
   (the spike 4 result), the same lever as there (`growheapsizesmall`).
-- **The default stays 1:1** until the round trip on several carriers beats 1:1 (the `runnext` lever) and CI has run
-  under `MNMODES` for a while; then it flips (`-dSAFE_LIBC` stays 1:1).
+- **`runnext` (2026-11-05, §25.1 step 6).** A goroutine woken by a goroutine takes the place "next" of the carrier of
+  the waker instead of the run queue, and no idle carrier is woken for it; the goroutine it pushes out of that place
+  goes into the queue. A carrier runs that place first, except every 61st pick, which serves the queue first (two
+  goroutines that wake each other do not starve it), and the monitor moves the place into the queue when its carrier did
+  not switch for a tick (a long loop). The seed mode is unchanged. The round trip between two goroutines on 4 carriers:
+  12 us → 0.8 us (2 carriers 0.7 us, one 0.7-1.0 us), 13 times faster than 1:1; the start of a goroutine is unchanged.
+- **The default stays 1:1** until CI has run under `MNMODES` for a while; then it flips (`-dSAFE_LIBC` stays 1:1).
 
 ### 21.4 The tree of `TComponent` is an owner
 
@@ -1977,7 +1983,7 @@ destroys it. Better Pascal takes it as it is:
 The README says the LCL is not yet tested with `bp build`; this rule is what lets the code of a Lazarus form pass without
 marks. Cost: one exception of S6 and one root kind of S17.
 
-Status: **implemented** in the typed `bpvet` (step 4 of §21.7, v0.22): `tools/bpvet/bpvethold.pas`, the tests
+Status: **implemented** in the typed `bpvet` (step 4 of §21.7, v0.23): `tools/bpvet/bpvethold.pas`, the tests
 `tests/lint/component_*.pas` (a form-like unit with a stub `TComponent`, `TControl`, `TButton`, `TForm`, and one unit over
 `Classes.TComponent`). A component class is a class that descends from `Classes.TComponent`, or from a class `TComponent`
 declared in the checked module (a stub, so that a test needs no LCL). What is checked:
@@ -2060,11 +2066,11 @@ data.
    destructor; lint tests. *Status:* **done** for `Hold`, `Defer` and `TScopeRef` (§21.1, v0.21); `TArena` on the list is
    left for later.
 4. **The `TComponent` owner** (S6 and a root kind of S17). *Done:* lint tests on a form-like unit (a stub `TComponent` is
-   enough). *Status:* **done** (§21.4, v0.22): S5, S6 and S17 of the component tree in the typed `bpvet`
+   enough). *Status:* **done** (§21.4, v0.23): S5, S6 and S17 of the component tree in the typed `bpvet`
    (`tools/bpvet/bpvethold.pas`, `tests/lint/component_*.pas`).
 5. **The M:N runtime** after step 2: the scheduler behind the hooks, the monitor, deadlock detection, `BP_SCHED_SEED`.
    *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test. *Status:* **done** (§21.3, step 5
-   result): on with `BP_MN=1`; the default flips after the `runnext` lever of §25.1 step 6.
+   result): on with `BP_MN=1`; `runnext` is in (§21.3); the default flips after a period of CI under M:N.
 6. **Atomic `Select` with send cases.** *Done:* `test_go` covers a send case and a race between two ready cases.
    *Status:* **done** (§14): `TChan.RecvCase`, `TChan.SendCase`, `TSafeChan.RecvCase`; the channels hand values over
    through queues of waiting cases; `test_go` (`AtomicSelect`) runs under 1:1, M:N and the seeds.
@@ -2636,7 +2642,7 @@ a bug found by a program built with `bp build` goes ahead of the plan.
 | 2 | — (the cheap holes of §8: done) | | |
 | 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and five languages, v0.16 and v0.19: the baseline is in §25.2; channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
 | 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (done: the runtime is on with `BP_MN=1`, §21.3, step 5 result; the atomic `Select`, §14) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
-| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.20; `Hold` and `Defer`: done, v0.21), then the `TComponent` owner (done, v0.22) | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
+| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.20; `Hold` and `Defer`: done, v0.21), then the `TComponent` owner (done, v0.23) | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
 | 6 | **The speed work** that the numbers of step 3 point to (§25.2) | §25.2 | after the runtime: it changes what is measured |
 | 7 | **The tools,** cheapest first: `bp explain`, S20 and `Fmt`, `bp test`, `--target`, `// derive:`, the profiler, `bp lsp`, the browser, S26c, hot reload | §22.8 steps 2–11 | each stands alone; the ones users ask for first go first |
 | 8 | **The language from FPC 3.2:** nested procedure values, the `String` helper, CORBA interfaces, `// raises:` | §24.8 steps 4–7 | after the runtime and S17, which they extend |
@@ -2737,7 +2743,8 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   - inlining of generics and of small routines;
   - `-O3` and the target CPU (`-Cp`, `-Cf`);
   - the code generator: FPC's own against the LLVM back end of FPC main, where it builds the dialect;
-  - the M:N scheduler (§21.3, step 5 result): the woken goroutine runs next on the carrier of the waker (`runnext`), an
-    idle carrier spins a little before it sleeps, per-carrier run queues, a smaller first heap chunk of a goroutine.
+  - the M:N scheduler (§21.3, step 5 result): the woken goroutine runs next on the carrier of the waker (`runnext`:
+    done, 12 us → 0.8 us per round trip on 4 carriers), an idle carrier spins a little before it sleeps, per-carrier run
+    queues, a smaller first heap chunk of a goroutine.
 
   A lever that needs a compiler fork is out (§0: `bp` works over the stock `fpc`).

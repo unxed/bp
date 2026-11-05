@@ -123,6 +123,9 @@ type
     WaitAddr: Pointer;     // the critical section it waits on (bpsched.inc)
     Votes: LongInt;        // ended + closed: the second vote frees the region
     Switches: PtrUInt;     // a carrier: goroutines run so far (the monitor watches progress)
+    RunNext: Pointer;      // a carrier: the goroutine (PRawThread) a goroutine on it woke last, run next (runnext of Go)
+    Picks: PtrUInt;        // a carrier: picks so far (every 61st looks at the run queue first)
+    Seen: PtrUInt;         // a carrier: Switches at the last tick of the monitor
     Done: TSchedEvent;     // set when the goroutine ends (WaitForThreadTerminate)
   end;
 
