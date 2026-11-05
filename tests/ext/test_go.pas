@@ -29,9 +29,9 @@ type
   { Waits for the group to be cancelled with Select on Done. }
   TWaiter = class(TTask)
   private
-    FIn: TIntChan;
+    FIn, FAck: TIntChan;
   public
-    constructor Create(const AIn: TIntChan);
+    constructor Create(const AIn, AAck: TIntChan);
     procedure Run; override;
   end;
 
@@ -56,10 +56,11 @@ begin
   raise EConvertError.Create('boom');
 end;
 
-constructor TWaiter.Create(const AIn: TIntChan);
+constructor TWaiter.Create(const AIn, AAck: TIntChan);
 begin
   inherited Create;
   FIn := AIn;
+  FAck := AAck;
 end;
 
 procedure TWaiter.Run;
@@ -69,7 +70,11 @@ begin
   repeat
     case Select([FIn.Sel, Done]) of
       // UNSAFE: the only task that writes Counter in this test; the main block reads it after Wait
-      0: if FIn.TryRecv(V) then Inc(Counter, V);
+      0: if FIn.TryRecv(V) then
+         begin
+           Inc(Counter, V);
+           FAck.Send(V);
+         end;
       1: Exit; // the group is cancelled
     end;
   until False;
@@ -183,8 +188,9 @@ end;
 procedure SelectAndCancel;
 var
   G: TGroup;
-  A, B: TIntChan;
+  A, B, Ack: TIntChan;
   T0: QWord;
+  V: Integer;
 begin
   A := TIntChan.Create(1);
   B := TIntChan.Create(1);
@@ -195,11 +201,15 @@ begin
   Check(Select([A.Sel, B.Sel], 1000) = 1, 'select: ready channel index');
 
   Counter := 0;
+  Ack := TIntChan.Create(2);
   G := TGroup.Create;
-  G.Go(TWaiter.Create(A));
+  G.Go(TWaiter.Create(A, Ack));
   A.Send(5);
   A.Send(6);
-  Sleep(50);
+  // both values taken before the cancel: a Select that sees A empty and Done closed may otherwise leave 6 (found by
+  // BP_SCHED_SEED=3)
+  Ack.Recv(V);
+  Ack.Recv(V);
   G.Cancel;
   G.Wait;
   Check(Counter = 11, 'select: worker received values, then stopped on Done');
