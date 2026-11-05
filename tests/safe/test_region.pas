@@ -1,5 +1,6 @@
 { Runtime tests of the region style (safe/region.*.inc, SPEC §20): TRegion, Scope, Each, TRegionObject, TGrowArray<T>,
-  R2, R12 (SAFE_DEBUG on unix only), R14, R15, R16. Exit code = number of failed checks. }
+  Hold and Defer (SPEC §21.1), R2, R3, R12 (SAFE_DEBUG on unix only), R14, R15, R16. Exit code = number of failed
+  checks. }
 // UNSAFE-UNIT: the checks break R2, R12, R14, R15 and R16 on purpose, and only the typed mode of bpvet knows that a region owns its objects (S6)
 program test_region;
 
@@ -22,6 +23,35 @@ type
     X, Y: Integer;
   end;
 
+  { an object on the heap that a scope holds: it writes into Log when it is destroyed, and its methods are actions }
+  THeld = class
+  public
+    Tag: String;
+    constructor Create(const ATag: String);
+    destructor Destroy; override;
+    procedure Note;
+    procedure Boom;
+  end;
+
+  { its destructor raises after it has done its work }
+  TBadHeld = class(THeld)
+  public
+    destructor Destroy; override;
+  end;
+
+  { an interfaced object: writes into Log when its last reference goes }
+  TProbe = class(TInterfacedObject)
+  public
+    Tag: String;
+    constructor Create(const ATag: String);
+    destructor Destroy; override;
+  end;
+
+  { an object of a region with a managed field: the finalizer of the region releases the reference }
+  TTagged = class(TRegionObject)
+    P: IInterface;
+  end;
+
   TRow = record
     Key: String;
     N: Integer;
@@ -35,6 +65,7 @@ type
 
 var
   Failed: Integer = 0;
+  Log: String = '';   // what the held objects, the actions and the probes did, in order
 
 procedure Check(const Cond: Boolean; const What: String);
 begin
@@ -50,6 +81,46 @@ end;
 function HeapUsed: PtrUInt;
 begin
   Result := GetFPCHeapStatus.CurrHeapUsed;
+end;
+
+constructor THeld.Create(const ATag: String);
+begin
+  inherited Create;
+  Tag := ATag;
+end;
+
+destructor THeld.Destroy;
+begin
+  Log := Log + '~' + Tag + ' ';
+  inherited Destroy;
+end;
+
+procedure THeld.Note;
+begin
+  Log := Log + Tag + '! ';
+end;
+
+procedure THeld.Boom;
+begin
+  raise Exception.Create('boom ' + Tag);
+end;
+
+destructor TBadHeld.Destroy;
+begin
+  inherited Destroy;
+  raise Exception.Create('a destructor that raises');
+end;
+
+constructor TProbe.Create(const ATag: String);
+begin
+  inherited Create;
+  Tag := ATag;
+end;
+
+destructor TProbe.Destroy;
+begin
+  Log := Log + Tag + ' ';
+  inherited Destroy;
 end;
 
 { ---------- a region variable: released once, at the end of its scope ---------- }
@@ -286,7 +357,8 @@ var
   Outer: TRegion;
   A: TPts;
   P: TPt;
-  I, R: Integer;
+  I: Integer;
+  R: TScopeRef;
   Ok: Boolean;
 begin
   Outer := TRegion.Create;
@@ -395,7 +467,7 @@ end;
 
 procedure InScopeRaise;
 var
-  R: Integer;
+  R: TScopeRef;
 begin
   for R in Scope do
     raise Exception.Create('x');
@@ -403,7 +475,8 @@ end;
 
 procedure Scopes;
 var
-  R, I, J, Inside: Integer;
+  R, J: TScopeRef;
+  I, K, Inside: Integer;
   N: TNode;
   Raised: Boolean;
 begin
@@ -411,10 +484,10 @@ begin
   for I := 1 to 100 do
     for R in Scope do
     begin
-      for J := 1 to 1000 do
+      for K := 1 to 1000 do
       begin
         N := TNode.Create;
-        N.X := J;
+        N.X := K;
       end;
       if CurrentRegionDepth > Inside then
         Inside := CurrentRegionDepth;
@@ -422,7 +495,7 @@ begin
   Check((Inside = 1) and (CurrentRegionDepth = 0), 'for R in Scope: a region per block, released at its end');
   for R in Scope do
     for J in Scope do
-      Inside := J;
+      Inside := J.Depth;
   Check((Inside = 2) and (CurrentRegionDepth = 0), 'for R in Scope: blocks nest');
   Raised := False;
   try
@@ -500,6 +573,172 @@ begin
   end;
   Check((Count = 300 * 301 div 2) and (CurrentRegionDepth = 1) and (Peak < 256 * 1024), 'for P in A.Each: every '
     + 'element in place, a region per iteration (peak ' + IntToStr(Peak div 1024) + ' KiB)');
+end;
+
+{ ---------- Hold and Defer (SPEC §21.1) ---------- }
+
+procedure HoldOrder;
+var
+  S: TScopeRef;
+  A, B: THeld;
+  T: TTagged;
+  Before: String;
+begin
+  Log := '';
+  for S in Scope do
+  begin
+    S.Hold(A, THeld.Create('a'));
+    T := TTagged.Create;
+    T.P := TProbe.Create('r');
+    S.Defer(@A.Note);
+    S.Hold(B, THeld.Create('b'));
+    T := TTagged.Create;
+    T.P := TProbe.Create('s');
+    S.Defer(@B.Note);
+    Before := Log;
+    Check((S.Depth = CurrentRegionDepth) and (S.Depth = 1), 'Scope: the handle knows the depth of its region');
+  end;
+  Check((Before = '') and (Log = 'b! s ~b a! r ~a '), 'Scope: held objects, actions and region objects are undone '
+    + 'when the scope ends, the newest first (' + Log + ')');
+end;
+
+procedure InScopeHoldRaise;
+var
+  S: TScopeRef;
+  A: THeld;
+begin
+  for S in Scope do
+  begin
+    S.Hold(A, THeld.Create('x'));
+    S.Defer(@A.Note);
+    A.Boom;
+  end;
+end;
+
+procedure HoldException;
+var
+  Raised: Boolean;
+begin
+  Log := '';
+  Raised := False;
+  try
+    InScopeHoldRaise;
+  except
+    on E: Exception do Raised := Pos('boom x', E.Message) = 1;
+  end;
+  Check(Raised and (Log = 'x! ~x ') and (CurrentRegionDepth = 0), 'Scope: an exception in the scope still runs its '
+    + 'actions and destroys its objects (' + Log + ')');
+end;
+
+procedure HoldFailures;
+var
+  S: TScopeRef;
+  A, B, C: THeld;
+  Failures: LongInt;
+begin
+  Log := '';
+  Failures := SafeDeferFailures;
+  for S in Scope do
+  begin
+    S.Hold(A, THeld.Create('a'));
+    S.Hold(B, TBadHeld.Create('b'));
+    S.Defer(@A.Boom);
+    S.Hold(C, THeld.Create('c'));
+  end;
+  Check((Log = '~c ~b ~a ') and (SafeDeferFailures = Failures + 2), 'Scope: an exception in a destructor and in an '
+    + 'action is counted (SafeDeferFailures), and the rest of the list still runs (' + Log + ')');
+end;
+
+procedure HeldInRegion;
+var
+  R: TRegion;
+  A: THeld;
+  I: Integer;
+  Ok: Boolean;
+begin
+  R := TRegion.Create;
+  Ok := True;
+  for I := 1 to 3 do
+  begin
+    Log := '';
+    R.Hold(A, THeld.Create(IntToStr(I)));
+    R.Defer(@A.Note);
+    A.Note;
+    R.Reset;
+    if Log <> Format('%d! %d! ~%d ', [I, I, I]) then
+      Ok := False;
+  end;
+  Check(Ok, 'TRegion: Reset in a loop runs the actions and destroys the held objects of each round');
+  Log := '';
+  R.Hold(A, THeld.Create('last'));
+  R.Release;
+  Check(Log = '~last ', 'TRegion: Release destroys the held objects');
+end;
+
+procedure HeldAtExit;
+var
+  R: TRegion;
+  A: THeld;
+begin
+  R := TRegion.Create;
+  R.Hold(A, THeld.Create('exit'));
+end;
+
+procedure HoldMisuse;
+var
+  S: TScopeRef;
+  R: TRegion;
+  A: THeld;
+  N: TNode;
+  Q: TProbe;
+  Msg, Msg3, Msg15: String;
+begin
+  Log := '';
+  HeldAtExit;
+  Check(Log = '~exit ', 'TRegion: the end of the scope of its variable destroys the held objects');
+  Log := '';
+  Msg := '';
+  Msg3 := '';
+  for S in Scope do
+  begin
+    S.Hold(A, nil);
+    Check(A = nil, 'Hold(V, nil): V is nil');
+    N := TNode.Create;
+    try
+      S.Hold(N, TNode.Create);
+    except
+      on E: ESafety do Msg := E.Message;
+    end;
+    Check((Pos('SAFE-R16', Msg) > 0) and (N = nil), 'R16: Hold of a region object raises ESafety');
+    try
+      S.Hold(Q, TProbe.Create('q'));
+    except
+      on E: ESafety do Msg3 := E.Message;
+    end;
+    Check((Pos('SAFE-R3', Msg3) > 0) and (Q = nil) and (Log = 'q '), 'R3: Hold of a TInterfacedObject raises '
+      + 'ESafety and destroys it');
+  end;
+  Check(Log = 'q ', 'Hold(V, nil) adds nothing to the scope');
+  Log := '';
+  Msg15 := '';
+  R := TRegion.Create;
+  R.Release;
+  try
+    R.Hold(A, THeld.Create('z'));
+  except
+    on E: ESafety do Msg15 := E.Message;
+  end;
+  Check((Pos('SAFE-R15', Msg15) > 0) and (A = nil) and (Log = '~z '), 'R15: Hold on a released TRegion raises '
+    + 'ESafety and destroys the object');
+  Log := '';
+  Msg15 := '';
+  S := Default(TScopeRef);
+  try
+    S.Hold(A, THeld.Create('w'));
+  except
+    on E: ESafety do Msg15 := E.Message;
+  end;
+  Check((Pos('SAFE-R15', Msg15) > 0) and (Log = '~w '), 'R15: Hold on a handle without a region raises ESafety');
 end;
 
 { ---------- R14, R15, R16 ---------- }
@@ -674,6 +913,13 @@ begin
   ResetLoop;
   Scopes;
   Iterations;
+  HoldOrder;
+  HoldException;
+  HoldFailures;
+  HeldInRegion;
+  HoldMisuse;
+  Log := '';
+  Check(CurrentRegionDepth = 0, 'every region of the Hold checks is released');
   R14;
   R15;
   R16;

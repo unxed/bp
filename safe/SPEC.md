@@ -35,7 +35,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S4 (`^T`, `@`, pointer arithmetic) | **implemented, lint tests, CI** | §6 |
-| `bpvet` rule S6 (`TFoo.Create` at once into `Own/Share/Adopt/Go`/`raise`, else `// UNSAFE:`) | **implemented, lint tests, CI** | §6 |
+| `bpvet` rule S6 (`TFoo.Create` at once into `Own/Share/Adopt/Go`/`Hold`/`raise`, else `// UNSAFE:`) | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S9 (`UnicodeString/WideString/ShortString`, `String[N]` only under `// UNSAFE:`) | **implemented, lint tests, CI** | §6 |
 | `bpvet` rule S10, static part (`TOwned` copied only through `.Move`, no `TOwned` by value in a parameter) | **implemented, lint tests, CI**; the `SAFE_DEBUG` runtime check is **plan** | §6 |
 | `bpvet` rule S5, fields and globals (a field/global of a class declared in the module or of a common RTL class only with `// borrow:`) | **implemented, lint tests, CI**; classes of other units and the borrow-escape rule are **plan** | §6 |
@@ -49,9 +49,10 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Support for `object` (Turbo Pascal) | **plan** | §19 |
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
+| The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list and the `TComponent` owner: **plan** | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
-| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | **design (plan)** | §21 |
+| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (`BP_MN=1`): **implemented**; `TArena` on the list, the `TComponent` owner: **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; doc tests exist (`tools/doctest.py`); the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
@@ -99,7 +100,8 @@ REFERENCES
     parameter/local variable of a class type → borrow, lives no longer than the call
     a borrow field/global is allowed only with a comment  // borrow: <who owns it>   (S5, checked by bpvet)
     the result of .Get or a class parameter is not saved into a field or a global: Cache := Box.Get, Self.F := AObj (S5)
-  The result of TFoo.Create goes straight into Own/Share/Adopt, into an interface or into raise (S6).
+  The result of TFoo.Create goes straight into Own/Share/Adopt, into Hold of a scope, into an interface or into
+  raise (S6).
   No .Free, FreeAndNil, Destroy, GetMem, New, Dispose, Move, FillChar, Pointer, ^T, @ (S1–S4).
   Instead of FillChar(R, SizeOf(R), 0) — R := Default(TRec).
   A slice parameter is an open array: procedure Parse(const Data: array of Byte); Parse(Buf[10..20]).
@@ -119,6 +121,8 @@ SUM TYPES AND PARAMETERS               (§16; enum and match from Rust without a
 CLEANUP AND TESTS                      (§5; an idea from Zig)
   Non-memory (a handle, terminal mode, a lock): D := TDefer.Call(@Self.Close) — called on leaving the scope
   and on an exception; D.Cancel — "success, no need to call".
+  A block with a scope (§21.1): for S in Scope do begin S.Hold(L, TStringList.Create); S.Defer(@T.Restore); ... end;
+  — L is a plain local, destroyed at the end of the block (also on an exception), the actions first, newest first.
   End of a test: SafeCheckNoLeaks — no live owned objects, nothing suppressed in TDefer (R5).
 
 OLD STYLE                              (§12)
@@ -363,7 +367,7 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S3 | `.Free`, `FreeAndNil`, `.Destroy` | `FreeAndNil` and `.Free` are a compiler error. `.Free` is closed off by a `TObject` helper with the method `Free(const X: SAFE_S3_NoFree_UseTOwnedReset_or_UnsafeDestroy)`: without an argument the call does not compile, and the type name in the "Found declaration" message explains the rule. `.Destroy` — linter |
 | S4 | `Pointer, PByte, PChar, PAnsiChar, PWideChar`, `^T`, `@`, pointer arithmetic | the types — warning `SAFE-S4`; `^T`, `@`, pointer arithmetic — `bpvet` S4 |
 | S5 | a field/global variable of a class type without `// borrow:` | `bpvet` S5: an error on a global or a field of a class/object/record whose type is a class declared in the module or a common RTL class (`TObject`, `Exception`, `TStringList`, `TList`, `TStream`, `TThread`, …), unless the line ends with or follows `// borrow: <who owns it>`; a module marked `// UNSAFE-UNIT:` is not checked; an assignment `Name := X.Get` / `Self.Name := X.Get` into a global of the module or a field of its class without `// borrow:`, and `Name := AParam` / `Self.Name := AParam` where `AParam` is a parameter of such a class type (a one-line routine header); `Owner.Reset`/`Owner.Move` after `Local := Owner.Get` while `Local` is still used later in the same routine (before a new `Local := …`), unless `// UNSAFE: <why>` stands on the line above or at its end; task fields are covered by the field rule; closures are not checked: FPC 3.2.2 does not compile anonymous procedures or `reference to` types (fcl-passrc 3.2.2 parses them for pas2js); a class of another unit counts when that unit's file lies next to the checked file (`name.pas` in the same directory; classes declared in its interface, read as text); or in a directory given with `bpvet -FuDIR` (CI: `-Fusafe -Fuext` for tests/) |
-| S6 | `TFoo.Create` not immediately into `Own/Share/Adopt`/an interface/`raise` | linter; partly at runtime (R3) |
+| S6 | `TFoo.Create` not immediately into `Own/Share/Adopt`/`Hold`/an interface/`raise` | linter; partly at runtime (R3); `S.Hold(V, TFoo.Create)` is an owner (the text before the class name ends with `,` inside a call of `Hold`), and the typed `bpvet` checks its shape: `V` a plain local of a class type, the second argument a constructor call of that class or of a descendant (`tools/bpvet/bpvethold.pas`; `tests/lint/s06_hold_ok.pas`, `hold_class_bad.pas`, `hold_field_bad.pas`, `hold_expr_bad.pas`) |
 | S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14); a warning is not reported when the uses are marked `// UNSAFE: <why>` (§7), an error has no mark. Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
 | S8 | unsafe code without `// UNSAFE:` / a module without `uses Safe` and without `// UNSAFE-UNIT:` | linter |
 | S9 | `UnicodeString/WideString/ShortString` outside unsafe | `bpvet` S9: an error on the type name or a sized `String[N]` (a `ShortString`) without a `// UNSAFE: <why>` mark on the line above or at the end of the line (§7); a `// UNSAFE-UNIT:` module is not checked |
@@ -1063,6 +1067,7 @@ or above the parameter suppresses its S14 finding.
 | v0.18 | §21.7 step 6: the atomic `Select` with send cases (`RecvCase`, `SendCase`), channels over queues of waiting cases (an unbuffered send ends when a receiver has the value); §14 updated |
 | v0.19 | §25.2: the Goose column of the suite (the four programs in Goose v2026.3, `goose build -O2`; the release is installed and cached by the CI job) and its numbers in the baseline |
 | v0.20 | §20 the region runtime (step 4 of #108): `safe/region.*.inc` in units Safe and BP, `test_region`, R2, R12 (`SAFE_DEBUG`), R14, R15, R16 at `Own`/`Share`/`Adopt`; `Reset` keeps the largest block, chunks in the region of the header, `Create` moves into a variable passed by reference |
+| v0.21 | §21.1 the scope (step 3 of §21.7): `Hold` and `Defer` of `TScopeRef` (`for S in Scope`, was an `Integer`) and of `TRegion` on the finalizer list of the region, newest first, failures counted in `SafeDeferFailures`; S6 accepts `Hold`; the typed `bpvet` checks every `Hold` (`bpvethold.pas`: S6 for the shape, S17 for escapes and reads after the scope); R15, R16 and R3 at `Hold` |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1352,6 +1357,8 @@ with both, at the options of `bp build` too, and CI runs it once more with `SAFE
   `for P in A`, `for C in A.Chunks`, `for P in A.Each`; a finalizer per chunk only for a type with managed fields.
 - Errors are `ESafety`: R2 (an index of `At` and `A[I]`, in every build), R14, R15, R16 (`Own`, `Share`, `TArena.Adopt`
   and so `TArenaRef.Adopt` of a region object: one `is` check next to the R3 check), R12 in `SAFE_DEBUG` on unix.
+- The scope of §21.1 (step 3 of §21.7, later): `Hold` and `Defer` of `TScopeRef` (the variable of `for S in Scope`) and of
+  `TRegion` put entries into the same finalizer list.
 
 What differs from the spike, and why:
 
@@ -1617,24 +1624,29 @@ by trial deletion, as in CPython). It needs no stack scan and frees acyclic garb
 
 | Code | Meaning |
 |---|---|
-| S17 | root analysis of the region style: S17a no destructor in a region class, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena` |
+| S17 | root analysis of the region style: S17a no destructor in a region class, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena`; the variable of a `Hold` (§21.1) does not escape and is not read after its scope |
 | S18 | style boundaries: rooted values and GC references stay in their style and goroutine; where a GC reference may live; reference fields first in a GC class (`--fix` reorders); a destructor in a GC class; `TWeak` or any other observer of the life of a GC object; the `// BP-STYLES:` allow-list |
 | R11 | not used (it was a growth past a fixed reservation; regions and `TGrowArray` have no reservation, spike 2) |
 | R12 | `SAFE_DEBUG`: access to a released region (its pages lose access: `EAccessViolation`) |
 | R13 | `SAFE_DEBUG`: a GC object used on another goroutine |
 | R14 | `Release` of a region that is not the innermost one of the goroutine (regions are nested) |
-| R15 | an allocation in the current region when the goroutine has no region |
-| R16 | `Own/Share/Adopt` of a region object (it belongs to its region) |
+| R15 | an allocation in the current region when the goroutine has no region; `Hold` or `Defer` of a released `TRegion` or of a `TScopeRef` without a region |
+| R16 | `Own/Share/Adopt/Hold` of a region object (it belongs to its region) |
 | R17 | `SAFE_DEBUG`: `TChan.Send` of a dynamic array that another variable also holds (the receiver would share it, H14) |
 
 ## §21. Concept v3: fewer things, fewer holes (design, plan)
 
-Status: design; done are step 1 (§21.2) and the spike of the M:N switch (§21.3), the plan by steps is §21.7. A fresh look at the whole
+Status: design; done are step 1 (§21.2), the spike of the M:N switch and the M:N runtime (§21.3) and the scope (§21.1,
+step 3), the plan by steps is §21.7. A fresh look at the whole
 concept against the table of the README (Rust, Go, Goose, Zig, Mojo) and the languages it does not name (Swift, Odin, Nim,
 Pony, D, C#, Hylo, Erlang). Four changes. Each one reuses a mechanism that Better Pascal or FPC already has, so each one is
 small; two of them remove concepts rather than add them.
 
 ### 21.1 One scope object: region + defer + held objects
+
+Status: **implemented** (step 3 of §21.7): `Hold`, `Defer` and `TScopeRef` in `safe/region.*.inc`, the tests in
+`test_region`, the check of `Hold` in the typed `bpvet` (`tools/bpvet/bpvethold.pas`, `tests/lint/hold_*.pas`). `TArena`
+on the list of a region and the end of a local `TOwned` are not done yet.
 
 Four parts of Better Pascal answer one question, "what is undone when this scope ends": `TRegion` (memory), `TArena`
 (objects with one fate), `TDefer` (an action) and a local `TOwned` (one object). Go answers it with `defer`, Zig with
@@ -1642,15 +1654,48 @@ Four parts of Better Pascal answer one question, "what is undone when this scope
 undo. The region of §20 already keeps that list (the finalizers of objects with managed fields), so it can hold the other
 three:
 
-```pascal plan
-for S in Scope do                       // or a TRegion local for the whole routine
+```pascal
+program ScopeDemo;
+
+{$mode objfpc}{$H+}
+
+uses
+  SysUtils, Classes, Safe;
+
+type
+  TTerm = class
+  public
+    procedure Restore;
+  end;
+
+procedure TTerm.Restore;
 begin
-  S.Hold(Lines, TStringList.Create);    // any existing class: Destroy is called when the scope ends
-  Lines.LoadFromFile(Name);             // a plain class reference: no .Get, no type alias
-  S.Defer(@Term.Restore);               // an action: run when the scope ends, also on an exception
-  N := TNode.Create;                    // a TRegionObject: a bump allocation, as in §20
-end;                                    // undone in reverse order: Restore, Lines.Destroy, then the memory
+  WriteLn('restored');
+end;
+
+procedure Show(const Name: String);
+var
+  S: TScopeRef;
+  Term: TTerm;
+  Lines: TStringList;
+begin
+  for S in Scope do                       // or a TRegion local for the whole routine
+  begin
+    S.Hold(Term, TTerm.Create);           // any existing class: Destroy is called when the scope ends
+    S.Hold(Lines, TStringList.Create);
+    Lines.LoadFromFile(Name);             // a plain class reference: no .Get, no type alias
+    S.Defer(@Term.Restore);               // an action: run when the scope ends, also on an exception
+    WriteLn(Lines.Count);
+  end;                                    // undone in reverse order: Restore, Lines.Destroy, Term.Destroy
+end;
+
+begin
+  Show(ParamStr(0));
+end.
 ```
+
+A `TRegionObject` made in the block (`N := TNode.Create`) is a bump allocation in the same region, as in §20; its entry
+(for a class with managed fields) is on the same list, and the memory goes after the whole list has run.
 
 - `Hold(out V; Obj: TObject)` takes an untyped `out`. The compiler cannot type it; the typed `bpvet` does: `V` is a local
   of a class type and `Obj` is a constructor call of that class or of a descendant (S6 accepts `Hold` as it accepts
@@ -1659,13 +1704,28 @@ end;                                    // undone in reverse order: Restore, Lin
   is the one of `bp build`.
 - It replaces the most frequent idiom of Pascal, `X := TFoo.Create; try ... finally X.Free end`, with one line, for every
   class of every package (the LCL included), with no wrapper type.
-- The loop variable of `for S in Scope` is a handle of the region (`TScopeRef`: a pointer, no ownership; S17 roots it too).
-  The spike returns an `Integer` there today.
+- The loop variable of `for S in Scope` is a handle of the region (`TScopeRef`: a pointer, no ownership); `S.Depth` is
+  the number of regions of the goroutine up to it. A `TRegion` has the same `Hold` and `Defer`: its entries run at each
+  `Reset` (so a loop with `R.Reset` destroys the objects of each round) and at `Release`.
 - `TOwned` stays the owner of a **field** (ownership that is not lexical, moved with `.Move`); a local `TOwned` is no longer
   needed. `TArena` keeps its API on the list of a region without bump memory (`Adopt` = `Hold`), and `// borrow: arena` is
   S17d with no engine of its own. `TDefer` stays for code without a scope; `S.Defer` adds to the same list. An exception in a
   destructor or a deferred action is counted as in `TDefer` (`SafeDeferFailures`), and the rest of the list still runs.
 - Cost: one list entry per `Hold` or `Defer` (the list exists anyway), nothing at access.
+- The runtime, as shipped: `Hold(V, nil)` sets `V` to `nil` and adds nothing; `Hold` of a `TRegionObject` raises R16 (the
+  region owns it already), of a `TInterfacedObject` R3 (its reference count owns it; the object is destroyed), on a
+  released `TRegion` or a `TScopeRef` without a region R15 (the object is destroyed). An entry added while the list runs
+  (by a destructor or an action) runs too. FPC skips the end of a destructor that raised, `FreeInstance` included, so the
+  runtime frees the memory of such an object itself.
+- The check of `Hold`, as shipped (typed `bpvet`, `bpvethold.pas`): S6 for the shape (`V` a plain local of the routine of
+  a class type, the second argument `TFoo.Create(...)` of that class or of a descendant; `Hold(V, nil)` is a finding too);
+  S17 for `V` stored into anything but a local of the routine (the result, `Exit(V)`, a field, an element, a global, a
+  parameter), sent to a `TChan` or given to the constructor of a `TTask` descendant, and for a read of `V` on a line after
+  the end of its loop `for S in Scope`, or after the first later `R.Reset`, `R.Release` or `R := TRegion.Create` of the
+  region of `R.Hold`, until `V` is assigned again; a `Hold` through a `TScopeRef` local that is not the variable of an
+  enclosing scope loop is S17 too. The order is that of the lines: a read on an earlier line that runs later (the next
+  round of an outer loop) is not seen, nor is a copy into another local that then escapes; passing `V` to a routine is a
+  borrow and allowed. Tests: `tests/lint/hold_ok.pas`, `hold_escape_*_bad.pas`, `hold_after_*_bad.pas`.
 
 ### 21.2 Data races: Send and Sync, inferred
 
@@ -1973,7 +2033,8 @@ data.
    Independent of step 1. *Status:* **done** (§21.3, Spike 4 result): worth it; guard areas by default (the owner's decision, 2026-11-05).
 3. **The scope** on the region runtime (step 4 of unxed/bp#108, done: §20, "The region runtime"): `Hold`, `Defer`, `TScopeRef`, `TArena` on the list; S6
    accepts `Hold`, S17 roots it. *Done:* `test_region` covers the order of destruction, an exception in the scope and in a
-   destructor; lint tests.
+   destructor; lint tests. *Status:* **done** for `Hold`, `Defer` and `TScopeRef` (§21.1, v0.21); `TArena` on the list is
+   left for later.
 4. **The `TComponent` owner** (S6 and a root kind of S17). *Done:* lint tests on a form-like unit (a stub `TComponent` is
    enough).
 5. **The M:N runtime** after step 2: the scheduler behind the hooks, the monitor, deadlock detection, `BP_SCHED_SEED`.
@@ -2550,7 +2611,7 @@ a bug found by a program built with `bp build` goes ahead of the plan.
 | 2 | — (the cheap holes of §8: done) | | |
 | 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and five languages, v0.16 and v0.19: the baseline is in §25.2; channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
 | 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (done: the runtime is on with `BP_MN=1`, §21.3, step 5 result; the atomic `Select`, §14) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
-| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.20), then the `TComponent` owner | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
+| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.20; `Hold` and `Defer`: done, v0.21), then the `TComponent` owner (next) | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
 | 6 | **The speed work** that the numbers of step 3 point to (§25.2) | §25.2 | after the runtime: it changes what is measured |
 | 7 | **The tools,** cheapest first: `bp explain`, S20 and `Fmt`, `bp test`, `--target`, `// derive:`, the profiler, `bp lsp`, the browser, S26c, hot reload | §22.8 steps 2–11 | each stands alone; the ones users ask for first go first |
 | 8 | **The language from FPC 3.2:** nested procedure values, the `String` helper, CORBA interfaces, `// raises:` | §24.8 steps 4–7 | after the runtime and S17, which they extend |

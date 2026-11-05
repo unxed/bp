@@ -8,7 +8,7 @@ of dangerous primitives (`GetMem`, `New`, `Move`, `FillChar`, `FreeAndNil`, `Obj
 |---|---|
 | `safe.pas` | `unit Safe`: pulls in this layer only; `uses ..., Safe;` goes last in the module |
 | `core.intf.inc`, `core.impl.inc` | ownership, slices, arena, defer, FFI; the same files are included by `unit BP` |
-| `region.intf.inc`, `region.impl.inc` | the region style (SPEC §20): `TRegion`, the current region, `Scope`, `Each`, `TRegionObject`, `TGrowArray<T>`, R2, R12, R14–R16 |
+| `region.intf.inc`, `region.impl.inc` | the region style (SPEC §20): `TRegion`, the current region, `Scope`, `Each`, `TRegionObject`, `TGrowArray<T>`, R2, R12, R14–R16; the scope (SPEC §21.1): `Hold` and `Defer` of `TScopeRef` (`for S in Scope`) and of `TRegion` |
 | `poison.intf.inc`, `poison.impl.inc` | poisoned primitives and the `Free` helper; included last |
 | `SPEC.md` | the specification of Better Pascal (both layers); §0 is the rules card, §13 FFI, §14 goroutines, §15–16 plan |
 | `DN-ADOPTION.md` | plan for migrating DOS Navigator (`unxed/dn`) to Safe Pascal: stages S0–S10 |
