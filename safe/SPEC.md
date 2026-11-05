@@ -51,6 +51,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
 | Strings and maps: `TStrSlice`, `Fields`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 in the typed `bpvet` | §25.3 |
 | A memory manager of BP: a cache per carrier, pages of one size class, frees from other threads by an atomic list, the start of a goroutine without `InitThread` | **step 1 implemented, tests, CI, on by default since v0.38** (`ext/bpheap.inc`, `BP_HEAP=rtl` for the heap of the RTL; `test_heap`, modes `rtlheap` and `mnrtlheap`); the start without `InitThread` is **design** (step 3) | §25.4 |
+| Vector kernels: unit `BPVec` (`Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays of numbers), SSE2 on x86_64 and Pascal elsewhere | **implemented, tests, CI** (`ext/bpvec.pas`, `test_vec`) | §25.2 |
 | The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
@@ -1089,6 +1090,7 @@ or above the parameter suppresses its S14 finding.
 | v0.36 | §25.5 the check cache per file (`bpvet --cache`, `tools/bp`): a rebuild of the project of 20 files after an edit 493 → 248 ms (gcc 260, Go 349); §25.2 the toolchain policy: Bp builds on the releases of FPC, not on main |
 | v0.37 | §25.3 the word count 0.47 → 0.43 s: the hash, the comparison of slices and the probe of `TMap` inlined, the last bytes of a key read at once; where the rest of the gap is (a managed slice) and why the region of objects is 3.3x (the protocol of a constructor) |
 | v0.38 | §25.4 the memory manager of BP on by default (`BP_HEAP=rtl` for the RTL heap): runs grown in place, a freed run of 1 MiB or more back to the kernel but for the last one; peak memory below the RTL heap on the arena and region tiers, a buffer of 1–3 MB in a loop 15–18 times faster |
+| v0.39 | §25.2 unit `BPVec` (#197): `Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays in SSE2 on x86_64, the same loops in Pascal elsewhere; `Axpy` of `Double` 1.74 → 0.73 s on 2G elements (gcc -O3 0.77 s) |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -2922,13 +2924,20 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
      tier are 5–20% faster (1.24x and 1.14x of gcc); fannkuch was 24% slower within BP, which plain FPC does not
      repeat (2.92 s against 2.96 s), so that is noise of the shared machine or BP, not the back end. It needs FPC
      main, a second toolchain and a workaround in the link, so it is not adopted (the policy below); the tickets and
-     the workarounds in Bp code stay the way, and the loops get kernels of SSE2 (#197).
+     the workarounds in Bp code stay the way, and the loops get kernels of SSE2 (#197, below).
 
 - **The toolchain policy (the owner, 2026-11-05): Bp builds on the releases of FPC, not on FPC main,** unless there
   are very strong reasons. Following main costs too much (its RTL changes signatures BP uses: #194), and a project
   must build the same for years (the `fpc 3.2.2` line of `deps.txt`, §15). BP is still kept compiling on main
   (#194 fixed), so the next release costs little; the measurements of main (its LLVM back end) are information for
   the tickets, not a mode of Bp.
+
+- **The verdict on the run time (2026-11-05, #181).** Catch up with C: yes, to about 1.0–1.3x across the benchmarks,
+  without a compiler fork: the heap (§25.4) and the library of BP (§25.3) are in the hands of Bp, the code generator
+  in part through the workarounds above and the kernels of `BPVec`. Overtake: in places, not across the board: where
+  the library chooses the algorithm and the memory (vector kernels, regions and arenas, the memory manager, maps tuned
+  for their use) Bp can beat plain C and Goose; in plain scalar loops gcc (and Goose, which compiles through gcc) stays
+  ahead until the optimizer of FPC improves (#185). The table of all the tiers after these steps: #181, #108.
 
 - **Then the levers the numbers point to (step 6),** each measured on its own:
   - the cost of reference counting (`String`, dynamic arrays, `TShared`): `const` parameters (S14) already avoid most of
@@ -2944,6 +2953,27 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     in a `TGrowArray` with `Int32` links instead of objects takes 0.28 s, so the rest is not the object model; a
     node of 32 bytes against 8 in Goose (two 4-byte self-relative links) is the next candidate. The baseline table
     above keeps its numbers;
+  - loops over whole arrays (v0.39, #197): FPC does not vectorize a loop (fpc#42043), so unit `BPVec`
+    (`ext/bpvec.pas`; `uses ..., BPVec, BP;`) does it once per array: `Axpy`, `Scale`, `Add`, `Mul`, `Dot` and `Sum`
+    of `Double` and `Single`, `Add` and `Sum` of `LongInt` and `Int64`. SSE2 assembler on x86_64 (every x86_64 CPU
+    has it, so no check of the CPU), the same loops in Pascal on the other targets and with `-dBPVEC_PASCAL`.
+    `Axpy`, `Scale`, `Add` and `Mul` give the bits of the plain loop; `Dot` and `Sum` keep W sums of the elements
+    I mod W (W = 8 for `Double`, 16 for `Single`) and fold them in halves, in the kernels and in the Pascal loops
+    alike, so a result does not depend on the target that has SSE2 arithmetic (x86_64, aarch64; x87 on i386 may
+    differ in the last bits). Arrays of different lengths raise a range error. 1024 elements, 2,000,000 rounds
+    (i5-6300U, one run each; `tests/ext/test_vec.pas` checks the results):
+
+    | kernel | the Pascal loop | `BPVec` | gcc 13 `-O3` |
+    |---|---|---|---|
+    | `Axpy` of `Double` | 1.74 s | 0.73 s | 0.77 s |
+    | `Dot` of `Double` | 0.89 s | 0.46 s | |
+    | `Sum` of `Double` | 0.42 s | 0.37 s | |
+    | `Axpy` of `Single` | 1.57 s | 0.37 s | |
+    | `Dot` of `Single` | 0.94 s | 0.26 s | |
+
+    The Pascal loop of `Dot` and `Sum` in the table is already the one with W sums. A loop that does other work per
+    element (the inner loop of n-body works on vectors of three) stays scalar until FPC vectorizes; AVX2 kernels behind
+    a check of the CPU come when a number asks for them;
   - the checks a release build keeps (R1–R4 of the runtime);
   - inlining of generics and of small routines;
   - `-O3` and the target CPU (`-Cp`, `-Cf`): no gain on n-body (2026-11-05: `-O3` and `-O4` within the noise of

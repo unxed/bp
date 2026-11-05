@@ -95,6 +95,7 @@ where `<path>` is the directory of `bp.pas`.
 | UTF-8 by default, `CodePoints`, `CPLength` | `ext/` | no | yes |
 | Goroutines: `TGroup/TTask`, `TChan<T>`, `Select` | `ext/` | no | yes |
 | Thread manager without libc on Linux (`BPThreads`) | `ext/` | no | yes |
+| Vector kernels over arrays: `Axpy`, `Dot`, `Sum` ... (unit `BPVec`, SSE2 on x86_64) | `ext/` | no | a unit of its own |
 
 `unit Safe` (`safe/safe.pas`) is the safe layer alone. `ext/fpc-utf8/` is a separate UTF-8-only variant for code that does
 not use `BP` (a unit inserted with `-Fa`).
