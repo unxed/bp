@@ -1,4 +1,5 @@
 { SPDX-License-Identifier: MIT }
+// UNSAFE-UNIT: a test of the heap itself works on raw blocks of GetMem and FreeMem
 { Tests of the heap (SPEC §25.4): the same checks pass with the heap of the RTL and with the memory manager of BP
   (BP_HEAP=bp; tests/run.sh modes heap and mnheap). Blocks are filled with a pattern of their own and checked before they
   are freed, so two blocks that overlap or a block written by the allocator are found. Exit code = number of failures. }
@@ -73,9 +74,14 @@ begin
   Result := True;
 end;
 
+procedure NextSeed(var Seed: Cardinal);
+begin
+  Seed := Cardinal((QWord(Seed) * 1103515245 + 12345) and $FFFFFFFF);
+end;
+
 function SizeFor(var Seed: Cardinal): PtrUInt;
 begin
-  Seed := Seed * 1103515245 + 12345;
+  NextSeed(Seed);
   case (Seed shr 16) mod 16 of
     0: Result := 33000 + (Seed shr 8) mod 200000;   // a run of pages
     1..3: Result := 1024 + (Seed shr 8) mod 31000;
@@ -239,7 +245,7 @@ begin
   Ok := True;
   for I := 1 to 400000 do
   begin
-    Seed := Seed * 1103515245 + 12345;
+    NextSeed(Seed);
     K := (Seed shr 8) mod N;
     if A[K] <> nil then
     begin
