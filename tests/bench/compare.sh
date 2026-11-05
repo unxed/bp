@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The benchmark suite of Better Pascal against C, Rust, Go and Goose (safe/SPEC.md §25.2; report only, no thresholds).
 # Four programs, each written the same way in each language (tests/bench/suite/NAME/NAME.{pas,c,rs,go,goose}): binary trees
-# (allocation) in two tiers, n-body (floating point), fannkuch (integers and arrays), a word count (strings) in two tiers.
+# (allocation) in two tiers, n-body (floating point), fannkuch (integers and arrays), a word count (strings) in two tiers,
+# axpy (a loop over arrays of floating point: Bp calls the kernel of unit BPVec, the others write the loop).
 # A tier is one allocation style, compared only with the same style (SPEC §25.2, like for like):
 #   bintrees: one heap block per node (Bp class object, C malloc, Rust Box, Go collector)
 #   bintrees_arena: the nodes of a tree in one arena, dropped at once (Bp region, Goose array, and C, Rust, Go with an
@@ -15,7 +16,7 @@
 # Each binary is run RUNS times; the cell is the median wall time and the ratio to C (gcc). The output is a Markdown
 # table with the machine and the compiler versions. A missing toolchain makes its column "n/a".
 # usage: tests/bench/compare.sh [out-dir]
-# environment: RUNS (5)   LANGS ("bp gcc clang rust go goose")   PROGS ("bintrees bintrees_arena bintrees_region nbody fannkuch wordcount wordcount_owned")
+# environment: RUNS (5)   LANGS ("bp gcc clang rust go goose")   PROGS ("bintrees bintrees_arena bintrees_region nbody fannkuch wordcount wordcount_owned axpy")
 #              WORDS (4000000: the length of the text of the word count)   FPC (fpc)
 #              GOOSE (goose on PATH, else ~/.local/opt/goose-v2026.3/goose: the Goose compiler)
 # The exit code is 1 when a build fails or the checksums differ; a missing toolchain is not a failure.
@@ -27,7 +28,7 @@ suite=$here/suite
 out=${1:-$(mktemp -d)}
 RUNS=${RUNS:-5}
 LANGS=${LANGS:-"bp gcc clang rust go goose"}
-PROGS=${PROGS:-"bintrees bintrees_arena bintrees_region nbody fannkuch wordcount wordcount_owned"}
+PROGS=${PROGS:-"bintrees bintrees_arena bintrees_region nbody fannkuch wordcount wordcount_owned axpy"}
 WORDS=${WORDS:-4000000}
 FPC=${FPC:-fpc}
 if [ -z "${GOOSE:-}" ]; then
