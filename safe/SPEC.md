@@ -804,6 +804,11 @@ Availability: FFI through libc requires a dynamic build (on static Linux without
 What cgo does not have and we get for free: FPC strings are always null-terminated, so a string
 goes to C **without a copy** (`C.CString` in Go always copies); the cost of a C call is an ordinary function call.
 
+**Sockets go through fcl-net (unxed/bp#146, item 9).** `fpBind` and `fpsetsockopt` of the RTL take a record by its
+address, which S4 rejects outside `// UNSAFE:`; S4 keeps no exemption for it. A program takes a listening socket from
+`TInetServer` and a connection from `TSocketStream` of fcl-net (`ssockets`), as `examples/httpd` does; the raw socket
+calls stay inside a `// UNSAFE-UNIT:` module when a program needs them.
+
 ## §14. Goroutines: like Go, better in places
 
 The Go principle — "share memory by communicating" — maps onto the Safe Pascal ownership model: ownership
@@ -1234,6 +1239,11 @@ Verdict: **it works; one form was missing and is added to rule 4 (below).**
 - **A `TRegion` is a local of a routine:** a global, a threadvar or a field is an error (`s17_global_region_bad`).
 
 ### Regions: scopes, speed, the debug net, a look at real code (2026-11-04; unxed/bp#124, #125)
+
+- **The unit of a region is the connection or the loop, not the request** (unxed/bp#146, `examples/httpd`). A region
+  per request costs an `mmap`/`munmap` pair per request through the FPC heap (a 4 KiB block taken and given back):
+  throughput fell from 33 to 16 thousand requests per second. A region per connection, `Reset` after each request,
+  keeps its block.
 
 - **Scopes like Goose without block variables.** FPC 3.2 has none, but `for ... in` is a real scope, so the runtime
   gives two enumerators that own a region: `for R in Scope do begin ... end` (a region for the block) and
