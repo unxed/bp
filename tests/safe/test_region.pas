@@ -19,6 +19,29 @@ type
     Name: String;
   end;
 
+  { a descendant of a class with a managed field: it has the finalizer of its parent }
+  TNamedTwice = class(TNamed)
+    Other: Integer;
+  end;
+
+  { AfterConstruction runs after the constructor of a region class too }
+  TAfter = class(TRegionObject)
+    Done: Boolean;
+    procedure AfterConstruction; override;
+  end;
+
+  {$push}{$interfaces corba}
+  IArea = interface
+    function Area: Integer;
+  end;
+  {$pop}
+
+  { a region class with an interface: the interface pointer of the object is set up as for any class }
+  TSquare = class(TRegionObject, IArea)
+    Side: Integer;
+    function Area: Integer;
+  end;
+
   TPt = record
     X, Y: Integer;
   end;
@@ -210,6 +233,65 @@ begin
   Check(R.Used > 0, 'region objects: the region holds them (' + IntToStr(R.Used) + ' bytes)');
 end;
 
+{ The memory of a region is reused after Reset: a new object still starts with zeroed fields. }
+procedure ObjectsZeroed;
+var
+  R: TRegion;
+  N: TNode;
+  I: Integer;
+  Ok: Boolean;
+begin
+  R := TRegion.Create;
+  for I := 1 to 1000 do
+  begin
+    N := TNode.Create;
+    N.X := -1;
+    N.Next := N;
+  end;
+  R.Reset;
+  Ok := True;
+  for I := 1 to 1000 do
+  begin
+    N := TNode.Create;
+    Ok := Ok and (N.X = 0) and (N.Next = nil) and (N.ClassType = TNode);
+  end;
+  Check(Ok, 'region objects: the fields of an object made after Reset are zero');
+end;
+
+procedure TAfter.AfterConstruction;
+begin
+  inherited AfterConstruction;
+  Done := True;
+end;
+
+procedure ObjectsAfter;
+var
+  R: TRegion;
+  A: TAfter;
+begin
+  R := TRegion.Create;
+  A := TAfter.Create;
+  Check(A.Done, 'region objects: AfterConstruction runs');
+end;
+
+function TSquare.Area: Integer;
+begin
+  Result := Side * Side;
+end;
+
+procedure ObjectsInterface;
+var
+  R: TRegion;
+  Q: TSquare;
+  A: IArea;
+begin
+  R := TRegion.Create;
+  Q := TSquare.Create;
+  Q.Side := 7;
+  A := Q;
+  Check(A.Area = 49, 'region objects: a method called through an interface of a region object');
+end;
+
 { ---------- strings and other managed fields ---------- }
 
 procedure Strings;
@@ -237,6 +319,22 @@ begin
     IntToStr(StringRefCount(S)) + ')');
   R.Release;
   Check(StringRefCount(S) = 1, 'strings: Release finalizes the objects and the elements (refcount ' +
+    IntToStr(StringRefCount(S)) + ')');
+end;
+
+{ A managed field of the parent class is finalized too. }
+procedure StringsInherited;
+var
+  R: TRegion;
+  S: String;
+  N: TNamedTwice;
+begin
+  S := 'parent ' + IntToStr(Random(1000));
+  R := TRegion.Create;
+  N := TNamedTwice.Create;
+  N.Name := S;
+  R.Release;
+  Check(StringRefCount(S) = 1, 'strings: Release finalizes a field of the parent class (refcount ' +
     IntToStr(StringRefCount(S)) + ')');
 end;
 
@@ -902,7 +1000,11 @@ begin
   CopyRaises;
   Check(CurrentRegionDepth = 0, 'every region of the checks above is released');
   Objects;
+  ObjectsZeroed;
+  ObjectsInterface;
+  ObjectsAfter;
   Strings;
+  StringsInherited;
   StringsReset;
   Grow;
   NodesInArray;

@@ -106,9 +106,12 @@ type
   end;
 
   { A class whose objects live in the current region: N := TNode.Create allocates there, Free and Destroy release
-    nothing, and the region releases its objects at once. A region class has no destructor (S17a). }
+    nothing, and the region releases its objects at once. A region class has no destructor (S17a).
+    Create has no frame that frees the object when a constructor raises (the region frees it), and NewInstance bumps in
+    place and, for a class with neither managed fields nor interfaces, writes the VMT and zeroes the fields itself. }
   TRegionObject = class
   public
+    constructor Create;
     class function NewInstance: TObject; override;
     procedure FreeInstance; override;
   end;

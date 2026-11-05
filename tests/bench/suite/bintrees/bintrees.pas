@@ -2,15 +2,15 @@
 { Benchmark suite (tests/bench/compare.sh): binary trees, an allocation-heavy tree.
   The program makes complete binary trees of growing depth and counts their nodes; every tree is built, walked once and
   dropped. The trees of the loop live in one region that is reset after each walk (SPEC §20: "a loop uses Reset"); the
-  long-lived tree has a region of its own. The unit Region is the spike of tools/spikes/region (BP does not export a
-  region yet). The other languages: bintrees.c (malloc and free), bintrees.rs (Box), bintrees.go (the collector).
+  long-lived tree has a region of its own (TRegion and TRegionObject of unit BP). The other languages: bintrees.c
+  (malloc and free), bintrees.rs (Box), bintrees.go (the collector).
   Output: one line, the number of nodes counted. }
 program bintrees;
 
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils, Region, BP;
+  SysUtils, BP;
 
 type
   TNode = class(TRegionObject)
