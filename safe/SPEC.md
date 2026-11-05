@@ -1080,6 +1080,7 @@ or above the parameter suppresses its S14 finding.
 | v0.28 | §21.3, §25.2 step 6: the start of a goroutine: a freed region stays warm for the next goroutine and the monitor gives back the ones not taken at the next tick (no `madvise` at each end); the first heap chunk of a goroutine is one page; the start and end 17 us → 5 us on 4 carriers, a tree of 8191 goroutines 1.07 s → 0.43 s |
 | v0.29 | §21.3, §25.2 step 6: per-carrier run queues (a yield and a goroutine pushed out of "next" stay on the carrier; an idle carrier steals half of a queue); 64 goroutines that yield take 93 ms instead of 574 ms on 4 carriers |
 | v0.30 (design) | §25.4 a memory manager of BP: a cache per carrier, pages of one size class with a local free list and one for other threads, abandoned pages adopted, the start of a goroutine without `InitThread`; the spike: a tree of 8191 goroutines 286 ms → 32 ms on one carrier |
+| v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)

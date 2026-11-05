@@ -39,6 +39,8 @@ uses
 
 implementation
 
+{$I safe/atomic.inc}
+
 {$I safe/core.impl.inc}
 {$I safe/region.impl.inc}
 {$I safe/map.impl.inc}
