@@ -65,6 +65,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Class casts and untyped parameters (H17, H18): an unchecked downcast, `TBig(Buf)[N]` over a `var Buf`, `absolute` | **checked** by the typed `bpvet` (`tools/bp build`): S24 (`--fix` writes `as`), S25 | §8, §24.6 |
 | Speed competitive with C, Rust, Go and Goose on the same algorithm | **measured** (`tests/bench/compare.sh`, CI report): the tables of every tier and the verdict on the run time are in §25.2 (about 1.0–1.3x of C is within reach without a compiler fork; gcc stays ahead in plain scalar loops); the before/after table of the steps of #181 is in unxed/bp#181 and #108; the levers still open: §25.2 | §25.2 |
 | Competitive size, memory, start and build time (#181) | **measured** (`tests/bench/size.sh`), verdicts and levers in §25.5 | §25.5 |
+| Soundness: a fact base of FPC, a fuzzer with a semantic oracle, Featherweight BP and its proof, obligations for §8 | **design, for the owner's review**; its first step measured H21 (a `const` argument uncounted from every place) and H22 (`--release` drops `-Cr`) | §26 |
 
 ---
 
@@ -464,7 +465,7 @@ System.GetMem(Buf, Len);
 | A dangling `TSlice`, a dangling `TWeak` | impossible by construction | — |
 | `.Free` outside unsafe | compiler (error) | — |
 | raw pointers outside unsafe | compiler warning (named pointer types) + linter (plan) (`^T`, `@`, arithmetic) | H4 |
-| A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1, H20 |
+| A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1, H20, H21 |
 | No `TShared` cycles | programmer + linter `bpvet` (S15, heuristic) | H2 |
 | Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
@@ -476,7 +477,7 @@ System.GetMem(Buf, Len);
 | `Safe` is last in `uses` | linter `bpvet` S7, an error in a program too (`tools/bp build` adds `-FaBPThreads`, §24.3) | H9 |
 | Unsafe code is marked, `external` only in unsafe modules | linter (plan) (S8, S12) | H10 |
 | Exhaustive `case`, `const` parameters | `bpvet` S13; S14 errors on copy-heavy by-value parameters and warns on other by-value parameters not changed by the body and unused `var` parameters | H11 |
-| Range and overflow checks are not switched off in safe code | programmer | H12 |
+| Range and overflow checks are not switched off in safe code | programmer; `tools/bp build --release` switches `-Cr` off (H22) | H12, H22 |
 | Turbo Pascal style `object` code | not covered (§19) | H13 |
 | A region object or a `TGrowArray` element does not outlive its region | `bpvet` S17 in the typed mode (static, zero cost); `SAFE_DEBUG` R12 (released pages lose access, `test_region`) as a second net | §20 |
 | A GC object is never freed while reachable; cycles are collected | plan: the collector + `bpvet` S18 (where a GC reference may live, it stays in its goroutine) | §20 |
@@ -517,6 +518,8 @@ compensating check, and accepted risks are listed with a reason.
 | H18 | an untyped parameter with a variable typecast, `TBig(Buf)[N] := 1`, writes anywhere (§24.6); `absolute` | `bpvet` S25 (typed): an untyped `var`/`const`/`out` parameter, a typecast of one and `absolute` are errors outside a `// UNSAFE:` mark | — (done: the 5 untyped parameters of the repository are in `ext/bpthreads.pas`, a `// UNSAFE-UNIT:`) | §24 step 3 |
 | H19 | an uninitialised local of a class type is a garbage pointer: `var F: TFoo; WriteLn(F.X)` | FPC: a warning | done: `bp build` adds `-Sew` (`mf_uninit.pas`; the region runtime had two results never set, fixed); S26a in the typed `bpvet`: definite assignment of a local, a function result and an `out` parameter of a class type; S26b: a class under 64 KiB (§22.9) | §24 step 2, §22 step 0 |
 | H20 | a nested routine frees the argument of its own `const` parameter: `Print(X)` where `Print` writes the local `X` of its parent, then reads `S` (FPC passes a local `String` or dynamic array to a `const` parameter without a count; measured: the freed block is taken by the next `String` of its size, §24.9) | nothing | the rule *change* of §24.9: a call of a nested routine, or of a nested procedure value, that writes a local passed as its `const` argument is an error of S17 | **closed** (v0.40, #207): `bpvet` S17 (typed, `tools/bpvet/bpveth20.pas`) reports a call of a nested routine, or of an `is nested` procedure value, that passes a parent's local, value parameter or result of a managed type as a `const`/`constref` argument the callee writes, directly or through the nested routines it calls (`tests/lint/h20_bad.pas`, `h20_transitive_bad.pas`, `h20_ok.pas`); `tools/bp build` rejects the program of #207 |
+| H21 | a `const` (or `constref`) managed argument is uncounted from **every** place, not only from a local of a parent: `PrintG(G)` where `PrintG` writes the global `G`, `Box.Get.Print(Box.Get.FS)` where the method writes `FS`, `Alias(X, X)` with `var A; const S`, a nested routine that writes a `var` parameter of its parent; each reads freed memory (measured on FPC 3.2.2, 2026-11-06, §26.2; the count is 1 in every case) | nothing: `tools/bp build` accepts all four | the rule *change* for every place a call may write, and no `var`/`out` argument overlapping a `const` one (§26.4, the rule *Call*; open question 1 of §26.11) | open (found by §26) |
+| H22 | `tools/bp build --release` replaces `-Cr -Co` with `-O2 -XX -CX`: an index of an array is not checked, `A[N] := 99` past the end writes into the next array (measured, §26.2) | nothing in a release build; `-Cr` in a debug build | keep `-Cr` in `--release` (open question 2 of §26.11) | open (found by §26) |
 
 **H1. A borrow outlives its owner.**
 
@@ -1137,6 +1140,7 @@ or above the parameter suppresses its S14 finding.
 | v0.44 | the philosophy of Better Pascal (§1, README): the simplicity of development of Go with the performance and reliability of Rust, the determinism of owners and regions instead of a collector; goroutine is the term of the project (§14); goroutines run M:N by default (`BP_MN=0`, `-dBP_1TO1` for 1:1), CI runs the 1:1 mode as the extra one |
 | v0.44.1 | the philosophy (§1, README): whether the reliability of Rust can be reached without lifetime annotations is an open question, and the project is a study of its feasibility; §24.9: the audit of `// UNSAFE:` matters most for generated code |
 | v0.44.2 | §1, README: the research questions of the project (memory safety without changing the compiler, the reliability of Rust without lifetime annotations, the speed of C without annotations and a collector, several safe memory models in one language), each tested by measurements and tests |
+| v0.45 (design) | §26 soundness, for the owner's review: the goal as claims (C1 the soundness of a core, C2 `bpvet` refines its checker, C3 the model refines FPC, C4 the honest table is complete) and "Rust-level" as levels L0-L4; the research table (RustBelt, Oxide, Featherweight Rust, Stacked and Tree Borrows, Miri, Swift exclusivity, borrowed parameters of reference counting, Csmith, Rustlantis, Redex); Featherweight BP (syntax, the machine, the facts as rules, the five rules and the call rule as judgments, the invariant, the lemmas); the oracle (a guard heap, the value semantics, four verdicts) and the fuzzer (an exhaustive enumeration of borrow, root, route and use); the fact base (`tests/facts/`); proof obligations and a gate for §8; stages 0-5; H21 (a `const` argument is uncounted from every place, a use after free through a global, a field, a `var` alias) and H22 (`--release` drops `-Cr`) found and measured; §24.9 rule 1 corrected |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -2861,6 +2865,10 @@ changes (a collection frees only what nobody can reach). Its reach is the places
    `const String` parameter (measured on FPC 3.2.2: the count is 2 inside the routine; with a local it is 1), so a
    `const` parameter is a root that does not change while its routine runs, with the one exception of the rule
    *change* below.
+   **Measured again on 2026-11-06 (§26.2): not reproduced.** The count of a global, a field and a `var` parameter
+   passed to a `const String` parameter is 1, as for a local, and a write of that place in the call frees the
+   argument (H21). The exception of the rule *change* covers every place a call may write, not only the locals of
+   the caller.
 2. **Reach.** A borrow is stored only in a place that ends no later than its root:
 
    | Place | Ends | Takes |
@@ -4014,3 +4022,493 @@ What changes in the verdicts:
   - fpc compares the time of a source with the one in its `.ppu` to the second: an edit within the second of the last
     build, at the same size, is not compiled again. `project.sh` waits a second before an edit (not timed); a user
     who saves and builds within one second is not likely, but `tools/bp` could add a check by content.
+
+## §26. Soundness: from holes found by luck to holes ruled out (design, for the owner's review)
+
+Status: **design, for the owner's review** (2026-11-06). Nothing here is built yet, except the measurements of 26.2.
+The goal of the owner: prove that the rules of `bpvet` leave no hole, instead of finding the holes by luck. H20 was
+found while the model of §24.9 was being written, not by a method; the fix (#207) rests on a fact that was measured
+once and written as prose. This section designs the method: a base of measured facts about FPC, a fuzzer with a
+semantic oracle, a small formal core of the dialect with a soundness theorem, and a process that gives every row of
+§8 a proof obligation and a status. The first step of the method was tried while this section was written, and it
+found two holes at once (26.2). It is the method for research question 2 of §1 (the reliability of Rust without lifetime annotations):
+a "yes" needs C1-C4 below, a "no" is a hole the method finds that no inferred rule can close.
+
+### 26.1 The goal, stated as claims
+
+Featherweight BP (FBP, 26.4) is a small core of the dialect: values, `String`, dynamic arrays, records, the modes of a
+parameter, nested routines, globals, classes behind `TOwned`, views. A **run gets stuck** when it reads or writes
+a freed block, or a place outside a block without a check; a failed check (`ERangeError`, `ESafety`) is not stuck, it
+is a defined exception. The claims:
+
+| # | Claim | Kind | How it is shown |
+|---|---|---|---|
+| C1 | **Soundness of the core.** For every FBP program `P`: if `check(P)`, no run of `P` gets stuck (progress and preservation of the invariant of 26.4) | a theorem about the model | on paper (stage 3), then in Lean 4 (stage 4) |
+| C2 | **`bpvet` refines the checker.** For every FBP program `P`: `bpvet` accepts `P` ⇒ `check(P)` | a property of 12.7 thousand lines of Pascal | not proved: differential testing on generated programs (26.5), every run of CI |
+| C3 | **The model refines FPC.** Every run of the binary that `fpc` builds from an FBP program is a run of the model | a property of FPC 3.2.2 and its RTL | not proved: the fact base (26.6) and differential runs (26.5) |
+| C4 | **The honest table is complete relative to the model.** Every construct of the dialect outside FBP is a row of §8 with its status | a property of the documents | the obligation table (26.7), checked by CI |
+
+C1 is the only claim that can be proved; C2 and C3 are where the holes have been so far (H20 and H21 break C2: the
+rule *change* of §24.9 names the writes of a call, `bpvet` does not see all of them; the prose fact under H20 broke C3). A program outside FBP
+gets the guarantee of its rows in §8, no more.
+
+**What "Rust-level" means as a measurable claim.** Rust itself is: a core calculus with a mechanized soundness proof
+(RustBelt, POPL 2018, in Iris, on Rocq), semantic proofs for a part of the standard library that uses `unsafe`, an
+executable reference semantics with an interpreter that finds undefined behaviour (MiniRust, Miri, POPL 2026), and a
+compiler that is not verified: on 2026-11-06 the tracker of `rust-lang/rust` had 179 open issues labelled
+`I-unsound` (762 in all). So "Rust-level" is not "no bugs"; it is a set of things that can be counted:
+
+| Level | Measured by | Reached by |
+|---|---|---|
+| L0 | rules with lint tests; holes found by reading | Bp today |
+| L1 | every row of §8 and every rule has an obligation and a status; the facts are tests on every target of CI; the enumeration of 26.5 runs to size `k` with no escape, the random fuzzer `N` CPU-hours with no escape | stages 0-2 |
+| L2 | a proof on paper of C1 for the fragment of strings, arrays, parameter modes, nested routines, globals and fields | stage 3 |
+| L3 | C1 mechanized in Lean 4; the checker of the model runs against `bpvet` in CI (C2 tested every day) | stage 4 |
+| L4 ("Rust-level") | L3 for the five rules of §24.9 and every root kind of its table (owners, regions, views, maps, procedure values); the library types with unsafe insides (`TOwned`, `TShared`, `TRegion`, `TMap`, `TStrView`, `TChan`) specified, their specifications tested against their code; release builds keep the checks the proof assumes (H22); a public label for soundness bugs with the time to a fix | stage 5 and later |
+
+The numbers to publish at each level: the obligations by status, the size `k` of the exhaustive enumeration, the
+CPU-hours of random fuzzing since the last escape, the open soundness issues and the median days to a fix.
+
+### 26.2 What the first step found: H21 and H22
+
+The fact under the fix of H20 says that FPC counts a global, a field and a `var` parameter passed to a `const`
+parameter (§24.9 rule 1: "the count is 2 inside the routine"), so only a local of a parent can be freed under its
+own `const` argument. Turned into a test (stage 0 of 26.8) on FPC 3.2.2, x86_64, `-O-` and `-O2`, with and without
+`BP`, it does not hold: the count of a `const String` argument is 1 from every place tried, and each place gives a use
+after free that `tools/bp build` accepts (`bpvet: 0 error(s)`; the freed block is taken by the next `String` of its
+size, so `S` prints `####################`):
+
+```pascal sketch
+var
+  G: String;
+
+procedure PrintG(const S: String);    // PrintG(G): the global is not counted either
+begin
+  G := '';                            // frees the bytes S names
+  WriteLn(S);                         // reads freed memory
+end;
+
+procedure TFoo.Print(const S: String); // Box.Get.Print(Box.Get.FS): nor a field
+begin
+  FS := '';
+  WriteLn(S);
+end;
+
+procedure Alias(var A: String; const S: String);  // Alias(X, X) with a local X: one place, two names
+begin
+  A := '';
+  WriteLn(S);
+end;
+
+procedure ShowV(var V: String);
+  procedure Print(const S: String);   // Print(V): a nested routine and a var parameter of its parent
+  begin
+    V := '';                          // the H20 rule skips a var parameter, by the same fact
+    WriteLn(S);
+  end;
+begin
+  Print(V);
+end;
+```
+
+The same holds for a dynamic array (`Alias(Arr, Arr)` with `var A, const B: TInts`, `A := nil`: `B[0]` reads the
+bytes of the next array) and for a `TOwned` (`UseBox(Box, Box)` with `var A, const B`, `A.Reset`: `B.Get.Name` reads
+the destroyed object, no `ESafety`). This is **H21**: *a `const` parameter of a managed type names its argument
+without a count, from any place; any write of that place during the call, through any name, frees what the parameter
+names.* H20 is one route of H21 (the frame of the parent). The other routes: a `var` or `out` argument of the same
+call, a global, a field reached through `Self` or another reference, a `var` parameter of the parent, and every
+callee of the routine that writes one of these. The §24.9 argument "why the model needs no exclusivity" holds for
+counted references only: a `const` argument is an uncounted alias for the length of the call, so the place it came
+from must not be written during the call. Swift has the same rule for the same reason (SE-0176, the law of
+exclusivity: checked statically for locals and `inout` parameters, at run time for class properties, globals and
+escaping closures), and the borrowed parameters of the reference counting of Lean 4 ("Counting Immutable Beans",
+IFL 2019) are sound because nothing can write the owner while the borrow lives. The rule *change* of §24.9 covers
+H21 once its "a call is a change of every root that the callee may write" reads "every place", not "every local of
+the caller"; the fix is open question 1. S28 rests on the same fact ("a `const` parameter is a root that does not
+change while its routine runs"), so a view of a `const` parameter is open to H21 too.
+
+**H22, found on the way:** `tools/bp build --release` replaces `-Cr -Co` with `-O2 -XX -CX`, so an index of a plain
+array is not checked in a release build: `SetLength(A, 2); A[N] := 99` with `N = 4` wrote into the next array `B`
+(`B[0]` became 99), and `bpvet` passed the program. Rust keeps its bounds checks in a release build. The model
+assumes the checks (a write out of bounds is stuck), so a release build is outside C1 until the release keeps `-Cr`
+(open question 2; its cost on the suite of §25.2 is to be measured).
+
+### 26.3 The research: approaches, what each gives, and its fit
+
+| Approach | What it proves or finds | Cost here | Fit |
+|---|---|---|---|
+| **RustBelt** (Jung et al., POPL 2018) on **Iris** (separation logic in Rocq) | semantic soundness of lambda-Rust and of library types with `unsafe` insides: a type means a predicate on memory, so a library is proved once | very high: years of experts; Iris is a field of its own | the idea, not the tool: give each library type of BP a specification (26.7); prove one only if a type keeps having bugs |
+| **Oxide** (Weiss, Gierczak, Patterson, Ahmed, arXiv 1903.00982) | a syntactic proof (progress and preservation) for a calculus close to source Rust; lifetimes as sets of loans; checked against the borrow-check tests of rustc | medium: a paper calculus, a few thousand lines in a prover | **high**: FBP is built the same way, roots in place of loans, and validated against `tests/lint` as Oxide was against rustc |
+| **Featherweight Rust** (Pearce, TOPLAS 2021) | a small flow-sensitive calculus of borrows with a proof; its reference checker was model checked on 500 billion generated programs | low to medium | **high**: the size and the style to copy; the exhaustive enumeration of small programs is the cheapest certainty |
+| **Stacked Borrows** (POPL 2020), **Tree Borrows** (PLDI 2025), **Miri** (POPL 2026), **MiniRust** | an aliasing model checked at run time on an interpreter; an executable specification | medium for an interpreter of FBP | **high** for the oracle: the reference interpreter of FBP is the Miri of the dialect (26.5); no aliasing model of raw pointers is needed (S4 forbids them) |
+| **Polonius** and NLL | two borrow checkers run on the same programs, every difference studied | low | **high**: `bpvet` against the checker of the model is the same differential (C2) |
+| **Hylo** (mutable value semantics, Racordon et al., JOT 2022) | no stored references: aliasing cannot be observed | — | the target semantics of `String` and arrays: the value oracle (26.5) |
+| **Vale** (generational references, region borrowing) | a check per use where the proof is missing | low | `TWeak`, `TArenaRef`, R10, the guard heap |
+| **Goose** (roots, regions) | a root per reference, no annotations | — | already the frame of §24.9 |
+| **Cyclone** (Grossman et al., PLDI 2002), Tofte and Talpin regions | a type system of regions with a soundness proof; region subtyping by outlives | medium | the rule *reach* for `TRegion` (S17) in stage 5 |
+| **Linear and affine types** | use once, no copy | — | `TOwned` uniqueness (S10) is an affine discipline by a lint; FBP models `Own` as affine |
+| **Separation logic** (Reynolds 2002; VeriFast; Iris) | local reasoning on a heap; the frame rule | high | the invariant of 26.4 is stated in its terms (counted and lent parts of a block), proved without a full logic |
+| **Swift exclusivity** (SE-0176) | no overlapping write while an access lasts; static for locals and `inout`, dynamic for class properties and globals | — | the fix of H21 (open question 1) |
+| **Counting Immutable Beans** (Ullrich, de Moura, IFL 2019), **Perceus** (Reinking, Xie, de Moura, Leijen, PLDI 2021) | precise reference counting with borrowed parameters, formalized | — | the formal reading of `const`: a borrowed parameter, sound only with the owner kept alive and unwritten |
+| **Aeneas**, **RefinedRust** (PLDI 2024), **Verus**, **Kani** | proofs of programs, not of the language | — | not the goal: they prove one program |
+| **Csmith** (PLDI 2011), **EMI** (PLDI 2014), **YARPGen**, **Rustlantis** (OOPSLA 2024) | random programs that find compiler bugs by comparing builds, levels and an interpreter | low to medium | **high** for C3: the same program at `-O-`/`-O2`, on three CPUs, with three heaps; Rustlantis compares against Miri, the model of 26.5 does the same |
+| **PLT Redex**, "Run Your Research" (Klein et al., POPL 2012) | random testing of a semantics found errors in all nine papers studied | low | test the model before proving it (stage 3 starts with the interpreter) |
+| **QuickChick** (Rocq), **Plausible** (Lean 4) | property-based testing inside the prover | low | the theorem is tested on random programs before it is proved |
+| **The small scope hypothesis** (Jackson, Alloy) | most bugs have a small counterexample | — | why exhaustive enumeration to a small size gives the most certainty per hour |
+| **CBMC**, **ESBMC** | bounded model checking of C | high: FPC emits no C; a translation would need trust of its own | low: FBP programs have no input, so a bounded enumeration of programs, run on the interpreter, is the model checking |
+| **Lean 4** or **Rocq** | a kernel checks every proof | medium | Lean 4 (open question 3): the definition of the semantics is the interpreter (`def step`), compiled and fast; the checker is a function; a proof written by a model is checked by the kernel, so it cannot be wrong and pass. Rocq is the choice only if Iris is needed |
+
+### 26.4 Featherweight BP
+
+**Scope.** In: `Int`, `String`, dynamic arrays, records, globals, locals, nested routines (the static link), the
+parameter modes `val`, `const`, `constref`, `var`, `out`, assignment with counts, copy on write, `SetLength`,
+classes held by `TOwned` (an affine owner) with `.Get` borrows and `Reset`, `TStrView`, a nested procedure value,
+`raise` and `try ... finally`. Later (stage 5): `TShared`, `TWeak`, `TRegion` and region objects, `TMap.Ref`,
+interfaces, destructors that run code, methods that free. Out: pointers (S4), `// UNSAFE:` code, goroutines (their
+safety is S11, S11m, S11s and S19: a separate claim, tested with the seeded scheduler of §21.3).
+
+**FBP is a subset of BP.** Every FBP program is a Pascal program that `fpc` compiles; the abstract syntax below is
+read from it. So one generated program goes to `bpvet`, to the checker of the model, to the interpreter of the model
+and to `fpc`.
+
+```text
+t ::= Int | Str | Arr t | Rec {f: t; ...} | Own C | Ref C | View | Proc (m x: t; ...) nested     types
+m ::= val | const | constref | var | out                                                     modes of a parameter
+p ::= x | g | p.f | p[e] | r.f                       places: a local or parameter, a global, a field of a record,
+                                                     an element, a field of an object (r: Ref C)
+e ::= n | p | e + e | e & e | Len(e) | StrView(p) | v.Sub(e, e) | o.Get | f(a, ...)          expressions (& joins)
+s ::= p := e | p[e] := e | SetLength(p, e) | o.Reset | o := Own(New C) | call f(a, ...) | Write(e)
+    | s; s | if e then s else s | while e do s | raise | try s finally s
+d ::= routine f(m x: t; ...): t;  var x: t; ...;  d ...;  begin s end                        nested routines in d
+P ::= var g: t; ...;  class C = {f: t; ...};  d ...;  begin s end
+```
+
+**The machine** (what the semantics must capture):
+
+```text
+heap    H : Loc ⇀ Block,  Block = (count: Nat, body, alive: Bool)    a String, an array, an object
+frames  S = F1 ... Fn,    F = (slots: Name ⇀ Value, link: k)        link: the frame of the routine around (static link)
+values  v ::= n | nil | l | (l, off, len) | addr(q)                  a view is uncounted; addr: var, out, constref
+```
+
+The rules that carry the facts of FPC (each names its fact of 26.6):
+
+```text
+[assign]      q := v (managed): inc(v), then dec(old v); a count that reaches 0 frees the block
+              (alive := false) and decrements what the block holds                                (F2)
+[call-val]    a managed argument is copied into the new frame and counted (inc)                   (F2)
+[call-const]  a managed argument is copied into the new frame and NOT counted, from every place
+              (local, parent local, global, field, element, var parameter)                        (F1)
+[call-var]    the address of the place of the argument is passed                                  (F4)
+[call-out]    the caller finalizes the place before the arguments are loaded                      (F5)
+[cow]         p[i] := c on a Str: copy first when count > 1, in place when it is 1                (F3)
+[nested]      a nested routine reads and writes the slots of its parents through the link, in place (F7)
+[unwind]      raise runs the finally blocks and finalizes the locals of each frame it leaves      (F9)
+[stuck]       a read or write of a block with alive = false, or an index outside a block where
+              no check runs: no rule applies (undefined behaviour)
+[check]       a failed check raises ERangeError or ESafety: a defined step, not stuck             (F8)
+```
+
+In the semantics a freed block stays dead forever (never reused). That is the guard semantics: a real heap reuses the
+block, which can only hide a stuck state, never make one; the guard heap of 26.5 runs the binary the same way.
+
+**The judgments.** `bpvet` already infers everything below; the judgments say what each inference must mean.
+
+```text
+kind(t) ∈ {value, owner, borrow}                  the table of kinds of §24.9; Rec and Arr: the join of the parts
+                                                  (rule container)
+overlap(p, q)                                     p and q may name the same memory: x ~ x.f ~ x[e]; x[e1] ~ x[e2];
+                                                  g ~ g; r1.f ~ r2.f when r1 and r2 may be one object (same class)
+writes(f) ⊆ Places                                every place a call of f may write: its var and out parameters
+                                                  (as positions), the slots of its parents, globals, fields C.f,
+                                                  and writes(h) of every h it calls, also through procedure values;
+                                                  a fixpoint over the module, a signature summary across units
+Env; L ⊢ s ⊣ L'                                   flow: L maps each live borrow (a const parameter, a view, a local
+                                                  from .Get, a nested procedure value) to its roots
+```
+
+The five rules of §24.9 as rules of `Env; L ⊢ s ⊣ L'`:
+
+```text
+Name       root(StrView(x)) = {x}  when x is a local, a val or const parameter or Self
+           root(StrView(e)) undefined otherwise   (an error: S28 name)
+
+Reach      Env ⊢ e : borrow, roots R      for every r ∈ R:  life(p) ≤ life(r)
+           ----------------------------------------------------------------
+           Env; L ⊢ p := e ⊣ L[p ↦ R]
+
+Change     s writes q (itself, or q ∈ writes(f) up to overlap for a call of f in s)
+           ----------------------------------------------------------------
+           Env; L ⊢ s ⊣ L \ {b | some root of b overlaps q}        a later use of such b: error
+
+Signature  roots(f(a, ...)) = the roots of the arguments in the positions that sig(f) names
+           (Self for a method; the one candidate parameter; else // root:, inferred in the module)
+
+Container  kind(Rec {..., f: t, ...}) = borrow when kind(t) = borrow; roots: the union of the parts
+```
+
+The rule of a call, with the premise that H20 and H21 show is needed:
+
+```text
+           for each i with mode_i ∈ {const, constref} and kind(t_i) managed:
+             (1) not overlap(a_i, a_j)  for every j with mode_j ∈ {var, out}            (H21: Alias(X, X))
+             (2) not overlap(a_i, w)    for every w ∈ writes(f)[a/x]                     (H20: a parent slot;
+                                                                                         H21: a global, a field)
+Call       ------------------------------------------------------------------------------------------------
+           Env; L ⊢ call f(a1, ..., an) ⊣ Change(L, writes(f)[a/x])
+```
+
+**The invariant and the theorem.**
+
+```text
+Inv(H, S):  for every block l of H
+  (a) count(l) = the number of counted references to l in S and H              (FPC counts exactly: F2)
+  (b) every uncounted reference to l (a const argument, a view, a .Get borrow) has a lender: a place q in an
+      older frame or a block that holds a counted reference to l, and q is not written while the reference lives
+  (c) alive(l) whenever some reference to l exists
+
+Theorem C1.  If check(P), then Inv holds in every state reached from the start of P (preservation), and every state
+             that is not final takes a step (progress): a run of P ends, runs forever or raises a defined exception.
+```
+
+**The map of the proof.** Preservation is a case per rule of the semantics. The case that matters is `[assign]` to a
+place `q` that frees a block `l`: by (b) every uncounted reference to `l` has a lender, and the lender is not `q`
+only if the judgment forbade the write. Inside a call that is premise (2) of *Call*, and (2) is only as good as
+`writes(f)`. So the proof reduces to lemmas of three kinds: **M**, proved in the model; **F**, a fact of FPC, kept as
+a test (26.6); **B**, a property of the implementation of `bpvet`, tested against the model (26.5).
+
+| Lemma | Kind | Says | Status today |
+|---|---|---|---|
+| L1 counts | F | FPC increments and decrements exactly as `[assign]` and `[call-val]` | assumed (the RTL); F2 to write |
+| L2 const | F | `const` and `constref` pass a managed argument uncounted, from every place | **measured 2026-11-06** (26.2); the prose of §24.9 rule 1 said otherwise |
+| L3 frames | F | a nested routine writes the slot of its parent in place | measured (H20) |
+| W write sets | B | `writes(f)` of `bpvet` contains every place a call of `f` writes, by every route | **false today**: the H20 rule takes the slots of the parent only, and not its `var` parameters (H21) |
+| A aliasing | B | (1) of *Call*: no `var`/`out` argument overlaps a `const` one | **not checked** (H21) |
+| N names | B | a root is a name; a view of anything else is refused | S28 name; tested |
+| K kinds | M+B | `kind` of the model equals the kinds `bpvet` uses (one table, below) | to do |
+| U unwind | F+M | the finally blocks and the finalization of frames keep Inv | F9 to measure |
+| R bounds | F | `-Cr` checks every index of an array and a string | measured; **off in `--release`** (H22) |
+
+A paper proof of C1 for this fragment would have stopped at lemma W: its case "the callee writes the lender" has as
+many sub-cases as there are routes to a place, and each route must be in `writes(f)`. That list is H20 and H21.
+
+**Keeping the model and `bpvet` in step.** The tables of §24.9 (the kinds of types; the roots, how long each lives and
+its changes; the modes of a parameter and whether each is counted) become one data file, `safe/model/roots.tsv`
+(plan). A generator writes from it a Pascal include for `bpvet` and a Lean file for the model (each with
+`Generated by tools/...` on its first line, checked by running the generator again in CI). A new root kind is one row,
+so the model and `bpvet` cannot disagree on it; what they can still disagree on is the inference, and that is C2,
+tested by the differential of 26.5.
+
+### 26.5 The oracle and the fuzzer
+
+**Four verdicts per program.** Each generated FBP program gets:
+
+| Verdict | From | Values |
+|---|---|---|
+| V-vet | `bpvet --strict --typed` (as `tools/bp build` runs it) | accept, reject |
+| V-model | the checker of the model (stage 4; before it, absent) | accept, reject |
+| V-ref | the reference interpreter of the model: the value semantics of `String` and arrays, no counts at all | output, stuck, exception |
+| V-bin | the binary of `tools/bp build` (debug and `--release`) and of plain `fpc`, run under `BP_HEAP=guard` | output, fault, exception |
+
+| When | It is | Then |
+|---|---|---|
+| V-vet accepts, V-bin faults or its output differs from V-ref | a hole of `bpvet` (or of the model) | reduce, file as a bug, add the reduced program to `tests/lint` as `*_bad.pas` |
+| V-vet accepts, V-model rejects | `bpvet` is more permissive than the model: a hole even when the run did not show it | the same; this is how a hole is found without luck in the heap |
+| V-model accepts, V-ref stuck | an error of the model or of its proof | stop: the theorem is false as stated |
+| V-ref and V-bin differ on a program both accept, with no stuck state in V-ref | the model is wrong about FPC: a missing fact | a new fact (26.6) |
+| V-vet rejects, V-model accepts | `bpvet` is less precise than the model | a log of false positives, for usability (not a bug) |
+| V-bin differs between `-O-` and `-O2`, between CPUs, or between `BP_HEAP` modes | an FPC bug or an undefined program | a new fact or a ticket upstream (as #185) |
+
+**The value oracle** needs no fault. The meaning of a `String` and of an array of values is a value (§24.9, the table of
+kinds), so the interpreter computes outputs with plain values. A run of the binary that prints something else on an
+accepted program shows an alias the model forbids: a use after free, or a write in place through a `const` alias that
+the count of 1 allowed (F3).
+
+**The guard heap** (plan): `BP_HEAP=guard` in `ext/bpheap.inc`: each block on pages of its own, the end of the block at
+the end of its last page and an unmapped page after it, every free takes all access away from the pages
+(`mprotect`), and freed pages are never reused (a cap on the address space, then a quarantine in FIFO order). The
+first read of freed memory faults, wherever it is. It is R12 of §20 for the whole heap, and the quarantine R20 of
+decision 4 of §24.9 is the same mechanism for objects; one mechanism serves both. Before it exists:
+`fpc -gh` with `HEAPTRC=keepreleased` keeps freed blocks and fills them with `$F0` (measured: the `String` of H21 then
+prints megabytes of garbage), which the value oracle sees; `SAFE_DEBUG` adds R2, R10, R12, R17, R19.
+
+**The generator.**
+
+1. **Exhaustive, small.** Every hole so far has one shape: *make a borrow of a root, change the root by some route,
+   use the borrow*. The enumerator takes the product of the dimensions and writes one program per typed combination:
+   the borrow (a `const` parameter of `String`, of an array, of an interface, of a `TOwned`, of a record that holds
+   one; a `constref`; a view; a `.Get` local; later a region object, the place of `M.Ref`), the root (a local, a
+   parent local, a value parameter, a `var` parameter, a global, a field of `Self`, a field of another object, a
+   field of a record, an element), the route of the change (direct, a nested routine, a nested procedure value, a
+   `var` or `out` argument of the same call, a callee that writes a global, a method that writes a field, a
+   destructor run by a free, unwinding), the use (after, none). About 8 × 9 × 8 × 2 = 1152 shapes before the typing
+   drops the ill-typed ones; each is a program of 20 to 40 lines. Built in parallel, the whole set takes minutes. The
+   small scope hypothesis says this is where most holes are; H20 and every route of H21 are in it.
+2. **Random, typed, larger.** Programs grown from a grammar of FBP with the types tracked (as Csmith and Rustlantis
+   do), seeded with the shapes above and with `tests/lint/*.pas`, mutated (swap a mode, move a write into a nested
+   routine, wrap in a loop, add a `try`). Hours per night, not per PR.
+3. **Reduction.** A failing program is cut down while "V-vet accepts and the oracle fails" stays true (delta
+   debugging over the syntax of FBP), then kept as a lint test.
+4. **The method is tested too.** Remove the H20 rule from `bpvet` (a mutant): the enumerator must find H20. A
+   generator that does not find a known hole is not trusted to find an unknown one.
+
+**Differential runs against FPC (C3).** The same program at `-O-` and `-O2`, on x86_64, i386 and aarch64 (qemu, as CI
+does), with `BP_HEAP=rtl`, `bp` and `guard`, with `BP_MN=0` and `1`: the outputs must agree. Facts that hold at one
+level and not another (F5, the order of an `out` argument) are found this way. The EMI idea (Le et al., PLDI 2014)
+adds dead code that changes what the optimizer does without changing the meaning.
+
+**Model checking.** CBMC and ESBMC check C; FPC emits none, and a translation from Pascal would need its own trust.
+FBP programs read no input, so a run is a full check of that program, and the bounded enumeration of programs above,
+run on the interpreter, is the bounded model checking of the dialect. Pearce did the same for Featherweight Rust.
+
+### 26.6 The fact base
+
+A **fact** is a statement about FPC that the model rests on, with a program that measures it and fails when FPC
+changes. H20 and H21 show why: the one fact under the fix of H20 was measured once and kept as prose, and it was
+wrong (or right only in a case nobody wrote down). The rule from now on: **no statement of the form "FPC does X" in
+SPEC without a fact test**.
+
+- **Where:** `tests/facts/` (plan; bp has no `tools/audit/` of its own), one program per fact, `fNN_name.pas`, with a
+  header that `tests/facts.sh` reads:
+
+```pascal plan
+// FACT: F1 a managed argument of a const or constref parameter is not counted, from any place
+// USED BY: §24.9 rule 1, §26.4 [call-const], S28, H20, H21
+// MEASURED: FPC 3.2.2; x86_64, i386, aarch64; -O-, -O2; BP_HEAP=rtl, bp
+// EXPECT: local 1 / global 1 / field 1 / var alias 1 / parent var 1
+program f01_const_uncounted;
+```
+
+- **How it runs:** `tests/facts.sh` builds each with `tools/bp build` (debug and `--release`) and with plain `fpc`,
+  on every target and mode of CI, and compares the output with `EXPECT`. A changed fact fails CI and prints its
+  `USED BY` line: the obligations to open again. A new FPC release is first a run of the fact base.
+- **A fact is measured two ways** where it can be: the number (`StringRefCount`) and the behaviour (the program of the
+  hole under the guard heap). The number alone misled once.
+
+| Id | Fact | Status |
+|---|---|---|
+| F1 | `const`/`constref` pass a managed argument (`String`, dynamic array, interface, `TOwned`, a record with one) uncounted, from every place | **measured** 2026-11-06 for `String` (local, parent local, global, field, `var` alias, parent `var` parameter), dynamic array, `TOwned`; interface to measure |
+| F2 | a value parameter and an assignment count; the count is exact | measured in part (§4); to write |
+| F3 | a write `S[I] := C` copies when the count is above 1, writes in place when it is 1 | to write |
+| F4 | `var` passes the address of the place | to write |
+| F5 | an `out` argument is finalized by the caller before the other arguments are loaded: `P(X, X)` with `out A; const B` gives `B = ''` | **measured** 2026-11-06 (x86_64, `-O-`, `-O2`) |
+| F6 | a temporary passed to `const` (a function result) is held by the caller until the end of the statement | to measure |
+| F7 | a nested routine reads and writes the slots of its parents in place | measured (H20) |
+| F8 | `-Cr` checks every index of an array, a string and an open array; `for ... in` and `with` over an element of a dynamic array index it again on each use (measured: `A := nil` inside the loop raises `ERangeError` under `-Cr`) | measured in part; **`--release` drops `-Cr`** (H22) |
+| F9 | `raise` runs the `finally` blocks and finalizes the managed locals of each frame it leaves, the newest first | to measure |
+| F10 | the order in which the arguments of a call are evaluated | to measure (it decides `P(X, F(X))` where `F` writes `X`) |
+| F11 | class objects never move; a `TGrowArray` never moves (§20) | measured (§20); to keep as a test |
+| F12 | `Interlocked*` of FPC 3.2.2 on aarch64 has no barrier (v0.30.1) | measured; to keep as a test |
+| F13 | a global `TRegion` assigned in a program goes through a temporary (§20) | measured; to keep as a test |
+
+F12 and F13 are facts that the project found and fixed before; kept as tests, they cannot come back unseen.
+
+### 26.7 Proof obligations for the honest table
+
+Every row of §8 (Hn), every rule (Sn) and every run-time check (Rn) gets an **obligation**: the claim it must make
+true, in the words of the model (a lemma of 26.4 or a property of a library type), the facts it uses, and its
+**status**, one of, from weakest to strongest:
+
+| Status | Means |
+|---|---|
+| assumed | stated, with no evidence; the programmer (as in "linter (plan) + programmer") |
+| tested | lint tests and run tests exist for the cases someone wrote |
+| enumerated (k) | the exhaustive generator of 26.5 covers its constructs up to size `k`, no escape |
+| fuzzed (h) | also `h` CPU-hours of random generation, no escape |
+| proved | a proof on paper of its lemma in FBP, reviewed |
+| mechanized | the lemma is a theorem of the Lean model |
+
+An example of the table (plan: `tests/obligations.tsv`, read by a check `tools/obligations.py` in CI that fails when a
+rule code of `bpvet` has no row, when a row names a fact without a test, or when a fact test fails):
+
+| Row | Obligation | Facts | Status |
+|---|---|---|---|
+| H20, H21 | lemma W and A: no write of the place of a `const` managed argument during the call, by any route | F1, F4, F5, F7 | assumed (the nested route: tested; the others: open) |
+| S28 | a view is used only while its `String` is alive and unchanged (N, Reach, Change, Container) | F1, F3, F7 | tested; depends on H21 for a view of a `const` parameter |
+| S10 | `TOwned` is affine: copied only by `Move` | F2 | tested |
+| S5 | a `.Get` borrow does not outlive its owner, nor its `Reset` | F2 | tested |
+| S17 | region objects do not outlive their region | F11, F13 | tested |
+| H12, H22 | every index is checked in every build | F8 | assumed in `--release` (H22) |
+| `TOwned`, `TShared`, `TStrView`, `TMap` | the specification of the type (what `Get`, `Reset`, `Ref` promise) holds of its code | F2, F11 | tested |
+
+**The gate.** A change that adds a rule, a kind of borrow or root, or a type with `unsafe` insides (as `TStrView`,
+type helpers and `// raises:` did) lands with: (1) its rows in the table; (2) the facts it rests on, as tests; (3) its
+constructs in the grammar of the generator, so the fuzzer can reach its holes; (4) the status **enumerated** at least.
+After stage 3 a change of the core (the five rules, the call rule, the kinds) needs **proved**; after stage 4,
+**mechanized**. For the three examples: a `TStrView` would have needed F1 as a test, which fails today (H21); a type
+helper needs only "the body of a helper is checked as a method" (tested, `helper_*_bad.pas`) and the poison of `.Free`
+(S29); `// raises:` is not a memory rule, but its inference must keep lemma U (unwinding) true.
+
+### 26.8 The stages, cheapest certainty first
+
+| Stage | What | Done when | Effort (one model with review) |
+|---|---|---|---|
+| 0 | H21 and H22 filed as bugs (bugs first, §25); the corrections of §24.9 rule 1 and of the H20 comment of `bpveth20.pas`; `tests/facts/` with F1, F5, F7, F8 and `tests/facts.sh` in CI on the three CPUs | the facts run in CI; H21 and H22 are issues | 1-2 days |
+| 1 | the guard heap (`BP_HEAP=guard`); the exhaustive generator of the shapes of 26.5, the runner and the reducer (Python, `tools/fuzz/`); the value oracle (a small interpreter in Python first) | the mutant without the H20 rule is caught; every route of H21 is found on today's `bpvet`; a nightly job | 1-2 weeks |
+| 2 | the obligation table and its check; a status for every row of §8 and every rule | no row without a status; CI fails on a rule without a row | 2-3 days |
+| 3 | FBP on paper: the semantics, the judgments, C1 for strings, arrays, modes, nested routines, globals, fields; the interpreter tested against the binaries before the proof | the proof reviewed by a second agent with no access to the first one's notes, and by the owner; every lemma tagged M, F or B | 2-4 weeks |
+| 4 | FBP in Lean 4: the interpreter (`def step`), the checker (`def check`), the theorem `check P = true → never stuck`; the Lean interpreter replaces the Python one as V-ref; the differential `bpvet` against `check` in CI | the theorem has no `sorry`; the differential runs every night with no escape | 1-3 months |
+| 5 | grow FBP by one root kind at a time: `TShared` and `TWeak`, classes with destructors and the methods that free (decision 4), `TRegion` (S17, after Cyclone), `TMap.Ref` (S27), procedure values, interfaces | each kind: its lemmas mechanized and its shapes in the enumerator | 1-2 weeks per kind |
+| later | the library types with `unsafe` insides against their specifications, in Iris, only for a type that keeps having bugs; goroutines (data races) as a separate theorem, tested by the seeded scheduler of §21.3 until then | — | — |
+
+Stages 0 and 1 give the most certainty per hour: they test the facts the rules stand on, and they search the space
+where every known hole lives, without waiting for a proof. Stage 3 gives the list of lemmas, which is the list of what
+can still be wrong. Stage 4 makes the list short and checked by a machine.
+
+### 26.9 How each stage would have caught H20
+
+| Stage | How |
+|---|---|
+| 0, the fact base | F1 written as a test must say from which places an argument is uncounted; the test enumerates them, and the parent local is one of them. This is how H21 was found today |
+| 1, the enumerator | H20 is the shape (a `const String` borrow, a parent local root, a nested routine route, a use after): a program of about ten lines in the first thousand; the guard heap faults, `bpvet` accepted it before v0.40 |
+| 1, the value oracle | the interpreter prints the 20 letters `a`, the binary prints `#`: no fault needed |
+| 2, the obligations | §24.9 rule 1 and S28 claimed "a `const` parameter is a root that does not change while its routine runs"; its row asks for lemma W, with status "assumed", which the gate does not accept for a new rule |
+| 3, the paper proof | the case `[assign]` to a lender inside a call cannot be closed without premise (2) of *Call* and a complete `writes(f)` |
+| 4, Lean | the same case, and the proof cannot skip a sub-case: a missing route of `writes(f)` is an unproved goal, not a footnote |
+| 4, the differential | `bpvet` of v0.39 accepts the program of H20, the checker of the model rejects it: V-vet accepts, V-model rejects, with no run at all |
+
+### 26.10 The limits, said plainly
+
+- **FPC is not verified.** C1 is about the model; C3 (the binary behaves as the model) is tested, not proved. A
+  miscompilation, a bug of the RTL or of the heap is outside every theorem here. The differential runs of 26.5 find
+  some; a verified compiler (CompCert for C) has no counterpart for Pascal.
+- **`bpvet` is not verified.** C2 is tested on generated programs. A hole in a construct the generator never makes
+  stays. Extracting `bpvet` from the Lean checker would close C2 but replace a fast Pascal tool by another; not proposed.
+- **The model is a specification**: an error in the model is an error in both the proof and the oracle. The value
+  oracle and the binaries check the model against reality (C3), not against intent.
+- **The facts hold where they were measured**: the targets and versions of CI. Windows is run under wine; DOS is
+  measured by hand.
+- **`// UNSAFE:` and `// UNSAFE-UNIT:` code is outside**, as `unsafe` is in Rust; so are the RTL and the FCL, the
+  units used unchecked, and the insides of the library types until their specifications are checked.
+- **Goroutines** are outside C1: data races (S11, S11m, S11s, S19) and the M:N runtime are a separate claim, tested by
+  the seeded scheduler, not proved. The weak memory of aarch64 (F12) is a fact, not a model.
+- **The guard heap changes timing and addresses**: a hole that depends on reuse of a block is still found (the read
+  faults earlier), but a hole that depends on a race may hide.
+- **A small enumeration is not a proof**: it finds the holes of the shapes it knows. The shapes come from the rules of
+  the model, so a hole of a kind the model does not have (as H21 was, until its fact was measured) needs the fact
+  base, not the fuzzer.
+
+### 26.11 Open questions for the owner
+
+1. **H21 first, and how.** It is a use after free in code `tools/bp build` accepts, so by §25 it goes ahead of this
+   design. The fix proposed: (a) at a call, no `var` or `out` argument overlaps a `const` or `constref` managed
+   argument (static, local to the call; the law of exclusivity of Swift for locals and `inout`); (b) a `const` managed
+   argument whose place is not a local of the caller (a global, a field, an element, a `var` parameter, a slot of a
+   parent) is accepted only when `writes(f)` of the callee cannot reach it; when it may, or `f` is of another unit with
+   no summary, an error whose fix `bp fix` writes: a local copy (`T := G; P(T)`, one count); (c) the H20 rule takes the
+   `var` parameters of the parent too. Swift checks class properties and globals at run time instead; a static error
+   with a copy as the fix is cheaper and fits `bp fix`. Agree, or prefer a check at run time in `SAFE_DEBUG` for (b)?
+2. **H22: checks in `--release`.** Keep `-Cr` in `--release` (Rust keeps its bounds checks; the cost on the suite of
+   §25.2 to be measured, the hot loops already have `Chunks` and `BPVec`) and drop only `-Co`, or keep the release as
+   it is and say in §8 that a release build is outside the guarantee?
+3. **Lean 4 or Rocq** for stage 4. Recommended: Lean 4 (an executable interpreter, a fast compiled checker,
+   `Plausible` for testing the theorem first); Rocq only if a library type ever needs Iris.
+4. **The fact base** in `tests/facts/` (recommended) or under a `tools/audit/facts/` as in tv3?
+5. **The gate.** Should "enumerated" be required for every new rule now (recommended), and "proved" for the core after
+   stage 3?
+6. **The budget of CI.** The exhaustive set on every PR that changes `tools/bpvet` (a few minutes, recommended) and the
+   random generation nightly, or both nightly?
+7. **"Rust-level"**: accept the levels L0-L4 of 26.1 as the measure, with the numbers of 26.1 published in README?
+8. **Review of the proofs.** A proof on paper written by a model is reviewed by a second model with no access to the
+   first one's notes and then by the owner; a proof in Lean needs no review of its steps, only of its statement.
+   Agree?
