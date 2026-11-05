@@ -11,8 +11,9 @@ leaves "in progress" after every job has finished) and prints a line whenever th
   minutes (3 times QUEUE while another job of the run runs: the runners are busy with other PRs, a restart only puts the
   job at the end of the queue), or hangs in a step: the run is cancelled at once and its failed jobs started again, up
   to RERUNS times; one more such failure is exit 1. A step hangs when it runs longer than 3 times the same step of the
-  last successful run of the workflow plus 2 minutes; an install step (a name that starts with "Install", where a slow
-  apt mirror stalls: 15 s as a rule, 3 minutes on a slow mirror, 13 and 20 minutes when it stalled) after STALL minutes.
+  last successful run of the workflow plus 2 minutes, and at least STALL minutes; an install step (a name that starts
+  with "Install", where a slow apt mirror stalls: 15 s as a rule, 3 minutes on a slow mirror, 13 and 20 minutes when it
+  stalled) after STALL minutes.
 - A PR that conflicts with its base is exit 3 at once (merge the base in and push): GitHub starts no run for it, and
   an older run cannot be merged.
 - No run for the head commit: a new head commit (a push during the wait) is followed; no run after a minute
@@ -91,9 +92,11 @@ def hung(job, base):
         if s.get("status") != "in_progress" or not s.get("started_at"):
             continue
         b = base.get((job["name"], s["name"]))
-        limit = 3 * b + 120 if b is not None else None
+        # never below STALL: a test step of a few seconds in the baseline may take two minutes under qemu, and a
+        # restart for nothing costs more than the minutes it saves; apt: 15 s as a rule, 3 min on a slow mirror
+        limit = max(3 * b + 120, STALL) if b is not None else None
         if s["name"].startswith("Install"):
-            limit = STALL  # apt: 15 s as a rule, 3 min on a slow mirror is not a hang, 13-20 min is
+            limit = STALL
         if limit is not None and age(s["started_at"]) > limit:
             return "%s (%d s, the limit %d s)" % (s["name"], age(s["started_at"]), limit)
     return None
