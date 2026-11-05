@@ -143,7 +143,8 @@ GOROUTINES                             (§14; "do not communicate by sharing mem
     A TArray (or a record holding one) only as the last use of a local or as Copy(A): an array is shared by reference.
     TShared only of a class nobody changes after its constructor; a global is written only in initialization (§21.2).
   Channels: Ch := specialize TChan<T>.Create(Cap); Send / Recv(out V): Boolean / TryRecv / Close; for V in Ch.
-  select: case Select([A.Sel, B.Sel, Done], TimeoutMs) of ... — then TryRecv; -1 = timeout.
+  select: case Select([A.RecvCase(V), B.SendCase(X), Done.RecvCase], TimeoutMs) of ... — exactly one case happens; -1 = timeout.
+    Select([A.Sel, B.Sel, Done], TimeoutMs) — readiness only, then TryRecv.
   Cancellation: G.Cancel → Done is closed; in a task — Cancelled or Done in Select. A task error → G.Wait raises R7.
   The thread manager (on Linux threads without libc, §18; with -dSAFE_LIBC and on other Unixes — cthreads) is installed
   by -FaBPThreads, which tools/bp build adds: BP stays last in the program file too (§24.3). A bare fpc without the
@@ -824,17 +825,22 @@ passes into the task (fields, `Move`), and values come back through a channel.
 | `go f(x)` | `G.Go(TF.Create(X))` / `G.Go(@Proc)` | worse: no closures in FPC 3.2 (in 3.3+ an overload with an anonymous procedure can be added) |
 | `chan T`, `make(chan T, n)` | `specialize TChan<T>`, `TChan.Create(N)`; a copy of the record is the same channel | the same: a reference type, `N = 0` — rendezvous |
 | `v, ok := <-ch`, `for v := range ch` | `Ch.Recv(V)`, `for V in Ch` | the same |
-| `select` | `Select([A.Sel, B.Sel], TimeoutMs)` + `TryRecv` | worse: receive only, not atomic with the receive (retry on failure); plan: atomic, with send cases (§21.3) |
+| `select` | `Select([A.RecvCase(V), B.SendCase(X), Done.RecvCase], TimeoutMs)` | the same: atomic, receive and send cases, a random ready case; a timeout instead of `time.After` |
 | `sync.WaitGroup`, `errgroup` | `TGroup` | **better**: the group waits for the tasks on leaving the scope (structured concurrency), a goroutine leak is impossible |
 | a panic in a goroutine kills the process | error → group cancellation → `Wait` raises R7 with the original text | **better** |
 | `context.Context` | `G.Cancel`, `Done` (a closed channel) in `Select`, `Cancelled` | the same in meaning, without an extra parameter |
 | races are caught by `-race` | races are prevented by S11, S11m, S11s and S19: only values, moved arrays, channels, `TShared` of frozen or `// sync:` classes, `Move` go into a task, and globals are written in `initialization` | different: a prohibition instead of a detector (§21.2), with the `SAFE_DEBUG` net R17 at `Send` |
-| M:N scheduler, millions of goroutines | one task = one OS thread | worse: thousands, not millions; honestly "conditional" goroutines; plan: M:N on the stacks of `BPThreads` (§21.3) |
+| M:N scheduler, millions of goroutines | one task = one OS thread by default; M:N with `BP_MN=1` (§21.3) | worse: thousands, not millions (about 23 thousand goroutines per GiB under M:N, 44 KiB each); the default flips after the `runnext` lever (§25.1 step 6) |
 
 Design (we reuse the RTL, minimal custom code): a thread is `BeginThread`; a lock is `TRTLCriticalSection`;
-waiting is an `RTLEvent` (a binary semaphore). A waiting thread puts its event into the channel's waiter list
-while holding its lock, and whoever changed the state wakes everyone on the list — this way a wakeup is not lost
-(the same idea as `sudog` in the Go runtime), and `Select` is the same registration in several channels at once.
+waiting is an `RTLEvent` (a binary semaphore). A channel has a buffer and two queues of waiting cases (`sudog` of the Go
+runtime), each a record on the stack of the waiting call: a sender hands its value straight to the first waiting
+receiver (or puts it into the buffer), a receiver takes from the buffer or straight from the first waiting sender, so an
+unbuffered send ends when a receiver has the value. A waiter is queued while the call holds the lock, and the channel that
+fires it sets its event under the same lock, so a wakeup is not lost. `Select` locks the channels of its cases in the order
+of their addresses (`sellock` of Go), does a ready case picked from a random start, or queues one waiter per case that
+share one ticket: the first channel to fire one of them wins the ticket with a compare-and-swap, and the others skip it.
+`Select` over `Sel` (readiness only) keeps a list of events per channel that every change of the channel wakes.
 FPC strings and dynamic arrays count references atomically, so values are passed between threads as is.
 
 The thread manager must be initialized before SysUtils, so `BP` (which uses `BPThreads` first) goes first in the `uses`
@@ -843,8 +849,8 @@ The thread manager must be initialized before SysUtils, so `BP` (which uses `BPT
 On Linux `BPThreads` is threads on `clone`/`futex`/`mmap` without libc (§18), with `-dSAFE_LIBC` and on other
 Unixes — `cthreads`. On DOS (go32v2) there are no threads: `TGroup.Go` raises R8 immediately.
 
-Limitations of v0.3: `Select` is receive-only; no timers (`time.After`) — there is a `Select` timeout;
-no deadlock detection ("all goroutines are asleep"). All three are in the plan of §21.3.
+No timers (`time.After`): there is a `Select` timeout. Deadlock detection ("all goroutines are asleep") works under
+M:N (§21.3); under 1:1 a deadlock hangs.
 
 ## §15. Dependencies like Go, without a proxy (plan)
 
@@ -1054,7 +1060,8 @@ or above the parameter suppresses its S14 finding.
 | v0.15 | §24 step 3: S24 (a class downcast is `as`, `--fix` writes it) and S25 (an untyped parameter, a typecast of one, `absolute`) in the typed `bpvet`; H17 and H18 checked; the claims row of H19 said H17 |
 | v0.16 | §25.1 step 3: the benchmark suite `tests/bench/compare.sh` (binary trees, n-body, fannkuch, word count in Bp, C, Rust and Go; Goose not installed) and the baseline of §25.2; a non-failing CI step |
 | v0.17 | §21.3 step 5 result: the M:N runtime in `BPThreads` (`ext/bpsched.inc`) behind `BP_MN=1`, `BP_SCHED_SEED`, deadlock detection, `MNMODES` in `tests/run.sh` and CI; critical sections park goroutines in a table by address; the numbers against 1:1 |
-| v0.18 | §25.2: the Goose column of the suite (the four programs in Goose v2026.3, `goose build -O2`; the release is installed and cached by the CI job) and its numbers in the baseline |
+| v0.18 | §21.7 step 6: the atomic `Select` with send cases (`RecvCase`, `SendCase`), channels over queues of waiting cases (an unbuffered send ends when a receiver has the value); §14 updated |
+| v0.19 | §25.2: the Goose column of the suite (the four programs in Goose v2026.3, `goose build -O2`; the release is installed and cached by the CI job) and its numbers in the baseline |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1935,6 +1942,8 @@ data.
    *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test. *Status:* **done** (§21.3, step 5
    result): on with `BP_MN=1`; the default flips after the `runnext` lever of §25.1 step 6.
 6. **Atomic `Select` with send cases.** *Done:* `test_go` covers a send case and a race between two ready cases.
+   *Status:* **done** (§14): `TChan.RecvCase`, `TChan.SendCase`, `TSafeChan.RecvCase`; the channels hand values over
+   through queues of waiting cases; `test_go` (`AtomicSelect`) runs under 1:1, M:N and the seeds.
 7. **The summary:** §0, §4, the README, the statuses at the top: what exists, nothing else.
 
 ## §22. Final touches: what users love in the languages of the niche (design, plan)
@@ -2501,8 +2510,8 @@ a bug found by a program built with `bp build` goes ahead of the plan.
 | — | **done:** the typed `bpvet` (S17 v2), S21/S22, `bp run`, `--watch`, `bp new`; Send and Sync (S11m, S11s, S19, R17); spike 4 (M:N switch, guard areas by default); #146 (#151, #153–#155); the cheap holes of §8: `-FaBPThreads` and `-Sew` in `tools/bp build` (#156), S26a and S26b (#157, H19), S24 and S25 (#158, H17, H18) | §20, §21.7 steps 1–2, §22.8 steps 0–1, §24.8 steps 1–3 | |
 | 1 | — (the bugs of #146: done) | | |
 | 2 | — (the cheap holes of §8: done) | | |
-| 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and five languages, v0.16 and v0.18: the baseline is in §25.2; channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
-| 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (the runtime is done, on with `BP_MN=1`: §21.3, step 5 result; next: the atomic `Select`) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
+| 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and five languages, v0.16 and v0.19: the baseline is in §25.2; channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
+| 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (done: the runtime is on with `BP_MN=1`, §21.3, step 5 result; the atomic `Select`, §14) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
 | 5 | **The scope** (`Hold`, `Defer`) on the region runtime, then the `TComponent` owner | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
 | 6 | **The speed work** that the numbers of step 3 point to (§25.2) | §25.2 | after the runtime: it changes what is measured |
 | 7 | **The tools,** cheapest first: `bp explain`, S20 and `Fmt`, `bp test`, `--target`, `// derive:`, the profiler, `bp lsp`, the browser, S26c, hot reload | §22.8 steps 2–11 | each stands alone; the ones users ask for first go first |
