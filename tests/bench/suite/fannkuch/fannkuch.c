@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-/* Benchmark suite (tests/bench/compare.sh): fannkuch, the C version (the same loops). */
+/* Benchmark suite (tests/bench/compare.sh): fannkuch, the C version (the same loops; the elements and the flip counts
+   are 32-bit, the indices 64-bit, as in the other languages). */
 #include <stdio.h>
 #include <string.h>
 
@@ -11,7 +12,7 @@ static int flips(const int *p) {
   int result = 0;
   int k = q[0];
   while (k != 0) {
-    int i = 0, j = k;
+    long i = 0, j = k;
     while (i < j) {
       int t = q[i];
       q[i] = q[j];
@@ -26,12 +27,12 @@ static int flips(const int *p) {
 }
 
 static int next(int *p) {
-  int i = N - 2;
+  long i = N - 2;
   while (i >= 0 && p[i] > p[i + 1])
     i--;
   if (i < 0)
     return 0;
-  int j = N - 1;
+  long j = N - 1;
   while (p[j] < p[i])
     j--;
   int t = p[i];

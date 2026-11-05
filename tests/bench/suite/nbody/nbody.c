@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-/* Benchmark suite (tests/bench/compare.sh): n-body, the C version (the same bodies, the same order of operations). */
+/* Benchmark suite (tests/bench/compare.sh): n-body, the C version (the same bodies, the same order of operations;
+   the indices are 64-bit, as usize in Rust, int in Go, i64 in Goose and SizeInt in Bp). */
 #include <math.h>
 #include <stdio.h>
 
@@ -20,8 +21,8 @@ static Body bodies[COUNT] = {
 };
 
 static void advance(void) {
-  for (int i = 0; i < COUNT - 1; i++)
-    for (int j = i + 1; j < COUNT; j++) {
+  for (long i = 0; i < COUNT - 1; i++)
+    for (long j = i + 1; j < COUNT; j++) {
       double dx = bodies[i].x - bodies[j].x;
       double dy = bodies[i].y - bodies[j].y;
       double dz = bodies[i].z - bodies[j].z;
@@ -34,7 +35,7 @@ static void advance(void) {
       bodies[j].vy = bodies[j].vy + dy * bodies[i].m * mag;
       bodies[j].vz = bodies[j].vz + dz * bodies[i].m * mag;
     }
-  for (int i = 0; i < COUNT; i++) {
+  for (long i = 0; i < COUNT; i++) {
     bodies[i].x = bodies[i].x + DT * bodies[i].vx;
     bodies[i].y = bodies[i].y + DT * bodies[i].vy;
     bodies[i].z = bodies[i].z + DT * bodies[i].vz;
@@ -43,10 +44,10 @@ static void advance(void) {
 
 static double energy(void) {
   double e = 0;
-  for (int i = 0; i < COUNT; i++) {
+  for (long i = 0; i < COUNT; i++) {
     e = e + 0.5 * bodies[i].m *
                 (bodies[i].vx * bodies[i].vx + bodies[i].vy * bodies[i].vy + bodies[i].vz * bodies[i].vz);
-    for (int j = i + 1; j < COUNT; j++) {
+    for (long j = i + 1; j < COUNT; j++) {
       double dx = bodies[i].x - bodies[j].x;
       double dy = bodies[i].y - bodies[j].y;
       double dz = bodies[i].z - bodies[j].z;

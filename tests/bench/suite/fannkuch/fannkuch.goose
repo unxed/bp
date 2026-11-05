@@ -6,9 +6,9 @@ import std;
 
 let N = 10;
 
-fn flips(p: i32[10]) -> i64 {
+fn flips(p: i32[10]) -> i32 {
     var q = p;
-    var result = 0;
+    var result: i32 = 0;
     var k = q[0];
     while k != 0 {
         var i = 0;
@@ -53,11 +53,11 @@ fn main() {
     for i in N { p[i] = i as i32; }
     var index: i64 = 0;
     var checksum: i64 = 0;
-    var max_flips: i64 = 0;
+    var max_flips: i32 = 0;
     loop {
         let f = flips(p);
         if f > max_flips { max_flips = f; }
-        if index % 2 == 0 { checksum += f; } else { checksum -= f; }
+        if index % 2 == 0 { checksum += f as i64; } else { checksum -= f as i64; }
         index++;
         guard next(p) else { break; }
     }

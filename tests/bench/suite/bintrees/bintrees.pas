@@ -1,9 +1,9 @@
 { SPDX-License-Identifier: MIT }
-{ Benchmark suite (tests/bench/compare.sh): binary trees, an allocation-heavy tree.
+{ Benchmark suite (tests/bench/compare.sh): binary trees, the tier with one heap block per node.
   The program makes complete binary trees of growing depth and counts their nodes; every tree is built, walked once and
-  dropped. The trees of the loop live in one region that is reset after each walk (SPEC §20: "a loop uses Reset"); the
-  long-lived tree has a region of its own (TRegion and TRegionObject of unit BP). The other languages: bintrees.c
-  (malloc and free), bintrees.rs (Box), bintrees.go (the collector).
+  dropped node by node. A node is a plain class object on the heap; Drop frees each one (the destructor call is marked
+  UNSAFE: the dialect closes .Free). The other languages: bintrees.c (malloc and free), bintrees.rs (Box), bintrees.go
+  (the collector); Goose has no heap of single blocks. The tier with one arena per tree is bintrees_arena.
   Output: one line, the number of nodes counted. }
 program bintrees;
 
@@ -13,7 +13,8 @@ uses
   SysUtils, BP;
 
 type
-  TNode = class(TRegionObject)
+  TNode = class
+    // borrow: Drop frees every node of a tree
     Left, Right: TNode;
   end;
 
@@ -23,6 +24,7 @@ const
 
 function Make(const Depth: Integer): TNode;
 begin
+  // UNSAFE: the benchmark owns each node by hand; Drop frees it
   Result := TNode.Create;
   if Depth > 0 then
   begin
@@ -38,38 +40,42 @@ begin
     Result := Result + Check(T.Left) + Check(T.Right);
 end;
 
-{ the nodes of one tree of the given depth, in a region of its own }
-function Stretch(const Depth: Integer): Int64;
-var
-  R: TRegion;
+{ frees every node of the tree, children first }
+procedure Drop(T: TNode);
 begin
-  R := TRegion.Create;
-  Result := Check(Make(Depth));
+  if T.Left <> nil then
+  begin
+    Drop(T.Left);
+    Drop(T.Right);
+  end;
+  // UNSAFE: the benchmark frees each node by hand, as the C version calls free
+  T.Destroy;
 end;
 
-{ Iterations trees of the given depth, one region reset after each }
+function Once(const Depth: Integer): Int64;
+var
+  T: TNode;
+begin
+  T := Make(Depth);
+  Result := Check(T);
+  Drop(T);
+end;
+
 function Many(const Depth: Integer; const Iterations: Int64): Int64;
 var
-  R: TRegion;
   I: Int64;
 begin
   Result := 0;
-  R := TRegion.Create;
   for I := 1 to Iterations do
-  begin
-    Result := Result + Check(Make(Depth));
-    R.Reset;
-  end;
+    Result := Result + Once(Depth);
 end;
 
 function Run: Int64;
 var
-  R: TRegion;
   Long: TNode;
   Depth: Integer;
 begin
-  Result := Stretch(MaxDepth + 1);
-  R := TRegion.Create;
+  Result := Once(MaxDepth + 1);
   Long := Make(MaxDepth);
   Depth := MinDepth;
   while Depth <= MaxDepth do
@@ -78,6 +84,7 @@ begin
     Depth := Depth + 2;
   end;
   Result := Result + Check(Long);
+  Drop(Long);
 end;
 
 begin

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Benchmark suite (tests/bench/compare.sh): binary trees, the Rust version (Box; the tree is dropped by Drop).
+// Benchmark suite (tests/bench/compare.sh): binary trees, the tier with one heap block per node, the Rust version (Box; the tree is dropped by Drop).
 
 const MAX_DEPTH: u32 = 16;
 const MIN_DEPTH: u32 = 4;
