@@ -1770,6 +1770,49 @@ contended `EnterCriticalSection` yields. Verdict: **worth it; step 5 goes on**, 
   `ext/go`) can live in its record instead of the heap; the switch saves the FPU control words (MXCSR and x87, FPCR) or a
   goroutine that changes the rounding mode changes it for the others; `StackError` is reset per goroutine.
 
+#### Step 5 design: the M:N runtime in `BPThreads` (2026-11-05)
+
+The runtime is the spike moved into `BPThreads` (`ext/bpsched.inc`) and made multi-carrier. What the spike left out and
+how it is closed:
+
+- **The switch** also saves the FPU control words (x86_64: MXCSR and the x87 control word; i386: the x87 control word;
+  aarch64: FPCR). A new goroutine starts with the words of the thread that started it, as a kernel thread inherits them.
+- **One record for both kinds.** The goroutine fields join `TRawThread` (a flag `Green`, the saved stack pointer, the
+  state, the carrier it runs on, the links of the run queue, of the timers and of the waiters of an event). The
+  threadvar block lies in the record page. Goroutine regions are carved out of reservations of 4096 regions (64 on
+  i386), a new reservation when one is full; the guard area stays `PROT_NONE` (the owner's decision).
+- **Park without a lost wake-up.** A goroutine that parks keeps the lock of the object it waits on (an event) through
+  the switch; the carrier releases it after the goroutine's stack is saved (the `unlock` of `gopark` in Go). So a waker
+  that takes the waiter from the event under that lock always finds a goroutine that has left its stack. A yield is the
+  same with "put back into the run queue" as the action after the switch.
+- **Events.** One event type serves `RTLEvent` and `BasicEvent` (manual and auto reset), with OS waiters (futex) and
+  goroutine waiters (a list) at once. A wait with a timeout puts the goroutine on the timer list (after the switch, as
+  above); the timer and `Set` race for it with one compare-and-swap of its wake word, the loser does nothing. An auto
+  reset event hands its signal to a parked goroutine directly.
+- **Carriers.** One OS thread per CPU (`sched_getaffinity`; `BP_PROCS=N` overrides), started at the first goroutine. One
+  run queue under a spin lock for now (per-carrier queues are a measured lever of §25.1 step 6); an idle carrier sleeps
+  on a futex until a push or the next timer.
+- **A contended critical section** in a goroutine yields until it is free (it never sleeps in the futex while the owner
+  may wait in the run queue); an OS thread keeps the futex.
+- **The monitor** (one OS thread, every 10 ms) fires timers the carriers did not, adds a carrier when the run queue is
+  not empty and no switch happened in a tick (a blocking system call or a long loop; at most 256 carriers), and reports a
+  deadlock.
+- **Deadlock:** every goroutine parked without a timer, no carrier running one, the run queue empty, and every OS thread
+  of the program (the main thread) blocked in a wait of the runtime, two ticks in a row: the program stops with "BP: all
+  goroutines are asleep - deadlock!" and exit code 2, as in Go.
+- **`BP_SCHED_SEED=N`:** no carriers; the main thread runs the goroutines whenever it blocks (an event, a join, a
+  contended lock, `ThreadSwitch`), picks the next ready one at random from the seed, and a goroutine yields at a random
+  half of its lock entries (every channel operation takes one). One OS thread: the same seed gives the same
+  interleaving, a deadlock is exact. Timers use real time.
+- **The main thread stays an OS thread** (not a goroutine): its waits are futex waits, and in the seed mode it is the
+  carrier.
+- **The switch to M:N** is `BP_MN=1` at run time (or `-dBP_MN` as the default of a build) until the benchmark of
+  §25.1 step 3 and the tests under M:N and under seeds prove it; then the default flips. `-dSAFE_LIBC` stays 1:1.
+- **Left for later, measured first:** a start without the system calls of `InitThread` (40-50 us), a smaller first heap
+  chunk (`growheapsizesmall`), per-carrier run queues, a netpoller, `Sleep` that parks (FPC has no hook for it: a
+  `Sleep` in a goroutine pins its carrier, and the monitor adds one), the stacks of the parked goroutines in the
+  deadlock report.
+
 ### 21.4 The tree of `TComponent` is an owner
 
 Delphi and Lazarus have had an ownership tree since 1995: `TButton.Create(Form)` gives the button to the form, which
