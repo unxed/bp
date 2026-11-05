@@ -81,4 +81,19 @@ for name in s24_fix raises_fix; do
   check "$fixdir/$name.pas" --strict 0 "" ""
   rm -rf "$fixdir"
 done
+# a module that must not resolve: exit code 2 and a Fatal with the message the test names
+for f in "$here"/lint/compile/mf_*.pas; do
+  [ -e "$f" ] || continue
+  read -r _ _ kind text < "$f"
+  args=$(sed -n '2s#^// ARGS: ##p' "$f"); args=${args//@root@/$root}; args=${args//@rtl@/$rtl}
+  out=$("$bpvet" $args "$f" 2>&1)
+  got=$?
+  if [ "$kind" = fatal ] && [ "$got" = 2 ] && printf '%s\n' "$out" | grep -qF " Fatal: bpvet cannot resolve this file: $text"; then
+    echo "ok   $(basename "$f"): exit $got, Fatal: $text"
+  else
+    echo "FAIL $(basename "$f"): expected exit 2 and a Fatal with \"$text\", got exit $got:"
+    printf '%s\n' "$out"
+    fail=1
+  fi
+done
 exit $fail

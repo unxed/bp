@@ -30,7 +30,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | FFI: `TCResource`, the `ffi_libc` binding | **implemented, test** (needs libc, `-dSAFE_LIBC`) | §13 |
 | Goroutines: `TGroup/TTask/TChan/Select`, R6–R8 (ext layer, unit `BP`) | **implemented, tests** | §14, `test_go` |
 | Threads without libc (`ext/bpthreads.pas`: `clone`+`futex`+`mmap`), Linux without libc by default | **implemented, tests** (`test_threads`; x86_64, i386, aarch64, Alpine) | §18 |
-| Sum types: example and test; **S13 checks (`case` exhaustiveness, tag)** | example and test exist; **checks (linter) — plan** | §16, `test_sumtype` |
+| Sum types: example and test; **S13 checks (`case` exhaustiveness, tag)** | example and test (`test_sumtype`); **S13 is implemented in `bpvet`**: a `case` over an enumeration of the module lists every value and has no `else` (`s13_ok`, `s13_bad`, `s13_else_bad`), a variant field is read only in the branch of its tag (a read outside every `case` over its tag is an error, a write is allowed: `s13_variant_ok`, `s13_variant_bad`, `s13_read_ok`, `s13_read_bad`); **implemented, lint tests, CI**. Not checked yet: an enumeration of another unit, labels that are ranges or constants, and that a variant record is made only by its constructor function (a convention) | §16, §6, `test_sumtype`, `tests/lint/s13_*.pas` |
 | Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | `deps.txt`, `deps.lock`, MVS, the module cache, `vendor`, mirrors: **implemented, test, CI** (`tools/bp get`, `tools/bp vendor`, `tests/deps.sh`); Software Heritage, the unsafe audit: **plan** | §15 |
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
@@ -49,20 +49,21 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Support for `object` (Turbo Pascal) | **plan** | §19 |
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
-| Strings and maps: `TStrSlice`, `Fields`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 in the typed `bpvet` | §25.3 |
+| Strings and maps: `TStrSlice`, `Fields`, `TStrView`, `FieldViews`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 and S28 (a view does not outlive its `String`) in the typed `bpvet` | §25.3 |
 | A memory manager of BP: a cache per carrier, pages of one size class, frees from other threads by an atomic list, the start of a goroutine without `InitThread` | **step 1 implemented, tests, CI, on by default since v0.38** (`ext/bpheap.inc`, `BP_HEAP=rtl` for the heap of the RTL; `test_heap`, modes `rtlheap` and `mnrtlheap`); the start without `InitThread` is **design** (step 3) | §25.4 |
 | Vector kernels: unit `BPVec` (`Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays of numbers), SSE2 on x86_64 and Pascal elsewhere | **implemented, tests, CI** (`ext/bpvec.pas`, `test_vec`) | §25.2 |
 | The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
-| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (`BP_MN=1`), the `TComponent` owner (the typed `bpvet`, §21.4): **implemented**; `TArena` on the list: **design (plan)** | §21 |
+| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (the default since v0.44, `BP_MN=0` for 1:1), the `TComponent` owner (the typed `bpvet`, §21.4): **implemented**; `TArena` on the list: **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; doc tests exist (`tools/doctest.py`); the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
-| Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | `-FaBPThreads`, `-Sew`, S24, S25: **implemented**; `// raises:` inferred, checked and written by `--fix`: **implemented, lint tests, CI** (S30 in the typed `bpvet`, `bpvetraise.pas`); the rest **design (plan)**; the facts of §24 are measured; one model of lifetimes (a root, its reach, its changes): **design, for the owner's review** (§24.9) | §24 |
+| Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | `-FaBPThreads`, `-Sew`, S24, S25: **implemented**; `// raises:` inferred, checked and written by `--fix`: **implemented, lint tests, CI** (S30 in the typed `bpvet`, `bpvetraise.pas`); the rest **design (plan)**; the facts of §24 are measured; one model of lifetimes (a root, its reach, its changes): **design, decided 2026-11-05** (§24.9); extension methods are the exception, see the next row | §24 |
+| Extension methods (concept v4): `type helper for Integer`, `record helper for TPoint`, `class helper for TNode`, written by the author with the modeswitch in the module (class helpers need none) | **checked, lint tests, CI**: every rule of §6 applies to the body of a helper method as to any method (`tests/lint/helper_*_bad.pas`), the resolver of the typed mode refuses a helper that reads a private member of the type it extends (`tests/lint/compile/mf_helper_private.pas`), **S29** refuses a helper for `TObject` that would lift the poison of `.Free` (`s29_*.pas`; compile tests `mf_helper_*.pas`); `bp fix` writing the modeswitch is **plan** (§24.8 step 5) | §24.4, §6 (S29) |
 | An uninitialized local class reference, function result or `out` parameter (H19) | **checked:** `tools/bp build` adds `-Sew` (`tests/safe/compile/mf_uninit.pas`) and runs the typed `bpvet`: S26a proves the assignment on every path (also where FPC does not warn: a branch, an `out` parameter, a result), S26b keeps a class under 64 KiB so a nil dereference faults | §8, §22.9 |
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **checked** by the typed `bpvet` (`tools/bp build`): S11m, S11s, S19; `SAFE_DEBUG` R17 at `Send` | §8, §21.2 |
 | Class casts and untyped parameters (H17, H18): an unchecked downcast, `TBig(Buf)[N]` over a `var Buf`, `absolute` | **checked** by the typed `bpvet` (`tools/bp build`): S24 (`--fix` writes `as`), S25 | §8, §24.6 |
-| Speed competitive with C, Rust, Go and Goose on the same algorithm | **goal**, not measured yet; the order of the work: §25 | §25.2 |
+| Speed competitive with C, Rust, Go and Goose on the same algorithm | **measured** (`tests/bench/compare.sh`, CI report): the tables of every tier and the verdict on the run time are in §25.2 (about 1.0–1.3x of C is within reach without a compiler fork; gcc stays ahead in plain scalar loops); the before/after table of the steps of #181 is in unxed/bp#181 and #108; the levers still open: §25.2 | §25.2 |
 | Competitive size, memory, start and build time (#181) | **measured** (`tests/bench/size.sh`), verdicts and levers in §25.5 | §25.5 |
 
 ---
@@ -122,6 +123,15 @@ SUM TYPES AND PARAMETERS               (§16; enum and match from Rust without a
   String and other managed types go in the common part of the record (FPC does not allow them in the variant part).
   Parameters are const by default; var/out only when the caller must see the change (S14).
 
+EXTENSION METHODS                      (§24.4; the extension functions of Kotlin and Swift, shipped by FPC)
+  A helper adds methods to a type that is not yours: TIntHelper = type helper for Integer; TNodeHelper = class helper
+  for TNode; TPointHelper = record helper for TPoint. The line stays in the module, as for every modeswitch:
+  {$modeswitch typehelpers} for a type helper, {$modeswitch advancedrecords} as well for a record helper; a class
+  helper needs none. A helper method is a method: S3–S6, S9, S14, S19, S24–S26 check its body as any other.
+  A helper for TObject inherits TSafeObjectHelper (class helper(TSafeObjectHelper) for TObject), else S29; a helper
+  uses no private member of the type it extends (the typed bpvet stops there). One helper is in effect per type, the
+  last declared: to keep the methods of SysUtils write type helper(TStringHelper) for String.
+
 CLEANUP AND TESTS                      (§5; an idea from Zig)
   Non-memory (a handle, terminal mode, a lock): D := TDefer.Call(@Self.Close) — called on leaving the scope
   and on an exception; D.Cancel — "success, no need to call".
@@ -168,6 +178,12 @@ FFI                                    (§13; like cgo)
 ---
 
 ## §1. The idea in one paragraph
+
+**The philosophy of Better Pascal:** the simplicity of development of Go with the performance and reliability of Rust.
+Take the best of Go (memory safety, code that is simple to write and for a model to generate, build speed,
+performance, goroutines, light dependencies) and replace the unpredictability of a collector with the determinism of
+owners and regions, in a way that needs no lifetime annotations written by hand: everything is to be inferred.
+The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
 
 FPC already has almost everything: reference-counted strings with an encoding, dynamic arrays, records
 with automatic finalization, interfaces with an atomic counter, range checks,
@@ -390,6 +406,8 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S26a | definite assignment (H19): a class reference that FPC does not zero, read or returned before it is assigned | `bpvet` S26a (typed, `tools/bpvet/bpvetnil.pas`): an error on the first read of a local of a class or class-of type that is not assigned on every path before it, and on the end of a routine (or an `Exit`) where its result or an `out` parameter of such a type is not assigned on every path; branches are joined, a `while` or `for` body may not run (a `for` with constant bounds in its direction runs), a handler of `try...except` and a `finally` block start from the state before `try`; a `var` argument, `@F`, a name used by a nested routine and `asm` count as assignments; what `-Sew` already catches is reported too (`tests/lint/s26a_bad.pas`, `s26a_out_bad.pas`, `s26a_result_bad.pas`, `s26a_finally_bad.pas`, `s26a_ok.pas`); `// UNSAFE: <why>` on the line or above |
 | S26b | a class whose instance is larger than 64 KiB: a field of a nil reference past the unmapped first pages would not fault | `bpvet` S26b (typed): an error on a class of the module whose fields with those of its ancestors, counted from below (no alignment, no variant parts), exceed 65536 bytes; a large buffer goes into a dynamic array (`s26b_bad.pas`, `s26b_ok.pas`) |
 | S27 | the place of a value of a `TMap` kept: `P := M.Ref(K, D)` points into the slots of the map, which the next change of the map moves | `bpvet` S27 (typed, `bpvethold.pas`): an error on a call of `Ref` of a specialization of `TMap` that is not dereferenced at once (`Inc(M.Ref(K, 0)^)` is the form); `// UNSAFE: <why>` on the line or above (`tests/lint/s27_bad.pas`, `s27_ok.pas`) |
+| S28 | a `TStrView` (a part of a `String` without a reference, §25.3) outlives its `String`, or the `String` is written while a view of it lives | `bpvet` S28 (typed, `tools/bpvet/bpvets28.pas`): an error on a view of a `String` that is not a local variable, a value or `const` parameter or a constant of the routine (a field, a global, a result, a temporary, a `var`/`out` parameter); on a view, or a value holding one (a record, an array, a `TMap` or `TChan` of views), put in a field, a global, a `var`/`out` parameter, a local of the enclosing routine, a place reached through a pointer, the result outside its root, `Send`, a task or `Go`; on a field or global of a view type; on a write of the `String` (`:=`, `S[I] :=`, `SetLength`, `Insert`, `Delete`, `SetString`, `Str`, `Read`, a `var` argument, `@S`, a call of a nested routine that writes it) **before a later use** of a view of it (liveness until the last use, §24.9 decision 1: a write after the last use is fine); the root of a function that returns a view is elided with one `String` parameter, inferred inside the module, and written as `// root: S` on an exported routine with several (§24.9 decision 5); `// UNSAFE: <why>` on the line or above (`tests/lint/s28_*.pas`). Not caught: pointers to views, raw writes through `PChar(S)`, `with`, `goto`. `SAFE_DEBUG` is the second net: there a view holds its `String` |
+| S29 | a helper for `TObject` that does not inherit `TSafeObjectHelper` (extension methods, §24.4): FPC puts one helper in effect per type, the last one declared, so a second helper for `TObject` takes the place of the one that makes `.Free` a compile error, and `Obj.Free` compiles again (measured on FPC 3.2.2: `class helper for TObject` after `Safe` and `N.Free` builds) | `bpvet` S29 (`bpvetrules.pas`): an error on a class helper whose extended type is `TObject`, `System.TObject` or a name of the module that is `TObject` (`T = TObject`, also through another alias), unless it inherits `TSafeObjectHelper` (`class helper(TSafeObjectHelper) for TObject` keeps the poison and adds methods: `mf_helper_inherit.pas`); `// UNSAFE: <why>` on the line above or at the end of the line drops it; `TSafeObjectHelper` itself is not reported; a `// UNSAFE-UNIT:` module is not checked (`tests/lint/s29_bad.pas`, `s29_alias_bad.pas`, `s29_qualified_bad.pas`, `s29_ok.pas`). A helper for any other type has no rule of its own: the rules above check its body as the body of any method (`tests/lint/helper_destroy_bad.pas`, `helper_address_bad.pas`, `helper_create_bad.pas`, `helper_param_bad.pas`, `helper_cast_bad.pas`, `helper_nil_bad.pas`, `helper_global_bad.pas`, `helper_untyped_bad.pas`; S3, S4, S6, S14, S24, S26a, S19, S25), and a helper that reads a private member of the type it extends (`FObj` of a `TOwned`: FPC allows it, also from another unit, and it skips the check of `Get`) does not resolve in the typed mode, which `tools/bp build` runs (`tests/lint/compile/mf_helper_private.pas`). `Self.Free` in a helper and `N.Free` after a helper that inherits the poison do not compile (`tests/safe/compile/mf_helper_free.pas`, `mf_helper_inherit.pas`) |
 | S30 | a routine of the interface of a unit that may raise and does not say what (§24.5): the errors of a routine are hidden from its callers | `bpvet` S30 (typed, `tools/bpvet/bpvetraise.pas`): the set of a routine is the static class of each `raise X` of its body and the sets of the routines it calls, minus what an `except` around them handles (`on E: X` takes `X` and its descendants; a bare `except` and an `else` take everything), plus what a re-raise (`raise;`, `raise E` of the handler variable) raises again; the routines of the module grow to a fixpoint. A callee of a used unit (or of the module without a body: abstract, external) gives its mark; a routine of the RTL gives a table (the `StrToInt` family and `EncodeDate`/`EncodeTime`: `EConvertError`; `TFileStream.Create`: `EFCreateError`, `EFOpenError`; `TStrings.LoadFromFile`/`SaveToFile`; `TStream.ReadBuffer`/`WriteBuffer`/`CopyFrom`), nothing else; a call through a procedure variable or a method pointer and a property getter give nothing; a virtual call gives the set of the method it names. An error on a routine declared in the interface (a non-private method of a type there included, an operator not) with a non-empty set and no mark, and on a mark of a routine with a body that lists other classes than its set, fewer or more. The mark, `// raises: EConvertError, EParse`, is on the header line or a comment line right above it; `--fix` (and `tools/bp fix`) writes it at the end of the header line of the declaration (above it past 120 columns), rewrites a wrong list and removes the mark of an empty set (`tests/lint/raises_*.pas`, `raises_fix.src`) |
 | S21 | a file without a `program`/`unit`/`library`/`package` header, or a header whose name is not the name of the file (two sources of one name) | `bpvet` S21 (`bpvetstyle.pas`, over the text before the parse): an error; the name is compared without letter case (`unit Region` in `region.pas`); a file without a header is a `unit` when it has `interface`, else a `program`; `bpvet --fix` / `tools/bp fix` inserts the header before the first token or writes the name of the file into it; a file whose name is not an identifier (dots allowed) is reported without a fix (`tests/lint/s21_none_bad.pas`, `s21_name_bad.pas`, `s21_ok.pas`) |
 | S22 | a reserved word with an upper-case letter (`Begin`, `END`): the style of Better Pascal is lower case, upper case is the style of the 1980s and stands out in the text | `bpvet` S22: a warning (an error with `--strict`, so in `tools/bp build`); `--fix` lowers the word; comments, strings, `&escaped` identifiers and the bodies of `asm` blocks are skipped; `string` is not checked, it is written as the type it names (`String`); directives (`override`, `virtual`) are not reserved words and are not checked (`tests/lint/s22_bad.pas`) |
@@ -485,7 +503,7 @@ compensating check, and accepted risks are listed with a reason.
 | H17 | an unchecked class cast: `TB(O).Y[100]` on an object that is a `TA` reads past it (§24.6) | `bpvet` S24 (typed): a downcast is `O as TB`, `--fix` rewrites it; a cast between classes of different branches is an error; a cast from `Pointer` or an integer to a reference is S4 | — (done: the 2 downcasts of `safe/core.impl.inc` are `as`) | §24 step 3 |
 | H18 | an untyped parameter with a variable typecast, `TBig(Buf)[N] := 1`, writes anywhere (§24.6); `absolute` | `bpvet` S25 (typed): an untyped `var`/`const`/`out` parameter, a typecast of one and `absolute` are errors outside a `// UNSAFE:` mark | — (done: the 5 untyped parameters of the repository are in `ext/bpthreads.pas`, a `// UNSAFE-UNIT:`) | §24 step 3 |
 | H19 | an uninitialised local of a class type is a garbage pointer: `var F: TFoo; WriteLn(F.X)` | FPC: a warning | done: `bp build` adds `-Sew` (`mf_uninit.pas`; the region runtime had two results never set, fixed); S26a in the typed `bpvet`: definite assignment of a local, a function result and an `out` parameter of a class type; S26b: a class under 64 KiB (§22.9) | §24 step 2, §22 step 0 |
-| H20 | a nested routine frees the argument of its own `const` parameter: `Print(X)` where `Print` writes the local `X` of its parent, then reads `S` (FPC passes a local `String` or dynamic array to a `const` parameter without a count; measured: the freed block is taken by the next `String` of its size, §24.9) | nothing | the rule *change* of §24.9: a call of a nested routine, or of a nested procedure value, that writes a local passed as its `const` argument is an error of S17 | §24.9 step 2 |
+| H20 | a nested routine frees the argument of its own `const` parameter: `Print(X)` where `Print` writes the local `X` of its parent, then reads `S` (FPC passes a local `String` or dynamic array to a `const` parameter without a count; measured: the freed block is taken by the next `String` of its size, §24.9) | nothing | the rule *change* of §24.9: a call of a nested routine, or of a nested procedure value, that writes a local passed as its `const` argument is an error of S17 | **closed** (v0.40, #207): `bpvet` S17 (typed, `tools/bpvet/bpveth20.pas`) reports a call of a nested routine, or of an `is nested` procedure value, that passes a parent's local, value parameter or result of a managed type as a `const`/`constref` argument the callee writes, directly or through the nested routines it calls (`tests/lint/h20_bad.pas`, `h20_transitive_bad.pas`, `h20_ok.pas`); `tools/bp build` rejects the program of #207 |
 
 **H1. A borrow outlives its owner.**
 
@@ -828,6 +846,11 @@ calls stay inside a `// UNSAFE-UNIT:` module when a program needs them.
 
 ## §14. Goroutines: like Go, better in places
 
+**Goroutine** is the term of Better Pascal for a task started by `G.Go` (`TTask`), in respect of the language that
+inspired it: the documents, the messages of the tools and the code say goroutine, not coroutine or green thread. Since
+v0.44 goroutines run M:N on a few carrier threads by default (§21.3); `BP_MN=0` in the environment, or `-dBP_1TO1` in the
+build, gives one OS thread per goroutine, and `-dSAFE_LIBC` stays one OS thread per goroutine.
+
 The Go principle — "share memory by communicating" — maps onto the Safe Pascal ownership model: ownership
 passes into the task (fields, `Move`), and values come back through a channel.
 
@@ -841,7 +864,7 @@ passes into the task (fields, `Move`), and values come back through a channel.
 | a panic in a goroutine kills the process | error → group cancellation → `Wait` raises R7 with the original text | **better** |
 | `context.Context` | `G.Cancel`, `Done` (a closed channel) in `Select`, `Cancelled` | the same in meaning, without an extra parameter |
 | races are caught by `-race` | races are prevented by S11, S11m, S11s and S19: only values, moved arrays, channels, `TShared` of frozen or `// sync:` classes, `Move` go into a task, and globals are written in `initialization` | different: a prohibition instead of a detector (§21.2), with the `SAFE_DEBUG` net R17 at `Send` |
-| M:N scheduler, millions of goroutines | one task = one OS thread by default; M:N with `BP_MN=1` (§21.3) | worse: thousands, not millions (about 23 thousand goroutines per GiB under M:N, 44 KiB each); a round trip between goroutines 0.8 us under M:N against 11 us under 1:1; the default flips after a period of CI under M:N |
+| M:N scheduler, millions of goroutines | M:N on a few carriers by default since v0.44 (§21.3); `BP_MN=0` for one OS thread per goroutine | worse: thousands, not millions (about 23 thousand goroutines per GiB, 44 KiB each); a round trip between goroutines 0.8 us under M:N against 11 us under 1:1; a `Sleep` or a blocking system call holds its carrier (no netpoller yet) |
 
 Design (we reuse the RTL, minimal custom code): a thread is `BeginThread`; a lock is `TRTLCriticalSection`;
 waiting is an `RTLEvent` (a binary semaphore). A channel has a buffer and two queues of waiting cases (`sudog` of the Go
@@ -1093,10 +1116,13 @@ or above the parameter suppresses its S14 finding.
 | v0.37 | §25.3 the word count 0.47 → 0.43 s: the hash, the comparison of slices and the probe of `TMap` inlined, the last bytes of a key read at once; where the rest of the gap is (a managed slice) and why the region of objects is 3.3x (the protocol of a constructor) |
 | v0.38 | §25.4 the memory manager of BP on by default (`BP_HEAP=rtl` for the RTL heap): runs grown in place, a freed run of 1 MiB or more back to the kernel but for the last one; peak memory below the RTL heap on the arena and region tiers, a buffer of 1–3 MB in a loop 15–18 times faster |
 | v0.39 | §25.2 unit `BPVec` (#197): `Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays in SSE2 on x86_64, the same loops in Pascal elsewhere; `Axpy` of `Double` 1.74 → 0.73 s on 2G elements (gcc -O3 0.77 s) |
+| v0.40 | §25.3 `TStrView` (a part of a `String` without a reference: 16 bytes, not managed), `StrView`, `FieldViews`, keys of `TMap`; S28 in the typed `bpvet` with the liveness until the last use (the `String` of a view is a local or a parameter, not written before a later use of a view, a view does not leave the routine; `// root:` elided or inferred); H20 closed (#207: a nested routine that writes the local bound to its `const` parameter, an S17 finding); `SAFE_DEBUG`: a view holds its `String`; the hash of every key reads no byte past it; the word count of the suite on views: 1.98x → 1.24x of C (the VM) |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.41 (design) | §24.9 one model of lifetimes, for the owner's review: values, owners (roots) and borrows; one sentence (a borrow is used only while its root is alive and unchanged) and five rules (name, reach, change, signature, container) of which S5, S11, S17, S18, S27 and the approved S28 are instances; the string view as an instance; nested procedure values and CORBA interfaces as borrows; the lifetime marks sorted into fact and intent (`// borrow:` stays intent); the research table (Rust, Swift, Go, Goose, Zig, Vale, Hylo); H20 found and measured (a nested routine frees the argument of its own `const` parameter) |
 | v0.41.1 | §24.9 decided by the owner: the liveness until the last use for every *change* rule now, the codes kept, `// borrow:` stays intent, the quarantine R20 and the inferred freeing methods both, `// root:` a fact, H20 first (#207), `procedure of object` with the LCL, `M.Ref` one expression |
+| v0.42 | §24.4 extension methods (`typehelpers`): the dialect writes the modeswitch in the module; every rule of §6 checks the body of a helper method (`tests/lint/helper_*.pas`); S29: a helper for `TObject` must inherit `TSafeObjectHelper`, else `.Free` compiles again; a helper that reads a private member of the type it extends does not resolve in the typed mode; the rule card (§0) gets a block; the status rows of S13 (implemented) and of the speed (measured, §25.2, unxed/bp#181, #108) are corrected |
 | v0.43 | §24.5 `// raises:` (step 7 of §24.8): the typed `bpvet` infers the exception classes a routine may raise and checks the mark, S30 (`bpvetraise.pas`); `--fix` writes it; the policy for callees it cannot see (§24.5); the typed run of 228 files stays 1.1–1.2 s (the nodes that raise are collected once, the sets of the callees outside the module are kept) |
+| v0.44 | the philosophy of Better Pascal (§1, README): the simplicity of development of Go with the performance and reliability of Rust, the determinism of owners and regions instead of a collector; goroutine is the term of the project (§14); goroutines run M:N by default (`BP_MN=0`, `-dBP_1TO1` for 1:1), CI runs the 1:1 mode as the extra one |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1954,8 +1980,8 @@ how it is closed:
   thread without blocking must yield (`ThreadSwitch`), as with one carrier in Go before 1.14.
 - **The main thread stays an OS thread** (not a goroutine): its waits are futex waits, and in the seed mode it is the
   carrier.
-- **The switch to M:N** is `BP_MN=1` at run time (or `-dBP_MN` as the default of a build) until the benchmark of
-  §25.1 step 3 and the tests under M:N and under seeds prove it; then the default flips. `-dSAFE_LIBC` stays 1:1.
+- **The switch to M:N** was `BP_MN=1` at run time until the benchmark of §25.1 step 3 and the tests under M:N and under
+  seeds proved it; since v0.44 M:N is the default (`BP_MN=0` or `-dBP_1TO1` for 1:1). `-dSAFE_LIBC` stays 1:1.
 - **Left for later, measured first:** a start without the system calls of `InitThread` (40-50 us), a smaller first heap
   chunk (`growheapsizesmall`; done, see the start of a goroutine below), per-carrier run queues, a netpoller, `Sleep` that parks (FPC has no hook for it: a
   `Sleep` in a goroutine pins its carrier, and the monitor adds one), the stacks of the parked goroutines in the
@@ -2151,7 +2177,7 @@ data.
    (`tools/bpvet/bpvethold.pas`, `tests/lint/component_*.pas`).
 5. **The M:N runtime** after step 2: the scheduler behind the hooks, the monitor, deadlock detection, `BP_SCHED_SEED`.
    *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test. *Status:* **done** (§21.3, step 5
-   result): on with `BP_MN=1`; `runnext` is in (§21.3); the default flips after a period of CI under M:N.
+   result): the default since v0.44, after a period of CI under M:N (`BP_MN=0` for 1:1); `runnext` is in (§21.3).
 6. **Atomic `Select` with send cases.** *Done:* `test_go` covers a send case and a race between two ready cases.
    *Status:* **done** (§14): `TChan.RecvCase`, `TChan.SendCase`, `TSafeChan.RecvCase`; the channels hand values over
    through queues of waiting cases; `test_go` (`AtomicSelect`) runs under 1:1, M:N and the seeds.
@@ -2620,9 +2646,34 @@ run on 2026-11-04.
   class, as Kotlin extension functions and Swift extensions do. `SysUtils` already ships `TStringHelper`:
   `S.Trim`, `S.Split([','])`, `S.StartsWith('a')`, `(42).ToString` work on the UTF-8 `String` of §3 with byte lengths
   (measured: `S.Trim.Length` and `Length(S.Trim)` are both 20 for a Cyrillic text of 11 code points). `BP` adds one
-  helper with the code point view (`S.CPLength`, `for Ch in S.CodePoints`). Caveats: `Chars[I]` and `IndexOf` of
+  helper with the code point view (`S.CPLength`, `for Ch in S.CodePoints`; step 5 of §24.8, today `CPLength(S)` and
+  `CodePoints(S)` are functions). Caveats: `Chars[I]` and `IndexOf` of
   `TStringHelper` are byte based, as `S[I]` is (§3), and `ToUpper` of a non-ASCII text goes through the §3 limitation. This
-  is the same mechanism that poisons `.Free` (§6): a helper on `TObject`.
+  is the same mechanism that poisons `.Free` (§6): a helper on `TObject`. What the dialect says about it
+  (measured on FPC 3.2.2, 2026-11-05):
+  - **The modeswitch is written in the module, by the author.** FPC has no command line option for a modeswitch, so
+    `tools/bp build` could only add it by editing a copy of the source; the other modeswitches of the dialect
+    (`autoderef`, `nestedprocvars`) stand in the file too. A `type helper` needs `typehelpers`, a `record helper` needs
+    `advancedrecords` as well, a `class helper` needs none, and the helpers that SysUtils ships (`S.Trim`) work
+    in a module without the line: it is for declaring a helper, not for using one. Without the line both `fpc` and `bpvet` stop at the declaration (`Identifier not found
+    "helper"`, `cannot parse this file`), so it cannot be forgotten silently; the line is a mark of fact (§24.2), and
+    `bp fix` writing it with the first helper is step 5 of §24.8, not done yet.
+  - **A helper method is a method.** `bpvet` walks its body like any other: `Self.Destroy` is S3, `@Self` is S4,
+    `TNode.Create` without an owner is S6, a `String` by value is S14, `TSquare(Self)` is S24, a local class reference
+    read before it is assigned is S26a, a write to a global is S19, an untyped parameter is S25 (the lint tests
+    `helper_*_bad.pas`). `Self.Free` does not compile in a helper of a class: the poison reaches it.
+  - **One helper is in effect per type, the last one declared.** A second `type helper for String` hides
+    `TStringHelper` (`S.Trim` becomes `Illegal qualifier`); `type helper(TStringHelper) for String` inherits it and both
+    work. The same holds for `TObject`, and there it is a hole: `class helper for TObject` declared after `Safe`
+    takes the place of `TSafeObjectHelper` and `N.Free` compiles. **S29** closes it (§6): a helper for `TObject` inherits
+    `TSafeObjectHelper`, and then `N.Free` still does not compile.
+  - **A helper reads the private members of the type it extends,** also of a type of another unit: a record helper for
+    `specialize TOwned<TNode>` compiled with `Result := FObj`, which skips the check of `Get`, or could clear `FLife`
+    and end the ownership. The resolver of `bpvet` refuses it (`Can't access private member FObj`, a Fatal), so
+    `tools/bp build` does not compile such a module; the lint test `mf_helper_private.pas` holds the message.
+  - **Not closed:** a helper method that returns `Get` under another name (`function Raw: TNode`) hides the call from the
+    text rule S5 (`Local := Box.Raw; Box.Reset; Local.X`), as any function that wraps `Get` does; the typed `bpvet`
+    does not follow the result of a wrapper either (measured). It is the same open point as the roots of §24.1.
 - **Interfaces as borrows: `{$interfaces corba}`.** A CORBA interface is a plain reference with no counter: any class
   implements it (`TConsole = class(TObject, IWriter)`, no `TInterfacedObject`), and passing it is a borrow (measured:
   `Emit(C)` with `W: IWriter`, then `still alive`, then `destroyed` at the owner's `Free`). This is the interface of Go,
@@ -2685,7 +2736,7 @@ the three holes until the steps close them.
 | Loved in | Was in Better Pascal | After §24 |
 |---|---|---|
 | Swift non-escaping closures, Kotlin lambdas | "no closures in FPC 3.2" (§14, §22.7) | `nestedprocvars`: the non-escaping kind, today |
-| Kotlin and Swift extensions, Rust `impl` on a foreign type | not used | `typehelpers`, shipped by FPC |
+| Kotlin and Swift extensions, Rust `impl` on a foreign type | not used | `typehelpers`, shipped by FPC; a helper method is checked as any method, S29 keeps `.Free` poisoned (§24.4) |
 | Go interfaces | COM interfaces with ownership | `{$interfaces corba}`: an interface is a borrow |
 | Zig error sets, Rust `Result` in the signature | hidden exceptions | `// raises:` inferred and written |
 | Rust: no unchecked downcast, no `transmute` outside `unsafe`; Zig: no silent cast | not listed in §8 | S24, S25 |
@@ -2717,6 +2768,8 @@ One step is one PR from a fresh `main`, with a criterion of done.
 4. **Nested procedure values:** S17 roots one in its frame; `bp fix` writes the modeswitch; `tests/` gets a `ForEach` and
    a `Sort` with a nested comparator. *Done:* lint tests, the example builds with `bp build`.
 5. **The `String` helper of `BP`** (`CPLength`, `CodePoints`); `bp fix` writes `typehelpers`. *Done:* `test_utf8`.
+   *Status:* the rules for helpers are **done** (v0.42: S29, the lint tests of the bodies of helper methods, the compile
+   tests, §24.4); the helper of `BP` and `bp fix` writing the modeswitch are not.
 6. **CORBA interfaces:** S5 treats an interface local as a borrow and an interface field as a class field; `bp new`
    writes the directive. *Done:* lint tests; §0 item 5 rewritten.
 7. **`// raises:`** on the engine of §23, the two findings of §24.5. *Done:* lint tests; `bp explain` shows the set.
@@ -2728,7 +2781,7 @@ One step is one PR from a fresh `main`, with a criterion of done.
 
 Status: **design, decided by the owner on 2026-11-05** (the answers are under "Decisions of the owner" at the end);
 the implementation follows the order there. One part is decided and is an input, not a proposal: the string view `TStrView` with the rule S28
-(the conservative rule 3, `TStrSlice` stays the type that keeps its text; approved by the owner on 2026-11-05, built on
+(built with the liveness until the last use of decision 1, `TStrSlice` stays the type that keeps its text; approved by the owner on 2026-11-05, built on
 the branch `feat/strview`, §25.3 from v0.40). Here it is one instance of the general rule. The section answers four
 asks of unxed/bp#108: the borrowed string slice, the one sentence of §24.1 made into a model, the marks of fact
 (§24.2), and the same rule for closures that cannot escape and for interfaces as borrows (§24.4). Research first:
@@ -2859,7 +2912,7 @@ code.
 | S17 | the roots of the region style, `Hold`, components | the engine of all five rules; its root kinds grow by the rows of the table of roots | the engine |
 | S18 | style boundaries, where a GC reference lives | *reach*: a place of another root takes only values; the order of fields and the destructor of a GC class stay style findings of S18 | the boundary half joins *reach* |
 | S27 | `M.Ref(K, D)` dereferenced at once | *change* with a borrow of one expression | a root kind of the engine, the strict form stays |
-| S28 (approved) | a view: its `String` a local or a `const` parameter, no escape, no write after the first view | *name*, *reach*, *change* and *container* for the root `String` | a root kind of the engine; v1 as approved |
+| S28 (approved) | a view: its `String` a local or a `const` parameter, no escape, no write before a later use of a view | *name*, *reach*, *change* and *container* for the root `String` | a root kind of the engine; v1 as approved |
 | new | a call of a nested routine that writes a local passed as its `const` argument (H20, below) | *change* by a call | a finding of S17 |
 
 #### The string view as an instance of the model
@@ -3122,9 +3175,10 @@ Nothing is read across units but the signatures and their marks.
 
 Nothing moves for the user: the codes, the marks and the API stay, and S28 v1 lands as approved. The steps, one PR each:
 
-1. **S28 v1** (`feat/strview`, approved), with the call of a nested routine that writes the root as a change (above).
+1. **S28 v1** (`feat/strview`, approved), with the call of a nested routine that writes the root as a change (above);
+   built with the liveness until the last use (decision 1) and the elided or inferred `// root:` (decision 5), v0.40.
 2. **H20 closed**: S17 reports a call of a nested routine, or of a nested procedure value, that writes a local passed
-   as its `const` argument. *Done:* the program of H20 is a lint test `s17_constarg_bad.pas`.
+   as its `const` argument. *Done:* the program of H20 is a lint test `h20_bad.pas` (v0.40, #207).
 3. **One engine:** the escapes of S5 and the checks of S27 and `Hold` move onto the root engine of S17; the findings
    keep their codes; `bp explain` prints the sentence, the root and the rule. *Done:* `tests/lint.sh` unchanged, the
    typed run no slower.
@@ -3265,7 +3319,7 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     (`Pull(Bodies[I], Bodies[J])`), the same operations in the same order; the baseline above was measured with
     `Bodies[I].VX` written out in the loop.
   - **Word count.** Bp (since v0.25, §25.3) counts the words as `TStrSlice` values of the text (`for W in Fields(Text)`,
-    no copy of a word) in a `TMap` of unit `BP`, one lookup per word (`Inc(Counts.Ref(W, 0)^)`); the baseline above was
+    no copy of a word; `TStrView` values with `FieldViews` since v0.40) in a `TMap` of unit `BP`, one lookup per word (`Inc(Counts.Ref(W, 0)^)`); the baseline above was
     measured with a `String` of every word (`Copy`) and a table of its own (FNV-1a of 32 bits, open addressing).
     C counts the words in place in a table of the same kind. Rust and Go slice the text without copying and use their
     standard maps. Goose reads the text into one buffer and counts in its standard `dictionary` keyed by slices of that
@@ -3490,6 +3544,17 @@ end;
 function StrSlice(const S: String): TStrSlice;   // all of S
 function Fields(const S: String): TFields;       // for W in Fields(S): the runs of bytes above the space
 
+TStrView = record                          // a part of a String without a reference to it (v0.40): 16 bytes, not managed
+  function Sub(AStart, ALen: SizeInt): TStrView; // 1-based as Copy (R2)
+  function Len: SizeInt;
+  function ToString: String;               // a copy of the bytes: the way to keep a word
+  function Equals(const S: String): Boolean;
+  property Items[I: SizeInt]: Char; default; // 1-based (R2)
+  class operator =(const A, B: TStrView): Boolean;
+end;
+function StrView(const S: String): TStrView;       // all of S
+function FieldViews(const S: String): TViewFields; // for W in FieldViews(S): the words as views
+
 generic TMap<K, V> = record                // a copy refers to the same map (Go, TSlice); made by Create or the first write
   function Ref(const Key: K; const Default: V): PV;  // the place of the value, added with Default: Inc(M.Ref(W, 0)^)
   procedure Put(const Key: K; const Value: V);
@@ -3507,8 +3572,17 @@ end;
 - **A slice holds its text.** `TStrSlice` keeps a reference to the whole `String` (24 bytes: the `String`, the start,
   the length), so a slice, and a map whose keys are slices, keeps the text alive, as in Go; a write to the `String`
   variable later makes a new `String` (copy on write) and the slice does not see it. Nothing to check, the price is the
-  memory of the text. A slice without the reference would need a borrow rule of its own in `bpvet` (the text outlives
-  the slice and is not written meanwhile) and is not worth it: the measured cost of the reference is in the line below.
+  memory of the text. A slice is the type for a word that outlives its text or goes to another goroutine.
+- **A view does not (v0.40).** `TStrView` is a pointer and a length, 16 bytes, not managed: a copy is two words (no
+  `fpc_copy` in `for-in`) and an entry of a `TMap<TStrView, V>` is 32 bytes (40 with a slice). It is valid while its
+  `String` is not changed, and S28 of the typed `bpvet` proves it before the build, as Rust does for `&str` and Goose for
+  a slice of an array (§24.9 is the model): the `String` is a local, a parameter or a constant of the routine; it is not
+  written before a later use of a view of it (a write after the last use is fine); and a view, or a value that holds
+  one (a map of views), does not leave the routine: not in a field, a global, a `var` parameter, a task or an object.
+  It goes down as a `const` parameter; a function that returns a view is rooted in its one `String` parameter, or in
+  the one its body shows, and an exported one with several names it with `// root: S`. `W.ToString` copies a word that
+  must stay. `SAFE_DEBUG` is the second net: there a view holds its `String` (the layout of a slice), so a case
+  `bpvet` missed reads the old bytes, not freed memory.
 - **The map.** Open addressing with linear probing, the hash in the entry (`Hash`, `Key`, `Value`), at most half
   full, the slot from the top bits of the hash; deletion moves the entries after the hole back, so there are no
   tombstones. The hash of a key is `MapHash` (overloads for `String`, `TStrSlice`, `Int64`, `QWord`, `Pointer`; a
@@ -3535,16 +3609,19 @@ end;
   each 0.13 s (C 0.08 s); with the map 0.37 s (C 0.21 s, all of it); `for W in Fields` adds the 0.08 s of
   `fpc_copy`. Two changes, the output the same:
   - the hash: `MapHash` of a slice and `SafeHashBytes` are inlined, and the last bytes of a key are read as one
-    word, masked, when the `String` has eight more bytes (little-endian targets; a `String` key keeps the loop of
-    bytes, and a test checks that every slice of 0 to 20 bytes has the hash of a `String` of its bytes): 0.13 → 0.11 s;
+    word, masked, when the `String` has eight more bytes: 0.13 → 0.11 s. Since v0.40 the last 1–7 bytes of every key
+    (`String`, slice, view) are read as two overlapping words of four, or as the first, the middle and the last byte,
+    never past the key: within 3% of the masked word, and a test checks that every slice and view of 0 to 20 bytes has
+    the hash of a `String` of its bytes;
   - the comparison: `TStrSlice.=` and `SafeSameBytes` are inlined, and so is `Find` into `Ref`: no call is left in
     a probe. The word count: 0.47 → 0.43 s (C 0.21-0.22 s on the same runs).
   - Not a lever: a table at most a quarter full (0.40 s against 0.37 s: a larger table misses the cache more), and
     the slots taken through one pointer in `Find` (the same time).
   - What is left is in the type: a `TStrSlice` holds a `String`, so it is a managed record. Its copy in `for-in` goes
     through the type information (0.08 s), and an entry of the map is 40 bytes against 24 of C (the hand-written
-    table: 0.05 s of the difference). Both need a slice without the reference: a decision of design (a view valid
-    only in its loop, with a borrow rule in `bpvet`), not a change of code.
+    table: 0.05 s of the difference). Both need a slice without the reference: `TStrView` with S28 (v0.40, above).
+    The word count of the suite on views (median of 9, a busy machine): slices 452–507 ms, views 326–366 ms, C 252–262
+    ms, so 1.8–1.9x of C becomes about 1.3x.
 - **The region of objects (gprof, v0.37).** 85% of the time is the construction of a node: the constructor, the
   virtual `NewInstance` (the bump itself) and the virtual `AfterConstruction` that FPC calls for every object, about
   12 ns against the 1-2 ns of a bump in C; the walk of the tree is 4%. A copy of the current region in a global

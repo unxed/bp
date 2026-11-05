@@ -1526,7 +1526,8 @@ begin
   end;
 end;
 
-{ The switch to M:N, read once at the start: BP_MN=1|0, BP_SCHED_SEED=N, BP_PROCS=N. }
+{ The switch to M:N, read once at the start: M:N by default, BP_MN=0 (or -dBP_1TO1 as the default of a build) for one
+  OS thread per task; BP_SCHED_SEED=N, BP_PROCS=N. }
 procedure ReadSchedEnv;
 var
   V: PChar;
@@ -1535,10 +1536,10 @@ var
   Mask: array[0..127] of Byte;
   Got, I, B: LongInt;
 begin
-  MNOn := {$ifdef BP_MN}True{$else}False{$endif};
+  MNOn := {$ifdef BP_1TO1}False{$else}True{$endif};
   V := EnvValue('BP_MN');
-  if V <> nil then
-    MNOn := V[0] = '1';
+  if (V <> nil) and (V[0] <> #0) then
+    MNOn := V[0] <> '0';
   V := EnvValue('BP_SCHED_SEED');
   if (V <> nil) and (V[0] <> #0) then
   begin
