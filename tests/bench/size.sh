@@ -2,8 +2,7 @@
 # The size of a binary, its memory, its start and the build time of the smallest program, Better Pascal against C, Rust,
 # Go and Goose (safe/SPEC.md §25.5; report only, no thresholds). The program prints one line
 # (tests/bench/suite/hello/hello.{pas,c,rs,go,goose}); hello_sysutils.pas adds SysUtils and Format.
-# Variants:  bp: tools/bp build --release -O2         bp-sysutils: the same, hello_sysutils.pas
-#            bp-xx: the same as bp with -XX -CX (smart linking)
+# Variants:  bp: tools/bp build --release -O2 (with -XX -CX, smart linking)   bp-sysutils: the same, hello_sysutils.pas
 #            bp-libc: the same as bp with -dSAFE_LIBC (dynamic, glibc: the mode of an FFI to C, SPEC §18)
 #            gcc: gcc -O2 (dynamic, glibc)            gcc-static: gcc -O2 -static
 #            rust: rustc -O (dynamic, glibc)          rust-static: rustc -O -C target-feature=+crt-static (static glibc)
@@ -29,7 +28,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 out=${1:-$(mktemp -d)}
 N=${N:-1000}
-VARIANTS=${VARIANTS:-"bp bp-xx bp-sysutils bp-libc gcc gcc-static rust rust-static rust-musl rust-small go go-dyn go-small goose goose-static"}
+VARIANTS=${VARIANTS:-"bp bp-sysutils bp-libc gcc gcc-static rust rust-static rust-musl rust-small go go-dyn go-small goose goose-static"}
 FPC=${FPC:-fpc}
 if [ -z "${GOOSE:-}" ]; then
   if command -v goose > /dev/null 2>&1; then GOOSE=goose; else GOOSE=$HOME/.local/opt/goose-v2026.3/goose; fi
@@ -47,7 +46,7 @@ have() { command -v "$1" > /dev/null 2>&1; }
 
 avail() {
   case $1 in
-    bp | bp-xx | bp-sysutils | bp-libc) have "$FPC" && have python3 ;;
+    bp | bp-sysutils | bp-libc) have "$FPC" && have python3 ;;
     gcc | gcc-static) have gcc ;;
     rust | rust-static | rust-small) have rustc ;;
     rust-musl) have rustc && [ -d "$(rustc --print target-libdir --target x86_64-unknown-linux-musl 2> /dev/null)" ] ;;
@@ -64,7 +63,6 @@ build() {
   [ "${2:-}" = keep ] || { rm -rf "${o:?}" && mkdir -p "$o"; }
   case $v in
     bp) "$root/tools/bp" build --release -O2 -FU"$o" -FE"$o" "$src/hello.pas" && mv "$o/hello" "$b" ;;
-    bp-xx) "$root/tools/bp" build --release -O2 -XX -CX -FU"$o" -FE"$o" "$src/hello.pas" && mv "$o/hello" "$b" ;;
     bp-libc) "$root/tools/bp" build --release -O2 -dSAFE_LIBC -FU"$o" -FE"$o" "$src/hello.pas" && mv "$o/hello" "$b" ;;
     bp-sysutils) "$root/tools/bp" build --release -O2 -FU"$o" -FE"$o" "$src/hello_sysutils.pas" \
       && mv "$o/hello_sysutils" "$b" ;;

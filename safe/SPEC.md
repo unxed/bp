@@ -1084,6 +1084,7 @@ or above the parameter suppresses its S14 finding.
 | v0.31 | §25.4 step 1: the memory manager of BP (`ext/bpheap.inc`, `BP_HEAP=bp`): segments of 4 MiB, pages of 64 KiB, 72 size classes, a cache per carrier and per thread, frees from other threads by an atomic list, a pool of the caches of ended threads; 2M live blocks 444 → 145 ns per block, a tree of 8191 goroutines 404 → 80 ms on 4 carriers |
 | v0.32 (report) | §25.5 competitive on every dimension, step 1 (#181): `tests/bench/size.sh` (hello world in Bp, C, Rust, Go and Goose: build, rebuild, size, RSS, start); verdicts: size — reach (smart linking 1171 → 697 KiB, the collation table on request); memory — ahead (0.3 MiB); start — ahead of all but static C; build — reach (a rebuild 171 ms, target under 100 ms) |
 | v0.33 | §25.5 size and build: `BP` no longer uses `unicodeducet` (strings compare by code point unless the program uses it; hello world 1199 → 781 KiB, with `-XX` 697 → 288 KiB); `bpvet --buildkey` gives both keys of `tools/bp` in one run, and `tools/bp` starts fewer processes: a rebuild after an edit 176 → 144 ms |
+| v0.34 | §25.5: `tools/bp` keeps the units of each kind of build in a directory of its own (a release build linked the `BP` of a debug build when that came first: 34–36% slower in the region and word count programs); `--release` adds `-XX -CX` (smart linking, hello world 288 KiB) |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -3170,7 +3171,8 @@ The verdicts:
 - **Binary size: reach or beat.** The link map of the `-XX` binary (697 KiB) shows where the bytes are: the collation
   table of Unicode (`unicodeducet`) 427 KiB, the Unicode data (`unicodedata`, the letter case) 131 KiB, `System` 53
   KiB, `SysUtils` 33 KiB, `BPThreads` 21 KiB. Two levers:
-  1. `tools/bp build --release` links with `-XX -CX`: 1171 → 697 KiB, measured, and the RSS 0.7 → 0.3 MiB.
+  1. `tools/bp build --release` links with `-XX -CX`: 1171 → 697 KiB, measured, and the RSS 0.7 → 0.3 MiB. Done in
+     v0.34.
   2. The collation table only in a program that asks for it. Without a collation, `fpwidestring` compares strings by
      code point (it falls back to the old string manager), so only the order of `AnsiCompareStr` and its kin changes.
      The link map gives about 270 KiB for hello world: below static C (690 KiB) and Go (1203 KiB).
@@ -3217,6 +3219,20 @@ The verdicts:
   - What remains: the loading of the units (fewer units for a program that does not use them) and the link of the
     whole of `System` and `SysUtils`; on another machine FPC main compiles a hello world without `BP` in 36 ms and
     links it in 23 ms.
+- **The units of a build, v0.34.** fpc does not compile a unit again when only the options change. `tools/bp` let fpc
+  write the units of `BP` beside their sources, so every kind of build took the units of whichever kind came first: a
+  release build could link the `BP` of a debug build (`-Cr -Co`, no `-O2`, no `-CX`), and a debug build the `BP` of a
+  release one, without its checks. `tests/bench/compare.sh` gives each language a directory of its own (`-FU`), but
+  fpc looks in the current directory first, and it ran in the root of the repository, next to `bp.ppu`. The cost, one
+  check (a busy machine, median of 5): the region of objects 0.50 s with a release `BP` against 0.67 s with a debug
+  one, the word count 0.94 s against 1.28 s. The numbers of §25.2 measured since match the release ones, so they
+  stand.
+  - Now each kind of build (the version of fpc, the options, the directory of the program) has its units in
+    `units/<key>` of the cache, unless `-FU` is given; the first build into a directory compiles every unit (`-B`).
+    A `.ppu` in the current directory whose source is beside it is removed, as fpc would take it first.
+  - The cost: one compile of `BP` (about 330 ms) for each new kind and directory; the directories stay in the cache.
+  - `--release` adds `-XX -CX` (lever 1 above): hello world 288 KiB. A debug build stays without them: the link with
+    `-XX` took as long (168 against 167 ms on a busy machine), and the debug binary keeps all of `BP`.
 - **What a build needs: level, ahead of Rust.**
   - FPC with all its units is 282 MiB, and a build needs binutils (`ld`), not a C compiler or libc headers.
   - Go is 97 MiB. Rust is 1.2 GiB and links with a C compiler. Goose is 28 MiB and compiles through gcc.
