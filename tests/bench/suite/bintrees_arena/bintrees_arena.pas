@@ -1,9 +1,8 @@
 { SPDX-License-Identifier: MIT }
-{ Benchmark suite (tests/bench/compare.sh): binary trees, the arena tier (bump allocation, a tree dropped at once).
-  The program makes complete binary trees of growing depth and counts their nodes; every tree is built, walked once and
-  dropped. The trees of the loop live in one region that is reset after each walk (SPEC §20: "a loop uses Reset"); the
-  long-lived tree has a region of its own (TRegion and TRegionObject of unit BP). The other languages: bintrees_arena.c,
-  .rs, .go (one array of nodes with 4-byte index links) and .goose; the tier with one heap block per node is bintrees.
+{ Benchmark suite (tests/bench/compare.sh): binary trees, the arena tier, the Bp version. The nodes of a tree are the
+  elements of one growing dynamic array with 4-byte index links, the layout of bintrees_arena.c, .rs, .go and .goose;
+  dropping a tree is setting the length to zero, and a loop of trees keeps the array. The nodes as objects of a region
+  are the tier bintrees_region.
   Output: one line, the number of nodes counted. }
 program bintrees_arena;
 
@@ -12,74 +11,92 @@ program bintrees_arena;
 uses
   SysUtils, BP;
 
-type
-  TNode = class(TRegionObject)
-    Left, Right: TNode;
-  end;
-
 const
   MaxDepth = 16;
   MinDepth = 4;
+  None = High(Cardinal);
 
-function Make(const Depth: Integer): TNode;
+type
+  TNode = record
+    Left, Right: Cardinal;
+  end;
+
+  TPool = record
+    Items: array of TNode;
+    Len: Cardinal;
+  end;
+
+function Push(var A: TPool): Cardinal;
 begin
-  Result := TNode.Create;
+  if A.Len = Cardinal(Length(A.Items)) then
+    if A.Len = 0 then
+      SetLength(A.Items, 16)
+    else
+      SetLength(A.Items, 2 * A.Len);
+  A.Items[A.Len].Left := None;
+  A.Items[A.Len].Right := None;
+  Result := A.Len;
+  Inc(A.Len);
+end;
+
+function Make(var A: TPool; const Depth: Integer): Cardinal;
+var
+  L, R: Cardinal;
+begin
+  Result := Push(A);
   if Depth > 0 then
   begin
-    Result.Left := Make(Depth - 1);
-    Result.Right := Make(Depth - 1);
+    L := Make(A, Depth - 1);
+    A.Items[Result].Left := L;
+    R := Make(A, Depth - 1);
+    A.Items[Result].Right := R;
   end;
 end;
 
-function Check(T: TNode): Int64;
+function Check(const A: TPool; const T: Cardinal): Int64;
 begin
   Result := 1;
-  if T.Left <> nil then
-    Result := Result + Check(T.Left) + Check(T.Right);
+  if A.Items[T].Left <> None then
+    Result := Result + Check(A, A.Items[T].Left) + Check(A, A.Items[T].Right);
 end;
 
-{ the nodes of one tree of the given depth, in a region of its own }
-function Stretch(const Depth: Integer): Int64;
+function Once(const Depth: Integer): Int64;
 var
-  R: TRegion;
+  A: TPool;
 begin
-  R := TRegion.Create;
-  Result := Check(Make(Depth));
+  A.Len := 0;
+  Result := Check(A, Make(A, Depth));
 end;
 
-{ Iterations trees of the given depth, one region reset after each }
 function Many(const Depth: Integer; const Iterations: Int64): Int64;
 var
-  R: TRegion;
+  A: TPool;
   I: Int64;
 begin
+  A.Len := 0;
   Result := 0;
-  R := TRegion.Create;
   for I := 1 to Iterations do
   begin
-    Result := Result + Check(Make(Depth));
-    R.Reset;
+    Result := Result + Check(A, Make(A, Depth));
+    A.Len := 0;
   end;
 end;
 
-function Run: Int64;
 var
-  R: TRegion;
-  Long: TNode;
+  Long: TPool;
+  Root: Cardinal;
+  Total: Int64;
   Depth: Integer;
 begin
-  Result := Stretch(MaxDepth + 1);
-  R := TRegion.Create;
-  Long := Make(MaxDepth);
+  Total := Once(MaxDepth + 1);
+  Long.Len := 0;
+  Root := Make(Long, MaxDepth);
   Depth := MinDepth;
   while Depth <= MaxDepth do
   begin
-    Result := Result + Many(Depth, Int64(1) shl (MaxDepth - Depth + MinDepth));
+    Total := Total + Many(Depth, Int64(1) shl (MaxDepth - Depth + MinDepth));
     Depth := Depth + 2;
   end;
-  Result := Result + Check(Long);
-end;
-
-begin
-  WriteLn('bintrees ', Run);
+  Total := Total + Check(Long, Root);
+  WriteLn('bintrees ', Total);
 end.

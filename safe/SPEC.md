@@ -2830,27 +2830,34 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
      - `bintrees`, one heap block per node: Bp a plain class object freed by `Drop` (the construction and the
        destructor call carry `// UNSAFE:` and `// borrow:` marks, as the dialect asks for hand-owned objects), C
        `malloc`/`free`, Rust `Box`, Go the collector; Goose n/a (it has no heap of single blocks).
-     - `bintrees_arena`, the nodes of a tree in one arena that goes at once: Bp the region (as before, the file moved),
-       Goose the grow-only array (as before), and new: C, Rust and Go with one array of nodes and 4-byte index links
+     - `bintrees_arena`, the nodes of a tree in one arena that goes at once, with one layout: one array of nodes and
+       4-byte index links in every language. Bp a dynamic array of records, Goose the grow-only array (as before),
+       C, Rust and Go
        (`realloc` doubling, `Vec`, `append`; the layout of the Goose version). A loop of trees clears the array and
        keeps its buffer, as the Bp loop resets one region. Goose makes a new array per tree (the style of the
        language), which is not equalised.
-     - Layouts that still differ: the Bp region node is an object of 32 bytes (a VMT pointer and two
-       pointers), the others in this tier are 8 bytes; in the heap tier every node is 16 bytes of data plus the header of the
+     - `bintrees_region`, Bp only: the nodes as objects of a region (`TRegionObject`, 32 bytes with the VMT pointer
+       and two pointers), the program that was the arena row before. It shows the cost of the region style against
+       the same algorithm in a plain array.
+     - Layouts that still differ: in the heap tier every node is 16 bytes of data plus the header of the
        allocator (Bp: the RTL heap; `BP_HEAP=bp` gave the same time within 10% in one check).
      - Numbers (5 runs, a busy machine), ratio to gcc of the same tier:
 
        | tier | Bp | gcc | clang | Rust | Go | Goose |
        |---|---|---|---|---|---|---|
        | heap, one block per node | 1.023 s (2.24x) | 0.456 s (1.00x) | 0.581 s (1.27x) | 0.489 s (1.07x) | 0.980 s (2.14x) | n/a |
-       | arena | 0.267 s (3.31x) | 0.080 s (1.00x) | 0.094 s (1.16x) | 0.092 s (1.14x) | 0.117 s (1.45x) | 0.073 s (0.90x) |
+       | arena (one array, 4-byte links) | 0.135 s (1.67x) | 0.080 s (1.00x) | 0.091 s (1.13x) | 0.093 s (1.14x) | 0.125 s (1.55x) | 0.075 s (0.93x) |
+       | region of objects, Bp only | 0.262 s (3.3x) | n/a | n/a | n/a | n/a | n/a |
 
      - Verdicts withdrawn or changed: "Goose is six times faster than C" was the allocation style: Goose is level with
-       C in the same style (0.90x). "The region takes 0.57x of C" compared a bump with `malloc`: in its own tier the
-       Bp region is 3.3x of C and 3.7x of Goose, and with a heap block per node Bp is 2.2x of C, level with Go (2.1x);
-       Rust (`Box`) is level with C. So the gap of Bp on binary trees is real and larger than the baseline said, in
-       both tiers; the object model alone does not explain it (a `TGrowArray` with `Int32` links took 0.28 s, the same
-       as the region). No cause is diagnosed here: step 6 looks for it.
+       C in the same style (0.90x). "The region takes 0.57x of C" compared a bump with `malloc`.
+       - With the layout of the others (a dynamic array of records, 4-byte links), Bp is 1.67x of C, level with Go
+         (1.55x).
+       - The region of objects takes twice that: 0.26 s, 3.3x of C. So did a `TGrowArray` with `Int32` links
+         (0.28 s). The cost is in the object model and in the access of `TGrowArray`, not in the arena.
+       - These two are levers of step 6: the construction of a `TRegionObject` (a virtual `NewInstance` and
+         `AfterConstruction` per node) and the element access of `TGrowArray`.
+       - With a heap block per node, Bp is 2.2x of C, level with Go (2.1x); Rust (`Box`) is level with C.
   2. **Checks: noted, not equalised.** What each build keeps:
      - Bp `tools/bp build --release -O2`: no `-Cr` (range), no `-Co` (overflow), no stack check. Plain arrays,
        `Bodies[I]` and `P[I]` have no check at run time. The checks R1–R4 of the runtime guard `TOwned.Get`,
