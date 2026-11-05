@@ -32,6 +32,8 @@ uses
 
 implementation
 
+{$I atomic.inc}
+
 {$I core.impl.inc}
 {$I region.impl.inc}
 {$I map.impl.inc}
