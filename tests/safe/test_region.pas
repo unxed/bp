@@ -993,6 +993,7 @@ var
   H0, H1: PtrUInt;
 begin
   WriteLn('-- region');
+  SafeQuarantineSetLimits(4096, 16 * 1024 * 1024); // with SAFE_DEBUG the tables of the quarantine of R20 are made here
   H0 := HeapUsed;          // after the first output: the RTL allocates once on it
   ScopeExit;
   ByReference;
@@ -1031,6 +1032,7 @@ begin
   WriteLn('skip R12: SAFE_DEBUG on unix only');
   {$endif}
   Speed;
+  SafeQuarantineFlush;     // freed objects wait in the quarantine of R20 with SAFE_DEBUG
   H1 := HeapUsed;
   Check(H1 <= H0, 'nothing leaks: the heap is not above where it was (' + IntToStr(H1) + ' against ' + IntToStr(H0)
     + ')');

@@ -196,10 +196,22 @@ type
   PSafeVmtWords = ^TSafeVmtWords;
   TSafeVmtWords = array[0..(MaxInt div 64)] of PtrUInt;
 
+  { The poison VMT of a class: a copy of the header of its VMT whose parent is the class itself (so that a check of
+    the type, -CR, or an `is`, still sees a TFoo and the call reaches the trap, not an EInvalidCast), a name that says
+    SAFE-R20, and a trap in every virtual slot. One node per class, kept to the exit. }
+  PSafeQNode = ^TSafeQNode;
+  TSafeQNode = record
+    Next: PSafeQNode;
+    Orig: PtrUInt;          // the VMT of the class; the parent reference of the poison VMT points here
+    Name: ShortString;
+    Vmt: record end;        // 16 bytes of header, 256 of name, then the VMT
+  end;
+
 const
-  SafeQPoisonSlots = 1024;   // virtual methods of the poison VMT; a class with more has the rest unchecked
+  SafeQPoisonSlots = 512;   // virtual methods of the poison VMT; a class with more has the rest unchecked
   SafeQFillByte = $DE;
-  SafeQPoisonName: ShortString = 'TSafeFreedObject';
+  SafeQBuckets = 1024;
+  SafeQNodeVmt = 2 * SizeOf(System.Pointer) + 256;
 
 var
   GQLock: LongInt = 0;
@@ -216,7 +228,7 @@ var
   GQArmed: PSafeQArr = nil;        // open addressing, a power of two slots
   GQArmedCap: SizeInt = 0;
   GQArmedCount: SizeInt = 0;       // read without the lock by the wrapper: zero means nothing to look for
-  GQPoison: PSafeVmtWords = nil;
+  GQNodes: array[0..SafeQBuckets - 1] of PSafeQNode;
 
 {$push}{$R-}{$Q-}
 procedure SafeQLock;
@@ -309,25 +321,48 @@ begin
   Dec(GQArmedCount);
 end;
 
-{ Every virtual method of the poison VMT. The object is the first argument, as for any method. }
+{ Every virtual method of the poison VMT. The object is the first argument, as for any method; its VMT is the poison
+  one of its class, whose parent is the class. }
 procedure SafeQTrap(Obj: System.Pointer);
 var
-  I: SizeInt;
+  Vmt: PSafeVmtWords;
   Cls: String;
 begin
-  Cls := '';
-  SafeQLock;
-  for I := 0 to GQCount - 1 do
-    if GQRing^[(GQHead + I) mod GQCap].P = PtrUInt(Obj) then
-    begin
-      Cls := TClass(System.Pointer(GQRing^[(GQHead + I) mod GQCap].Orig)).ClassName;
-      Break;
-    end;
-  SafeQUnlock;
-  if Cls = '' then
-    SafeFail('SAFE-R20: a virtual method of an object that was freed (it has left the quarantine) is called')
-  else
-    SafeFail('SAFE-R20: a virtual method of a freed ' + Cls + ' is called (use after free or a second free)');
+  Vmt := PSafeVmtWords(PPtrUInt(Obj)^);
+  Cls := TClass(System.Pointer(PPtrUInt(Vmt^[vmtParent div SizeOf(PtrUInt)])^)).ClassName;
+  SafeFail('SAFE-R20: a virtual method of a freed ' + Cls + ' is called (use after free or a second free)');
+end;
+
+{ Under the lock: the poison VMT of the class with the VMT Orig. }
+function SafeQPoisonFor(Orig: PtrUInt): PtrUInt;
+var
+  B: SizeInt;
+  N: PSafeQNode;
+  V: PSafeVmtWords;
+  I: SizeInt;
+begin
+  B := SizeInt(((Orig shr 4) xor (Orig shr 14)) and (SafeQBuckets - 1));
+  N := GQNodes[B];
+  while N <> nil do
+  begin
+    if N^.Orig = Orig then
+      Exit(PtrUInt(@N^.Vmt));
+    N := N^.Next;
+  end;
+  N := GQOld.AllocMem(SafeQNodeVmt + vmtMethodStart + SafeQPoisonSlots * SizeOf(CodePointer));
+  N^.Next := GQNodes[B];
+  N^.Orig := Orig;
+  N^.Name := 'SAFE-R20 freed ' + TClass(System.Pointer(Orig)).ClassName;
+  V := PSafeVmtWords(@N^.Vmt);
+  System.Move(System.Pointer(Orig)^, V^, vmtMethodStart);   // the sizes stay those of the class
+  for I := vmtDynamicTable div SizeOf(PtrUInt) to vmtMsgStrPtr div SizeOf(PtrUInt) do
+    V^[I] := 0;
+  V^[vmtParent div SizeOf(PtrUInt)] := PtrUInt(@N^.Orig);
+  V^[vmtClassName div SizeOf(PtrUInt)] := PtrUInt(@N^.Name);
+  for I := vmtMethodStart div SizeOf(PtrUInt) to vmtMethodStart div SizeOf(PtrUInt) + SafeQPoisonSlots - 1 do
+    V^[I] := PtrUInt(@SafeQTrap);
+  GQNodes[B] := N;
+  Result := PtrUInt(V);
 end;
 
 { Under the lock: the oldest block goes back to the heap. }
@@ -367,7 +402,7 @@ begin
       E^.Size := Size;
       Inc(GQCount);
       Inc(GQBytes, Size);
-      W^[0] := PtrUInt(GQPoison);
+      W^[0] := SafeQPoisonFor(W^[0]);
       Tail := System.PByte(P) + SizeOf(PtrUInt);
       System.FillChar(Tail^, Size - SizeOf(PtrUInt), SafeQFillByte);
       SafeQUnlock;
@@ -384,10 +419,21 @@ begin
 end;
 
 procedure SafeQuarantineFlush;
+var
+  I: SizeInt;
+  N: PSafeQNode;
 begin
   SafeQLock;
   while GQCount > 0 do
     SafeQEvictOldest;
+  // no object has a poison VMT now: the VMTs go back too
+  for I := 0 to SafeQBuckets - 1 do
+    while GQNodes[I] <> nil do
+    begin
+      N := GQNodes[I];
+      GQNodes[I] := N^.Next;
+      GQOld.FreeMem(N);
+    end;
   SafeQUnlock;
 end;
 
@@ -396,6 +442,16 @@ begin
   SafeQuarantineFlush;
   SafeQLock;
   GQClosed := True;   // the manager stays installed for the rest of the exit; nothing is armed from now on
+  if GQArmedCount = 0 then
+  begin
+    // the tables go back, so that a heap check at exit (heaptrc) sees no block of the quarantine
+    GQOld.FreeMem(GQRing);
+    GQRing := nil;
+    GQCap := 0;
+    GQOld.FreeMem(GQArmed);
+    GQArmed := nil;
+    GQArmedCap := 0;
+  end;
   SafeQUnlock;
 end;
 
@@ -411,6 +467,8 @@ begin
   GQBytes := 0;
 end;
 
+procedure SafeQuarantineEnsure; forward;
+
 procedure SafeQuarantineSetLimits(MaxObjects, MaxBytes: SizeInt);
 begin
   SafeQuarantineFlush;
@@ -423,6 +481,8 @@ begin
     SafeQAllocRing;
   end;
   SafeQUnlock;
+  if SafeDebugChecks then
+    SafeQuarantineEnsure;   // the tables are made now, not at the first free
 end;
 
 function SafeQuarantineCount: SizeInt;
@@ -435,8 +495,6 @@ end;
 procedure SafeQuarantineEnsure;
 var
   M: TMemoryManager;
-  Base: PSafeVmtWords;
-  I: SizeInt;
 begin
   if GQInstalled then
     Exit;
@@ -447,17 +505,6 @@ begin
     SafeQAllocRing;
     GQArmedCap := 256;
     GQArmed := GQOld.AllocMem(GQArmedCap * SizeOf(TSafeQEntry));
-    // the poison VMT: the header of TObject without a parent, a name of its own, and a trap in every slot
-    Base := PSafeVmtWords(System.Pointer(TObject));
-    GQPoison := GQOld.AllocMem(vmtMethodStart + SafeQPoisonSlots * SizeOf(CodePointer));
-    System.Move(Base^, GQPoison^, vmtMethodStart);
-    GQPoison^[vmtInstanceSize div SizeOf(PtrUInt)] := SizeOf(PtrUInt);
-    GQPoison^[vmtInstanceSize div SizeOf(PtrUInt) + 1] := PtrUInt(-SizeInt(SizeOf(PtrUInt)));
-    for I := vmtParent div SizeOf(PtrUInt) to vmtMsgStrPtr div SizeOf(PtrUInt) do
-      GQPoison^[I] := 0;
-    GQPoison^[vmtClassName div SizeOf(PtrUInt)] := PtrUInt(@SafeQPoisonName);
-    for I := vmtMethodStart div SizeOf(PtrUInt) to vmtMethodStart div SizeOf(PtrUInt) + SafeQPoisonSlots - 1 do
-      GQPoison^[I] := PtrUInt(@SafeQTrap);
     M := GQOld;
     M.FreeMem := @SafeQFreeMem;
     M.FreememSize := @SafeQFreeMemSize;
@@ -474,7 +521,7 @@ function SafeQArm(O: TObject): Boolean;
 begin
   SafeQuarantineEnsure;
   Result := False;
-  if PtrUInt(O.ClassType) = PtrUInt(GQPoison) then
+  if PSafeVmtWords(O.ClassType)^[vmtDestroy div SizeOf(PtrUInt)] = PtrUInt(@SafeQTrap) then
     Exit;
   SafeQLock;
   if not GQClosed then

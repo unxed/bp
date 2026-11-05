@@ -133,8 +133,9 @@ begin
   B := TShapeBox.Own(TShape.Create('pent', 5));
   S := B.Get;
   B.Reset;
-  Check(S.ClassName = 'TSafeFreedObject', 'r20: ClassName of a freed object names the poison class: ' + S.ClassName);
-  Check(not (TObject(S) is TShape), 'r20: a freed object is not a TShape any more');
+  Check((Pos('SAFE-R20', S.ClassName) = 1) and (Pos('TShape', S.ClassName) > 0),
+    'r20: ClassName of a freed object names the poison class: ' + S.ClassName);
+  Check(S.ClassType <> TShape, 'r20: ClassType of a freed object is the poison class, not TShape');
 end;
 
 procedure FieldsArePoisoned;
