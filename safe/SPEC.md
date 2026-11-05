@@ -3190,8 +3190,16 @@ The verdicts:
   behind (1.6 ms).
 - **Build time: reach.** A rebuild takes 171 ms against 55–110 ms for C, Go and Goose (Rust 237 ms). It splits into
   110 ms of fpc and 60 ms of `tools/bp` (the check of `bpvet`). Of the 110 ms, 40 ms is the link and 70 ms is the
-  compile; a program without `BP` compiles in 40 ms, so 30 ms is the loading of the units of BP. The target: a rebuild
-  under 100 ms. The levers:
+  compile; a program without `BP` compiles in 40 ms, so 30 ms is the loading of the units of BP. The target is the
+  fastest builder for each kind of program, measured side by side on the same machine; a fixed number of milliseconds
+  is not the target, as it says nothing without the others:
+  - a small program: gcc. On hello world gcc rebuilds after an edit in 66 ms and Go in 204–230 ms (single runs on a
+    busy machine), so C is the one to reach there (`tests/bench/size.sh`);
+  - a project of many files: Go. There Go builds much faster than C (no headers to read again in every file, a
+    package compiled once and kept in its cache), so the long-run target is Go. This needs a benchmark of a project
+    beside hello world: the same project in Bp, C, Go, Rust and Goose, and a rebuild after an edit of one file.
+
+  The levers:
   - the check of an unchanged file from the cache of `bpvet`;
   - fewer units loaded by a program that does not use them.
 
@@ -3203,7 +3211,7 @@ The verdicts:
   - The stubs are now keyed on the identifiers and the `uses` of the program (`genstubs.py --key`) and on a `stat` of
     the unit path, and a passed check is cached with its output.
   - A rebuild after an edit, on a busy machine: Bp 289 ms (530 before), gcc 66 ms, Go 230 ms.
-  - Still to do, toward the target of under 100 ms and the level of C: the key without a run of Python, the link
+  - Still to do, toward the targets above: the key without a run of Python, the link
     (`ld` takes about 50 ms; gold, lld and `-Xi` are to be measured on a quiet machine), and the units of BP that a
     program does not use.
 - **The rebuild, v0.33 (a quiet machine, hello world with an edit, median of 11).** 176 → 144 ms.
@@ -3219,6 +3227,16 @@ The verdicts:
   - What remains: the loading of the units (fewer units for a program that does not use them) and the link of the
     whole of `System` and `SysUtils`; on another machine FPC main compiles a hello world without `BP` in 36 ms and
     links it in 23 ms.
+- **The units a program loads (v0.34, a busy machine, `ppcx64 -Cn`, median of 15).** An empty program compiles in
+  35 ms (`System` and 3 more units); `uses SysUtils` makes it 61 ms (13 units), `uses SysUtils, Classes` 91 ms;
+  `uses BP` 76 ms (20 units). So `BP` adds about 15 ms over `SysUtils` (`fpwidestring`, `BPThreads` and `BP`
+  itself), and most of the compile of a small program is the loading of `System` and `SysUtils`, which a program
+  of BP needs anyway. Leaving units of `BP` out would save at most those 15 ms; it is not done for now. The driver
+  `fpc` costs nothing measurable against `ppcx64` (81 against 82 ms, 21 runs each in turn).
+  - The floor of a rebuild of hello world over FPC 3.2.2 is then fpc itself: about 75 ms of compile and 45 ms of
+    `ld` on this machine, against 17 + 7 ms of `tools/bp`. Bp (144 ms) is ahead of Go (204–230 ms) there and behind
+    gcc (66 ms); the level of gcc needs a faster fpc: FPC main is to be measured with `BP` on one machine, and its
+    LLVM back end (#185).
 - **The units of a build, v0.34.** fpc does not compile a unit again when only the options change. `tools/bp` let fpc
   write the units of `BP` beside their sources, so every kind of build took the units of whichever kind came first: a
   release build could link the `BP` of a debug build (`-Cr -Co`, no `-O2`, no `-CX`), and a debug build the `BP` of a

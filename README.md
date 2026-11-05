@@ -21,7 +21,8 @@
 - **Ahead:** the memory of a program, the start (all but static C), the size among static binaries, one static file
   that runs on any Linux.
 - **Reaching:**
-  - the rebuild: under 100 ms;
+  - the rebuild: on a small program the level of gcc (hello world after an edit: Bp 144 ms, gcc 66 ms, Go 204–230
+    ms); on a project of many files the level of Go, which builds much faster than C there;
   - the run time: the levers of §25.2;
   - goroutines: M:N with `BP_MN=1`, and the memory manager of BP with `BP_HEAP=bp`, both off by default for now.
 - **Accepted as the niche:** a dynamic binary over glibc is smaller, but runs only where that glibc is.
