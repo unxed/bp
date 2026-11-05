@@ -18,6 +18,11 @@ uses
 procedure VetCheckS17(const Src: TVetSource; const Module: TPasModule; const Resolver: TPasResolver;
   var Report: TVetReport);
 
+{ The names of "// root: A, B" in Line (a header line) as ",a,b,"; '' without the mark. S28 reads the same marks. }
+function VetRootMark(const Line: String): String;
+{ Name is one of the names of Mark (as VetRootMark gives it). }
+function VetInMark(const Mark, Name: String): Boolean;
+
 var
   { bpvet --fix: S17 writes the // root: marks it infers onto the headers of the exported routines. }
   S17Fix: Boolean = False;
@@ -84,6 +89,7 @@ type
     function Alloc(const E: TPasExpr; const F: TFlow): TRoots;
     function HoldsRef(const T: TPasType; const Depth: Integer): Boolean;
     function Tracked(const E: TPasExpr): Boolean;
+    function IsS28Root(const A: TPasArgument): Boolean;
     function RootIndex(const Decl: TPasElement): Integer;
     function AddRoot(const AKind: TRootKind; const ADecl: TPasElement; const AName: String): Integer;
     function VarIndex(const F: TFlow; const Decl: TPasElement): Integer;
@@ -162,6 +168,12 @@ begin
     C := TPasClassType(C).AncestorType;
   end;
   Result := False;
+end;
+
+{ A view of a String (S28, bpvets28.pas): not a value of a region. }
+function IsStrView(const T: TPasType): Boolean;
+begin
+  Result := (T is TPasRecordType) and (SameText(T.Name, 'TStrView') or SameText(T.Name, 'TViewFields'));
 end;
 
 { A value of the region style: an object of a region class or a TGrowArray. }
@@ -396,6 +408,8 @@ begin
     Exit;
   if T is TPasClassType then
     Exit(IsRegionClass(T) or SameText(T.Name, 'TObject'));
+  if IsStrView(T) then
+    Exit; // its pointer is into a String, which S28 checks (bpvets28.pas)
   if (T is TPasPointerType) or SameText(T.Name, 'Pointer') or IsGrowArray(T) then
     Exit(True);
   if T is TPasArrayType then
@@ -408,6 +422,21 @@ begin
         and HoldsRef(Resolve(TPasVariable(M).VarType), Depth + 1) then
         Exit(True);
     end;
+end;
+
+{ A parameter that a // root: mark of S28 names: a String or a view. }
+function TS17.IsS28Root(const A: TPasArgument): Boolean;
+var
+  R: TPasResolverResult;
+begin
+  Result := False;
+  try
+    FResolver.ComputeElement(A, R, []);
+    Result := (R.BaseType in [btString, btAnsiString, btRawByteString]) or IsStrView(R.LoTypeEl);
+  except
+    on Exception do
+      Result := False;
+  end;
 end;
 
 function TS17.Tracked(const E: TPasExpr): Boolean;
@@ -517,14 +546,11 @@ begin
     F.Alive := F.Alive and not Bit(Region);
 end;
 
-{ The names of "// root: A, B" on the header line of P as ",a,b,"; '' without the mark. }
-function TS17.RootMark(const P: TPasProcedure): String;
+function VetRootMark(const Line: String): String;
 var
-  Line: String;
   I, J: Integer;
 begin
   Result := '';
-  Line := LineOf(P.SourceFilename, P.SourceLinenumber);
   I := Pos('// root:', Line);
   if I = 0 then
     Exit;
@@ -548,9 +574,20 @@ begin
     Result := Result + ',';
 end;
 
-function InMark(const Mark, Name: String): Boolean;
+function VetInMark(const Mark, Name: String): Boolean;
 begin
   Result := Pos(',' + LowerCase(Name) + ',', Mark) > 0;
+end;
+
+{ The names of "// root: A, B" on the header line of P as ",a,b,"; '' without the mark. }
+function TS17.RootMark(const P: TPasProcedure): String;
+begin
+  Result := VetRootMark(LineOf(P.SourceFilename, P.SourceLinenumber));
+end;
+
+function InMark(const Mark, Name: String): Boolean;
+begin
+  Result := VetInMark(Mark, Name);
 end;
 
 { A routine marked "// root: P" keeps values of the current region in P: at the call, P must be in that region. }
@@ -1322,6 +1359,10 @@ begin
     Named := 0;
     for K := 1 to High(FRoots) do
       if InMark(Written, FRoots[K].Name) then
+        Inc(Named);
+    // a // root: of S28 names the String (or the view) that the view the routine returns is a part of
+    for I := 0 to P.ProcType.Args.Count - 1 do
+      if InMark(Written, TPasArgument(P.ProcType.Args[I]).Name) and IsS28Root(TPasArgument(P.ProcType.Args[I])) then
         Inc(Named);
     if (Written <> '') and (Named = 0) then
       Add(P, Format('// root: of %s names no region object among its parameters (or Self of a region class)',

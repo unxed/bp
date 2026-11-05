@@ -3,8 +3,9 @@
   The file (made by compare.sh) is read whole. A word is a run of bytes above the space; each word is counted in a hash
   map. The program prints the number of words, the number of different words, the largest count and the sum of the
   squares of the counts.
-  Here the words are TStrSlice values of the text (Fields: no copy of a word) and the map is TMap of unit BP, updated
-  with one lookup per word (Ref). C counts the words in place in a table of its own (wordcount.c); Rust, Go and Goose
+  Here the words are TStrView values of the text (FieldViews: no copy of a word, no reference to the text) and the
+  map is TMap of unit BP, updated with one lookup per word (Ref); the text is a local of Count, which bpvet S28 checks
+  is not written while the views live. C counts the words in place in a table of its own (wordcount.c); Rust, Go and Goose
   slice the text and use their standard maps (wordcount.rs, wordcount.go, wordcount.goose).
   usage: wordcount FILE }
 program wordcount;
@@ -16,7 +17,7 @@ uses
 
 type
   TStreamBox = specialize TOwned<TFileStream>;
-  TCounts = specialize TMap<TStrSlice, Int64>;
+  TCounts = specialize TMap<TStrView, Int64>;
 
 function ReadAll(const Name: String): String;
 var
@@ -28,22 +29,17 @@ begin
     F.Get.ReadBuffer(Result[1], Length(Result));
 end;
 
+procedure Count(const Name: String);
 var
   Text: String;
-  W: TStrSlice;
+  W: TStrView;
   Counts: TCounts;
   P: TCounts.TPair;
   Total, MaxCount, SumSquares: Int64;
-
 begin
-  if ParamCount < 1 then
-  begin
-    WriteLn(StdErr, 'usage: wordcount FILE');
-    Halt(2);
-  end;
-  Text := ReadAll(ParamStr(1));
+  Text := ReadAll(Name);
   Total := 0;
-  for W in Fields(Text) do
+  for W in FieldViews(Text) do
   begin
     Inc(Counts.Ref(W, 0)^);
     Inc(Total);
@@ -57,4 +53,13 @@ begin
     SumSquares := SumSquares + P.Value * P.Value;
   end;
   WriteLn('wordcount ', Total, ' ', Counts.Count, ' ', MaxCount, ' ', SumSquares);
+end;
+
+begin
+  if ParamCount < 1 then
+  begin
+    WriteLn(StdErr, 'usage: wordcount FILE');
+    Halt(2);
+  end;
+  Count(ParamStr(1));
 end.
