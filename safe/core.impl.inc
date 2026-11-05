@@ -220,6 +220,27 @@ begin
   inherited Destroy;
 end;
 
+function TSafeLife.QueryInterface(constref IID: TGUID; out Obj): LongInt;
+  {$ifndef WINDOWS}cdecl{$else}stdcall{$endif};
+begin
+  if GetInterface(IID, Obj) then
+    Result := S_OK
+  else
+    Result := LongInt(E_NOINTERFACE);
+end;
+
+function TSafeLife._AddRef: LongInt; {$ifndef WINDOWS}cdecl{$else}stdcall{$endif};
+begin
+  Result := InterlockedIncrement(FRefCount);
+end;
+
+function TSafeLife._Release: LongInt; {$ifndef WINDOWS}cdecl{$else}stdcall{$endif};
+begin
+  Result := InterlockedDecrement(FRefCount);
+  if Result = 0 then
+    Destroy; // TryAddRef sees 0 from now on and does not revive it
+end;
+
 function TSafeLife.Cell: TSafeCell;
 begin
   if CellObj = nil then
