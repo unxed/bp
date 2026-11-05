@@ -1061,7 +1061,8 @@ or above the parameter suppresses its S14 finding.
 | v0.16 | §25.1 step 3: the benchmark suite `tests/bench/compare.sh` (binary trees, n-body, fannkuch, word count in Bp, C, Rust and Go; Goose not installed) and the baseline of §25.2; a non-failing CI step |
 | v0.17 | §21.3 step 5 result: the M:N runtime in `BPThreads` (`ext/bpsched.inc`) behind `BP_MN=1`, `BP_SCHED_SEED`, deadlock detection, `MNMODES` in `tests/run.sh` and CI; critical sections park goroutines in a table by address; the numbers against 1:1 |
 | v0.18 | §21.7 step 6: the atomic `Select` with send cases (`RecvCase`, `SendCase`), channels over queues of waiting cases (an unbuffered send ends when a receiver has the value); §14 updated |
-| v0.19 | §20 the region runtime (step 4 of #108): `safe/region.*.inc` in units Safe and BP, `test_region`, R2, R12 (`SAFE_DEBUG`), R14, R15, R16 at `Own`/`Share`/`Adopt`; `Reset` keeps the largest block, chunks in the region of the header, `Create` moves into a variable passed by reference |
+| v0.19 | §25.2: the Goose column of the suite (the four programs in Goose v2026.3, `goose build -O2`; the release is installed and cached by the CI job) and its numbers in the baseline |
+| v0.20 | §20 the region runtime (step 4 of #108): `safe/region.*.inc` in units Safe and BP, `test_region`, R2, R12 (`SAFE_DEBUG`), R14, R15, R16 at `Own`/`Share`/`Adopt`; `Reset` keeps the largest block, chunks in the region of the header, `Create` moves into a variable passed by reference |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -2547,9 +2548,9 @@ a bug found by a program built with `bp build` goes ahead of the plan.
 | — | **done:** the typed `bpvet` (S17 v2), S21/S22, `bp run`, `--watch`, `bp new`; Send and Sync (S11m, S11s, S19, R17); spike 4 (M:N switch, guard areas by default); #146 (#151, #153–#155); the cheap holes of §8: `-FaBPThreads` and `-Sew` in `tools/bp build` (#156), S26a and S26b (#157, H19), S24 and S25 (#158, H17, H18) | §20, §21.7 steps 1–2, §22.8 steps 0–1, §24.8 steps 1–3 | |
 | 1 | — (the bugs of #146: done) | | |
 | 2 | — (the cheap holes of §8: done) | | |
-| 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and four languages, v0.16: the baseline is in §25.2; Goose, channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
+| 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and five languages, v0.16 and v0.19: the baseline is in §25.2; channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
 | 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (done: the runtime is on with `BP_MN=1`, §21.3, step 5 result; the atomic `Select`, §14) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
-| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.19), then the `TComponent` owner | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
+| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.20), then the `TComponent` owner | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
 | 6 | **The speed work** that the numbers of step 3 point to (§25.2) | §25.2 | after the runtime: it changes what is measured |
 | 7 | **The tools,** cheapest first: `bp explain`, S20 and `Fmt`, `bp test`, `--target`, `// derive:`, the profiler, `bp lsp`, the browser, S26c, hot reload | §22.8 steps 2–11 | each stands alone; the ones users ask for first go first |
 | 8 | **The language from FPC 3.2:** nested procedure values, the `String` helper, CORBA interfaces, `// raises:` | §24.8 steps 4–7 | after the runtime and S17, which they extend |
@@ -2570,14 +2571,15 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   - channels (a ping-pong between goroutines, after step 4);
   - a small HTTP server (`examples/httpd`).
 
-  Each is run with the release build of each language (`bp build --release`, `gcc -O2`, `rustc -O`, `go build`, Goose's
-  release mode), on the same machine. CI reports the table and does not fail on it. The table goes here, with the
+  Each is run with the release build of each language (`bp build --release`, `gcc -O2`, `rustc -O`, `go build`,
+  `goose build`, whose default is the release mode), on the same machine. CI reports the table and does not fail on
+  it. The table goes here, with the
   machine and the versions.
 - **The baseline (step 3, 2026-11-05).** `tests/bench/compare.sh` builds and runs the four programs of
-  `tests/bench/suite/NAME/` (`NAME.pas`, `.c`, `.rs`, `.go`) in every language it finds, prints the table below and
+  `tests/bench/suite/NAME/` (`NAME.pas`, `.c`, `.rs`, `.go`, `.goose`) in every language it finds, prints the table below and
   checks that every language prints the same line. The channel and `httpd` items wait for the M:N runtime (step 4;
-  `examples/httpd/bench/run.sh` measures the server against Go and Rust meanwhile). CI runs it for Bp, C (gcc) and Go
-  and never fails on it (`continue-on-error`).
+  `examples/httpd/bench/run.sh` measures the server against Go and Rust meanwhile). CI runs it for Bp, C (gcc), Go and Goose
+  (the release v2026.3, installed by the job and cached) and never fails on it (`continue-on-error`).
 
   **Baseline (2026-11-05, Intel Core i5-6300U @ 2.40GHz, 4 logical CPUs, Linux 6.8.0-147-generic).**
 
@@ -2585,17 +2587,20 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     passes `-O2`.
   - C: gcc 13.3.0 `-O2` (the reference of the ratios) and clang 18.1.3 `-O2`; Rust: rustc 1.85.1 `-O`; Go: go1.22.2
     `go build`. No target CPU option anywhere.
-  - Goose: **not installed.** The owner picks the Goose version and installs it; its column is filled by the same
-    script then.
+  - Goose: v2026.3 (the official linux-x64 release, runtime 4d3da949e563), `goose build -O2` over gcc 13.3.0
+    (`-O2` is the default of a build: the release mode, without `--debug`, whose checks name the source line; signed
+    overflow wraps). No target CPU option. The Goose column was measured on the same machine on 2026-11-05 in a later
+    run; the gcc times of that run, for reference: binary trees 0.456 s, n-body 0.450 s, fannkuch 0.225 s, word count
+    0.235 s. The ratios of the Goose column are to those times; the other columns keep the numbers of the first run.
 
   Median wall time of 5 runs (the runs of the languages alternate), in seconds, and the ratio to C (gcc); lower is better:
 
-  | program | Bp | C (gcc -O2) | C (clang -O2) | Rust (rustc -O) | Go | Goose |
+  | program | Bp | C (gcc -O2) | C (clang -O2) | Rust (rustc -O) | Go | Goose (build -O2) |
   |---|---|---|---|---|---|---|
-  | binary trees | 0.656 s (1.43x) | 0.456 s (1.00x) | 0.552 s (1.21x) | 0.482 s (1.05x) | 0.946 s (2.07x) | not installed |
-  | n-body | 0.832 s (1.91x) | 0.435 s (1.00x) | 0.454 s (1.04x) | 0.553 s (1.26x) | 0.596 s (1.36x) | not installed |
-  | fannkuch | 0.303 s (1.37x) | 0.221 s (1.00x) | 0.238 s (1.07x) | 0.244 s (1.10x) | 0.252 s (1.13x) | not installed |
-  | word count | 0.560 s (2.61x) | 0.214 s (1.00x) | 0.244 s (1.14x) | 0.376 s (1.75x) | 0.357 s (1.66x) | not installed |
+  | binary trees | 0.656 s (1.43x) | 0.456 s (1.00x) | 0.552 s (1.21x) | 0.482 s (1.05x) | 0.946 s (2.07x) | 0.074 s (0.16x) |
+  | n-body | 0.832 s (1.91x) | 0.435 s (1.00x) | 0.454 s (1.04x) | 0.553 s (1.26x) | 0.596 s (1.36x) | 0.444 s (0.98x) |
+  | fannkuch | 0.303 s (1.37x) | 0.221 s (1.00x) | 0.238 s (1.07x) | 0.244 s (1.10x) | 0.252 s (1.13x) | 0.280 s (1.24x) |
+  | word count | 0.560 s (2.61x) | 0.214 s (1.00x) | 0.244 s (1.14x) | 0.376 s (1.75x) | 0.357 s (1.66x) | 0.204 s (0.86x) |
 
   The sizes: binary trees of depth 16 (14,985,902 nodes made, walked and dropped); n-body with 5 bodies and 5,000,000
   steps; fannkuch with n = 10; a word count over a generated text of 4,000,000 words (28 MB, 30,000 different words).
@@ -2615,13 +2620,21 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   - **Word count.** Bp makes a `String` of every word (`Copy`) and counts in a table of its own (FNV-1a of 32 bits,
     open addressing, a size fixed for this text), because `TDictionary` is not usable under the typed `bpvet` (below). C counts
     the words in place in a table of the same kind. Rust and Go slice the text without copying and use their standard
-    maps. The four are not the same work, which is the point of a strings item: it measures what the natural program
-    of each language costs.
+    maps. Goose reads the text into one buffer and counts in its standard `dictionary` keyed by slices of that buffer,
+    so it copies no word. The five are not the same work, which is the point of a strings item: it measures what the
+    natural program of each language costs.
+  - **Binary trees, Goose.** The nodes of one tree are the elements of one grow-only array with 4-byte self-relative
+    links; the array belongs to the scope of the call, so dropping the tree is the end of that scope, a pointer store.
+    That is the region style of Bp in the language that has it by construction.
+  - **N-body, fannkuch (Goose).** The same loops and the same order of operations; the n-body line equals the others.
 
   What the numbers say, for step 6 to check (no cause is diagnosed here): Bp is 1.4-1.9x of C on binary trees, n-body
   and fannkuch, where the code generator of FPC and the region allocator are the candidates, and 2.6x on the word
   count, where a `String` per word (a reference count and a heap block) is the candidate. Go is the slowest on binary
   trees. Bp is slower than C on all four, and nowhere by an order of magnitude: the goal of this section is not met yet.
+  Goose is ahead of C on binary trees by a factor of six (0.16x: a bump allocator and no per-node `free`), level with C
+  on n-body (0.98x), 1.24x on fannkuch and 0.86x on the word count (no copy of a word). Bp in the region style takes
+  1.43x of C on binary trees, about nine times the time of Goose; step 6 looks for the reason.
 
   Found on the way and fixed since (#162, #163): the typed `bpvet` refused `Round(X)`, `Trunc(X)`, a literal above the
   Int64 range (`QWord($CBF29CE484222325)`), `QWord($CBF29CE4) or $84222325` and a unit with a dot in its name
