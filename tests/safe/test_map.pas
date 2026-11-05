@@ -190,7 +190,8 @@ const
 var
   M: TInts;
   Ref: array of Int64;
-  I, K: Int64;
+  I: Integer;
+  K: Int64;
   Ok: Boolean;
   P: TInts.TPair;
   Sum, Seen: Int64;
@@ -222,10 +223,10 @@ begin
     if Ref[I] >= 0 then
     begin
       Inc(K);
-      Ok := Ok and M.Has(I) and (M[I] = Ref[I]);
+      Ok := Ok and M.Has(Int64(I)) and (M[Int64(I)] = Ref[I]);
     end
     else
-      Ok := Ok and not M.Has(I);
+      Ok := Ok and not M.Has(Int64(I));
   end;
   Check(Ok and (M.Count = K), 'TMap: 600000 random puts and deletes agree with an array (' + IntToStr(K) + ' keys)');
   Sum := 0;
