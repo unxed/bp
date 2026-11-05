@@ -30,8 +30,8 @@
   The directive nostackframe, which that parser does not know, is skipped (bpvetcore.pas, TVetLineReader).
   Rules: S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16 (bpvetrules.pas); S17 (bpvets17.pas, typed);
   S11m, S11s, S19 (bpvetrace.pas, typed); S24, S25 (bpvetcast.pas, typed); S26a, S26b (bpvetnil.pas, typed);
-  S6 and S17 of the calls of Hold of a scope or a region, S5, S6 and S17 of the tree of TComponent (bpvethold.pas,
-  typed);
+  S6 and S17 of the calls of Hold of a scope or a region, S5, S6 and S17 of the tree of TComponent, S27 (bpvethold.pas,
+  typed); S28, a view of a String does not outlive it (bpvets28.pas, typed);
   S21, S22 (bpvetstyle.pas, over the text, before the parse). --fix writes the fixes of S17, S21, S22 and S24 into the files. }
 program bpvet;
 
