@@ -70,6 +70,8 @@ implementation
   RawRelocateThreadVar, which would check the stack again, without end. }
 {$S-}
 
+{$I ../safe/atomic.inc}
+
 const
   {$ifdef cpu64}
   RegionLog2 = 23; // 8 MiB of virtual address space per thread, as with pthread
