@@ -103,6 +103,15 @@ jobs:
           FPCOPTS: -Cr -Co -Sew
           NO_COMPILE_CHECKS: "1"
         run: bash tests/run.sh
+      - name: test_region with SAFE_DEBUG (a use after Reset stops at once, R12; SPEC §20)
+        env:
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
+          OUT: ${{ runner.temp }}/out-debug
+          FPCOPTS: -dSAFE_DEBUG
+          NO_COMPILE_CHECKS: "1"
+          SKIP: test_safe test_sumtype test_ffi
+        run: bash tests/run.sh safe
       - name: Spike 3 of unxed/bp#108, GC roots from the stack of the goroutine (tools/spikes/gcroots)
         run: bash tools/spikes/gcroots/run.sh
       - name: Spike 2 of unxed/bp#108, the region style (tools/spikes/region)

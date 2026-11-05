@@ -1,6 +1,6 @@
 { SPDX-License-Identifier: MIT }
 { Better Pascal: one unit that gives everything.
-    1) safe (safe/): ownership, slices, arena, defer, FFI, poisoned dangerous primitives;
+    1) safe (safe/): ownership, slices, arena, regions, defer, FFI, poisoned dangerous primitives;
     2) ext  (ext/):  UTF-8 by default, goroutines/channels/Select, the thread manager.
   Usage: `uses ..., BP;` LAST in every module, the program included; build with tools/bp build or fpc -FaBPThreads,
   which installs the thread manager before any other unit (SPEC §24.3). For debug builds, compile
@@ -27,9 +27,11 @@ uses
   {$if defined(unix) and not defined(SAFE_NO_CWSTRING)}cwstring,{$endif} // UTF-8 <-> UTF-16 and letter case through libc
   {$endif}
   {$ifdef windows}Windows,{$endif}
+  {$if defined(SAFE_DEBUG) and defined(unix)}BaseUnix,{$endif} // R12: the pages of a released region lose all access
   SysUtils;
 
 {$I safe/core.intf.inc}
+{$I safe/region.intf.inc}
 {$I ext/go.intf.inc}
 {$I ext/utf8.intf.inc}
 {$I safe/poison.intf.inc}
@@ -37,6 +39,7 @@ uses
 implementation
 
 {$I safe/core.impl.inc}
+{$I safe/region.impl.inc}
 {$I ext/go.impl.inc}
 {$I ext/utf8.impl.inc}
 {$I safe/poison.impl.inc}

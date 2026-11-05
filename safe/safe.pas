@@ -5,6 +5,7 @@
 
   What the module does (and only this):
   - TOwned/TShared/TWeak/TSlice/TArena, TDefer, FFI (TCResource), leak counter (SPEC §4–5, §13);
+  - the region style: TRegion, TRegionObject, TGrowArray<T> (SPEC §20);
   - "poisons" dangerous primitives by name shadowing (SPEC §6): GetMem(...) in a module
     where Safe is last in uses will not compile. The full name (System.GetMem) is an explicit unsafe.
 
@@ -20,14 +21,17 @@ unit Safe;
 interface
 
 uses
+  {$if defined(SAFE_DEBUG) and defined(unix)}BaseUnix,{$endif} // R12: the pages of a released region lose all access
   SysUtils;
 
 {$I core.intf.inc}
+{$I region.intf.inc}
 {$I poison.intf.inc}
 
 implementation
 
 {$I core.impl.inc}
+{$I region.impl.inc}
 {$I poison.impl.inc}
 
 end.

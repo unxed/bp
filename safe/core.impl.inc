@@ -192,6 +192,8 @@ begin
   if AObj is TInterfacedObject then
     SafeFail('SAFE-R3: ' + Who + '(' + AObj.ClassName +
       '): TInterfacedObject is owned by its interface refcount; hold it through an interface');
+  if AObj is TRegionObject then
+    SafeFail('SAFE-R16: ' + Who + '(' + AObj.ClassName + '): an object of a region belongs to its region');
   Result := TSafeLife.Create;
   Result.Obj := AObj;
   if SafeDebugChecks then
@@ -516,6 +518,8 @@ begin
   if AObj is TInterfacedObject then
     SafeFail('SAFE-R3: TArena.Adopt(' + AObj.ClassName +
       '): TInterfacedObject is owned by its interface refcount; hold it through an interface');
+  if AObj is TRegionObject then
+    SafeFail('SAFE-R16: TArena.Adopt(' + AObj.ClassName + '): an object of a region belongs to its region');
   if FImpl.Count = Length(FImpl.Items) then
     SetLength(FImpl.Items, 2 * FImpl.Count + 8);
   FImpl.Items[FImpl.Count] := AObj;
