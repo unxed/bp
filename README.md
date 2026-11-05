@@ -3,7 +3,7 @@
 **The philosophy of Better Pascal:** the simplicity of development of Go with the performance and reliability of Rust.
 Take the best of Go (memory safety, code that is simple to write and for a model to generate, build speed,
 performance, goroutines, light dependencies) and replace the unpredictability of a collector with the determinism of
-owners and regions, with no lifetime annotations written by hand: everything is to be inferred.
+owners and regions, in a way that needs no lifetime annotations written by hand: everything is to be inferred.
 The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
 
 > **Build with `tools/bp build`, not with `fpc` directly.** `bp build [--release] [fpc options] FILE.pas` checks the
