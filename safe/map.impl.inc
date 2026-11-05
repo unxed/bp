@@ -70,6 +70,101 @@ begin
   Result := SafeHashBytes(System.PByte(System.Pointer(K.FStr)) + K.FStart, K.FLen, Length(K.FStr) - K.FStart);
 end;
 
+{$ifdef SPIKE_EXACT}
+type
+  TSpikeDWordAt = packed record
+    V: Cardinal;
+  end;
+  PSpikeDWordAt = ^TSpikeDWordAt;
+
+{$push}{$Q-}{$R-}
+{ the tail of 1..7 bytes read without a byte past the key: two overlapping 4-byte words, or three bytes }
+function SpikeHashExact(P: System.PByte; N: SizeInt): QWord;
+var
+  H, W: QWord;
+  I, R: SizeInt;
+begin
+  H := QWord(N) * SafeHashMul;
+  I := 0;
+  while I + 8 <= N do
+  begin
+    W := PSafeQWordAt(P + I)^.V;
+    H := (H xor W) * SafeHashMul;
+    H := H xor (H shr 29);
+    Inc(I, 8);
+  end;
+  R := N - I;
+  if R > 0 then
+  begin
+    if R >= 4 then
+      W := QWord(PSpikeDWordAt(P + I)^.V) or (QWord(PSpikeDWordAt(P + N - 4)^.V) shl 32)
+    else
+      W := QWord(P[I]) or (QWord(P[I + R div 2]) shl 8) or (QWord(P[N - 1]) shl 16);
+    H := (H xor W) * SafeHashMul;
+    H := H xor (H shr 29);
+  end;
+  Result := (H * SafeHashMul) or 1;
+end;
+{$pop}
+{$endif}
+
+function MapHash(const K: TStrView): QWord;
+begin
+  {$ifdef SPIKE_EXACT}
+  Result := SpikeHashExact(System.PByte(K.FP), K.FLen);
+  {$else}{$ifdef SPIKE_OVERREAD}
+  Result := SafeHashBytes(System.PByte(K.FP), K.FLen, K.FLen + 8);
+  {$else}
+  Result := SafeHashBytes(System.PByte(K.FP), K.FLen, K.FLen);
+  {$endif}{$endif}
+end;
+
+function TStrView.Len: SizeInt;
+begin
+  Result := FLen;
+end;
+
+function TStrView.ToString: String;
+begin
+  SetString(Result, FP, FLen);
+end;
+
+class operator TStrView.=(const A, B: TStrView): Boolean;
+begin
+  Result := (A.FLen = B.FLen) and SafeSameBytes(System.PByte(A.FP), System.PByte(B.FP), A.FLen);
+end;
+
+function FieldViews(const S: String): TViewFields;
+begin
+  Result.FText := S;
+  Result.FPos := 0;
+  Result.FCur := Default(TStrView);
+end;
+
+function TViewFields.GetEnumerator: TViewFields;
+begin
+  Result := Self;
+end;
+
+function TViewFields.MoveNext: Boolean;
+var
+  P: System.PChar;
+  N, I, Start: SizeInt;
+begin
+  P := System.PChar(System.Pointer(FText));
+  N := Length(FText);
+  I := FPos;
+  while (I < N) and (P[I] <= ' ') do
+    Inc(I);
+  Start := I;
+  while (I < N) and (P[I] > ' ') do
+    Inc(I);
+  FPos := I;
+  Result := I > Start;
+  FCur.FP := P + Start;
+  FCur.FLen := I - Start;
+end;
+
 function MapHash(const K: String): QWord;
 begin
   Result := SafeHashBytes(System.PByte(System.Pointer(K)), Length(K), Length(K));

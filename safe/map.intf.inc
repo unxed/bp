@@ -67,11 +67,37 @@ type
   end;
 
 function Fields(const S: String): TFields;
+
+type
+  { SPIKE: a view of bytes of a String without a reference to it (16 bytes, not managed) }
+  TStrView = record
+  private
+    FP: System.PChar;
+    FLen: SizeInt;
+  public
+    function Len: SizeInt; inline;
+    function ToString: String;
+    class operator =(const A, B: TStrView): Boolean; inline;
+  end;
+
+  TViewFields = record
+  private
+    FText: String;
+    FPos: SizeInt;
+    FCur: TStrView;
+  public
+    function GetEnumerator: TViewFields;
+    function MoveNext: Boolean; inline;
+    property Current: TStrView read FCur;
+  end;
+
+function FieldViews(const S: String): TViewFields;
 function StrSlice(const S: String): TStrSlice; // the slice of all of S: TStrSlice.Make(S)
 
 { the hash of a key of a TMap; equal keys have equal hashes, and a String has the hash of the slice of all of it }
 function MapHash(const K: TStrSlice): QWord; overload; inline;
 function MapHash(const K: String): QWord; overload; inline;
+function MapHash(const K: TStrView): QWord; overload; inline;
 function MapHash(const K: Int64): QWord; overload;
 function MapHash(const K: QWord): QWord; overload;
 function MapHash(const K: System.Pointer): QWord; overload;
