@@ -26,9 +26,10 @@
     one: Bp 248 ms, gcc 260 ms, Go 349 ms; a clean build: Bp 718 ms, the fastest, gcc 2.7 s, Go 6.9 s;
     `tests/bench/project.sh`);
   - the run time: the gap to C is not in the language (typed, compiled, no collector, the class of C) but in the
-    optimizer of FPC (tickets upstream, #185; the LLVM back end of FPC is being measured), the RTL heap (the memory
-    manager of BP is off by default for now) and the map and strings of BP (our own code); §25.2 splits it;
-  - goroutines: M:N with `BP_MN=1`, and the memory manager of BP with `BP_HEAP=bp`, both off by default for now.
+    optimizer of FPC (tickets upstream, #185; Bp stays on the releases of FPC and its usual back end) and the map and
+    strings of BP; §25.2 splits it;
+  - the memory manager of BP is on by default (`BP_HEAP=rtl` for the heap of the RTL); goroutines: M:N with
+    `BP_MN=1`, off by default for now.
 - **Accepted as the niche:** a dynamic binary over glibc is smaller, but runs only where that glibc is.
 
 **How it compares** (built with `bp build`; measured 2026-11-04, details in unxed/bp#108 and `safe/SPEC.md` §20):

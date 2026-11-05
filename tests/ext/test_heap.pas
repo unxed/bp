@@ -1,8 +1,9 @@
 { SPDX-License-Identifier: MIT }
 // UNSAFE-UNIT: a test of the heap itself works on raw blocks of GetMem and FreeMem
-{ Tests of the heap (SPEC §25.4): the same checks pass with the heap of the RTL and with the memory manager of BP
-  (BP_HEAP=bp; tests/run.sh modes heap and mnheap). Blocks are filled with a pattern of their own and checked before they
-  are freed, so two blocks that overlap or a block written by the allocator are found. Exit code = number of failures. }
+{ Tests of the heap (SPEC §25.4): the same checks pass with the memory manager of BP (the default) and with the heap of
+  the RTL (BP_HEAP=rtl; tests/run.sh modes rtlheap and mnrtlheap). Blocks are filled with a pattern of their own and
+  checked before they are freed, so two blocks that overlap or a block written by the allocator are found. Exit code =
+  number of failures. }
 program test_heap;
 
 {$mode objfpc}{$H+}
@@ -215,6 +216,70 @@ begin
   Check(Ok and (P = nil), 'ReAllocMem keeps the bytes while it grows to 3 MB and shrinks; to 0 it frees');
 end;
 
+{ Bytes of a value from their index and K, so a block keeps them when it moves. }
+procedure Mark(P: System.Pointer; Size: PtrUInt; K: Byte);
+var
+  I: PtrUInt;
+begin
+  for I := 0 to Size - 1 do
+    System.PByte(P)[I] := Byte(I * 7 + K);
+end;
+
+function Marked(P: System.Pointer; Size: PtrUInt; K: Byte): Boolean;
+var
+  I: PtrUInt;
+begin
+  for I := 0 to Size - 1 do
+    if System.PByte(P)[I] <> Byte(I * 7 + K) then
+      Exit(False);
+  Result := True;
+end;
+
+{ Runs of pages: a block that grows keeps all its bytes, in place or moved; a freed run of 1 MiB or more stays in memory
+  for the next one and goes back to the kernel when another is freed, and a block made in its pages meanwhile keeps its
+  bytes. }
+procedure BigRuns;
+const
+  MiB = 1024 * 1024;
+var
+  P, A, B, C: System.Pointer;
+  S, Round: PtrUInt;
+  Ok: Boolean;
+begin
+  Ok := True;
+  S := 40000;
+  P := System.GetMem(S);
+  Mark(P, S, 3);
+  while S < 6000000 do
+  begin
+    System.ReAllocMem(P, S * 2);
+    Ok := Ok and Marked(P, S, 3);
+    S := S * 2;
+    Mark(P, S, 3);
+  end;
+  System.FreeMem(P);
+  Check(Ok, 'a block that grows to 6 MB by ReAllocMem keeps all its bytes');
+  Ok := True;
+  for Round := 1 to 3 do
+  begin
+    A := System.GetMem(2 * MiB);
+    Mark(A, 2 * MiB, 1);
+    B := System.GetMem(3 * MiB div 2);
+    Mark(B, 3 * MiB div 2, 2);
+    System.FreeMem(A);
+    C := System.GetMem(MiB + 100);
+    Mark(C, MiB + 100, 4);
+    System.FreeMem(B);   // the pages of A still free go back to the kernel; those of C stay
+    Ok := Ok and Marked(C, MiB + 100, 4);
+    A := System.GetMem(2 * MiB);
+    Mark(A, 2 * MiB, 5);
+    Ok := Ok and Marked(C, MiB + 100, 4) and Marked(A, 2 * MiB, 5);
+    System.FreeMem(A);
+    System.FreeMem(C);
+  end;
+  Check(Ok, 'runs of 1 MiB and more freed and made again: a block in the pages of a freed run keeps its bytes');
+end;
+
 procedure Zeroed;
 var
   A: array[0..999] of System.Pointer;
@@ -340,6 +405,7 @@ begin
   Before := GetFPCHeapStatus.CurrHeapUsed;
   Sizes;
   Realloc;
+  BigRuns;
   Zeroed;
   Random1;
   Reuse;

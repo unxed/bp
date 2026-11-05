@@ -1,11 +1,14 @@
 { SPDX-License-Identifier: MIT }
-{ The memory manager of BP (SPEC §25.4), included by BPThreads after bpsched.inc. On with BP_HEAP=bp at run time (or
-  -dBP_HEAP as the default of a build); never under another manager (heaptrc, cmem: IsMemoryManagerSet).
+{ The memory manager of BP (SPEC §25.4), included by BPThreads after bpsched.inc. On by default; off with BP_HEAP=rtl at
+  run time or -dBP_RTLHEAP in the build, and never under another manager (heaptrc, cmem: IsMemoryManagerSet).
 
   - Address space: reservations of PROT_NONE cut into segments of 4 MiB aligned to their size; a block finds its
     segment by a mask, and the header of the segment (its page 0) describes the 63 other pages of 64 KiB.
   - A page holds blocks of one size class (72 classes up to 32 KiB, at most 12.5% lost to rounding). A larger block is
     a run of pages; a block over 63 pages is a run of whole segments.
+  - A run that ReAllocMem grows takes the free pages after it, in place. A freed run of 1 MiB or more goes back to the
+    kernel (madvise), but for the last one, which stays for the next run of its size; the old place of a moved block
+    goes back at once.
   - A cache per carrier (a goroutine uses the cache of its carrier: it is never preempted, so nothing switches it away
     in the middle of an allocation) and per OS thread; an ended thread gives its cache back to a pool, with its pages,
     and the next thread takes it. Per class: the current page, the pages with free blocks, the full pages.
@@ -338,15 +341,21 @@ begin
   Result := @S^.Pages[I];
 end;
 
-procedure HeapGivePages(S: PHeapSeg; I, N: LongInt);
+{ Under HeapPageLock. }
+procedure HeapGivePagesLocked(S: PHeapSeg; I, N: LongInt);
 begin
-  SpinLock(HeapPageLock);
   if N = HeapPagesPerSeg - 1 then
     S^.FreeMask := High(QWord) and not QWord(1)
   else
     S^.FreeMask := S^.FreeMask or (((QWord(1) shl N) - 1) shl I);
   if not S^.InFreeList then
     HeapLinkFreeSeg(S);
+end;
+
+procedure HeapGivePages(S: PHeapSeg; I, N: LongInt);
+begin
+  SpinLock(HeapPageLock);
+  HeapGivePagesLocked(S, I, N);
   SpinUnlock(HeapPageLock);
 end;
 
@@ -622,6 +631,49 @@ end;
 
 { ---------- large and huge blocks ---------- }
 
+const
+  HeapKeepPages = 15;   // a freed run of more pages (1 MiB and more) goes back to the kernel, but for the last one
+
+var
+  // the last freed run of more than HeapKeepPages, free and still in memory (under HeapPageLock): a buffer of a few
+  // MiB made and freed in a loop takes the same pages again, with no page faults on each round
+  HeapDirtySeg: PHeapSeg = nil;
+  HeapDirtyFirst, HeapDirtyCount: LongInt;
+
+{ The pages I .. I + N - 1 of S given back to the kernel. }
+procedure HeapPurge(S: PHeapSeg; I, N: LongInt); inline;
+begin
+  do_syscall(syscall_nr_madvise, TSysParam(PtrUInt(S) + PtrUInt(I) shl HeapPageLog2),
+    TSysParam(PtrUInt(N) shl HeapPageLog2), MADV_DONTNEED);
+end;
+
+{ Under HeapPageLock: the pages of the last freed run that are still free given back to the kernel. }
+procedure HeapPurgeDirty;
+var
+  I, J, Stop: LongInt;
+  S: PHeapSeg;
+begin
+  S := HeapDirtySeg;
+  if S = nil then
+    Exit;
+  HeapDirtySeg := nil;
+  I := HeapDirtyFirst;
+  Stop := HeapDirtyFirst + HeapDirtyCount;
+  while I < Stop do
+  begin
+    if S^.FreeMask and (QWord(1) shl I) = 0 then
+    begin
+      Inc(I);
+      Continue;
+    end;
+    J := I;
+    while (J < Stop) and (S^.FreeMask and (QWord(1) shl J) <> 0) do
+      Inc(J);
+    HeapPurge(S, I, J - I);
+    I := J;
+  end;
+end;
+
 function HeapGetLarge(C: PHeapCache; Size: PtrUInt): Pointer;
 var
   N, K: PtrUInt;
@@ -659,7 +711,8 @@ begin
   Result := Pointer(S + HeapPageSize);
 end;
 
-procedure HeapFreeRun(C: PHeapCache; Pg: PHeapPage; P: PtrUInt);
+{ Keep: a run of more than HeapKeepPages may stay in memory for the next one (not the old place of a moved block) }
+procedure HeapFreeRun(C: PHeapCache; Pg: PHeapPage; P: PtrUInt; Keep: Boolean);
 var
   S: PtrUInt;
   N: LongInt;
@@ -677,7 +730,24 @@ begin
     Exit;
   end;
   Pg^.Kind := PkFree;
-  HeapGivePages(PHeapSeg(S), (P - S) shr HeapPageLog2, N);
+  if N <= HeapKeepPages then
+  begin
+    HeapGivePages(PHeapSeg(S), (P - S) shr HeapPageLog2, N);
+    Exit;
+  end;
+  if not Keep then
+  begin
+    HeapPurge(PHeapSeg(S), (P - S) shr HeapPageLog2, N);
+    HeapGivePages(PHeapSeg(S), (P - S) shr HeapPageLog2, N);
+    Exit;
+  end;
+  SpinLock(HeapPageLock);
+  HeapPurgeDirty;
+  HeapDirtySeg := PHeapSeg(S);
+  HeapDirtyFirst := (P - S) shr HeapPageLog2;
+  HeapDirtyCount := N;
+  HeapGivePagesLocked(PHeapSeg(S), HeapDirtyFirst, N);
+  SpinUnlock(HeapPageLock);
 end;
 
 { ---------- the manager ---------- }
@@ -723,7 +793,7 @@ begin
   Result := Pg^.BlockSize;
   if Pg^.Kind <> PkSmall then
   begin
-    HeapFreeRun(C, Pg, PtrUInt(P));
+    HeapFreeRun(C, Pg, PtrUInt(P), True);
     Exit;
   end;
   Dec(C^.InUse, Result);
@@ -772,6 +842,39 @@ begin
   Result := HeapPageOf(PtrUInt(P))^.BlockSize;
 end;
 
+{ A run of pages grown in place to Size when the pages after it in its segment are free: a growing array keeps its
+  place, without a copy and without the old run left behind in memory. }
+function HeapGrowRun(Pg: PHeapPage; P: Pointer; Size: PtrUInt): Boolean;
+var
+  S: PHeapSeg;
+  I, N, M: LongInt;
+  Want: QWord;
+begin
+  if (Pg^.Kind <> PkLarge) or (Size >= PtrUInt(HeapPagesPerSeg) shl HeapPageLog2) then
+    Exit(False);
+  S := PHeapSeg(PtrUInt(P) and not (HeapSegSize - 1));
+  I := (PtrUInt(P) - PtrUInt(S)) shr HeapPageLog2;
+  N := Pg^.Count;
+  M := (Size + HeapPageSize - 1) shr HeapPageLog2;
+  if I + M > HeapPagesPerSeg then
+    Exit(False);
+  Want := ((QWord(1) shl (M - N)) - 1) shl (I + N);
+  SpinLock(HeapPageLock);
+  Result := S^.FreeMask and Want = Want;
+  if Result then
+  begin
+    S^.FreeMask := S^.FreeMask and not Want;
+    if S^.FreeMask = 0 then
+      HeapUnlinkFreeSeg(S);
+  end;
+  SpinUnlock(HeapPageLock);
+  if not Result then
+    Exit;
+  Pg^.Count := M;
+  Pg^.BlockSize := PtrUInt(M) shl HeapPageLog2;
+  Inc(HeapCache^.InUse, PtrInt(PtrUInt(M - N) shl HeapPageLog2));
+end;
+
 function HeapAllocMem(Size: PtrUInt): Pointer;
 begin
   Result := HeapGetMem(Size);
@@ -798,12 +901,18 @@ begin
   Old := HeapMemSize(P);
   if HeapOurs(PtrUInt(P)) and (Size <= Old) and (Size > Old div 2) then
     Exit(P);   // fits, and does not waste more than half
+  if (Size > Old) and HeapOurs(PtrUInt(P)) and HeapGrowRun(HeapPageOf(PtrUInt(P)), P, Size) then
+    Exit(P);
   Q := HeapGetMem(Size);
   N := Old;
   if N > Size then
     N := Size;
   System.Move(P^, Q^, N);
-  HeapFreeMem(P);
+  if HeapOurs(PtrUInt(P)) and (HeapPageOf(PtrUInt(P))^.Kind = PkLarge) then
+    // a growing array does not come back to the old size: its old place goes back at once
+    HeapFreeRun(HeapCache, HeapPageOf(PtrUInt(P)), PtrUInt(P), False)
+  else
+    HeapFreeMem(P);
   P := Q;
   Result := Q;
 end;
@@ -859,10 +968,10 @@ var
   V: PChar;
   Enabled: Boolean;
 begin
-  Enabled := {$ifdef BP_HEAP}True{$else}False{$endif};
+  Enabled := True;
   V := EnvValue('BP_HEAP');
   if V <> nil then
-    Enabled := (V[0] = 'b') and (V[1] = 'p');
+    Enabled := not ((V[0] = 'r') and (V[1] = 't') and (V[2] = 'l') and (V[3] = #0));
   {$ifdef BP_RTLHEAP}
   Enabled := False;
   {$endif}

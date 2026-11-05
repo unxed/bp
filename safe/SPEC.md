@@ -50,7 +50,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
 | Strings and maps: `TStrSlice`, `Fields`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 in the typed `bpvet` | §25.3 |
-| A memory manager of BP: a cache per carrier, pages of one size class, frees from other threads by an atomic list, the start of a goroutine without `InitThread` | **step 1 implemented, tests, CI** (`ext/bpheap.inc`, on with `BP_HEAP=bp`, off by default; `test_heap`, modes `heap` and `mnheap`); the start without `InitThread` is **design** (step 3) | §25.4 |
+| A memory manager of BP: a cache per carrier, pages of one size class, frees from other threads by an atomic list, the start of a goroutine without `InitThread` | **step 1 implemented, tests, CI, on by default since v0.38** (`ext/bpheap.inc`, `BP_HEAP=rtl` for the heap of the RTL; `test_heap`, modes `rtlheap` and `mnrtlheap`); the start without `InitThread` is **design** (step 3) | §25.4 |
 | The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
@@ -1088,6 +1088,7 @@ or above the parameter suppresses its S14 finding.
 | v0.35 (report) | §25.5 a project of many files (`tests/bench/project.sh`, 20 modules, 17326 lines): a clean build Bp 658 ms, Rust 1583, gcc 2599, Go 6085; a rebuild after an edit of one file Bp 493 ms, gcc 263, Go 316 (the check of every file by `bpvet` is the long pole; the lever: a check cache per file) |
 | v0.36 | §25.5 the check cache per file (`bpvet --cache`, `tools/bp`): a rebuild of the project of 20 files after an edit 493 → 248 ms (gcc 260, Go 349); §25.2 the toolchain policy: Bp builds on the releases of FPC, not on main |
 | v0.37 | §25.3 the word count 0.47 → 0.43 s: the hash, the comparison of slices and the probe of `TMap` inlined, the last bytes of a key read at once; where the rest of the gap is (a managed slice) and why the region of objects is 3.3x (the protocol of a constructor) |
+| v0.38 | §25.4 the memory manager of BP on by default (`BP_HEAP=rtl` for the RTL heap): runs grown in place, a freed run of 1 MiB or more back to the kernel but for the last one; peak memory below the RTL heap on the arena and region tiers, a buffer of 1–3 MB in a loop 15–18 times faster |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -2845,7 +2846,7 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
        and two pointers), the program that was the arena row before. It shows the cost of the region style against
        the same algorithm in a plain array.
      - Layouts that still differ: in the heap tier every node is 16 bytes of data plus the header of the
-       allocator (Bp: the RTL heap; `BP_HEAP=bp` gave the same time within 10% in one check).
+       allocator (Bp: the memory manager of BP since v0.38; the RTL heap was 4% slower).
      - Numbers (5 runs, a busy machine), ratio to gcc of the same tier:
 
        | tier | Bp | gcc | clang | Rust | Go | Goose |
@@ -2910,7 +2911,8 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
      (fpc#42042, #191: one of the causes of the arena tier) and no vectorization of loops (fpc#42043, #192: a part of
      n-body). Workarounds where they exist: a `var` parameter or a pointer to an element, `constref` for a record.
   2. **The heap.** The heap tier of binary trees (1.8–2.2x) is the RTL heap of FPC against the `malloc` of glibc. The
-     memory manager of BP (§25.4, `BP_HEAP=bp`) is off by default for now.
+     memory manager of BP (§25.4) is on by default since v0.38; it takes 4% off this tier, the rest is the code of
+     FPC around the allocation.
   3. **The library of BP.** The word count (1.8–2.3x) is `TMap` and the strings of BP against the table C writes for
      itself; the region of objects (3.3x) is the construction of a `TRegionObject` and the access of `TGrowArray`.
      This is our own code to speed up (the levers below).
@@ -3150,7 +3152,8 @@ slow path uses spin locks only.
 **The plan:**
 
 1. Segments, pages, size classes, caches, frees from other threads and the pool of caches (`ext/bpheap.inc`), on with
-   `BP_HEAP=bp`; `tests/ext/test_heap.pas`, and the modes `heap` and `mnheap` of `tests/run.sh` in CI. Measured against
+   `BP_HEAP=bp`; `tests/ext/test_heap.pas`, and the modes `heap` and `mnheap` of `tests/run.sh` in CI (since v0.38 the
+   default, and the modes `rtlheap` and `mnrtlheap` run the RTL heap). Measured against
    the RTL (step 1 result, below).
 2. The stress under load: `test_go`, `test_threads` and `test_heap` under `BP_PROCS` 1, 2, 3 and 8 and the seeds in CI
    for a while; the programs of `examples/` under the heap.
@@ -3165,7 +3168,7 @@ left for later: a buffered `TChan` of 256 takes about 1 us per item between two 
 carriers), against tens of nanoseconds in Go. The memory manager is not part of that cost: a block freed on the other
 side adds under 0.1 us.
 
-**Step 1 result (2026-11-05).** `ext/bpheap.inc`, on with `BP_HEAP=bp` (or `-dBP_HEAP`), off by default. The probes
+**Step 1 result (2026-11-05).** `ext/bpheap.inc`, on with `BP_HEAP=bp`, off by default until v0.38 (below). The probes
 were built with `-O2`, under M:N, and each number is the median of 5 runs on 4 cores (x86_64):
 
 | probe | RTL, 1 carrier | BP, 1 carrier | RTL, 4 carriers | BP, 4 carriers |
@@ -3186,6 +3189,35 @@ were built with `-O2`, under M:N, and each number is the median of 5 runs on 4 c
 - A free on another carrier costs the same as the channel that carries the block.
 - The check: `tests/run.sh` in all the modes, `test_go`, `test_threads` and `test_heap` 114 times under `BP_PROCS` 1, 2, 3
   and 8 and 15 seeds of the scheduler, and `tests/examples.sh` under `BP_HEAP=bp BP_MN=1`: no failure.
+
+**The default (v0.38, 2026-11-05).** The memory manager of BP is on in every program of `BPThreads`; `BP_HEAP=rtl` at
+run time or `-dBP_RTLHEAP` in the build keep the heap of the RTL (for valgrind, say). Measured before the flip on the
+VM of the benchmarks (9 runs, the time with BP against the time with the RTL heap): the heap tier of binary trees 0.96,
+the arena tier 0.96–0.98, the region tier 1.00, n-body 0.99–1.05, fannkuch 1.04–1.05 (no allocation in its loop: the
+layout of the code), the word count 1.01–1.03 and 0.88–0.91 with owned strings; the start of `hello` 469 → 452 us;
+`test_heap` 7.3 → 5.3 s and `test_threads` 1.27 → 0.61 s.
+
+The peak memory was larger with BP on two tiers (arena 3160 → 5632 KiB, region 10648 → 12428 KiB): a run of pages
+that was freed stayed in memory, and a growing array left its old runs behind. Two changes:
+
+- `ReAllocMem` grows a run in place when the pages after it are free, and gives the old place of a moved run back at
+  once.
+- A freed run of 1 MiB or more goes back to the kernel (`madvise`), but for the last one: it stays free in memory for
+  the next run of its size and goes back when another one is freed. The RTL unmaps a block of 1 MiB or more on every
+  free, so a buffer of that size made in a loop pays page faults each round.
+
+After them (this machine, one run each; peak RSS and time):
+
+| program | RTL heap | BP |
+|---|---|---|
+| bintrees_arena | 4048 KiB | 2304 KiB |
+| bintrees_region | 11232 KiB | 10416 KiB |
+| a 1 MiB array made and freed 20000 times | 19.3 s | 1.25 s |
+| the same with 3 MB | 58.3 s | 3.2 s |
+| the same with 256–900 KiB | 0.3–1.3 s | the same |
+
+`tests/ext/test_heap.pas` checks the runs: a block grown to 6 MB keeps all its bytes, and a block made in the pages of
+a freed run keeps its bytes when the rest of that run goes back to the kernel.
 
 ### 25.5 Competitive on every dimension: size, memory, start, build (report, 2026-11-05)
 
