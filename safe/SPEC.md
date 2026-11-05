@@ -1736,7 +1736,7 @@ contended `EnterCriticalSection` yields. Verdict: **worth it; step 5 goes on**, 
   merge into one mapping (0 per goroutine) and `-Ct` raises `EStackOverflow` in the goroutine, which can be caught while
   the others go on. But `-Ct` is not a guarantee: code built without it (the RTL, C) is not checked and only has the 16 KiB
   margin of the RTL plus the unused 64 KiB area above the record; and `StackError` of the RTL is one global, so after one
-  overflow the check is off in every thread until something resets it. **Decision proposed: guard areas by default** (exact
+  overflow the check is off in every thread until something resets it. **Decision (the owner, 2026-11-05): guard areas by default** (exact
   for every piece of code); no guard with `-Ct` stays an option for more than 32 thousand goroutines.
 - **32 bits:** a region is 1 MiB there, so the address space caps the goroutines at about 3 thousand. M:N on i386 needs a
   smaller region (the mask is global: the stacks of all threads shrink with it).
@@ -1821,7 +1821,7 @@ data.
 2. **Spike 4: the M:N switch** (`tools/spikes/mn/`): two goroutines exchange values over a channel on one carrier with a
    stack switch; threadvars, exceptions and the heap work across switches. *Done:* CI green on x86_64, aarch64 and i386; the
    time of a switch, the memory of a goroutine, the goroutines per GiB, guard pages against `-Ct`; a verdict in §21.3.
-   Independent of step 1. *Status:* **done** (§21.3, Spike 4 result): worth it; guard areas proposed by default.
+   Independent of step 1. *Status:* **done** (§21.3, Spike 4 result): worth it; guard areas by default (the owner's decision, 2026-11-05).
 3. **The scope** on the region runtime (step 4 of unxed/bp#108): `Hold`, `Defer`, `TScopeRef`, `TArena` on the list; S6
    accepts `Hold`, S17 roots it. *Done:* `test_region` covers the order of destruction, an exception in the scope and in a
    destructor; lint tests.
