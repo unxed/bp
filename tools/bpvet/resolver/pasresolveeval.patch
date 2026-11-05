@@ -1,0 +1,48 @@
+A change of packages/fcl-passrc/src/pasresolveeval.pas of Free Pascal 3.2.2 (tag release_3_2_2), applied by get.sh.
+Licence of this patch: that of the patched file, the LGPL with the static linking exception of Free Pascal (COPYING.FPC
+in the FPC sources); see README.md.
+
+1. TResExprEvaluator.EvalBinaryBoolOpExpr: and, or, xor of an Int64 and a QWord value (QWord($CBF29CE4) or $84222325)
+   work on the bits of both and give an unsigned value; they used to stop with "not yet implemented". FPC folds such
+   an expression.
+
+--- a/packages/fcl-passrc/src/pasresolveeval.pas
++++ b/packages/fcl-passrc/src/pasresolveeval.pas
+@@ -2855,6 +2855,17 @@
+ function TResExprEvaluator.EvalBinaryBoolOpExpr(Expr: TBinaryExpr; LeftValue,
+   RightValue: TResEvalValue): TResEvalValue;
+ // AND, OR, XOR
++
++  function BitOpIntUInt(OpCode: TExprOpCode; L, R: TMaxPrecUInt): TResEvalValue;
++  begin
++    case OpCode of
++    eopAnd: L:=L and R;
++    eopOr: L:=L or R;
++    else L:=L xor R;
++    end;
++    Result:=CreateResEvalInt(L);
++  end;
++
+ begin
+   Result:=nil;
+   case LeftValue.Kind of
+@@ -2888,6 +2899,9 @@
+       eopXor: TResEvalInt(Result).Int:=TResEvalInt(LeftValue).Int xor TResEvalInt(RightValue).Int;
+       end;
+       end;
++    revkUInt:
++      // int and/or/xor uint: the bits of both, as an unsigned value
++      Result:=BitOpIntUInt(Expr.OpCode,TMaxPrecUInt(TResEvalInt(LeftValue).Int),TResEvalUInt(RightValue).UInt);
+     else
+       {$IFDEF VerbosePasResolver}
+       writeln('TResExprEvaluator.EvalBinaryBoolOpExpr int ',Expr.OpCode,' ? Left=',LeftValue.AsDebugString,' Right=',RightValue.AsDebugString);
+@@ -2906,6 +2920,9 @@
+       eopXor: TResEvalUInt(Result).UInt:=TResEvalUInt(LeftValue).UInt xor TResEvalUInt(RightValue).UInt;
+       end;
+       end;
++    revkInt:
++      // uint and/or/xor int
++      Result:=BitOpIntUInt(Expr.OpCode,TResEvalUInt(LeftValue).UInt,TMaxPrecUInt(TResEvalInt(RightValue).Int));
+     else
+       {$IFDEF VerbosePasResolver}
+       writeln('TResExprEvaluator.EvalBinaryBoolOpExpr int ',Expr.OpCode,' ? Left=',LeftValue.AsDebugString,' Right=',RightValue.AsDebugString);
