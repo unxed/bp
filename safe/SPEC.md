@@ -50,7 +50,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
 | Strings and maps: `TStrSlice`, `Fields`, `TMap<K, V>` (one lookup per update with `Ref`) | **runtime implemented, tests, CI** (`safe/map.*.inc` in units Safe and BP, `test_map`; R2, R18, R19); S27 in the typed `bpvet` | §25.3 |
-| A memory manager of BP: a cache per carrier, pages of one size class, frees from other threads by an atomic list, the start of a goroutine without `InitThread` | **design**, a spike (a tree of 8191 goroutines 286 ms → 32 ms on one carrier) | §25.4 |
+| A memory manager of BP: a cache per carrier, pages of one size class, frees from other threads by an atomic list, the start of a goroutine without `InitThread` | **step 1 implemented, tests, CI** (`ext/bpheap.inc`, on with `BP_HEAP=bp`, off by default; `test_heap`, modes `heap` and `mnheap`); the start without `InitThread` is **design** (step 3) | §25.4 |
 | The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
@@ -1080,6 +1080,7 @@ or above the parameter suppresses its S14 finding.
 | v0.28 | §21.3, §25.2 step 6: the start of a goroutine: a freed region stays warm for the next goroutine and the monitor gives back the ones not taken at the next tick (no `madvise` at each end); the first heap chunk of a goroutine is one page; the start and end 17 us → 5 us on 4 carriers, a tree of 8191 goroutines 1.07 s → 0.43 s |
 | v0.29 | §21.3, §25.2 step 6: per-carrier run queues (a yield and a goroutine pushed out of "next" stay on the carrier; an idle carrier steals half of a queue); 64 goroutines that yield take 93 ms instead of 574 ms on 4 carriers |
 | v0.30 (design) | §25.4 a memory manager of BP: a cache per carrier, pages of one size class with a local free list and one for other threads, abandoned pages adopted, the start of a goroutine without `InitThread`; the spike: a tree of 8191 goroutines 286 ms → 32 ms on one carrier |
+| v0.31 | §25.4 step 1: the memory manager of BP (`ext/bpheap.inc`, `BP_HEAP=bp`): segments of 4 MiB, pages of 64 KiB, 72 size classes, a cache per carrier and per thread, frees from other threads by an atomic list, a pool of the caches of ended threads; 2M live blocks 444 → 145 ns per block, a tree of 8191 goroutines 404 → 80 ms on 4 carriers |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -2957,8 +2958,10 @@ slow path uses spin locks only.
 - **Address space.** A reservation of `PROT_NONE` with `MAP_NORESERVE` (64 GiB on 64 bits; on i386, 4 MiB at a time),
   cut into segments of 4 MiB aligned to their size. A block finds its segment by a mask, and the header of the segment
   describes its pages. Whether a block is ours is a range check against the few reservations.
-- **Size classes.** About 48 classes up to 32 KiB, with at most 12.5% lost to rounding. A page of 64 KiB holds blocks of
-  one class. A larger block is a run of pages in a segment; a block over 2 MiB is a segment of its own.
+- **Size classes.** 72 classes up to 32 KiB: steps of 16 bytes up to 128, then eight steps per doubling, so at most
+  12.5% is lost to rounding. A page of 64 KiB holds blocks of one class, handed out from its start as they are needed
+  (the RTL cuts a chunk into blocks at once and so touches all of it). A larger block is a run of pages in a segment; a
+  block over 63 pages is a run of whole segments.
 - **The cache.**
   - One cache per carrier, and one per OS thread that is not a goroutine (the main thread, a 1:1 thread). It is found
     from `CurThread`: a goroutine uses the cache of its carrier.
@@ -2972,8 +2975,9 @@ slow path uses spin locks only.
   - It belongs to another cache: push onto its list from other threads with a compare-and-swap. A goroutine moved to
     another carrier by stealing frees this way.
   - A page that becomes empty and is not current goes back to its segment.
-- **The end of an OS thread.** Its pages with live blocks are abandoned, with no owner. A free into them still works;
-  another cache adopts such a page when it needs one of that class. Carriers never end.
+- **The end of an OS thread.** Its cache goes to a pool with all its pages, and the next OS thread takes it. Meanwhile a
+  free into those pages works as from any other thread, and the next owner collects it. Carriers never end. (The
+  design first gave the pages away one by one; a cache in a pool is simpler and keeps the pages warm.)
 - **Memory back to the kernel.**
   - Under M:N, the monitor gives back each tick the pages that were already free at the tick before (`madvise`, a
     contiguous run in one call), as it does for regions (§21.3).
@@ -2999,10 +3003,11 @@ slow path uses spin locks only.
 
 **The plan:**
 
-1. Segments, pages, size classes, caches with local frees; installed as above. Measured against the RTL on one thread
-   (the pair and the 2,000,000 live blocks of the table), with `tests/run.sh` passing.
-2. Frees from other threads, and abandoned and adopted pages. The stress of `test_go` and `test_threads` (`BP_PROCS` 1,
-   2, 3 and 8, the seeds) and a probe that sends blocks over channels between carriers.
+1. Segments, pages, size classes, caches, frees from other threads and the pool of caches (`ext/bpheap.inc`), on with
+   `BP_HEAP=bp`; `tests/ext/test_heap.pas`, and the modes `heap` and `mnheap` of `tests/run.sh` in CI. Measured against
+   the RTL (step 1 result, below).
+2. The stress under load: `test_go`, `test_threads` and `test_heap` under `BP_PROCS` 1, 2, 3 and 8 and the seeds in CI
+   for a while; the programs of `examples/` under the heap.
 3. The start of a goroutine without `InitThread`. The numbers of the spike are the target: 2 us on 4 carriers, and the
    tree of goroutines under 40 ms on one.
 4. Memory back to the kernel: the monitor under M:N, the bound without it. The memory of a parked goroutine should be
@@ -3013,3 +3018,25 @@ Each step is measured, and the default flips only after CI has run under it, as 
 left for later: a buffered `TChan` of 256 takes about 1 us per item between two goroutines under M:N (1.4 us on 4
 carriers), against tens of nanoseconds in Go. The memory manager is not part of that cost: a block freed on the other
 side adds under 0.1 us.
+
+**Step 1 result (2026-11-05).** `ext/bpheap.inc`, on with `BP_HEAP=bp` (or `-dBP_HEAP`), off by default. The probes
+were built with `-O2`, under M:N, and each number is the median of 5 runs on 4 cores (x86_64):
+
+| probe | RTL, 1 carrier | BP, 1 carrier | RTL, 4 carriers | BP, 4 carriers |
+|---|---|---|---|---|
+| a `GetMem`/`FreeMem` pair, 16–72 B | 18 ns | 19 ns | 18 ns | 20 ns |
+| 2M live blocks, freed in a random order | 444 ns | 145 ns | 436 ns | 151 ns |
+| a string built (`IntToStr`, two concatenations) | 122 ns | 128 ns | 121 ns | 123 ns |
+| a block freed by another goroutine (with the channel) | 1016 ns | 973 ns | 1376 ns | 1428 ns |
+| the channel alone | 974 ns | 951 ns | 1168 ns | 1212 ns |
+| the start and end of a goroutine | 12.65 us | 11.95 us | 5.15 us | 5.15 us |
+| a tree of 8191 goroutines (depth 12) | 351 ms | 145 ms | 404 ms | 80 ms |
+| fan-out: 1 producer, workers over a channel | 168 ms | 168 ms | 243 ms | 247 ms |
+
+- A block that lives longer and the heap of many goroutines gain the most: 3 times for live blocks, 2.4 to 5 times for
+  the tree.
+- The short pair stays where the RTL is (one more call through `MemoryManager`).
+- The start of a goroutine does not change: it is the cost of `InitThread`, which step 3 removes.
+- A free on another carrier costs the same as the channel that carries the block.
+- The check: `tests/run.sh` in all the modes, `test_go`, `test_threads` and `test_heap` 114 times under `BP_PROCS` 1, 2, 3
+  and 8 and 15 seeds of the scheduler, and `tests/examples.sh` under `BP_HEAP=bp BP_MN=1`: no failure.
