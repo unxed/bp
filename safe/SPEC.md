@@ -2799,6 +2799,29 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   on n-body (0.98x), 1.24x on fannkuch and 0.86x on the word count (no copy of a word). Bp in the region style takes
   1.43x of C on binary trees, about nine times the time of Goose; step 6 looks for the reason.
 
+  **Like for like (the rule, 2026-11-05).** A benchmark compares the same algorithm, data layout, allocation style,
+  checks and linking in each language. A program that differs in any of these is a separate tier with its own row,
+  never mixed into one ratio. The word count now has two tiers:
+  - `wordcount`: each word is a slice of the text, with no allocation;
+  - `wordcount_owned`: each word is an owned string (Bp `String`, C `malloc`, Rust `String`, Go `string`; Goose has
+    no such tier, n/a).
+
+  First numbers (3 runs, a busy machine), ratio to gcc:
+
+  | tier | Bp | clang | Rust | Go | Goose |
+  |---|---|---|---|---|---|
+  | slices | 2.16x | 1.03x | 1.97x | 1.65x | 1.28x |
+  | owned | 1.75x | 0.82x | 1.35x | 1.10x | n/a |
+
+  The 2.6x of the baseline mixed a Bp `String` per word with raw C pointers; that verdict is withdrawn. C keeps a table
+  of its own (FNV-1a, open addressing), while Rust, Go and Goose use their standard maps; this is noted, not equalised.
+  Still to audit for the same error:
+  - binary trees: an allocator per style (the Goose bump, the Bp region, C malloc);
+  - range checks: Bp `--release` has no `-Cr`, Rust keeps bounds checks, C has none;
+  - the widths of integers and floats;
+  - buffered output;
+  - static against dynamic linking in §25.5.
+
   Found on the way and fixed since (#162, #163): the typed `bpvet` refused `Round(X)`, `Trunc(X)`, a literal above the
   Int64 range (`QWord($CBF29CE484222325)`), `QWord($CBF29CE4) or $84222325` and a unit with a dot in its name
   (`Generics.Collections`); `--release` added no `-O` (it adds `-O2` now). The programs of the suite still carry the
