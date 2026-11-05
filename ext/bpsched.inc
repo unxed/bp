@@ -257,7 +257,7 @@ begin
 end;
 
 { G may run: off the timers, into the run queue. G has left its stack (it is new, or it switched away). }
-procedure Ready(G: PRawThread);
+procedure ReadyQueued(G: PRawThread);
 begin
   SpinLock(SchedLock);
   if G^.InTimers then
@@ -271,6 +271,31 @@ begin
   Inc(RunCount);
   SpinUnlock(SchedLock);
   WakeIdle;
+end;
+
+{ G may run. Woken by a goroutine, it runs next on the carrier of that goroutine, which will soon switch away (a waker
+  usually blocks next: a channel round trip stays on one carrier, with no futex); the goroutine it pushes out of that
+  place goes into the run queue. Woken by anything else, it goes into the run queue. }
+procedure Ready(G: PRawThread);
+var
+  T, Old: PRawThread;
+begin
+  T := CurThread;
+  if SeedMode or (T^.Green = 0) or (T^.Carrier = nil) then
+  begin
+    ReadyQueued(G);
+    Exit;
+  end;
+  if G^.InTimers then
+  begin
+    SpinLock(SchedLock);
+    if G^.InTimers then
+      UnlinkTimer(G);
+    SpinUnlock(SchedLock);
+  end;
+  Old := PRawThread(InterlockedExchange(T^.Carrier^.RunNext, Pointer(G)));
+  if Old <> nil then
+    ReadyQueued(Old);
 end;
 
 procedure AddTimer(G: PRawThread);
@@ -572,7 +597,16 @@ begin
   C := CurThread;
   repeat
     FireTimers;
-    G := TakeNext;
+    // the goroutine woken here runs next, but every 61st pick serves the run queue first, so that two goroutines that
+    // wake each other do not keep the carrier from it
+    Inc(C^.Picks);
+    G := nil;
+    if C^.Picks mod 61 = 0 then
+      G := TakeNext;
+    if G = nil then
+      G := PRawThread(InterlockedExchange(C^.RunNext, nil));
+    if G = nil then
+      G := TakeNext;
     if G <> nil then
     begin
       RunG(C, G);
@@ -580,7 +614,7 @@ begin
     end;
     Seq := IdleSeq;
     InterlockedIncrement(Idle);
-    if RunCount = 0 then
+    if (RunCount = 0) and (C^.RunNext = nil) then
     begin
       if TimerCount = 0 then
         Left := -1
@@ -620,6 +654,7 @@ function MonitorMain(P: Pointer): PtrInt;
 var
   I, N, Strikes: LongInt;
   Sum, Last: PtrUInt;
+  C, G: PRawThread;
 begin
   Last := High(PtrUInt);
   Strikes := 0;
@@ -632,7 +667,18 @@ begin
     Sum := 0;
     for I := 0 to N - 1 do
       if CarrierList[I] <> nil then
-        Inc(Sum, CarrierList[I]^.Switches);
+      begin
+        C := CarrierList[I];
+        Inc(Sum, C^.Switches);
+        // a carrier that did not switch for a tick (a long loop, a blocking call) gives its next goroutine away
+        if (C^.Switches = C^.Seen) and (C^.RunNext <> nil) then
+        begin
+          G := PRawThread(InterlockedExchange(C^.RunNext, nil));
+          if G <> nil then
+            ReadyQueued(G);
+        end;
+        C^.Seen := C^.Switches;
+      end;
     if (RunCount > 0) and (Idle = 0) and (Sum = Last) then
       StartCarrier;
     if (Live > 0) and (RunCount = 0) and (TimerCount = 0) and (Idle >= N) and (OsBlocked >= 1) and (Sum = Last) then
