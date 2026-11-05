@@ -14,8 +14,15 @@ unit BpvetKey;
 
 interface
 
+uses
+  Classes;
+
 type
   TKeyPaths = array of String;
+
+{ The identifiers (lower case) and the units of the uses clauses (lower case, without "in 'file'") of Text, as
+  genstubs.py scans them. Idents, Units: borrows of the caller's lists. }
+procedure ScanText(const Text: String; Idents, Units: TStringList);
 
 { Writes the key text of Paths to the standard output. }
 procedure PrintStubKey(const Paths: TKeyPaths);
@@ -29,7 +36,7 @@ procedure PrintBuildKeys(const Salt: String; const Targets, Stats: TKeyPaths);
 implementation
 
 uses
-  SysUtils, Classes, md5, Safe;
+  SysUtils, md5, Safe;
 
 type
   TListBox = specialize TOwned<TStringList>;

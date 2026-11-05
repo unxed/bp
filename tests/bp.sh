@@ -69,6 +69,49 @@ else
   echo "FAIL bp build of a program with uses BP:"; cat "$tmp/bp.log"; fail=1
 fi
 
+# the check cache per file: after an edit of the program a finding in a unit it did not touch comes from the cache
+# (the build still fails), and a unit edited so that the program no longer resolves makes the program be checked again
+mkdir -p "$tmp/pc"
+cp "$tmp/bad/rel.pas" "$tmp/pc/rel.pas"
+cat > "$tmp/pc/lib.pas" <<'PAS'
+unit lib;
+
+{$mode objfpc}{$H+}
+
+interface
+
+function Two: Integer;
+
+implementation
+
+function Two: Integer;
+begin
+  Result := 2;
+end;
+
+end.
+PAS
+printf 'program main;\n\n{$mode objfpc}{$H+}\n\nuses\n  lib, rel;\n\nbegin\n  WriteLn(Two);\nend.\n' \
+  > "$tmp/pc/main.pas"
+pcbuild() {
+  "$root/tools/bp" build -Fu"$root/tools/spikes/region" -FE"$tmp/pc" "$tmp/pc/main.pas" > "$tmp/pc$1.log" 2>&1
+}
+pcbuild 1
+echo '{ edited }' >> "$tmp/pc/main.pas"
+if pcbuild 2 || ! grep -q 'rel\.pas.*SAFE-S17' "$tmp/pc2.log" || [ -z "$(ls "$tmp/cache/vetfiles")" ]; then
+  echo "FAIL bp build: a finding of an unchanged unit is lost after an edit of the program:"; cat "$tmp/pc2.log"
+  fail=1
+else
+  echo "ok   bp build: after an edit of the program the finding of an unchanged unit comes from the check cache"
+fi
+sed -i 's/Two/Three/g' "$tmp/pc/lib.pas"
+if pcbuild 3 || ! grep -q 'main\.pas.*Fatal: bpvet' "$tmp/pc3.log"; then
+  echo "FAIL bp build: the program was not checked again after an edit of a unit it uses:"; cat "$tmp/pc3.log"
+  fail=1
+else
+  echo "ok   bp build: an edit of a used unit checks the program again"
+fi
+
 # bp run: a Pascal file with a #! line is a script
 mkdir -p "$tmp/run"
 cat > "$tmp/run/hello.pas" <<'PAS'

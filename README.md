@@ -22,8 +22,9 @@
   that runs on any Linux.
 - **Reaching:**
   - the rebuild: on a small program the level of gcc (hello world after an edit: Bp 144 ms, gcc 66 ms, Go 204–230
-    ms); on a project of many files the level of Go (20 files, 17 thousand lines, after an edit of one: Bp 493 ms,
-    gcc 263 ms, Go 316 ms; a clean build: Bp 658 ms, the fastest, gcc 2.6 s, Go 6.1 s; `tests/bench/project.sh`);
+    ms); on a project of many files the level of gcc and ahead of Go (20 files, 17 thousand lines, after an edit of
+    one: Bp 248 ms, gcc 260 ms, Go 349 ms; a clean build: Bp 718 ms, the fastest, gcc 2.7 s, Go 6.9 s;
+    `tests/bench/project.sh`);
   - the run time: the gap to C is not in the language (typed, compiled, no collector, the class of C) but in the
     optimizer of FPC (tickets upstream, #185; the LLVM back end of FPC is being measured), the RTL heap (the memory
     manager of BP is off by default for now) and the map and strings of BP (our own code); §25.2 splits it;
