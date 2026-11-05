@@ -543,16 +543,88 @@ begin
   Result := False;
 end;
 
+{ A class whose objects need no more than zeroed memory and the VMT: no managed fields, no interfaces. }
+function SafeRegionPlainClass(C: TClass): Boolean;
+var
+  K: TClass;
+  T: PInterfaceTable;
+begin
+  if SafeHasManagedFields(C) then
+    Exit(False);
+  K := C;
+  while K <> nil do
+  begin
+    T := K.GetInterfaceTable;
+    if (T <> nil) and (T^.EntryCount > 0) then
+      Exit(False);
+    K := K.ClassParent;
+  end;
+  Result := True;
+end;
+
+var
+  { SafeRegionPlainClass per class, direct-mapped by the address of the class: an entry is the class with bit 1 set,
+    and bit 0 set when the class is plain. One word, so a racing store is whole or absent. }
+  GRegionClassCache: array[0..255] of PtrUInt;
+
+function SafeRegionClassPlain(C: TClass): Boolean; inline;
+var
+  H: PtrUInt;
+  E: PtrUInt;
+begin
+  H := (PtrUInt(C) shr 4) and High(GRegionClassCache);
+  E := GRegionClassCache[H];
+  if E and not PtrUInt(3) = PtrUInt(C) then
+    Exit(E and 1 <> 0);
+  Result := SafeRegionPlainClass(C);
+  GRegionClassCache[H] := PtrUInt(C) or 2 or PtrUInt(Ord(Result));
+end;
+
+type
+  TSafeWords = array[0..$0FFFFFFF] of PtrUInt;
+  PSafeWords = ^TSafeWords;
+
 class function TRegionObject.NewInstance: TObject;
 var
-  D, P: System.Pointer;
+  D: PSafeRegionData;
+  P: System.PByte;
+  W: PSafeWords;
+  Size: SizeUInt;
+  I: SizeUInt;
 begin
-  D := SafeRegionCurrent;
-  P := SafeRegionAlloc(D, InstanceSize);
+  D := GRegionCurrent;
+  Size := (SizeUInt(InstanceSize) + 15) and not SizeUInt(15);
+  // the bump of SafeRegionAlloc in place; a new block, or no region (R15), takes the long way
+  if (D <> nil) and (D^.Cur <> nil) and (PtrUInt(D^.Limit) - PtrUInt(D^.Cur) >= Size) then
+  begin
+    P := D^.Cur;
+    Inc(D^.Cur, Size);
+  end
+  else
+  begin
+    D := SafeRegionCurrent;
+    P := SafeRegionAlloc(D, Size);
+  end;
+  if SafeRegionClassPlain(Self) then
+  begin
+    // what InitInstance does for such a class: zeroed fields and the VMT
+    W := PSafeWords(P);
+    W^[0] := PtrUInt(Self);
+    for I := 1 to Size div SizeOf(PtrUInt) - 1 do
+      W^[I] := 0;
+    Exit(TObject(P));
+  end;
   Result := InitInstance(P);
   if SafeHasManagedFields(Self) then
     SafeRegionAddFinalizer(D, P, nil, 1);
 end;
+
+{$implicitexceptions off}
+constructor TRegionObject.Create;
+begin
+  // empty: a region object needs no frame that frees it when a constructor fails (the region frees it)
+end;
+{$implicitexceptions on} // $push and $pop do not restore this switch: the generic bodies below need it
 
 procedure TRegionObject.FreeInstance;
 begin

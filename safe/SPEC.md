@@ -1070,6 +1070,7 @@ or above the parameter suppresses its S14 finding.
 | v0.21 | §21.1 the scope (step 3 of §21.7): `Hold` and `Defer` of `TScopeRef` (`for S in Scope`, was an `Integer`) and of `TRegion` on the finalizer list of the region, newest first, failures counted in `SafeDeferFailures`; S6 accepts `Hold`; the typed `bpvet` checks every `Hold` (`bpvethold.pas`: S6 for the shape, S17 for escapes and reads after the scope); R15, R16 and R3 at `Hold` |
 | v0.22 | §21.3, §25.2 step 6: `runnext` in the M:N scheduler (a goroutine woken by a goroutine runs next on its carrier; every 61st pick serves the queue; the monitor moves a stuck place): a round trip on 4 carriers 12 us → 0.8 us |
 | v0.23 | §21.4 the `TComponent` owner (step 4 of §21.7): the typed `bpvet` drops S6 of `TFoo.Create(AOwner)` of a component class with an owner that is not `nil` and S5 of a `published` component field of a component class; S17 for `.Free`, `FreeAndNil`, `Own`, `Share`, `Adopt` and `Hold` of a component that its owner destroys (`bpvethold.pas`, `tests/lint/component_*.pas`) |
+| v0.24 | §25.2 step 6, the region allocator: `TRegionObject.Create` without the frame of a failed constructor, `NewInstance` bumps in place, caches per class, and writes the VMT and zeroed fields itself for a class without managed fields or interfaces: `TNode.Create` 36 ns → 13 ns, binary trees 0.656 s → 0.255 s (0.57x of C); the suite uses the region of unit `BP` |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1407,6 +1408,7 @@ TRegion = record                          // a bump pointer in blocks that doubl
 end;
 
 TRegionObject = class                     // a class whose objects live in the current region
+  constructor Create;                              // no frame that frees the object on an exception (the region does)
   class function NewInstance: TObject; override;  // a bump in the current region instead of the heap
   procedure FreeInstance; override;                // nothing: the region frees its objects at once
 end;
@@ -2738,7 +2740,16 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
 - **Then the levers the numbers point to (step 6),** each measured on its own:
   - the cost of reference counting (`String`, dynamic arrays, `TShared`): `const` parameters (S14) already avoid most of
     it;
-  - the region allocator (one bump per object, nothing at the end of a region);
+  - the region allocator (one bump per object, nothing at the end of a region): **done for `TRegionObject`**
+    (2026-11-05). `N := TNode.Create` took 36 ns: 11 ns in the frame of the constructor (`TObject.Create` frees the
+    object when a constructor raises), 9 ns in the walk of the parents for managed fields on every object, the rest in
+    `SafeRegionAlloc` and `InitInstance` behind calls. Now `TRegionObject.Create` has no such frame (the region frees
+    the object), `NewInstance` bumps in place, keeps the answer per class in a cache of 256 words, and for a class
+    without managed fields or interfaces writes the VMT and zeroes the fields itself: 13 ns. Binary trees: 0.656 s →
+    0.255 s, 0.57x of C (gcc 0.446 s in the same run) and 3.5x of Goose (0.072 s; was about nine times). The tree kept
+    in a `TGrowArray` with `Int32` links instead of objects takes 0.28 s, so the rest is not the object model; a
+    node of 32 bytes against 8 in Goose (two 4-byte self-relative links) is the next candidate. The baseline table
+    above keeps its numbers;
   - the checks a release build keeps (R1–R4 of the runtime);
   - inlining of generics and of small routines;
   - `-O3` and the target CPU (`-Cp`, `-Cf`);

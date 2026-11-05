@@ -62,12 +62,11 @@ version() {
 
 # build LANG PROG: the binary is $out/PROG/LANG
 build() {
-  local l=$1 p=$2 d=$out/$2 src=$suite/$2/$2 extra=()
+  local l=$1 p=$2 d=$out/$2 src=$suite/$2/$2
   mkdir -p "$d/obj-$l"
   case $l in
     bp)
-      [ "$p" = bintrees ] && extra=(-Fu"$root/tools/spikes/region")   # the region style: the spike unit Region
-      "$root/tools/bp" build --release -O2 ${extra[@]+"${extra[@]}"} -FU"$d/obj-$l" -FE"$d/obj-$l" "$src.pas" \
+      "$root/tools/bp" build --release -O2 -FU"$d/obj-$l" -FE"$d/obj-$l" "$src.pas" \
         > "$d/build-$l.log" 2>&1 && mv "$d/obj-$l/$p" "$d/$l" ;;
     gcc) gcc -O2 -o "$d/$l" "$src.c" -lm > "$d/build-$l.log" 2>&1 ;;
     clang) clang -O2 -o "$d/$l" "$src.c" -lm > "$d/build-$l.log" 2>&1 ;;
