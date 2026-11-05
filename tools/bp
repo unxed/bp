@@ -24,7 +24,8 @@
 #   built from a copy in the cache with that line blank, so the line numbers stay; its directory is searched for units.
 #   --watch: polls the *.pas, *.pp and *.inc of the directory every 200 ms; Ctrl-C stops it and the program.
 #   Caches (BP_CACHE, default ~/.cache/bp): bpvet and bpget by the hash of their sources, the RTL stubs by the hash of
-#   the checked sources and the fpc version, the binaries of `run` by the hash of the sources, the fpc version and the
+#   the checked sources and the fpc version, the findings of bpvet per file in vetfiles/ (by the hash of what the check
+#   of the file reads), the binaries of `run` by the hash of the sources, the fpc version and the
 #   options, the units of each kind of build (fpc, options, directory; unless -FU is given) in units/, the git mirrors and
 #   the extracted versions of the modules in mod/. A .ppu in the current directory whose source is beside it is
 #   removed (fpc would take it before the units of the build).
@@ -225,7 +226,7 @@ sources() {
     for d in "${dirs[@]}"; do cat "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true; done; } 2>/dev/null || true
 }
 make_stubs() {
-  local sh stubtargets=("${targets[@]}")
+  local stubtargets=("${targets[@]}")
   # the keys, from one run of bpvet --buildkey: of the stubs, the identifiers and uses of the program (an edit that adds
   # none keeps the stubs) and the name, size and time of genstubs.py and of every file of the unit path (they change
   # rarely, and a stat is cheaper than a read); of the check (vk, used by build), also the text of every source
@@ -286,12 +287,14 @@ build() {
   refresh_script; make_stubs
   # a passed check is kept by the hash of what it read (bpvet, the stubs, the options, every source of the targets), with
   # its output; the same text again is not checked again. Otherwise the check runs while fpc builds, and when it fails
-  # the binary that fpc wrote is removed: nothing unchecked is handed out
+  # the binary that fpc wrote is removed: nothing unchecked is handed out. bpvet keeps the findings of each file too
+  # (--cache, salted with the key of the stubs), so after an edit it checks the edited file and the files that use it
   local vrc=0 vpid= vtmp= fout mark b
   [ -d "$cache/vet" ] || mkdir -p "$cache/vet"
   if [ ! -f "$cache/vet/$vk" ]; then
     vtmp=$cache/vet/run.$$; mark=$cache/vet/mark.$$; : > "$vtmp"; : > "$mark"
-    shown "$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" ${vet[@]+"${vet[@]}"} "${targets[@]}" > "$vtmp" 2>&1 &
+    shown "$bpvet" --strict --typed --rtl "$stubs" --cache "$cache/vetfiles" --salt "$sh" "${lib[@]}" ${vet[@]+"${vet[@]}"} \
+      "${targets[@]}" > "$vtmp" 2>&1 &
     vpid=$!
   fi
   if [ "$cmd" = run ]; then rm -rf "$1.tmp"; mkdir -p "$1.tmp"; extra=(-FE"$1.tmp"); quiet=(-l- -v0ew); fi

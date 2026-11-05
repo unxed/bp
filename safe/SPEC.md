@@ -1085,6 +1085,7 @@ or above the parameter suppresses its S14 finding.
 | v0.32 (report) | §25.5 competitive on every dimension, step 1 (#181): `tests/bench/size.sh` (hello world in Bp, C, Rust, Go and Goose: build, rebuild, size, RSS, start); verdicts: size — reach (smart linking 1171 → 697 KiB, the collation table on request); memory — ahead (0.3 MiB); start — ahead of all but static C; build — reach (a rebuild 171 ms, target under 100 ms) |
 | v0.33 | §25.5 size and build: `BP` no longer uses `unicodeducet` (strings compare by code point unless the program uses it; hello world 1199 → 781 KiB, with `-XX` 697 → 288 KiB); `bpvet --buildkey` gives both keys of `tools/bp` in one run, and `tools/bp` starts fewer processes: a rebuild after an edit 176 → 144 ms |
 | v0.34 | §25.5: `tools/bp` keeps the units of each kind of build in a directory of its own (a release build linked the `BP` of a debug build when that came first: 34–36% slower in the region and word count programs); `--release` adds `-XX -CX` (smart linking, hello world 288 KiB) |
+| v0.36 | §25.5 the check cache per file (`bpvet --cache`, `tools/bp`): a rebuild of the project of 20 files after an edit 493 → 248 ms (gcc 260, Go 349); §25.2 the toolchain policy: Bp builds on the releases of FPC, not on main |
 | v0.35 (report) | §25.5 a project of many files (`tests/bench/project.sh`, 20 modules, 17326 lines): a clean build Bp 658 ms, Rust 1583, gcc 2599, Go 6085; a rebuild after an edit of one file Bp 493 ms, gcc 263, Go 316 (the check of every file by `bpvet` is the long pole; the lever: a check cache per file) |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
@@ -2912,10 +2913,19 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   3. **The library of BP.** The word count (1.8–2.3x) is `TMap` and the strings of BP against the table C writes for
      itself; the region of objects (3.3x) is the construction of a `TRegionObject` and the access of `TGrowArray`.
      This is our own code to speed up (the levers below).
-  4. **The LLVM back end of FPC main: measured, not a lever for now (#185).** With LLVM 17 it removes the slow spots
-     of fpc#42040, fpc#42041 and fpc#42042 and does not vectorize either; on our programs n-body and the arena tier
-     are 5–20% faster (1.24x and 1.14x of gcc) and fannkuch 24% slower. It needs FPC main, a second toolchain and a
-     workaround in the link, so the tickets stay the way; it is to be measured again when a release of FPC has it.
+  4. **The LLVM back end of FPC main: measured, not adopted (#185).** With LLVM 17 it removes the slow spots of
+     fpc#42040, fpc#42041 and fpc#42042; it does not vectorize, because it emits constrained (strict) floating-point
+     operations (with `-OoFASTMATH` the loop of fpc#42043 vectorizes: fpc#42044). On our programs n-body and the arena
+     tier are 5–20% faster (1.24x and 1.14x of gcc); fannkuch was 24% slower within BP, which plain FPC does not
+     repeat (2.92 s against 2.96 s), so that is noise of the shared machine or BP, not the back end. It needs FPC
+     main, a second toolchain and a workaround in the link, so it is not adopted (the policy below); the tickets and
+     the workarounds in Bp code stay the way, and the loops get kernels of SSE2 (#197).
+
+- **The toolchain policy (the owner, 2026-11-05): Bp builds on the releases of FPC, not on FPC main,** unless there
+  are very strong reasons. Following main costs too much (its RTL changes signatures BP uses: #194), and a project
+  must build the same for years (the `fpc 3.2.2` line of `deps.txt`, §15). BP is still kept compiling on main
+  (#194 fixed), so the next release costs little; the measurements of main (its LLVM back end) are information for
+  the tickets, not a mode of Bp.
 
 - **Then the levers the numbers point to (step 6),** each measured on its own:
   - the cost of reference counting (`String`, dynamic arrays, `TShared`): `const` parameters (S14) already avoid most of
@@ -3216,7 +3226,7 @@ The verdicts:
     busy machine), so C is the one to reach there (`tests/bench/size.sh`);
   - a project of many files: Go. There Go builds much faster than C (no headers to read again in every file, a
     package compiled once and kept in its cache), so the long-run target is Go. `tests/bench/project.sh` measures it (the
-    last item of this section): a rebuild of a project of 20 files, Bp 493 ms, gcc 263 ms, Go 316 ms.
+    last item of this section): a rebuild of a project of 20 files, Bp 248 ms (v0.36), gcc 260 ms, Go 349 ms.
 
   The levers:
   - the check of an unchanged file from the cache of `bpvet`;
@@ -3337,8 +3347,33 @@ What changes in the verdicts:
   - A rebuild: Bp 493 ms against 263 ms (gcc) and 316 ms (Go), level with an incremental Rust; the target is Go.
     The cause is the check: `bpvet` reads and checks all 21 files again after an edit of one (0.6–0.9 s alone on a
     busy machine), while `fpc` compiles the one unit and the program and links (0.3–0.6 s) at the same time. The
-    lever is a check cache per file: a file is checked again only when it or the interface of a unit it uses
-    changed.
+    lever is a check cache per file: a file is checked again only when it or a unit it uses changed.
+- **The check cache per file (v0.36, `bpvet --cache`, `tools/bpvet/bpvetcache.pas`).** `bpvet` keeps the findings
+  of each file under a key of what its check reads: the salt (`tools/bp` gives the key of the RTL stubs: the version
+  of fpc, bpvet, the options, the identifiers of the program, a `stat` of the unit path), the options of the run,
+  and the text of the file, of its include files and of the units of the program it uses, through the units these
+  use. An entry is written aside and renamed. The findings come back the same (the lint fixtures: 178 files, the
+  same 235 lines with and without the cache, typed and untyped). On the project above `bpvet` alone takes 647 ms
+  with an empty cache, 190 ms after an edit of the last module (it checks that module and the program, which uses
+  every module) and 20 ms with nothing changed. The benchmark, the same machine:
+
+  | variant | clean build | rebuild after an edit |
+  |---|---|---|
+  | Bp `bp build --release -O2` | 718 ms | 248 ms (493 before) |
+  | Bp `bp build` (`-Cr -Co`) | 541 ms | 218 ms (506 before) |
+  | C, gcc `-O2`, `make -j4` | 2730 ms | 260 ms |
+  | Go `go build` | 6886 ms | 349 ms |
+  | Rust `cargo build --release` | 1794 ms | 1512 ms |
+  | Rust `cargo build` (incremental) | 1211 ms | 475 ms |
+  | Goose `-O2` | 15230 ms | 13874 ms |
+
+  - The rebuild of a project is now level with gcc and ahead of Go, the target of this section; the clean build
+    stays the fastest. The rest of a rebuild is fpc: the edited unit, the program, which loads every unit, and the
+    link.
+  - The key takes the whole text of a used unit, not only its interface: an edit of the body of a unit also checks
+    the files that use it. A key of the interface alone would leave only the edited file to check (37 ms here
+    against 190), for a scan of where the interface ends; it is not needed for the target.
+  - The entries are never removed for now; one is a few hundred bytes.
   - fpc compares the time of a source with the one in its `.ppu` to the second: an edit within the second of the last
     build, at the same size, is not compiled again. `project.sh` waits a second before an edit (not timed); a user
     who saves and builds within one second is not likely, but `tools/bp` could add a check by content.

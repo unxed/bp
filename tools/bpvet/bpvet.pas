@@ -3,7 +3,8 @@
   Built by tools/bpvet/build.sh (FPC with fcl-passrc); it reads the sources only, no other unit is needed (the typed
   mode reads the RTL from declaration stubs).
 
-  usage: bpvet [--report|--strict] [--fix] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...
+  usage: bpvet [--report|--strict] [--fix] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]...
+               [--cache DIR [--salt TEXT]] FILE|DIR...
          bpvet --stubkey FILE|DIR...   the text the RTL stubs of FILE|DIR depend on (bpvetkey.pas), for tools/bp
          bpvet --buildkey SALT FILE|DIR... -- STAT...   the key of the stubs and the key of the check (bpvetkey.pas)
     a directory is walked for *.pas, *.pp, *.lpr (include files are read through the modules that include them);
@@ -14,6 +15,9 @@
     --rtl directory (declaration stubs of the RTL, tools/bpvet/resolver/genstubs.py), the -Fu and -Fi directories
     and the directory of the file; a file that does not resolve is reported as Fatal; -FaUNIT: a unit every file
     uses without naming it (as for fpc);
+    --cache DIR keeps the findings of each file in DIR under a key of what its check reads, and does not check a file
+    again while its key stays the same (bpvetcache.pas); --salt TEXT goes into every key: what the checks read besides
+    the files of the program (tools/bp gives the key of the RTL stubs). Not used with --fix;
   Messages are those of FPC, one line each, so that an IDE and a model read them as compiler messages:
     FILE(LINE,COL) Error: SAFE-Sxx <what is wrong>; <how to fix it>
   Modes (the migration modes of §6):
@@ -34,7 +38,8 @@ program bpvet;
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, BpvetS17, BpvetStyle, BpvetCast, BpvetKey, Safe;
+  SysUtils, Classes, PasTree, BpvetCore, BpvetRules, BpvetTyped, BpvetS17, BpvetStyle, BpvetCast, BpvetKey, BpvetCache,
+  Safe;
 
 type
   TListBox = specialize TOwned<TStringList>;
@@ -42,7 +47,8 @@ type
 
 procedure Usage;
 begin
-  WriteLn('usage: bpvet [--report|--strict] [--fix] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]... FILE|DIR...');
+  WriteLn('usage: bpvet [--report|--strict] [--fix] [--typed --rtl DIR [-FaUNIT]...] [-dNAME]... [-FiDIR]... [-FuDIR]...');
+  WriteLn('             [--cache DIR [--salt TEXT]] FILE|DIR...');
   WriteLn('  default: errors fail; --report: everything is a warning, exit code 0; --strict: warnings are errors');
 end;
 
@@ -94,11 +100,30 @@ var
   Report: TVetReport;
   Src: TVetSource;
   Module: TPasModule;
-  A, Err, RtlDir: String;
+  A, Err, RtlDir, CacheDir, Salt, Key: String;
   Typed: Boolean = False;
-  I, Errors, Warnings, Fatals: Integer;
+  Fixing: Boolean = False;
+  I, Errors, Warnings, Fatals, From: Integer;
   KeyPaths, StatPaths: TKeyPaths;
   N: Integer;
+{ The checks of one file, their findings into Report. }
+procedure CheckFile(const Name: String);
+begin
+  if not VetReadSource(Name, Src, Err) then
+  begin
+    VetAdd(Report, Name, 1, 1, vsFatal, '', 'bpvet cannot read this file: ' + Err);
+    Exit;
+  end;
+  VetCheckStyle(Src, Report);
+  Module := VetParse(Src, Defines, IncludeDirs, Report);
+  if Module = nil then
+    Exit;
+  VetRunRules(Src, Module, Report);
+  Module.Release;
+  if Typed then
+    VetResolve(Src, RtlDir, Defines, IncludeDirs, VetUnitDirs, Implicit, Report);
+end;
+
 begin
   if (ParamCount >= 1) and (ParamStr(1) = '--stubkey') then
   begin
@@ -124,6 +149,8 @@ begin
     PrintBuildKeys(ParamStr(2), KeyPaths, StatPaths);
     Halt(0);
   end;
+  Salt := '';
+  CacheDir := '';
   Files := TListBox.Own(TStringList.Create);
   Files.Get.Sorted := True;
   Files.Get.Duplicates := dupIgnore;
@@ -132,6 +159,8 @@ begin
   begin
     A := ParamStr(I);
     Inc(I);
+    if Copy(A, 1, 1) = '-' then
+      Salt := Salt + #0 + A; // the options are a part of every key of the cache
     if A = '--report' then
       Mode := vmReport
     else if A = '--strict' then
@@ -140,6 +169,7 @@ begin
       Typed := True
     else if A = '--fix' then
     begin
+      Fixing := True;
       S17Fix := True;
       CastFix := True;
       StyleFix := True;
@@ -147,6 +177,17 @@ begin
     else if (A = '--rtl') and (I <= ParamCount) then
     begin
       RtlDir := ParamStr(I);
+      Salt := Salt + #0 + A + #0 + RtlDir;
+      Inc(I);
+    end
+    else if (A = '--cache') and (I <= ParamCount) then
+    begin
+      CacheDir := ParamStr(I);
+      Inc(I);
+    end
+    else if (A = '--salt') and (I <= ParamCount) then
+    begin
+      Salt := Salt + #0 + A + #0 + ParamStr(I);
       Inc(I);
     end
     else if (A = '-h') or (A = '--help') then
@@ -180,21 +221,23 @@ begin
     Halt(2);
   end;
 
+  if Fixing then
+    CacheDir := '';
+  if CacheDir <> '' then
+    VetCacheTargets(Files.Get);
   for I := 0 to Files.Get.Count - 1 do
   begin
-    if not VetReadSource(Files.Get[I], Src, Err) then
+    Key := '';
+    if CacheDir <> '' then
     begin
-      VetAdd(Report, Files.Get[I], 1, 1, vsFatal, '', 'bpvet cannot read this file: ' + Err);
-      Continue;
+      Key := VetCacheKey(Salt, Files.Get[I], IncludeDirs);
+      if VetCacheLoad(CacheDir, Key, Report) then
+        Continue;
     end;
-    VetCheckStyle(Src, Report);
-    Module := VetParse(Src, Defines, IncludeDirs, Report);
-    if Module = nil then
-      Continue;
-    VetRunRules(Src, Module, Report);
-    Module.Release;
-    if Typed then
-      VetResolve(Src, RtlDir, Defines, IncludeDirs, VetUnitDirs, Implicit, Report);
+    From := Length(Report.Findings);
+    CheckFile(Files.Get[I]);
+    if CacheDir <> '' then
+      VetCacheStore(CacheDir, Key, Report, From);
   end;
 
   Errors := 0;
