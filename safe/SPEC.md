@@ -1074,6 +1074,7 @@ or above the parameter suppresses its S14 finding.
 | v0.23 | §21.4 the `TComponent` owner (step 4 of §21.7): the typed `bpvet` drops S6 of `TFoo.Create(AOwner)` of a component class with an owner that is not `nil` and S5 of a `published` component field of a component class; S17 for `.Free`, `FreeAndNil`, `Own`, `Share`, `Adopt` and `Hold` of a component that its owner destroys (`bpvethold.pas`, `tests/lint/component_*.pas`) |
 | v0.24 | §25.2 step 6, the region allocator: `TRegionObject.Create` without the frame of a failed constructor, `NewInstance` bumps in place, caches per class, and writes the VMT and zeroed fields itself for a class without managed fields or interfaces: `TNode.Create` 36 ns → 13 ns, binary trees 0.656 s → 0.255 s (0.57x of C); the suite uses the region of unit `BP` |
 | v0.25 | §25.3 strings and maps: `TStrSlice` (a part of a `String` that holds it), `Fields`, `TMap<K, V>` (open addressing, `Ref(K, D)^` for one lookup, Go semantics of a copy) in units Safe and BP (`safe/map.*.inc`, `test_map`), R18, R19, S27; the word count of the suite over them: 0.56 s → 0.46 s (`while F.Next(W)`: 0.37 s) |
+| v0.26 | §25.2 step 6, n-body: FPC computes the address of an array element again after every store into the array; the pull of a pair as a routine with two `var` parameters takes it once: 0.832 s (1.91x of C) → 0.667 s (1.36x); `-O3`, `-O4` and the target CPU give nothing |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -2715,7 +2716,9 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     a second core: its CPU time is about twice its wall time).
   - **N-body, fannkuch.** The same loops and the same order of operations in every language, so that the floating
     point results are equal bit for bit (the line holds the energies in millionths). Rust indexes with bounds checks,
-    as written; Bp is built without them.
+    as written; Bp is built without them. Since v0.26 the pull of a pair in Bp is a routine with two `var` parameters
+    (`Pull(Bodies[I], Bodies[J])`), the same operations in the same order; the baseline above was measured with
+    `Bodies[I].VX` written out in the loop.
   - **Word count.** Bp (since v0.25, §25.3) counts the words as `TStrSlice` values of the text (`for W in Fields(Text)`,
     no copy of a word) in a `TMap` of unit `BP`, one lookup per word (`Inc(Counts.Ref(W, 0)^)`); the baseline above was
     measured with a `String` of every word (`Copy`) and a table of its own (FNV-1a of 32 bits, open addressing).
@@ -2758,7 +2761,14 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     above keeps its numbers;
   - the checks a release build keeps (R1–R4 of the runtime);
   - inlining of generics and of small routines;
-  - `-O3` and the target CPU (`-Cp`, `-Cf`);
+  - `-O3` and the target CPU (`-Cp`, `-Cf`): no gain on n-body (2026-11-05: `-O3` and `-O4` within the noise of
+    `-O2`, `-CpCOREI -CfAVX2` and `-CfSSE3` slower);
+  - the address of an array element (n-body, 2026-11-05): FPC computes `Bodies[I]` (the index times 56, the base of
+    the array) again for every access after a store into the array, where gcc keeps it in a register. Written as a
+    routine with `var` parameters for the two bodies (`Pull(Bodies[I], Bodies[J])`, the split borrow of Rust), the
+    address is taken once per pair: 0.832 s (1.91x of C) → 0.667 s (1.36x; gcc 0.487 s, Goose 0.479 s in the same run).
+    The style of the dialect for a hot loop over the elements of an array: a `var` parameter or a routine per element,
+    not the element written out in every expression. A compiler fork would fix it in FPC; that is out (§0);
   - the code generator: FPC's own against the LLVM back end of FPC main, where it builds the dialect;
   - the M:N scheduler (§21.3, step 5 result): the woken goroutine runs next on the carrier of the waker (`runnext`:
     done, 12 us → 0.8 us per round trip on 4 carriers), an idle carrier spins a little before it sleeps, per-carrier run
