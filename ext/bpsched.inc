@@ -964,9 +964,12 @@ begin
   // the first heap chunk of a thread for small blocks (32 KiB in the RTL) is cut into blocks at once, so every page of
   // it is touched: 16 page faults at the start of a goroutine that allocates, and 32 KiB of a parked one. A thread
   // started from now on (each goroutine copies it in InitThread) begins with one page; a heap that grows doubles it.
-  // A value the program set is kept.
+  // A value the program set is kept. The heap of FPC main has no such chunk (the variable is left only under
+  // LEGACYHEAP).
+  {$if declared(growheapsizesmall)}
   if growheapsizesmall = 32 * 1024 then
     growheapsizesmall := PageSize;
+  {$endif}
   if SeedMode then
     Exit;
   for I := 1 to Procs do
@@ -1443,10 +1446,18 @@ begin
   EventWait(PSchedEvent(State), -1);
 end;
 
+// FPC 3.3.1 (main) made the wait with a timeout a function and added FUseComWait to BasicEventWaitFor
+{$if FPC_FULLVERSION >= 30301}
+function RawRTLEventWaitForTimeout(State: PRTLEvent; Timeout: LongInt): Boolean;
+begin
+  Result := EventWait(PSchedEvent(State), Timeout);
+end;
+{$else}
 procedure RawRTLEventWaitForTimeout(State: PRTLEvent; Timeout: LongInt);
 begin
   EventWait(PSchedEvent(State), Timeout);
 end;
+{$endif}
 
 function RawBasicEventCreate(EventAttributes: Pointer; AManualReset, InitialState: Boolean;
   const Name: AnsiString): PEventState;
@@ -1469,7 +1480,11 @@ begin
   EventSet(PSchedEvent(State));
 end;
 
+{$if FPC_FULLVERSION >= 30301}
+function RawBasicEventWaitFor(Timeout: Cardinal; State: PEventState; FUseComWait: Boolean = False): LongInt;
+{$else}
 function RawBasicEventWaitFor(Timeout: Cardinal; State: PEventState): LongInt;
+{$endif}
 const
   wrSignaled = 0;
   wrTimeout = 1;

@@ -18,8 +18,16 @@ type
   end;
 
   { Object lifetime. The compiler maintains the count: the interface fields in the TOwned/TShared records
-    reference TSafeLife. When the last reference is gone, the object is destroyed. }
-  TSafeLife = class(TInterfacedObject)
+    reference TSafeLife. When the last reference is gone, the object is destroyed. The count is its own, not the one
+    of TInterfacedObject: TryAddRef raises it from another thread (a TWeak), and the RTL of FPC main drops a count of
+    1 without an atomic operation, on the ground that the last owner is alone (H6). }
+  TSafeLife = class(TObject, IInterface)
+  protected
+    FRefCount: LongInt;
+    function QueryInterface(constref IID: TGUID; out Obj): LongInt;
+      {$ifndef WINDOWS}cdecl{$else}stdcall{$endif};
+    function _AddRef: LongInt; {$ifndef WINDOWS}cdecl{$else}stdcall{$endif};
+    function _Release: LongInt; {$ifndef WINDOWS}cdecl{$else}stdcall{$endif}; // the last one destroys, atomically
   public
     Obj: TObject;
     CellObj: TSafeCell;
@@ -32,6 +40,7 @@ type
     destructor Destroy; override;
     function Cell: TSafeCell; // created on the first TShared.Weak
     function TryAddRef: Boolean; // +1 to the count only while it is above zero: never revives a dying object
+    property RefCount: LongInt read FRefCount;
   end;
 
   { Arena generation. FreeAll bumps it; a TArenaRef made in debug mode remembers it. Outlives the arena
