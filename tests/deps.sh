@@ -63,7 +63,7 @@ commit "$b" one v1.0.0
 
 mkdir -p "$app"
 printf '// the application\nsafe 0.6\nrequire %s v1.1.0  // Whisper\nrequire %s v1.0.0\n' "$a" "$b" > "$app/deps.txt"
-printf 'program app;\n\n{$mode objfpc}{$H+}\n\n// UNSAFE: BP goes first for the thread manager (SPEC §14); the units after it declare no unsafe primitive\nuses\n  BP, acme.str, bob.greet;\n\nbegin\n  WriteLn(Greet(%s), %s, Whisper(%s));\nend.\n' \
+printf 'program app;\n\n{$mode objfpc}{$H+}\n\nuses\n  acme.str, bob.greet, BP;\n\nbegin\n  WriteLn(Greet(%s), %s, Whisper(%s));\nend.\n' \
   "'world'" "' '" "'QUIET'" > "$app/app.pas"
 want='Hello, WORLD! quiet...'
 ca=$(git -C "$a" rev-parse v1.1.0) cb=$(git -C "$b" rev-parse v1.0.0)
