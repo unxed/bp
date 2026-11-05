@@ -38,7 +38,9 @@ var
   Timers: PRawThread = nil;
   TimerCount: LongInt = 0;
   NextDeadline: Int64 = High(Int64);
-  FreeRegions: PRawThread = nil;
+  FreeRegions: PRawThread = nil;  // cold: the pages given back to the kernel
+  WarmRegions: PRawThread = nil;  // freed during this tick of the monitor, the pages still mapped
+  OldWarmRegions: PRawThread = nil; // freed during the tick before
   ChunkNext: PtrUInt = 0;         // the first region of the current reservation never carved
   ChunkHigh: PtrUInt = 0;
   GCtlSize: PtrUInt = 0;          // the record and the threadvar block of a goroutine, rounded up to pages
@@ -433,20 +435,34 @@ begin
   SchedFail('cannot reserve the stacks of goroutines');
 end;
 
-{ A region for a goroutine: a free one (its pages read as zero), or a new one carved out of a reservation with the
-  guard area PROT_NONE between the record and the stack. }
+{ A region for a goroutine: a warm one (freed during the last two ticks of the monitor, its pages still mapped), a cold
+  one (its pages given back, they read as zero), or a new one carved out of a reservation with the guard area PROT_NONE
+  between the record and the stack. }
 function NewGRegion: PRawThread;
 var
   Base: PtrUInt;
 begin
   SpinLock(SchedLock);
-  Result := FreeRegions;
+  Result := WarmRegions;
   if Result <> nil then
-    FreeRegions := Result^.Next;
+    WarmRegions := Result^.Next
+  else
+  begin
+    Result := OldWarmRegions;
+    if Result <> nil then
+      OldWarmRegions := Result^.Next
+    else
+    begin
+      Result := FreeRegions;
+      if Result <> nil then
+        FreeRegions := Result^.Next;
+    end;
+  end;
   SpinUnlock(SchedLock);
   if Result <> nil then
   begin
-    System.FillChar(Result^, GCtlSize, 0); // qemu-user may keep the old pages after madvise
+    // a warm region keeps the record of the goroutine before; qemu-user may keep the old pages after madvise
+    System.FillChar(Result^, GCtlSize, 0);
     Exit;
   end;
   SpinLock(RegionLock);
@@ -462,17 +478,60 @@ begin
   Result := PRawThread(Base);
 end;
 
-{ The goroutine has ended and is closed: its pages go back to the kernel, its addresses to the next goroutine. }
-procedure FreeGRegion(G: PRawThread);
+{ The pages of a region go back to the kernel. A madvise costs a flush of the TLB of every carrier, so it is not done
+  at the end of each goroutine: a region stays warm for the next one, and the monitor gives back the ones not taken. }
+procedure ColdRegion(G: PRawThread);
 var
   Lo: PtrUInt;
 begin
   Lo := PtrUInt(G) + GCtlSize + GuardSize;
   do_syscall(syscall_nr_madvise, TSysParam(Lo), TSysParam(PtrUInt(G) + RegionSize - Lo), MADV_DONTNEED);
   do_syscall(syscall_nr_madvise, TSysParam(G), TSysParam(GCtlSize), MADV_DONTNEED);
+end;
+
+{ The goroutine has ended and is closed: its addresses go to the next goroutine. Without the monitor (the seed mode)
+  the pages go back to the kernel at once. }
+procedure FreeGRegion(G: PRawThread);
+begin
+  if SeedMode then
+  begin
+    ColdRegion(G);
+    SpinLock(SchedLock);
+    G^.Next := FreeRegions;
+    FreeRegions := G;
+    SpinUnlock(SchedLock);
+    Exit;
+  end;
   SpinLock(SchedLock);
-  G^.Next := FreeRegions;
-  FreeRegions := G;
+  G^.Next := WarmRegions;
+  WarmRegions := G;
+  SpinUnlock(SchedLock);
+end;
+
+{ The monitor, at each tick: the regions warm since the tick before and not taken again go back to the kernel; the
+  regions freed during this tick become the old ones. A region stays warm for one to two ticks. }
+procedure CoolRegions;
+var
+  L, G, Last: PRawThread;
+begin
+  if (WarmRegions = nil) and (OldWarmRegions = nil) then
+    Exit;
+  SpinLock(SchedLock);
+  L := OldWarmRegions;
+  OldWarmRegions := WarmRegions;
+  WarmRegions := nil;
+  SpinUnlock(SchedLock);
+  if L = nil then
+    Exit;
+  G := L;
+  repeat
+    ColdRegion(G);
+    Last := G;
+    G := G^.Next;
+  until G = nil;
+  SpinLock(SchedLock);
+  Last^.Next := FreeRegions;
+  FreeRegions := L;
   SpinUnlock(SchedLock);
 end;
 
@@ -735,6 +794,7 @@ begin
   repeat
     FutexWait(MonitorWord, 0, MonitorTickMs);
     FireTimers;
+    CoolRegions;
     N := CarrierCount;
     if N > MaxCarriers then
       N := MaxCarriers;
@@ -779,6 +839,12 @@ begin
   GCtlSize := (GRecSize + ThreadVarBlockSize + PageSize - 1) and not PtrUInt(PageSize - 1);
   if GCtlSize > CtlSize then
     SchedFail('the threadvars do not fit the record area of a region');
+  // the first heap chunk of a thread for small blocks (32 KiB in the RTL) is cut into blocks at once, so every page of
+  // it is touched: 16 page faults at the start of a goroutine that allocates, and 32 KiB of a parked one. A thread
+  // started from now on (each goroutine copies it in InitThread) begins with one page; a heap that grows doubles it.
+  // A value the program set is kept.
+  if growheapsizesmall = 32 * 1024 then
+    growheapsizesmall := PageSize;
   if SeedMode then
     Exit;
   for I := 1 to Procs do

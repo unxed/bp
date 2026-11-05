@@ -1076,6 +1076,7 @@ or above the parameter suppresses its S14 finding.
 | v0.25 | §25.3 strings and maps: `TStrSlice` (a part of a `String` that holds it), `Fields`, `TMap<K, V>` (open addressing, `Ref(K, D)^` for one lookup, Go semantics of a copy) in units Safe and BP (`safe/map.*.inc`, `test_map`), R18, R19, S27; the word count of the suite over them: 0.56 s → 0.46 s (`while F.Next(W)`: 0.37 s) |
 | v0.26 | §25.2 step 6, n-body: FPC computes the address of an array element again after every store into the array; the pull of a pair as a routine with two `var` parameters takes it once: 0.832 s (1.91x of C) → 0.667 s (1.36x); `-O3`, `-O4` and the target CPU give nothing |
 | v0.27 | §21.3, §25.2 step 6: an idle carrier of the M:N scheduler spins a little before it sleeps (at most half of them; a goroutine made ready meanwhile wakes no sleeping carrier) and takes the place "next" of a busy carrier: the start of a goroutine 28 us → 17 us, a fan-out over a channel 400 → 320 ms |
+| v0.28 | §21.3, §25.2 step 6: the start of a goroutine: a freed region stays warm for the next goroutine and the monitor gives back the ones not taken at the next tick (no `madvise` at each end); the first heap chunk of a goroutine is one page; the start and end 17 us → 5 us on 4 carriers, a tree of 8191 goroutines 1.07 s → 0.43 s |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1936,7 +1937,7 @@ how it is closed:
 - **The switch to M:N** is `BP_MN=1` at run time (or `-dBP_MN` as the default of a build) until the benchmark of
   §25.1 step 3 and the tests under M:N and under seeds prove it; then the default flips. `-dSAFE_LIBC` stays 1:1.
 - **Left for later, measured first:** a start without the system calls of `InitThread` (40-50 us), a smaller first heap
-  chunk (`growheapsizesmall`), per-carrier run queues, a netpoller, `Sleep` that parks (FPC has no hook for it: a
+  chunk (`growheapsizesmall`; done, see the start of a goroutine below), per-carrier run queues, a netpoller, `Sleep` that parks (FPC has no hook for it: a
   `Sleep` in a goroutine pins its carrier, and the monitor adds one), the stacks of the parked goroutines in the
   deadlock report.
 
@@ -1983,6 +1984,30 @@ and `test_threads` passed 20 times each under `BP_PROCS` 1, 2, 3 and 8 and under
   Measured on 4 carriers (medians, the machine shared with other work): the start and the end of a goroutine 28 us →
   17 us; one producer and three workers over a buffered `TChan`, 200,000 items: 400-430 ms → 300-340 ms; the round
   trip between two goroutines is unchanged (0.7-0.9 us). 200 and 20,000 rounds gave no more than 2000.
+- **The start of a goroutine (2026-11-05, §25.2 step 6).** Two costs of the start and the end, found with `strace` and
+  the page faults of a tree of goroutines (every goroutine starts two and waits for them; 8191 of them took 0.9-1.1 s
+  against 7 ms in Go):
+  - The two `madvise` that gave the pages of an ended goroutine back to the kernel. In a process of several threads each
+    one flushes the TLB of every CPU that runs one. A freed region stays warm now (its pages mapped) and the next
+    goroutine takes it; at each tick the monitor gives back the regions freed during the tick before and not taken
+    again, so the memory of a burst goes back after 10-20 ms. Without the monitor (the seed mode) the pages go back at
+    once, as before.
+  - The first heap chunk of the RTL for small blocks (`growheapsizesmall`, 32 KiB), which the RTL cuts into blocks at
+    once: 16 page faults for a goroutine that allocates. The scheduler sets it to one page before the first goroutine
+    (a heap that grows doubles it; a value the program set is kept). A parked goroutine takes about 12 KiB instead of
+    44 KiB (the step 5 numbers).
+
+  Medians of 5 runs (4 logical CPUs):
+
+  | | before | warm regions | and a heap chunk of one page |
+  |---|---|---|---|
+  | the start and the end of an empty goroutine, `BP_PROCS=1` | 28.9 us | 14.7 us | 14.9 us |
+  | the same, 4 carriers | 16.8 us | 6.2 us | 5.1 us |
+  | the tree of 8191 goroutines, 4 carriers | 1072 ms | 752 ms | 428 ms |
+  | the same, every goroutine waits for its first child before it starts the second | 937 ms | 720 ms | 331 ms |
+
+  Left of the start, per goroutine: `InitThread` and `DoneThread` of the RTL (the `mmap` and `munmap` of the heap chunk,
+  `isatty` four times, `getrlimit`), the `mprotect` of a new region. Go takes 0.65 us on the tree.
 - **The default stays 1:1** until CI has run under `MNMODES` for a while; then it flips (`-dSAFE_LIBC` stays 1:1).
 
 ### 21.4 The tree of `TComponent` is an owner
@@ -2785,8 +2810,9 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   - the code generator: FPC's own against the LLVM back end of FPC main, where it builds the dialect;
   - the M:N scheduler (§21.3, step 5 result): the woken goroutine runs next on the carrier of the waker (`runnext`:
     done, 12 us → 0.8 us per round trip on 4 carriers), an idle carrier spins a little before it sleeps (done: the start of
-    a goroutine 28 us → 17 us, a fan-out over a channel a quarter faster, §21.3), per-carrier run queues, a smaller first
-    heap chunk of a goroutine.
+    a goroutine 28 us → 17 us, a fan-out over a channel a quarter faster, §21.3), warm regions and a heap chunk of one page
+    (done: the start of a goroutine 17 us → 5 us, a tree of goroutines 2.5 times faster, §21.3), a start without the
+    system calls of `InitThread`, per-carrier run queues.
 
   A lever that needs a compiler fork is out (§0: `bp` works over the stock `fpc`).
 
