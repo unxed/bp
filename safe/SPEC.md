@@ -1792,8 +1792,9 @@ how it is closed:
 - **Carriers.** One OS thread per CPU (`sched_getaffinity`; `BP_PROCS=N` overrides), started at the first goroutine. One
   run queue under a spin lock for now (per-carrier queues are a measured lever of §25.1 step 6); an idle carrier sleeps
   on a futex until a push or the next timer.
-- **A contended critical section** in a goroutine yields until it is free (it never sleeps in the futex while the owner
-  may wait in the run queue); an OS thread keeps the futex.
+- **A contended critical section** parks a goroutine in a list of the lock (it never sleeps in the futex while the owner
+  may wait in the run queue): it marks the lock contended, as an OS waiter does, and the leaver wakes one OS waiter and
+  one goroutine. An OS thread keeps the futex.
 - **The monitor** (one OS thread, every 10 ms) fires timers the carriers did not, adds a carrier when the run queue is
   not empty and no switch happened in a tick (a blocking system call or a long loop; at most 256 carriers), and reports a
   deadlock.
@@ -1803,7 +1804,8 @@ how it is closed:
 - **`BP_SCHED_SEED=N`:** no carriers; the main thread runs the goroutines whenever it blocks (an event, a join, a
   contended lock, `ThreadSwitch`), picks the next ready one at random from the seed, and a goroutine yields at a random
   half of its lock entries (every channel operation takes one). One OS thread: the same seed gives the same
-  interleaving, a deadlock is exact. Timers use real time.
+  interleaving, a deadlock is exact. Timers use real time. There is no preemption, so a loop that waits for the main
+  thread without blocking must yield (`ThreadSwitch`), as with one carrier in Go before 1.14.
 - **The main thread stays an OS thread** (not a goroutine): its waits are futex waits, and in the seed mode it is the
   carrier.
 - **The switch to M:N** is `BP_MN=1` at run time (or `-dBP_MN` as the default of a build) until the benchmark of

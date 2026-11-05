@@ -24,7 +24,12 @@
   - exit: CLONE_CHILD_CLEARTID, the kernel clears Tid and wakes the waiters;
     the stack region is freed by the next BeginThread/CloseThread (the "zombie collector");
   - the main thread is recognised by the range [MainLow, MainHigh): argv above, the stack
-    limit below; a region that falls into the range is dropped (this happens under qemu-user). }
+    limit below; a region that falls into the range is dropped (this happens under qemu-user).
+
+  M:N (bpsched.inc, SPEC §21.3 "Step 5 design"): with BP_MN=1 in the environment (or -dBP_MN as the default) a
+  BeginThread starts a goroutine: a region of the same layout, run by carrier threads (one per CPU, BP_PROCS=N) with
+  a switch of the stack pointer. A wait of a goroutine parks it and runs the next one. BP_SCHED_SEED=N runs every
+  goroutine on the main thread in an order drawn from the seed. }
 unit BPThreads;
 
 {$mode objfpc}{$H+}
@@ -82,6 +87,17 @@ const
 
 type
   PRawThread = ^TRawThread;
+
+  { An event for RTLEvent and BasicEvent: OS threads wait on the futex Flag, goroutines in the list Waiters. }
+  PSchedEvent = ^TSchedEvent;
+  TSchedEvent = record
+    Lock: LongInt;         // a spin lock over the fields below
+    Flag: LongInt;         // signalled; the futex word of the OS waiters
+    Manual: Boolean;
+    OsWaiting: LongInt;    // OS threads in a wait: only then the futex is woken
+    Waiters: PRawThread;   // parked goroutines, in the order of their waits (WaitNext)
+  end;
+
   TRawThread = record
     Magic: PtrUInt;
     TVBlock: Pointer;      // the threadvar block
@@ -92,7 +108,21 @@ type
     Closed: LongInt;       // CloseThread was called: the region may be freed after the exit
     ExitCode: PtrInt;
     Region: Pointer;
-    Next: PRawThread;      // the list of regions not freed yet
+    Next: PRawThread;      // the list of regions not freed yet; of a goroutine: the run queue, the free regions
+    { M:N (bpsched.inc) }
+    Green: LongInt;        // 1: a goroutine
+    SP: Pointer;           // a goroutine: its saved stack pointer; a carrier: its own while a goroutine runs on it
+    Carrier: PRawThread;   // the carrier a goroutine runs on
+    After: LongInt;        // what the carrier does after the goroutine switched away (AfterYield...)
+    AfterLock: PLongInt;   // AfterPark: the spin lock the carrier releases
+    Wake: LongInt;         // a park: 0 waiting, 1 signalled, 2 timed out (one compare-and-swap decides)
+    Deadline: Int64;       // a park with a timeout: NowMs at which it ends, else 0
+    InTimers: Boolean;
+    TimerPrev, TimerNext: PRawThread;
+    WaitNext: PRawThread;  // the waiters of an event
+    Votes: LongInt;        // ended + closed: the second vote frees the region
+    Switches: PtrUInt;     // a carrier: goroutines run so far (the monitor watches progress)
+    Done: TSchedEvent;     // set when the goroutine ends (WaitForThreadTerminate)
   end;
 
   { A recursive futex mutex laid over TRTLCriticalSection. }
@@ -101,12 +131,8 @@ type
     State: LongInt;        // 0 free, 1 taken, 2 taken with waiters
     Count: LongInt;
     Owner: TThreadID;
-  end;
-
-  PRawEvent = ^TRawEvent;
-  TRawEvent = record
-    Flag: LongInt;
-    Manual: Boolean;
+    GLock: LongInt;        // a spin lock over GWaiters
+    GWaiters: PRawThread;  // goroutines parked on it (bpsched.inc), in order (WaitNext)
   end;
 
   TRawEntry = function(Arg: Pointer): PtrInt; cdecl;
@@ -119,11 +145,8 @@ var
   Zombies: PRawThread = nil;
   ZombieLock: TRawMutex;
   LiveThreads: LongInt = 0;
-
-function SafeRawThreadCount: LongInt;
-begin
-  Result := LiveThreads;
-end;
+  MNOn: Boolean = False;     // BeginThread starts goroutines (bpsched.inc)
+  SeedMode: Boolean = False; // BP_SCHED_SEED: the main thread is the only carrier
 
 { ---------- the current thread: from the stack pointer ---------- }
 
@@ -235,6 +258,8 @@ begin
   end;
 end;
 
+procedure WakeMutexWaiter(var M: TRawMutex); forward;
+
 procedure MutexLeave(var M: TRawMutex);
 begin
   Dec(M.Count);
@@ -245,6 +270,7 @@ begin
   begin
     InterlockedExchange(M.State, 0);
     FutexWake(M.State, 1);
+    WakeMutexWaiter(M);    // and a parked goroutine, if one is there
   end;
 end;
 
@@ -255,11 +281,6 @@ end;
 
 procedure RawDoneCS(var CS);
 begin
-end;
-
-procedure RawEnterCS(var CS);
-begin
-  MutexEnter(TRawMutex(CS));
 end;
 
 function RawTryEnterCS(var CS): LongInt;
@@ -304,7 +325,7 @@ var
   T: PRawThread;
 begin
   T := CurThread;
-  if T <> @MainThread then
+  if (T <> @MainThread) and (T^.Green = 0) then // a goroutine keeps its block in its record page
   begin
     Fpmunmap(T^.TVBlock, ThreadVarBlockSize);
     T^.TVBlock := nil;
@@ -413,12 +434,15 @@ end;
 function RawThreadMain(Arg: Pointer): PtrInt; cdecl;
 var
   T: PRawThread;
+  Counted: Boolean;
 begin
   T := PRawThread(Arg);
+  Counted := T^.ExitCode <> 0;
   InitThread(T^.StackLen);
   T^.ExitCode := T^.Fn(T^.Arg);
   DoneThread;
-  InterlockedDecrement(LiveThreads);
+  if Counted then
+    InterlockedDecrement(LiveThreads);
   Result := 0;
 end;
 
@@ -510,11 +534,8 @@ begin
   FpClose(Fd);
 end;
 
-function RawBeginThread(SA: Pointer; StackSize: PtrUInt; ThreadFunction: TThreadFunc; P: Pointer;
-  CreationFlags: DWord; var ThreadId: TThreadID): TThreadID;
-var
-  T: PRawThread;
-  Region: Pointer;
+{ The first BeginThread: the libc check, then the threadvars of the main thread are copied (still single-threaded). }
+procedure FirstThread;
 begin
   if InterlockedExchange(TVInitialized, 1) = 0 then
   begin
@@ -524,11 +545,20 @@ begin
       WriteLn(StdErr, 'Build this program with -dSAFE_LIBC (SPEC section 13, F5).');
       Halt(232);
     end;
-    InitThreadVars(@RawRelocateThreadVar); // still single-threaded: copies the threadvars of the main thread
+    InitThreadVars(@RawRelocateThreadVar);
   end;
   IsMultiThread := True;
+end;
+
+{ A kernel thread: a region of its own, clone. Counted: it counts in SafeRawThreadCount (the carriers and the monitor
+  of bpsched.inc do not). }
+function OsBeginThread(ThreadFunction: TThreadFunc; P: Pointer; Counted: Boolean): TThreadID;
+var
+  T: PRawThread;
+  Region: Pointer;
+begin
+  FirstThread;
   ReapZombies;
-  ThreadId := TThreadID(0);
   Result := TThreadID(0);
   Region := AllocRegion;
   if Region = nil then
@@ -541,190 +571,28 @@ begin
   T^.StackLen := RegionSize - CtlSize - GuardSize;
   T^.Tid := 1;
   T^.Closed := 0;
-  T^.ExitCode := 0;
+  T^.ExitCode := Ord(Counted);
   T^.Region := Region;
   MutexEnter(ZombieLock);
   T^.Next := Zombies;
   Zombies := T;
   MutexLeave(ZombieLock);
-  InterlockedIncrement(LiveThreads);
+  if Counted then
+    InterlockedIncrement(LiveThreads);
   if RawClone(@RawThreadMain, Region + RegionSize, CloneFlags, T, @T^.Tid) < 0 then
   begin
-    InterlockedDecrement(LiveThreads);
+    if Counted then
+      InterlockedDecrement(LiveThreads);
     T^.Tid := 0;
     T^.Closed := 1;
     Fpmunmap(T^.TVBlock, ThreadVarBlockSize);
     ReapZombies;
     Exit;
   end;
-  ThreadId := TThreadID(T);
-  Result := ThreadId;
+  Result := TThreadID(T);
 end;
 
-procedure RawEndThread(ExitCode: DWord);
-begin
-  DoneThread;
-  InterlockedDecrement(LiveThreads);
-  do_syscall(syscall_nr_exit, TSysParam(ExitCode)); // this thread only; the collector frees the region
-end;
-
-function RawWaitForThreadTerminate(ThreadHandle: TThreadID; TimeoutMs: LongInt): DWord;
-var
-  T: PRawThread;
-  Tid: LongInt;
-begin
-  T := PRawThread(ThreadHandle);
-  repeat
-    Tid := T^.Tid;
-    if Tid = 0 then
-      Break;
-    FutexWaitShared(T^.Tid, Tid);
-  until False;
-  Result := 0;
-end;
-
-function RawCloseThread(ThreadHandle: TThreadID): DWord;
-begin
-  if (ThreadHandle <> TThreadID(0)) and (PRawThread(ThreadHandle) <> @MainThread) then
-    InterlockedExchange(PRawThread(ThreadHandle)^.Closed, 1);
-  ReapZombies;
-  Result := 0;
-end;
-
-function RawUnsupported(ThreadHandle: TThreadID): DWord;
-begin
-  Result := DWord(-1);
-end;
-
-procedure RawThreadSwitch;
-begin
-  sched_yield;
-end;
-
-function RawSetPriority(ThreadHandle: TThreadID; Prio: LongInt): Boolean;
-begin
-  Result := False;
-end;
-
-function RawGetPriority(ThreadHandle: TThreadID): LongInt;
-begin
-  Result := 0;
-end;
-
-procedure RawSetNameA(ThreadHandle: TThreadID; const ThreadName: AnsiString);
-begin
-end;
-
-procedure RawSetNameU(ThreadHandle: TThreadID; const ThreadName: UnicodeString);
-begin
-end;
-
-{ ---------- events ---------- }
-
-function NewEvent(Manual, Initial: Boolean): PRawEvent;
-begin
-  System.New(Result);
-  Result^.Manual := Manual;
-  Result^.Flag := Ord(Initial);
-end;
-
-{ True: signalled, False: timeout. TimeoutMs < 0: no timeout. }
-function EventWait(E: PRawEvent; TimeoutMs: Int64): Boolean;
-var
-  Deadline, Left: Int64;
-begin
-  if TimeoutMs >= 0 then
-    Deadline := NowMs + TimeoutMs
-  else
-    Deadline := 0;
-  repeat
-    if E^.Manual then
-    begin
-      if E^.Flag <> 0 then
-        Exit(True);
-    end
-    else if InterlockedExchange(E^.Flag, 0) <> 0 then
-      Exit(True);
-    if TimeoutMs < 0 then
-      FutexWait(E^.Flag, 0, -1)
-    else
-    begin
-      Left := Deadline - NowMs;
-      if Left <= 0 then
-        Exit(False);
-      FutexWait(E^.Flag, 0, Left);
-    end;
-  until False;
-end;
-
-procedure EventSet(E: PRawEvent);
-begin
-  InterlockedExchange(E^.Flag, 1);
-  FutexWake(E^.Flag, High(LongInt));
-end;
-
-function RawRTLEventCreate: PRTLEvent;
-begin
-  Result := PRTLEvent(NewEvent(False, False));
-end;
-
-procedure RawRTLEventDestroy(State: PRTLEvent);
-begin
-  System.Dispose(PRawEvent(State));
-end;
-
-procedure RawRTLEventSet(State: PRTLEvent);
-begin
-  EventSet(PRawEvent(State));
-end;
-
-procedure RawRTLEventReset(State: PRTLEvent);
-begin
-  InterlockedExchange(PRawEvent(State)^.Flag, 0);
-end;
-
-procedure RawRTLEventWaitFor(State: PRTLEvent);
-begin
-  EventWait(PRawEvent(State), -1);
-end;
-
-procedure RawRTLEventWaitForTimeout(State: PRTLEvent; Timeout: LongInt);
-begin
-  EventWait(PRawEvent(State), Timeout);
-end;
-
-function RawBasicEventCreate(EventAttributes: Pointer; AManualReset, InitialState: Boolean;
-  const Name: AnsiString): PEventState;
-begin
-  Result := PEventState(NewEvent(AManualReset, InitialState));
-end;
-
-procedure RawBasicEventDestroy(State: PEventState);
-begin
-  System.Dispose(PRawEvent(State));
-end;
-
-procedure RawBasicEventReset(State: PEventState);
-begin
-  InterlockedExchange(PRawEvent(State)^.Flag, 0);
-end;
-
-procedure RawBasicEventSet(State: PEventState);
-begin
-  EventSet(PRawEvent(State));
-end;
-
-function RawBasicEventWaitFor(Timeout: Cardinal; State: PEventState): LongInt;
-const
-  wrSignaled = 0;
-  wrTimeout = 1;
-begin
-  if Timeout = $FFFFFFFF then
-    EventWait(PRawEvent(State), -1)
-  else if not EventWait(PRawEvent(State), Timeout) then
-    Exit(wrTimeout);
-  Result := wrSignaled;
-end;
+{$I bpsched.inc}
 
 { ---------- installation ---------- }
 
@@ -774,6 +642,7 @@ begin
     MainLow := 0;
   MainThread.Magic := ThreadMagic;
   MainThread.Tid := 1;
+  ReadSchedEnv;
 
   System.FillChar(TM, SizeOf(TM), 0);
   TM.InitManager := @RawInitManager;
