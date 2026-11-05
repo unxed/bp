@@ -1053,7 +1053,8 @@ or above the parameter suppresses its S14 finding.
 | v0.14 | §22.8 step 0: S26a (definite assignment of class references) and S26b (a class under 64 KiB) in the typed `bpvet`; H19 closed |
 | v0.15 | §24 step 3: S24 (a class downcast is `as`, `--fix` writes it) and S25 (an untyped parameter, a typecast of one, `absolute`) in the typed `bpvet`; H17 and H18 checked; the claims row of H19 said H17 |
 | v0.16 | §25.1 step 3: the benchmark suite `tests/bench/compare.sh` (binary trees, n-body, fannkuch, word count in Bp, C, Rust and Go; Goose not installed) and the baseline of §25.2; a non-failing CI step |
-| v0.17 | §25.2: the Goose column of the suite (the four programs in Goose v2026.3, `goose build -O2`; the release is installed and cached by the CI job) and its numbers in the baseline |
+| v0.17 | §21.3 step 5 result: the M:N runtime in `BPThreads` (`ext/bpsched.inc`) behind `BP_MN=1`, `BP_SCHED_SEED`, deadlock detection, `MNMODES` in `tests/run.sh` and CI; critical sections park goroutines in a table by address; the numbers against 1:1 |
+| v0.18 | §25.2: the Goose column of the suite (the four programs in Goose v2026.3, `goose build -O2`; the release is installed and cached by the CI job) and its numbers in the baseline |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1776,6 +1777,84 @@ contended `EnterCriticalSection` yields. Verdict: **worth it; step 5 goes on**, 
   `ext/go`) can live in its record instead of the heap; the switch saves the FPU control words (MXCSR and x87, FPCR) or a
   goroutine that changes the rounding mode changes it for the others; `StackError` is reset per goroutine.
 
+#### Step 5 design: the M:N runtime in `BPThreads` (2026-11-05)
+
+The runtime is the spike moved into `BPThreads` (`ext/bpsched.inc`) and made multi-carrier. What the spike left out and
+how it is closed:
+
+- **The switch** also saves the FPU control words (x86_64: MXCSR and the x87 control word; i386: the x87 control word;
+  aarch64: FPCR). A new goroutine starts with the words of the thread that started it, as a kernel thread inherits them.
+- **One record for both kinds.** The goroutine fields join `TRawThread` (a flag `Green`, the saved stack pointer, the
+  state, the carrier it runs on, the links of the run queue, of the timers and of the waiters of an event). The
+  threadvar block lies in the record page. Goroutine regions are carved out of reservations of 4096 regions (64 on
+  i386), a new reservation when one is full; the guard area stays `PROT_NONE` (the owner's decision).
+- **Park without a lost wake-up.** A goroutine that parks keeps the lock of the object it waits on (an event) through
+  the switch; the carrier releases it after the goroutine's stack is saved (the `unlock` of `gopark` in Go). So a waker
+  that takes the waiter from the event under that lock always finds a goroutine that has left its stack. A yield is the
+  same with "put back into the run queue" as the action after the switch.
+- **Events.** One event type serves `RTLEvent` and `BasicEvent` (manual and auto reset), with OS waiters (futex) and
+  goroutine waiters (a list) at once. A wait with a timeout puts the goroutine on the timer list (after the switch, as
+  above); the timer and `Set` race for it with one compare-and-swap of its wake word, the loser does nothing. An auto
+  reset event hands its signal to a parked goroutine directly.
+- **Carriers.** One OS thread per CPU (`sched_getaffinity`; `BP_PROCS=N` overrides), started at the first goroutine. One
+  run queue under a spin lock for now (per-carrier queues are a measured lever of §25.1 step 6); an idle carrier sleeps
+  on a futex until a push or the next timer.
+- **A contended critical section** parks a goroutine (it never sleeps in the futex while the owner may wait in the run
+  queue): it marks the lock contended, as an OS waiter does, and waits in a table of the runtime by the address of the
+  lock (the semaphore table of Go), not in the lock, because the memory of a lock may be freed as soon as it is free. The
+  leave is one exchange; a leaver that saw the lock contended wakes one OS waiter and one goroutine. An OS thread keeps
+  the futex.
+- **The monitor** (one OS thread, every 10 ms) fires timers the carriers did not, adds a carrier when the run queue is
+  not empty and no switch happened in a tick (a blocking system call or a long loop; at most 256 carriers), and reports a
+  deadlock.
+- **Deadlock:** every goroutine parked without a timer, no carrier running one, the run queue empty, and every OS thread
+  of the program (the main thread) blocked in a wait of the runtime, two ticks in a row: the program stops with "BP: all
+  goroutines are asleep - deadlock!" and exit code 2, as in Go.
+- **`BP_SCHED_SEED=N`:** no carriers; the main thread runs the goroutines whenever it blocks (an event, a join, a
+  contended lock, `ThreadSwitch`), picks the next ready one at random from the seed, and a goroutine yields at a random
+  half of its lock entries (every channel operation takes one). One OS thread: the same seed gives the same
+  interleaving, a deadlock is exact. Timers use real time. There is no preemption, so a loop that waits for the main
+  thread without blocking must yield (`ThreadSwitch`), as with one carrier in Go before 1.14.
+- **The main thread stays an OS thread** (not a goroutine): its waits are futex waits, and in the seed mode it is the
+  carrier.
+- **The switch to M:N** is `BP_MN=1` at run time (or `-dBP_MN` as the default of a build) until the benchmark of
+  §25.1 step 3 and the tests under M:N and under seeds prove it; then the default flips. `-dSAFE_LIBC` stays 1:1.
+- **Left for later, measured first:** a start without the system calls of `InitThread` (40-50 us), a smaller first heap
+  chunk (`growheapsizesmall`), per-carrier run queues, a netpoller, `Sleep` that parks (FPC has no hook for it: a
+  `Sleep` in a goroutine pins its carrier, and the monitor adds one), the stacks of the parked goroutines in the
+  deadlock report.
+
+#### Step 5 result: the M:N runtime in `BPThreads` (2026-11-05)
+
+The design above is built (`ext/bpsched.inc`, included by `ext/bpthreads.pas`) and is on with `BP_MN=1`; the default stays
+1:1 (below). `tests/run.sh` reruns every test of the `ext-BP` layer under the modes of `MNMODES` (CI: `mn` and the seeds 1-5
+on x86_64; `mn` and seed 1 on aarch64 and i386 under qemu; `test_go` and `test_threads` natively on i386 under `BP_MN=1`
+and two seeds); two compile checks expect the deadlock exit (`mf_deadlock_mn`, `mf_deadlock_seed`). Locally `test_go`
+and `test_threads` passed 20 times each under `BP_PROCS` 1, 2, 3 and 8 and under the seeds 1-30.
+
+- **What the seeds found.** Seed 3: a race in `test_go` itself (it waited with `Sleep` for goroutines to see a
+  cancellation; it waits for an acknowledgement now). Seed 20: a goroutine that waits for the main thread in a loop
+  without blocking holds the only carrier (no preemption, see the seed bullet above; the test yields now). `BP_MN=1`:
+  a contended critical section that kept its parked goroutines in the lock wrote into the lock after it was free (the
+  memory of a channel, freed by then) and lost a wake-up when a goroutine queued during the leave; the goroutines wait
+  in a table by the address of the lock now, and the leave is one exchange.
+- **The numbers** (x86_64, Intel Core i5-6300U, 4 logical CPUs, -O2, the default heap of the RTL; 5000 goroutines;
+  medians of 3 runs):
+
+  | | 1:1 | M:N, 4 carriers | M:N, `BP_PROCS=1` |
+  |---|---|---|---|
+  | the start and the end of a goroutine | 70 us | 16 us | 28 us |
+  | a round trip over two unbuffered `TChan` between two goroutines | 11 us | 12 us | 0.8 us |
+  | the memory of a parked goroutine | 48 KiB | 44 KiB | 40 KiB |
+
+  A start is 4.4 times cheaper. A round trip is 14 times faster on one carrier, but not on four: the woken goroutine
+  goes to the shared run queue and an idle carrier is woken with a futex, which costs what a thread switch costs. Go
+  runs the woken goroutine next on the carrier of the waker (`runnext`) and lets an idle carrier spin a little before
+  it sleeps; both are levers of §25.1 step 6, measured first. The memory is the first heap chunk of the RTL per thread
+  (the spike 4 result), the same lever as there (`growheapsizesmall`).
+- **The default stays 1:1** until the round trip on several carriers beats 1:1 (the `runnext` lever) and CI has run
+  under `MNMODES` for a while; then it flips (`-dSAFE_LIBC` stays 1:1).
+
 ### 21.4 The tree of `TComponent` is an owner
 
 Delphi and Lazarus have had an ownership tree since 1995: `TButton.Create(Form)` gives the button to the form, which
@@ -1853,7 +1932,8 @@ data.
 4. **The `TComponent` owner** (S6 and a root kind of S17). *Done:* lint tests on a form-like unit (a stub `TComponent` is
    enough).
 5. **The M:N runtime** after step 2: the scheduler behind the hooks, the monitor, deadlock detection, `BP_SCHED_SEED`.
-   *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test.
+   *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test. *Status:* **done** (§21.3, step 5
+   result): on with `BP_MN=1`; the default flips after the `runnext` lever of §25.1 step 6.
 6. **Atomic `Select` with send cases.** *Done:* `test_go` covers a send case and a race between two ready cases.
 7. **The summary:** §0, §4, the README, the statuses at the top: what exists, nothing else.
 
@@ -2421,8 +2501,8 @@ a bug found by a program built with `bp build` goes ahead of the plan.
 | — | **done:** the typed `bpvet` (S17 v2), S21/S22, `bp run`, `--watch`, `bp new`; Send and Sync (S11m, S11s, S19, R17); spike 4 (M:N switch, guard areas by default); #146 (#151, #153–#155); the cheap holes of §8: `-FaBPThreads` and `-Sew` in `tools/bp build` (#156), S26a and S26b (#157, H19), S24 and S25 (#158, H17, H18) | §20, §21.7 steps 1–2, §22.8 steps 0–1, §24.8 steps 1–3 | |
 | 1 | — (the bugs of #146: done) | | |
 | 2 | — (the cheap holes of §8: done) | | |
-| 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and five languages, v0.16 and v0.17: the baseline is in §25.2; channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
-| 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (in progress: the design is in §21.3, step 5 design; it is measured against the baseline of step 3) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
+| 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and five languages, v0.16 and v0.18: the baseline is in §25.2; channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
+| 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (the runtime is done, on with `BP_MN=1`: §21.3, step 5 result; next: the atomic `Select`) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
 | 5 | **The scope** (`Hold`, `Defer`) on the region runtime, then the `TComponent` owner | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
 | 6 | **The speed work** that the numbers of step 3 point to (§25.2) | §25.2 | after the runtime: it changes what is measured |
 | 7 | **The tools,** cheapest first: `bp explain`, S20 and `Fmt`, `bp test`, `--target`, `// derive:`, the profiler, `bp lsp`, the browser, S26c, hot reload | §22.8 steps 2–11 | each stands alone; the ones users ask for first go first |
@@ -2523,6 +2603,8 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   - the checks a release build keeps (R1–R4 of the runtime);
   - inlining of generics and of small routines;
   - `-O3` and the target CPU (`-Cp`, `-Cf`);
-  - the code generator: FPC's own against the LLVM back end of FPC main, where it builds the dialect.
+  - the code generator: FPC's own against the LLVM back end of FPC main, where it builds the dialect;
+  - the M:N scheduler (§21.3, step 5 result): the woken goroutine runs next on the carrier of the waker (`runnext`), an
+    idle carrier spins a little before it sleeps, per-carrier run queues, a smaller first heap chunk of a goroutine.
 
   A lever that needs a compiler fork is out (§0: `bp` works over the stock `fpc`).

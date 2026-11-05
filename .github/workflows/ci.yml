@@ -93,6 +93,7 @@ jobs:
           LANG: C.UTF-8
           LC_ALL: C.UTF-8
           OUT: ${{ github.workspace }}/out
+          MNMODES: mn seed1 seed2 seed3 seed4 seed5
         run: bash tests/run.sh
       - name: Tests with the options of bp build (-Cr -Co -Sew; unxed/bp#146, SPEC §24.6)
         env:
@@ -184,8 +185,8 @@ jobs:
       - name: aarch64 and i386 under qemu (side by side)
         env:
           CMDS: |
-            FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 LANG=C OUT=$PWD/outa64 bash tests/run.sh
-            FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 LANG=C OUT=$PWD/out386 bash tests/run.sh
+            FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 MNMODES="mn seed1" LANG=C OUT=$PWD/outa64 bash tests/run.sh
+            FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 SKIP="test_ffi fpc-utf8" NO_COMPILE_CHECKS=1 MNMODES="mn seed1" LANG=C OUT=$PWD/out386 bash tests/run.sh
             FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 OUT=$PWD/gca64 bash tools/spikes/gcroots/run.sh
             FPC=$I/ppcross386 FPCOPTS="-Tlinux -XPi686-linux-gnu- -Fu$I/units/i386-linux/*" RUN=qemu-i386 OUT=$PWD/gc386 bash tools/spikes/gcroots/run.sh
             FPC=$I/ppcrossa64 FPCOPTS="-Tlinux -XPaarch64-linux-gnu- -Fu$I/units/aarch64-linux/*" RUN=qemu-aarch64 OUT=$PWD/rga64 bash tools/spikes/region/run.sh
@@ -199,6 +200,8 @@ jobs:
         run: |
           cd out386
           for t in safe-BP/test_safe ext-BP/test_go ext-BP/test_threads ext-BP/test_utf8; do LANG=C ./$t > /dev/null || { echo "FAIL $t"; exit 1; }; echo "ok   $t"; done
+          # M:N on i386 (SPEC §21.3): the goroutines on carriers, and one carrier in a seeded order
+          for t in ext-BP/test_go ext-BP/test_threads; do for e in BP_MN=1 BP_SCHED_SEED=1 BP_SCHED_SEED=2; do env LANG=C $e ./$t > /dev/null || { echo "FAIL $t $e"; exit 1; }; echo "ok   $t $e"; done; done
       - name: Spike 4 on i386 natively (the binaries built for qemu)
         run: |
           for o in -O1 -O2 -O2-Ct; do echo "== mn $o"; mn386/mn$o/mntest || { echo "FAIL mn $o"; exit 1; }; done

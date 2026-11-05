@@ -126,6 +126,9 @@ begin
     InterlockedIncrement(GLocked);
     L.Reset;
     Inc(N);
+    // a goroutine is not preempted (SPEC §21.3): with one carrier (BP_SCHED_SEED) the main thread runs only when it yields
+    if N mod 1024 = 0 then
+      ThreadSwitch;
   end;
 end;
 

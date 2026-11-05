@@ -7,7 +7,8 @@
 #   layout                  bp.pas includes every file that unit Safe includes (BP gives all of Safe)
 #   compile/mf_*.pas        first line "// EXPECT: fail|warn SAFE-Sx", "clean", "run" (clean + exit code 0)
 #                           or "exit N" (builds, terminates with exit code N); an optional second line
-#                           "// FPCOPTS: <options>" (bare fpc otherwise, as a user)
+#                           "// FPCOPTS: <options>" (bare fpc otherwise, as a user) and third line
+#                           "// ENV: VAR=VALUE ..." (the environment of the run)
 #   test programs with BP   built with -FaBPThreads, as tools/bp build does (BP is last in every uses, SPEC §24.3)
 # usage: tests/run.sh [safe|ext|fpc-utf8|all]      (default: all)
 # Environment variables (for CI; by default — bare fpc on the host):
@@ -15,12 +16,15 @@
 #   RUN          run prefix (qemu-aarch64, wine)           OUT      where to put binaries (otherwise mktemp)
 #   EXE          suffix of the binaries (.exe for -Twin64, which writes name.exe)
 #   SKIP         tests to skip ("test_ffi fpc-utf8")                NO_COMPILE_CHECKS=1 — without compile/*.pas
+#   MNMODES      the ext tests run again in each mode: "mn" (BP_MN=1, goroutines M:N), "seedN" (BP_SCHED_SEED=N:
+#                one carrier, a seeded order); e.g. "mn seed1 seed2 seed3" (SPEC §21.3)
 set -u
 FPC=${FPC:-fpc}
 FPCOPTS=${FPCOPTS:-}
 RUN=${RUN:-}
 EXE=${EXE:-}
 SKIP=${SKIP:-}
+MNMODES=${MNMODES:-}
 layers=${1:-all}
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
@@ -56,6 +60,16 @@ run_layer() {
       grep -E 'Warning|Note|Hint' build.log | grep -v "$t.pas" || true
       echo "== run $t ($name)"
       timeout 300 $RUN "./$t$EXE" || fail=1
+      if [ "$name" = ext-BP ]; then
+        local m
+        for m in $MNMODES; do
+          echo "== run $t ($name, $m)"
+          case "$m" in
+            mn) BP_MN=1 timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
+            seed*) BP_SCHED_SEED=${m#seed} timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
+          esac
+        done
+      fi
     else
       cat build.log; fail=1
     fi
@@ -70,13 +84,14 @@ run_layer() {
     read -r _ _ kind rule < "$f"
     # an optional second line "// FPCOPTS: <options>" adds options for this check (bare fpc otherwise, as a user)
     local more; more=$(sed -n '2s#^// FPCOPTS: ##p' "$f")
+    local envs; envs=$(sed -n '3s#^// ENV: ##p' "$f")
     if $FPC $FPCOPTS $more $LIBOPTS -FU"$dir/compile" "$f" > log 2>&1; then built=yes; else built=no; fi
     case "$kind" in
       fail)  ok=$([ $built = no ] && grep -q "$rule" log && echo 1) ;;
       warn)  ok=$([ $built = yes ] && grep -q "$rule" log && echo 1) ;;
       clean) ok=$([ $built = yes ] && ! grep -q 'SAFE-' log && echo 1) ;;
-      run)   ok=$([ $built = yes ] && ! grep -q 'SAFE-' log && timeout 60 "./${f%.pas}$EXE" && echo 1) ;;
-      exit)  ok=$([ $built = yes ] && { timeout 60 "./${f%.pas}$EXE" > out 2>&1; [ $? = "$rule" ]; } && echo 1) ;;
+      run)   ok=$([ $built = yes ] && ! grep -q 'SAFE-' log && env $envs timeout 60 "./${f%.pas}$EXE" && echo 1) ;;
+      exit)  ok=$([ $built = yes ] && { env $envs timeout 60 "./${f%.pas}$EXE" > out 2>&1; [ $? = "$rule" ]; } && echo 1) ;;
     esac
     if [ "${ok:-}" = 1 ]; then echo "ok   $f ($kind $rule)"
     else echo "FAIL $f (expected $kind $rule, built=$built):"; grep -E 'Error|Warning|Fatal' log | head -5; fail=1; fi
