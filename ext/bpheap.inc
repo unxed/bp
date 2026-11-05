@@ -237,11 +237,11 @@ begin
   Result := 0;
 end;
 
+{ Under HeapPageLock; the pages were given back to the kernel before it was taken. }
 procedure HeapGiveSegs(P: PtrUInt; K: LongInt);
 var
   I, J, First: LongInt;
 begin
-  do_syscall(syscall_nr_madvise, TSysParam(P), TSysParam(PtrUInt(K) * HeapSegSize), MADV_DONTNEED);
   for I := 0 to HeapResCount - 1 do
     if (P >= HeapRes[I].Lo) and (P < HeapRes[I].Hi) then
     begin
@@ -385,6 +385,7 @@ begin
     end;
     Result := PHeapCache(HeapMeta);
     Inc(HeapMeta, (SizeOf(THeapCache) + 63) and not PtrUInt(63));
+    System.FillChar(Result^, SizeOf(THeapCache), 0); // the page may have held blocks before
     Result^.NextAll := HeapAllCaches;
     HeapAllCaches := Result;
   end;
@@ -579,6 +580,9 @@ var
   Pg: PHeapPage;
   S: PtrUInt;
 begin
+  if Size > PtrUInt(HeapResSegs - 1) * HeapSegSize then
+    // more than a reservation holds (64 MiB on i386): the heap of the RTL maps it on its own
+    Exit(HeapOld.GetMem(Size));
   N := (Size + HeapPageSize - 1) shr HeapPageLog2;
   if N < HeapPagesPerSeg then
   begin
@@ -614,15 +618,16 @@ var
 begin
   Dec(C^.InUse, Pg^.BlockSize);
   S := P and not (HeapSegSize - 1);
+  N := Pg^.Count;
   if Pg^.Kind = PkHuge then
   begin
-    Pg^.Kind := PkFree;
+    // the header of the run is in it: read before the pages read as zero
+    do_syscall(syscall_nr_madvise, TSysParam(S), TSysParam(PtrUInt(N) * HeapSegSize), MADV_DONTNEED);
     SpinLock(HeapPageLock);
-    HeapGiveSegs(S, Pg^.Count);
+    HeapGiveSegs(S, N);
     SpinUnlock(HeapPageLock);
     Exit;
   end;
-  N := Pg^.Count;
   Pg^.Kind := PkFree;
   HeapGivePages(PHeapSeg(S), (P - S) shr HeapPageLog2, N);
 end;

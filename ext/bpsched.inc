@@ -1339,6 +1339,7 @@ begin
     GoExit(T);
   end;
   DoneThread;
+  HeapRelease(T);
   if T^.ExitCode <> 0 then  // counted: see OsBeginThread
     InterlockedDecrement(LiveThreads);
   do_syscall(syscall_nr_exit, TSysParam(ExitCode)); // this thread only; the collector frees the region
