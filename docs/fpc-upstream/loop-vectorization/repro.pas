@@ -1,5 +1,5 @@
 { SPDX-License-Identifier: MIT }
-{ A loop over arrays of Double that gcc -O2 vectorizes (two doubles per SSE2 instruction); FPC emits one double per
+{ A loop over arrays of Double that gcc -O3 vectorizes (two doubles per SSE2 instruction); FPC emits one double per
   instruction. Build: fpc -O3 -al repro.pas; run: ./repro [rounds] }
 program repro;
 
