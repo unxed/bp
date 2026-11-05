@@ -1102,7 +1102,7 @@ or above the parameter suppresses its S14 finding.
 | v0.37 | §25.3 the word count 0.47 → 0.43 s: the hash, the comparison of slices and the probe of `TMap` inlined, the last bytes of a key read at once; where the rest of the gap is (a managed slice) and why the region of objects is 3.3x (the protocol of a constructor) |
 | v0.38 | §25.4 the memory manager of BP on by default (`BP_HEAP=rtl` for the RTL heap): runs grown in place, a freed run of 1 MiB or more back to the kernel but for the last one; peak memory below the RTL heap on the arena and region tiers, a buffer of 1–3 MB in a loop 15–18 times faster |
 | v0.39 | §25.2 unit `BPVec` (#197): `Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays in SSE2 on x86_64, the same loops in Pascal elsewhere; `Axpy` of `Double` 1.74 → 0.73 s on 2G elements (gcc -O3 0.77 s) |
-| v0.41 | §24.4 extension methods (`typehelpers`): the dialect writes the modeswitch in the module; every rule of §6 checks the body of a helper method (`tests/lint/helper_*.pas`); S29: a helper for `TObject` must inherit `TSafeObjectHelper`, else `.Free` compiles again; a helper that reads a private member of the type it extends does not resolve in the typed mode; the rule card (§0) gets a block; the status rows of S13 (implemented) and of the speed (measured, §25.2, unxed/bp#181, #108) are corrected |
+| v0.42 | §24.4 extension methods (`typehelpers`): the dialect writes the modeswitch in the module; every rule of §6 checks the body of a helper method (`tests/lint/helper_*.pas`); S29: a helper for `TObject` must inherit `TSafeObjectHelper`, else `.Free` compiles again; a helper that reads a private member of the type it extends does not resolve in the typed mode; the rule card (§0) gets a block; the status rows of S13 (implemented) and of the speed (measured, §25.2, unxed/bp#181, #108) are corrected |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -2734,7 +2734,7 @@ One step is one PR from a fresh `main`, with a criterion of done.
 4. **Nested procedure values:** S17 roots one in its frame; `bp fix` writes the modeswitch; `tests/` gets a `ForEach` and
    a `Sort` with a nested comparator. *Done:* lint tests, the example builds with `bp build`.
 5. **The `String` helper of `BP`** (`CPLength`, `CodePoints`); `bp fix` writes `typehelpers`. *Done:* `test_utf8`.
-   *Status:* the rules for helpers are **done** (v0.41: S29, the lint tests of the bodies of helper methods, the compile
+   *Status:* the rules for helpers are **done** (v0.42: S29, the lint tests of the bodies of helper methods, the compile
    tests, §24.4); the helper of `BP` and `bp fix` writing the modeswitch are not.
 6. **CORBA interfaces:** S5 treats an interface local as a borrow and an interface field as a class field; `bp new`
    writes the directive. *Done:* lint tests; §0 item 5 rewritten.
