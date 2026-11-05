@@ -1,0 +1,48 @@
+{ The input of the --fix test of tests/lint.sh (it is copied to s24_fix.pas): every downcast in Probe is rewritten to
+  `as`, the upcasts, the casts in a string and in a comment stay. }
+unit s24_fix;
+
+{$mode objfpc}{$H+}
+
+interface
+
+uses
+  Safe;
+
+type
+  TShape = class
+  public
+    Sides: Integer;
+  end;
+
+  TSquare = class(TShape)
+  public
+    Edge: Integer;
+  end;
+
+  TShapes = array of TShape;
+
+function Pick(const A, B: TShape): TShape;
+function Probe(const S, T: TShape; const Items: TShapes): Integer;
+
+implementation
+
+function Pick(const A, B: TShape): TShape;
+begin
+  Result := A;
+  if B = nil then
+    Result := B;
+end;
+
+function Probe(const S, T: TShape; const Items: TShapes): Integer;
+begin
+  Result := TSquare(S).Edge;
+  Result := Result + TSquare(S).Edge + TSquare(T).Edge;
+  Result := Result + TSquare(Items[1]).Edge + TShape(S).Sides;
+  if TSquare(Pick(S, T)).Edge > 0 then
+    Result := Length('TSquare(S)') + TSquare( S ).Edge; // TSquare(T) in a comment
+  Result := Result + TSquare(TShape(S)).Edge;
+  TSquare(S).Edge := Result;
+end;
+
+end.
