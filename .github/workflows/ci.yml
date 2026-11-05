@@ -48,6 +48,13 @@ jobs:
         run: bash tests/examples.sh
       - name: tools/bp get, vendor and build with deps.lock over local git repositories (tests/deps.sh)
         run: bash tests/deps.sh
+      - name: Benchmark baseline, Bp against C and Go (report only, never fails; tests/bench/compare.sh, SPEC §25.2)
+        continue-on-error: true
+        timeout-minutes: 4
+        env:
+          RUNS: "3"
+          LANGS: "bp gcc go"
+        run: bash tests/bench/compare.sh "$RUNNER_TEMP/compare" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
   # the "binary is static, no libc" check, and runs on different distributions.
