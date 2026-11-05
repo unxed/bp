@@ -13,7 +13,8 @@ benchmark). The same loop with `SizeInt` indexes is faster than gcc's.
 
 ## Versions and options
 
-- FPC 3.2.2 (Ubuntu 3.2.2+dfsg-32, x86_64-linux), and trunk 3.3.1 [2024/08/22], x86_64-linux.
+- FPC 3.2.2 (Ubuntu 3.2.2+dfsg-32, x86_64-linux); trunk 3.3.1 [2024/08/22]; trunk 3.3.1 [2026/11/05] (main at
+  d7965e4b, x86_64-linux).
 - `fpc -O3 -al repro.pas`; also `-O2`, `-O4`, `-O3 -CpCOREI`, `-O3 -OoLOOPUNROLL`, `-O3 -Cr-`,
   `-O4 -CpCOREI -OoLOOPUNROLL -Cr-`: the loop is the same in all of them.
 - Reference: gcc 13.3.0 `gcc -O2`, same program in C; `int32_t` there, `LongInt` in Pascal (both 32-bit).
@@ -58,7 +59,7 @@ end;
 
 ## The generated code of the inner loop
 
-FPC 3.2.2 `-O3` (trunk 3.3.1 [2024/08/22] gives the same 12 instructions):
+FPC 3.2.2 `-O3` (trunk 3.3.1 [2024/08/22] and main at d7965e4b [2026/11/05] give the same 12 instructions):
 
 ```asm
 .Lj13:
@@ -143,3 +144,12 @@ programs run in turn; every program prints `1275000255`.
 With `N = 16` (at most 8 swaps per round, the size of the fannkuch benchmark) the loop is bound by its exit branch
 and the three Pascal variants run equally fast (0.77 s for 150,000,000 rounds; gcc `-O2` 0.70 s), so the copies
 matter in longer loops.
+
+The same with main at d7965e4b [2026/11/05], `-O3`, on an Intel Xeon Platinum 8260 (a virtual machine, so the
+times are not comparable with the table above):
+
+| program | compiler and options | instructions per swap | time |
+|---|---|---|---|
+| repro.pas | FPC 3.3.1 [2026/11/05] `-O3` | 12 | 0.71 s |
+| repro_idx64.pas | FPC 3.3.1 [2026/11/05] `-O3` | 8 | 0.55 s |
+| repro.c | gcc 13.3.0 `-O2` | 11 | 0.63 s |
