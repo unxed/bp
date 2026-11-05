@@ -466,7 +466,7 @@ System.GetMem(Buf, Len);
 | A dangling `TSlice`, a dangling `TWeak` | impossible by construction | — |
 | `.Free` outside unsafe | compiler (error) | — |
 | raw pointers outside unsafe | compiler warning (named pointer types) + linter (plan) (`^T`, `@`, arithmetic) | H4 |
-| A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1, H20, H21 |
+| A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer; `SAFE_DEBUG` R20 as a second net for class objects: a virtual call or a second free of a freed object raises, a field read sees `$DE` | H1, H20, H21 |
 | No `TShared` cycles | programmer + linter `bpvet` (S15, heuristic) | H2 |
 | Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
@@ -1143,6 +1143,7 @@ or above the parameter suppresses its S14 finding.
 | v0.44.1 | the philosophy (§1, README): whether the reliability of Rust can be reached without lifetime annotations is an open question, and the project is a study of its feasibility; §24.9: the audit of `// UNSAFE:` matters most for generated code |
 | v0.44.2 | §1, README: the research questions of the project (memory safety without changing the compiler, the reliability of Rust without lifetime annotations, the speed of C without annotations and a collector, several safe memory models in one language), each tested by measurements and tests |
 | v0.45 (design) | §26 soundness, for the owner's review: the goal as claims (C1 the soundness of a core, C2 `bpvet` refines its checker, C3 the model refines FPC, C4 the honest table is complete) and "Rust-level" as levels L0-L4; the research table (RustBelt, Oxide, Featherweight Rust, Stacked and Tree Borrows, Miri, Swift exclusivity, borrowed parameters of reference counting, Csmith, Rustlantis, Redex); Featherweight BP (syntax, the machine, the facts as rules, the five rules and the call rule as judgments, the invariant, the lemmas); the oracle (a guard heap, the value semantics, four verdicts) and the fuzzer (an exhaustive enumeration of borrow, root, route and use); the fact base (`tests/facts/`); proof obligations and a gate for §8; stages 0-5; H21 (a `const` argument is uncounted from every place, a use after free through a global, a field, a `var` alias) and H22 (`--release` drops `-Cr`) found and measured; §24.9 rule 1 corrected |
+| v0.46 | R20 (§24.9 decision 4a): the `SAFE_DEBUG` quarantine of freed class objects: a wrapper of the memory manager armed by `SafeDestroyObject`, a per-class poison VMT whose virtual methods raise `SAFE-R20`, fields filled with `$DE`, a FIFO bounded by objects and bytes (`SafeQuarantineSetLimits`, `SetFill`, `Flush`, `Count`); over the heap of BP, the RTL heap and heaptrc; `tests/safe/test_r20.pas` |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1711,6 +1712,7 @@ by trial deletion, as in CPython). It needs no stack scan and frees acyclic garb
 | R17 | `SAFE_DEBUG`: `TChan.Send` of a dynamic array that another variable also holds (the receiver would share it, H14) |
 | R18 | `M[K]` of a `TMap` when `K` is not in the map (`Get(K, Default)` and `TryGet` do not raise) |
 | R19 | a key added to or deleted from a `TMap` while `for P in M` walks it (a new value of a key that is there is allowed) |
+| R20 | `SAFE_DEBUG`: a virtual method (the destructor included: a second free) of a class object that `TOwned`, `TShared`, `TArena` or `Hold` has destroyed: its memory goes to a quarantine (a FIFO of 4096 objects or 16 MiB, `SafeQuarantineSetLimits`), its VMT pointer becomes a VMT of its class whose every virtual method raises `ESafety` (`SAFE-R20`, naming the class), its fields are filled with `$DE` (`SafeQuarantineSetFill`); a field read is not trapped, it reads garbage (§24.9, "R20: how it is built"); the hook is one wrapper of the memory manager, so the quarantine can grow into the mode `BP_HEAP=guard` of §26.5 |
 
 ## §21. Concept v3: fewer things, fewer holes (design, plan)
 
@@ -3178,7 +3180,7 @@ Nothing is read across units but the signatures and their marks.
 
 | Borrow | Before the build | At run time, every build | `SAFE_DEBUG`, the second net |
 |---|---|---|---|
-| a class local from `.Get`, a class parameter | S5 (reach, change) | the owner itself is never freed twice (§4) | `-gh`; a quarantine of freed objects is the open question 4 |
+| a class local from `.Get`, a class parameter | S5 (reach, change) | the owner itself is never freed twice (§4) | R20: a freed object is kept in a quarantine and its virtual methods raise; `-gh` |
 | a region object, `TGrowArray`, `At`, a `Hold` variable | S17 | R2, R14, R15, R16 | R12: released pages lose all access |
 | a `TStrView` and a map of views | S28 | R2 | the view holds its `String` |
 | the place of `M.Ref` | S27 | — | — |
@@ -3221,11 +3223,64 @@ Nothing moves for the user: the codes, the marks and the API stay, and S28 v1 la
 | 1 | until the last use | **yes, now**: every *change* rule moves to one liveness, until the last use of the borrow (the non-lexical lifetimes of Rust), for all root kinds, S28 included from its first version (it is built so on `feat/strview`) |
 | 2 | the codes | **kept**: S5, S17, S27 and S28 stay the names of the findings over one engine |
 | 3 | `// borrow:` | **intent**: the rename to `// root:` of §24.1 is withdrawn; it is counted in the unsafe audit with `// UNSAFE:`; `// borrow: arena` goes (the root of a region object) |
-| 4 | the inside of a class | **both at once**: (a) the `SAFE_DEBUG` quarantine (R20: a freed object is not reused and its VMT points to a class whose methods raise) and (b) the inferred methods that may free, whose call is a change of `Self` |
+| 4 | the inside of a class | **both at once**: (a) the `SAFE_DEBUG` quarantine (R20: a freed object is not reused and its VMT points to a class whose methods raise) and (b) the inferred methods that may free, whose call is a change of `Self`; **(a) done** (v0.46, below), (b) later |
 | 5 | `// root: S` | **a fact**: inferred inside a module, elided with one candidate (`Self`, one `String` parameter), written by `bp fix` on an exported routine |
 | 6 | H20 | **first**: the S17 finding of a call that changes a root while a borrow of it lives (unxed/bp#207) goes ahead of the rest |
 | 7 | `procedure of object` | **later, with the LCL**: in the model, built with the Lazarus package (the tails of the order) |
 | 8 | the place of `M.Ref` | **one expression**, S27 as it is |
+
+#### R20: how it is built (v0.46)
+
+**What the user sees.** With `SafeDebugChecks` on (`-dSAFE_DEBUG`, or `SafeDebugChecks := True` before the first
+owner is made), an object that `TOwned`/`TShared` (the last owner leaves), `TArena.FreeAll` or a `Hold` of a region
+destroys is kept: its destructor runs as always, the memory is not returned to the heap, the VMT pointer is replaced and
+the fields are filled with `$DE`. A virtual call on it (`Destroy` of a second free, `Free` of SysUtils, `FreeInstance`,
+`NewInstance`, `AfterConstruction`, `BeforeDestruction`, `Dispatch`, `DefaultHandler`, every virtual method of the class
+up to slot 512) raises `ESafety: SAFE-R20: a virtual method of a freed TFoo is called`. `ClassType` and `ClassName`
+answer with the poison class (`SAFE-R20 freed TFoo`), whose parent is `TFoo`: `is TFoo` and the check of `-CR` still
+pass, so the call reaches the trap and not an `EInvalidCast`. A second free is caught here, since `Destroy` is virtual;
+the owner itself is never freed twice (R1, R9). The queue is `SafeQuarantineSetLimits(MaxObjects, MaxBytes)` (4096 and
+16 MiB), `SafeQuarantineSetFill`, `SafeQuarantineCount`, `SafeQuarantineFlush`; the oldest block goes back to the heap
+only when a bound is reached, and all of it at exit. Off: nothing runs. A destroyed object costs one test of
+`SafeDebugChecks` in a release build, and the wrapper below is never installed.
+
+**Interception: a wrapper of the memory manager, armed by the paths of the dialect.** Every destructor ends with
+`TObject.FreeInstance`, which calls `FreeMem(Pointer(Self))`. A root class cannot catch that: `TObject` is the RTL's, a
+helper cannot override a virtual method, a descendant keeps its own copy of the slot of `FreeInstance` in its VMT, and
+the dialect has no root class of its own. The heap of BP cannot see it either: it is a unit below `Safe`, `unit Safe`
+works without it, and it sees a free of every block, not of an object. So:
+
+1. `SafeDestroyObject` (the one place the dialect destroys an object: `TSafeLife.Destroy`, `TSafeArenaImpl.FreeAll`,
+   the finalizer of a held object) arms the address of the object in a hash table, runs the destructor, and disarms it
+   (`finally`: a destructor that raises never reaches `FreeInstance`);
+2. the first owner made with the checks on installs a wrapper of the memory manager in use (`GetMemoryManager`,
+   `SetMemoryManager`): its `FreeMem` and `FreeMemSize` look the address up when something is armed and otherwise call
+   the manager below it. This is the one hook (`SafeQFreeMem`); a free of an armed address becomes the quarantine
+   (the poison VMT of the class, the fill, the ring) and everything else is passed on.
+
+The wrapper goes over whatever manager is active: the heap of BP, the heap of the RTL (`-dBP_RTLHEAP`, `BP_HEAP=rtl`:
+tested, `test_r20` under both) and heaptrc (`-gh`: tested; the tables and the poison VMTs go back at exit, so the report
+stays clean). The poison VMT is made per class (a copy of the header of its VMT with the parent, the name and the tables
+changed, a trap in 512 slots) when the class is first freed, and goes back with the flush. The moves are under one spin
+lock; the table of armed addresses is read without it, and a free with nothing armed does not take it.
+
+**Growing into `BP_HEAP=guard` (§26.5).** The hook is one function, the bound, the fill and the poison VMT are settings,
+and the quarantine is a FIFO of blocks, so the guard heap can be the same mechanism with the arming moved from the
+dialect's paths to the heap itself: every free is "armed", the block is `mprotect`ed instead of filled when it is a page
+or more (R12 does this for regions), and the oldest leaves at the bound.
+
+**Not covered.**
+- A field read of a freed object is not trapped (no page protection): it reads `$DE`, which on a 64-bit target is not a
+  canonical pointer, so a dereference of a field faults. Objects of a page or more are not `mprotect`ed (R12 does that
+  only for regions).
+- An object freed outside the paths of the dialect is not quarantined: `Destroy` in unsafe code on an object nobody
+  owns, a child of a `TComponent` tree (§21.4), a task of `go`, a `TInterfacedObject` (R3: its interface count owns it).
+- A call through an interface (the table of the interface is static) and a non-virtual method run on the poison
+  fields; a class with more than 512 virtual methods has the later slots unchecked.
+- An object larger than the byte bound leaves at once; one that has left the quarantine is the old use after free
+  (`-gh`). A region object is R12's.
+- The wrapper is installed by the first owner made with the checks on, so a program that starts threads before it
+  should make one first (`SafeQuarantineSetLimits` installs it, too).
 
 The order of the implementation: H20 (#207); S28 with the liveness of decision 1 (`feat/strview`); the engine (S5,
 S17, S27, S28 on one root engine, decisions 1, 2, 5); the inside of a class (decision 4); S17 and S18 of the plan; the
