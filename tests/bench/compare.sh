@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# The benchmark suite of Better Pascal against C, Rust and Go (safe/SPEC.md §25.2; report only, no thresholds).
-# Four programs, each written the same way in each language (tests/bench/suite/NAME/NAME.{pas,c,rs,go}): binary trees
+# The benchmark suite of Better Pascal against C, Rust, Go and Goose (safe/SPEC.md §25.2; report only, no thresholds).
+# Four programs, each written the same way in each language (tests/bench/suite/NAME/NAME.{pas,c,rs,go,goose}): binary trees
 # (allocation), n-body (floating point), fannkuch (integers and arrays), a word count (strings). Every program prints
 # one line, a checksum, and the script checks that all languages print the same line.
 # Builds (release, same machine):  Bp: tools/bp build --release -O2     C: gcc -O2 and clang -O2
 #                                  Rust: rustc -O                      Go: go build
+#                                  Goose: goose build -O2 (the default of a build: no --debug checks)
 # Each binary is run RUNS times; the cell is the median wall time and the ratio to C (gcc). The output is a Markdown
-# table with the machine and the compiler versions. A missing toolchain makes its column "n/a". Goose is not installed
-# here: its column says so (the owner picks the version and installs it).
+# table with the machine and the compiler versions. A missing toolchain makes its column "n/a".
 # usage: tests/bench/compare.sh [out-dir]
-# environment: RUNS (5)   LANGS ("bp gcc clang rust go")   PROGS ("bintrees nbody fannkuch wordcount")
+# environment: RUNS (5)   LANGS ("bp gcc clang rust go goose")   PROGS ("bintrees nbody fannkuch wordcount")
 #              WORDS (4000000: the length of the text of the word count)   FPC (fpc)
+#              GOOSE (goose on PATH, else ~/.local/opt/goose-v2026.3/goose: the Goose compiler)
 # The exit code is 1 when a build fails or the checksums differ; a missing toolchain is not a failure.
 set -u
 export LC_ALL=C
@@ -19,14 +20,17 @@ root=$(cd "$here/../.." && pwd)
 suite=$here/suite
 out=${1:-$(mktemp -d)}
 RUNS=${RUNS:-5}
-LANGS=${LANGS:-"bp gcc clang rust go"}
+LANGS=${LANGS:-"bp gcc clang rust go goose"}
 PROGS=${PROGS:-"bintrees nbody fannkuch wordcount"}
 WORDS=${WORDS:-4000000}
 FPC=${FPC:-fpc}
+if [ -z "${GOOSE:-}" ]; then
+  if command -v goose > /dev/null 2>&1; then GOOSE=goose; else GOOSE=$HOME/.local/opt/goose-v2026.3/goose; fi
+fi
 mkdir -p "$out"
 failed=0
 
-declare -A title=([bp]="Bp" [gcc]="C (gcc -O2)" [clang]="C (clang -O2)" [rust]="Rust (rustc -O)" [go]="Go" )
+declare -A title=([bp]="Bp" [gcc]="C (gcc -O2)" [clang]="C (clang -O2)" [rust]="Rust (rustc -O)" [go]="Go" [goose]="Goose (build -O2)" )
 declare -A time_us samples ver ok
 
 have() { command -v "$1" > /dev/null 2>&1; }
@@ -38,6 +42,7 @@ avail() {
     clang) have clang ;;
     rust) have rustc ;;
     go) have go ;;
+    goose) have "$GOOSE" && have gcc ;;
     *) return 1 ;;
   esac
 }
@@ -51,6 +56,7 @@ version() {
     clang) first_line clang --version ;;
     rust) first_line rustc --version ;;
     go) first_line go version ;;
+    goose) echo "$(first_line "$GOOSE" version) (goose build -O2, over gcc)" ;;
   esac
 }
 
@@ -67,6 +73,7 @@ build() {
     clang) clang -O2 -o "$d/$l" "$src.c" -lm > "$d/build-$l.log" 2>&1 ;;
     rust) rustc -O -o "$d/$l" "$src.rs" > "$d/build-$l.log" 2>&1 ;;
     go) go build -o "$d/$l" "$src.go" > "$d/build-$l.log" 2>&1 ;;
+    goose) GOOSE_CC=gcc "$GOOSE" build -O2 -o "$d/$l" "$src.goose" > "$d/build-$l.log" 2>&1 ;;
   esac
 }
 
@@ -152,15 +159,14 @@ echo
 echo "Compilers:"
 echo
 for l in $LANGS; do echo "- ${title[$l]:-$l}: ${ver[$l]}"; done
-echo "- Goose: not installed"
 echo
 echo "Median wall time of $RUNS runs, in seconds, and the ratio to C (gcc -O2); lower is better."
 echo
 row="| program |"
 sep="|---|"
 for l in $LANGS; do row+=" ${title[$l]:-$l} |"; sep+="---|"; done
-echo "$row Goose |"
-echo "$sep---|"
+echo "$row"
+echo "$sep"
 for p in $PROGS; do
   row="| $p |"
   for l in $LANGS; do
@@ -178,10 +184,9 @@ for p in $PROGS; do
     fi
     row+=" $cell |"
   done
-  echo "$row not installed |"
+  echo "$row"
 done
 echo
-echo "Goose: the owner picks the version and installs it; the column is filled when it is."
 for p in $PROGS; do
   for l in $LANGS; do
     [ -z "${ok[$p,$l]:-}" ] || [ -z "${time_us[$p,$l]:-}" ] || { echo "Output of $p: ${ok[$p,$l]}"; break; }
