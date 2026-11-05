@@ -769,9 +769,9 @@ end;
 { S6 }
 
 const
-  S6ValueTypes = ' tarena tchan tgroup tdefer ';
+  S6ValueTypes = ' tarena tchan tgroup tdefer tmap ';
 
-{ The value types of the module: the names declared as NAME = specialize TArena|TChan|TGroup|TDefer<...>,
+{ The value types of the module: the names declared as NAME = specialize TArena|TChan|TGroup|TDefer|TMap<...>,
   each as ' name '. }
 function S6ModuleValueTypes(const Src: TVetSource): String;
 var

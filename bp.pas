@@ -32,6 +32,7 @@ uses
 
 {$I safe/core.intf.inc}
 {$I safe/region.intf.inc}
+{$I safe/map.intf.inc}
 {$I ext/go.intf.inc}
 {$I ext/utf8.intf.inc}
 {$I safe/poison.intf.inc}
@@ -40,6 +41,7 @@ implementation
 
 {$I safe/core.impl.inc}
 {$I safe/region.impl.inc}
+{$I safe/map.impl.inc}
 {$I ext/go.impl.inc}
 {$I ext/utf8.impl.inc}
 {$I safe/poison.impl.inc}
