@@ -48,12 +48,35 @@ jobs:
         run: bash tests/examples.sh
       - name: tools/bp get, vendor and build with deps.lock over local git repositories (tests/deps.sh)
         run: bash tests/deps.sh
-      - name: Benchmark baseline, Bp against C and Go (report only, never fails; tests/bench/compare.sh, SPEC §25.2)
+      - name: Cache Goose
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/opt/goose-v2026.3
+          key: goose-v2026.3-linux-x64
+      - name: Install Goose v2026.3 (release, sha256 checked; the benchmark step below needs it only for its Goose column)
         continue-on-error: true
-        timeout-minutes: 4
+        run: |
+          dir="$HOME/.local/opt/goose-v2026.3"
+          exe=$(find "$dir" -maxdepth 2 -name goose -type f 2> /dev/null | head -n 1)
+          if [ -z "$exe" ]; then
+            tmp=$(mktemp -d)
+            curl -sSfL -o "$tmp/goose.tar.gz" https://github.com/aardappel/goose/releases/download/v2026.3/goose-v2026.3-linux-x64.tar.gz
+            echo "06ac30284338269d3996d457412bf4f2b47c1f9a5601de65b6317187fe78d5c9  $tmp/goose.tar.gz" | sha256sum -c -
+            mkdir -p "$tmp/unpacked"
+            tar xzf "$tmp/goose.tar.gz" -C "$tmp/unpacked"
+            rm -rf "$dir"
+            mkdir -p "$(dirname "$dir")"
+            mv "$tmp/unpacked" "$dir"
+            exe=$(find "$dir" -maxdepth 2 -name goose -type f | head -n 1)
+          fi
+          test -x "$exe"
+          echo "GOOSE=$exe" >> "$GITHUB_ENV"
+      - name: Benchmark baseline, Bp against C, Go and Goose (report only, never fails; tests/bench/compare.sh, SPEC §25.2)
+        continue-on-error: true
+        timeout-minutes: 5
         env:
           RUNS: "3"
-          LANGS: "bp gcc go"
+          LANGS: "bp gcc go goose"
         run: bash tests/bench/compare.sh "$RUNNER_TEMP/compare" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Portable mode (Linux default, SPEC §18): all tests and compile checks,
