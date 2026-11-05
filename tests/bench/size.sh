@@ -10,7 +10,8 @@
 #            go: go build                             go-small: go build -ldflags="-s -w"
 #            goose: goose build -O2 (over gcc)
 # Columns: the build time (a clean build, the median of 3; the build caches of Go and Rust stay, as a user has them), a
-# rebuild with the object directory kept (the units of BP built, as for the second build of a program; median of 3),
+# rebuild after an edit (a comment line added to the source) with the object directory kept (the units of BP built,
+# as for the next build of a program; median of 3),
 # the size as built and stripped (strip --strip-all of a copy), static or dynamic, the peak RSS (/usr/bin/time, the
 # median of 5) and the start: the mean wall time of one run of N (tests/bench/spawn.c).
 # usage: tests/bench/size.sh [out-dir]
@@ -19,7 +20,6 @@ set -u
 export LC_ALL=C
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
-src=$here/suite/hello
 out=${1:-$(mktemp -d)}
 N=${N:-1000}
 VARIANTS=${VARIANTS:-"bp bp-xx bp-sysutils gcc gcc-static rust rust-small go go-small goose"}
@@ -29,6 +29,9 @@ if [ -z "${GOOSE:-}" ]; then
 fi
 mkdir -p "$out"
 failed=0
+# a copy of the sources: a rebuild edits it
+src=$out/src
+rm -rf "${src:?}" && cp -r "$here/suite/hello" "$src"
 
 have() { command -v "$1" > /dev/null 2>&1; }
 
@@ -83,6 +86,7 @@ for v in $VARIANTS; do
   [ -x "$out/$v" ] || continue
   rs=()
   for i in 1 2 3; do
+    for f in "$src"/hello*.*; do echo "// edit $i" >> "$f"; done
     t0=$(now_us); build "$v" keep > "$out/rebuild-$v.log" 2>&1; t1=$(now_us); rs+=($((t1 - t0)))
   done
   rtime[$v]=$(printf '%s\n' "${rs[@]}" | med 3)

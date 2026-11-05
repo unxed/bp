@@ -3097,6 +3097,16 @@ The verdicts:
   - fewer units loaded by a program that does not use them.
 
   A clean build (330 ms) also compiles `BP` and `BPThreads`; it happens once per object directory.
+- **The rebuild after an edit (measured later the same day).** The rebuild column above is a build with no change, so
+  the check came from its cache. `size.sh` now adds a comment line to a copy of the source before each rebuild.
+  - With an edit, `tools/bp` ran `genstubs.py` again, because the RTL stubs were keyed on the whole text of the program:
+    about 450 ms of a 530 ms rebuild of hello world.
+  - The stubs are now keyed on the identifiers and the `uses` of the program (`genstubs.py --key`) and on a `stat` of
+    the unit path, and a passed check is cached with its output.
+  - A rebuild after an edit, on a busy machine: Bp 289 ms (530 before), gcc 66 ms, Go 230 ms.
+  - Still to do, toward the target of under 100 ms and the level of C: the key without a run of Python, the link
+    (`ld` takes about 50 ms; gold, lld and `-Xi` are to be measured on a quiet machine), and the units of BP that a
+    program does not use.
 - **What a build needs: level, ahead of Rust.**
   - FPC with all its units is 282 MiB, and a build needs binutils (`ld`), not a C compiler or libc headers.
   - Go is 97 MiB. Rust is 1.2 GiB and links with a C compiler. Goose is 28 MiB and compiles through gcc.
