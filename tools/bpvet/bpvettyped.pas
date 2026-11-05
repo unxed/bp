@@ -38,6 +38,8 @@ type
     function AnyCompat(Proc: TResElDataBuiltInProc; Expr: TPasExpr; RaiseOnError: Boolean): Integer;
     procedure SizeResult(Proc: TResElDataBuiltInProc; Params: TParamsExpr; out ResolvedEl: TPasResolverResult);
     procedure FinishAny(Proc: TResElDataBuiltInProc; Params: TParamsExpr);
+    procedure EvalNone(Proc: TResElDataBuiltInProc; Params: TParamsExpr; Flags: TResEvalFlags;
+      out Evaluated: TResEvalValue);
     function CopyCompat(Proc: TResElDataBuiltInProc; Expr: TPasExpr; RaiseOnError: Boolean): Integer;
     procedure CopyResult(Proc: TResElDataBuiltInProc; Params: TParamsExpr; out ResolvedEl: TPasResolverResult);
     function EvalFunc(Sender: TCondDirectiveEvaluator; Name, Param: String; out Value: String): Boolean;
@@ -121,7 +123,7 @@ begin
   for N in MagicProcs do
     AddBuiltInProc(N, N + '(any)', @AnyCompat, nil, nil, @FinishAny, bfCustom, [bipfCanBeStatement]);
   for N in MagicFuncs do
-    AddBuiltInProc(N, N + '(any): SizeInt', @AnyCompat, @SizeResult, nil, @FinishAny);
+    AddBuiltInProc(N, N + '(any): SizeInt', @AnyCompat, @SizeResult, @EvalNone, @FinishAny);
   AddBuiltInProc('Copy', 'function Copy(const StringOrArray; Start, Count: SizeInt): StringOrArray', @CopyCompat,
     @CopyResult, nil, nil, bfCopyArray);
   FFiles := specialize TOwned<TFileResolver>.Own(VetNewFileResolver);
@@ -188,6 +190,15 @@ var
 begin
   for I := 0 to Length(Params.Params) - 1 do
     FinishCallArgAccess(Params.Params[I], rraRead);
+end;
+
+// UNSAFE: keep the parameter modes of the fcl-passrc callback type
+procedure TVetResolver.EvalNone(Proc: TResElDataBuiltInProc; Params: TParamsExpr; Flags: TResEvalFlags;
+  out Evaluated: TResEvalValue);
+begin
+  // Without an evaluator the resolver stops with "not yet implemented" as soon as it folds an expression that holds
+  // the call (I := Round(X)); the value of the call is not a constant here
+  Evaluated := nil;
 end;
 
 function TVetResolver.CopyCompat(Proc: TResElDataBuiltInProc; Expr: TPasExpr; RaiseOnError: Boolean): Integer;

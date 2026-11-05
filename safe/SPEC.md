@@ -924,7 +924,7 @@ what is already shipped with FPC (verified: `ptop`, `fpdoc`, `data2inc`, `bin2ob
 
 | `sp` | Analogue | Built on |
 |---|---|---|
-| `sp build [-release]` | `go build` | `fpc` + `-Fu` of the dependencies + a check profile (§6): debug `-Cr -Co -CR -Sa -gh -gt`, release without `-Cr -Co -CR`. **The first part exists: `tools/bp build [--release] [fpc options] FILE`** runs `bpvet --strict --typed` over the directory of `FILE` and calls `fpc` (debug adds `-Cr -Co`) only when the check passes, so unsafe code is built only where it is declared (`// UNSAFE:`, `// borrow:`, `// root:`); bpvet and the RTL stubs are cached by content (`~/.cache/bp`), and a cached check takes about 30 ms (`tests/bp.sh`) |
+| `sp build [-release]` | `go build` | `fpc` + `-Fu` of the dependencies + a check profile (§6): debug `-Cr -Co -CR -Sa -gh -gt`, release without `-Cr -Co -CR`, with `-O2`. **The first part exists: `tools/bp build [--release] [fpc options] FILE`** runs `bpvet --strict --typed` over the directory of `FILE` and calls `fpc` (debug adds `-Cr -Co`, `--release` adds `-O2`) only when the check passes, so unsafe code is built only where it is declared (`// UNSAFE:`, `// borrow:`, `// root:`); bpvet and the RTL stubs are cached by content (`~/.cache/bp`), and a cached check takes about 30 ms (`tests/bp.sh`) |
 | `sp test` | `go test` | a generalized `tests/run.sh`: `test_*.pas` (return code = number of failures) and `compile/*.pas` with `// EXPECT:` (an analogue of trybuild in Rust); `examples/*.pas` are built too (an analogue of Rust doc tests) |
 | `sp vet` | `go vet`, clippy | a linter on `fcl-passrc`: S3–S14 |
 | `sp fix` | `go fix`, `cargo fix` | **exists as `tools/bp fix [fpc options] FILE`**: `bpvet --fix` over the directory of `FILE`: the header from the file name (S21), reserved words in lower case (S22), the `// root:` marks of exported routines (S17); the rest is listed, nothing is built |
@@ -1174,17 +1174,21 @@ does not resolve is a Fatal with the position. The conditions of Spike 1 are met
 
 - **The resolver is patched at build time.** The owner's decision: the repository keeps only the patches
   (`tools/bpvet/resolver/*.patch`, under the licence of `fcl-passrc`); `resolver/get.sh` takes `pasresolver.pp`,
-  `pparser.pp` and `fcl-passrc.inc` of FPC 3.2.2 (from the installed FPC sources, else from the release tag), checks their
-  SHA-256 and applies the patches (`pastree`, `pparser`, `pasresolver`; each header lists its changes); `build.sh`
-  builds `bpvet` with the result. They make the resolver accept what FPC accepts and Better Pascal uses: the bare name of
-  a generic in its own method, a record enumerator, `String[N]` in a variable, the operators of a record (`Implicit`, and
-  the management operators `Initialize`/`Finalize`/`Copy` of `TRegion`), a typed pointer for a `Pointer` var argument, a
-  pointer to a member type of a generic declared after it; and they let a used unit be read up to its implementation.
-  FPC main has most of them; the rest are offered upstream when `bpvet` moves to the next FPC release.
+  `pparser.pp`, `pasresolveeval.pas` and `fcl-passrc.inc` of FPC 3.2.2 (from the installed FPC sources, else from the
+  release tag), checks their SHA-256 and applies the patches (`pastree`, `pparser`, `pasresolver`, `pasresolveeval`;
+  each header lists its changes); `build.sh` builds `bpvet` with the result. They make the resolver accept what FPC
+  accepts and Better Pascal uses: the bare name of a generic in its own method, a record enumerator, `String[N]` in a
+  variable, the operators of a record (`Implicit`, and the management operators `Initialize`/`Finalize`/`Copy` of
+  `TRegion`), a typed pointer for a `Pointer` var argument, a pointer to a member type of a generic declared after it, a
+  constant above the `Int64` range (`QWord($CBF29CE484222325)`) and `and`/`or`/`xor` of it with an `Int64`; and they let
+  a used unit be read up to its implementation. FPC main has most of them; the rest are offered upstream when `bpvet`
+  moves to the next FPC release.
 - **The stubs are generated.** `resolver/genstubs.py OUT SRC...` writes the RTL stubs from `ppudump -Fj` of the installed
   units (fp-utils): only the closure of what the sources name, so one run for the checked tree gives 13 units and a few
   hundred symbols. The used units are found in the stub directory first, then in `-Fu`, `-Fi` and the directory of the
-  file; `-FaUNIT` adds an implicit unit, as for `fpc`.
+  file; `-FaUNIT` adds an implicit unit, as for `fpc`. A unit may have a dotted name (`uses Generics.Collections`). The
+  `.ppu` holds a generic class without its type parameters, so `genstubs.py` declares the generics of
+  `Generics.Collections` (`TList`, `TQueue`, `TStack`, `TDictionary` and their object variants) itself.
 - **The resolver only resolves**, as in Spike 1 (permissive casts, compiler magic with any arguments).
 - **CI** (`tests/typed.sh`, job `lint`): every module of `bp.pas`, `safe/`, `ext/` and `tests/` resolves; the only files that
   do not are the seven compile tests that must fail. The output of the rules is unchanged (`tests/lint.sh`). On the way
@@ -2441,6 +2445,8 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
   Each is run with the release build of each language (`bp build --release`, `gcc -O2`, `rustc -O`, `go build`, Goose's
   release mode), on the same machine. CI reports the table and does not fail on it. The table goes here, with the
   machine and the versions.
+  For floating point the programs must give the same digits in every language: an untyped real constant is `Extended`
+  in FPC (`const Dt = 0.001` changed the n-body result against C, Rust and Go), so write `Double(0.001)`.
 - **Then the levers the numbers point to (step 6),** each measured on its own:
   - the cost of reference counting (`String`, dynamic arrays, `TShared`): `const` parameters (S14) already avoid most of
     it;
