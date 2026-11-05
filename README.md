@@ -23,7 +23,9 @@
 - **Reaching:**
   - the rebuild: on a small program the level of gcc (hello world after an edit: Bp 144 ms, gcc 66 ms, Go 204–230
     ms); on a project of many files the level of Go, which builds much faster than C there;
-  - the run time: the levers of §25.2;
+  - the run time: the gap to C is not in the language (typed, compiled, no collector, the class of C) but in the
+    optimizer of FPC (tickets upstream, #185; the LLVM back end of FPC is being measured), the RTL heap (the memory
+    manager of BP is off by default for now) and the map and strings of BP (our own code); §25.2 splits it;
   - goroutines: M:N with `BP_MN=1`, and the memory manager of BP with `BP_HEAP=bp`, both off by default for now.
 - **Accepted as the niche:** a dynamic binary over glibc is smaller, but runs only where that glibc is.
 
