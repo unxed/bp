@@ -2,6 +2,7 @@
 """Declaration stubs of the FPC RTL for the typed bpvet (safe/SPEC.md §20 "Spike 1 result").
 
 genstubs.py OUT SRCDIR...
+genstubs.py --key SRCDIR...   prints the key of the stubs of SRCDIR (the identifiers and uses of the sources)
 
 The units are read from their .ppu with `ppudump -Fj` (fp-utils of the same FPC version as the units; the plain dump
 adds the calling convention of the procedure types, which -Fj leaves out). Only the closure
@@ -938,9 +939,17 @@ class Gen:
 
 def main():
     if len(sys.argv) < 3:
-        die("usage: genstubs.py OUT SRCDIR...")
+        die("usage: genstubs.py OUT SRCDIR...  or  genstubs.py --key SRCDIR...")
     out = sys.argv[1]
     idents, uses = scan_sources(sys.argv[2:])
+    if out == "--key":
+        # what the stubs depend on: the identifiers and the uses of the sources, and this script; an edit that adds no
+        # identifier keeps the key, so the caller reuses the stubs it has
+        h = hashlib.sha256()
+        h.update(open(__file__, "rb").read())
+        h.update(("\n".join(sorted(idents)) + "\n|" + ",".join(sorted(uses))).encode())
+        print(h.hexdigest()[:16])
+        return
     units = Units()
     rtl = sorted(n for n in uses | {"system", "objpas"} if units.get(n) is not None)
     g = Gen(units, idents)

@@ -209,7 +209,12 @@ sources() {
     for d in "${dirs[@]}"; do cat "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true; done; } 2>/dev/null || true
 }
 make_stubs() {
-  local sh stubtargets=("${targets[@]}"); sh=$(sources | sha256sum | cut -c1-16)
+  local sh stubtargets=("${targets[@]}")
+  # the key: the identifiers and uses of the program (an edit that adds none keeps the stubs) and the name, size and
+  # time of every file of the unit path (BP and the modules change rarely, and a stat is cheaper than a read)
+  sh=$( { "$fpc" -iV; python3 "$root/tools/bpvet/resolver/genstubs.py" --key "${stubtargets[@]}"
+          for d in "$root" "${dirs[@]}"; do stat -c '%n %s %Y' "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true; done
+        } | sha256sum | cut -c1-16)
   stubs=$cache/stubs-$sh
   if [ ! -d "$stubs" ]; then
     rm -rf "$stubs.tmp"
@@ -231,9 +236,22 @@ fi
 build() {
   local t0 extra=() quiet=() rc=0; t0=$(now)
   refresh_script; make_stubs
-  shown "$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" ${vet[@]+"${vet[@]}"} "${targets[@]}" || {
-    echo "bp: the check failed: nothing built"; return 1; }
-  echo "bp: checked in $(( ($(now) - t0) / 1000000 )) ms"
+  # a passed check is kept by the hash of what it read (bpvet, the stubs, the options, every source of the targets), with
+  # its output; the same text again is not checked again
+  local vk vout vrc=0
+  vk=$( { echo "$bpvet $stubs ${lib[*]} ${vet[*]-}"
+          find "${targets[@]}" -type f \( -name '*.pas' -o -name '*.pp' -o -name '*.inc' -o -name '*.lpr' \) -print0 \
+            2>/dev/null | sort -z | xargs -0 cat 2>/dev/null; } | sha256sum | cut -c1-16)
+  if [ -f "$cache/vet/$vk" ]; then
+    cat "$cache/vet/$vk"
+    echo "bp: checked (cached)"
+  else
+    vout=$(shown "$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" ${vet[@]+"${vet[@]}"} "${targets[@]}" 2>&1) || vrc=$?
+    [ -z "$vout" ] || printf '%s\n' "$vout"
+    [ "$vrc" = 0 ] || { echo "bp: the check failed: nothing built"; return 1; }
+    mkdir -p "$cache/vet" && printf '%s' "${vout:+$vout$'\n'}" > "$cache/vet/$vk.tmp" && mv "$cache/vet/$vk.tmp" "$cache/vet/$vk"
+    echo "bp: checked in $(( ($(now) - t0) / 1000000 )) ms"
+  fi
   if [ "$cmd" = run ]; then rm -rf "$1.tmp"; mkdir -p "$1.tmp"; extra=(-FE"$1.tmp" -FU"$1.tmp"); quiet=(-l- -v0ew); fi
   shown "$fpc" ${quiet[@]+"${quiet[@]}"} ${checks[@]+"${checks[@]}"} "${always[@]}" "${lib[@]}" ${opts[@]+"${opts[@]}"} ${extra[@]+"${extra[@]}"} "$srcfile" || rc=$?
   [ "$rc" = 0 ] || return 1
