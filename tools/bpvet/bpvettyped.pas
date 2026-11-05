@@ -11,7 +11,8 @@ unit BpvetTyped;
 interface
 
 uses
-  SysUtils, Classes, Contnrs, PasTree, PScanner, PParser, PasResolveEval, PasResolver, BpvetCore, BpvetS17, BpvetRace, BpvetCast, Safe;
+  SysUtils, Classes, Contnrs, PasTree, PScanner, PParser, PasResolveEval, PasResolver, BpvetCore, BpvetS17, BpvetRace, BpvetNil,
+  BpvetCast, Safe;
 
 { Resolves the module of Src and checks it with S17 (bpvets17.pas): True when it and every unit it uses resolve;
   otherwise a fatal with the position is in Report. UnitDirs are searched for the used units after RtlDir (the stubs), then the directory of the file.
@@ -384,6 +385,7 @@ begin
   begin
     VetCheckS17(Src, M, Main, Report);
     VetCheckRaces(Src, M, Main, Report);
+    VetCheckNil(Src, M, Main, Report);
     VetCheckCasts(Src, M, Main, Report);
   end;
   if not Result then
