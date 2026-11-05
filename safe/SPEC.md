@@ -1797,9 +1797,11 @@ how it is closed:
 - **Carriers.** One OS thread per CPU (`sched_getaffinity`; `BP_PROCS=N` overrides), started at the first goroutine. One
   run queue under a spin lock for now (per-carrier queues are a measured lever of §25.1 step 6); an idle carrier sleeps
   on a futex until a push or the next timer.
-- **A contended critical section** parks a goroutine in a list of the lock (it never sleeps in the futex while the owner
-  may wait in the run queue): it marks the lock contended, as an OS waiter does, and the leaver wakes one OS waiter and
-  one goroutine. An OS thread keeps the futex.
+- **A contended critical section** parks a goroutine (it never sleeps in the futex while the owner may wait in the run
+  queue): it marks the lock contended, as an OS waiter does, and waits in a table of the runtime by the address of the
+  lock (the semaphore table of Go), not in the lock, because the memory of a lock may be freed as soon as it is free. The
+  leave is one exchange; a leaver that saw the lock contended wakes one OS waiter and one goroutine. An OS thread keeps
+  the futex.
 - **The monitor** (one OS thread, every 10 ms) fires timers the carriers did not, adds a carrier when the run queue is
   not empty and no switch happened in a tick (a blocking system call or a long loop; at most 256 carriers), and reports a
   deadlock.

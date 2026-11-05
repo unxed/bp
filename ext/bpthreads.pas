@@ -119,7 +119,8 @@ type
     Deadline: Int64;       // a park with a timeout: NowMs at which it ends, else 0
     InTimers: Boolean;
     TimerPrev, TimerNext: PRawThread;
-    WaitNext: PRawThread;  // the waiters of an event
+    WaitNext: PRawThread;  // the waiters of an event or of a critical section
+    WaitAddr: Pointer;     // the critical section it waits on (bpsched.inc)
     Votes: LongInt;        // ended + closed: the second vote frees the region
     Switches: PtrUInt;     // a carrier: goroutines run so far (the monitor watches progress)
     Done: TSchedEvent;     // set when the goroutine ends (WaitForThreadTerminate)
@@ -131,8 +132,6 @@ type
     State: LongInt;        // 0 free, 1 taken, 2 taken with waiters
     Count: LongInt;
     Owner: TThreadID;
-    GLock: LongInt;        // a spin lock over GWaiters
-    GWaiters: PRawThread;  // goroutines parked on it (bpsched.inc), in order (WaitNext)
   end;
 
   TRawEntry = function(Arg: Pointer): PtrInt; cdecl;
@@ -212,7 +211,7 @@ begin
   Result := Int64(TS.tv_sec) * 1000 + TS.tv_nsec div 1000000;
 end;
 
-{ ---------- mutex (Drepper, "Futexes are tricky", variant 2) + recursion ---------- }
+{ ---------- mutex (a futex: 0 free, 1 taken, 2 taken with waiters; the leave is one exchange) + recursion ---------- }
 
 procedure MutexEnter(var M: TRawMutex);
 var
@@ -258,7 +257,7 @@ begin
   end;
 end;
 
-procedure WakeMutexWaiter(var M: TRawMutex); forward;
+procedure WakeMutexWaiter(M: Pointer); forward;
 
 procedure MutexLeave(var M: TRawMutex);
 begin
@@ -266,11 +265,12 @@ begin
   if M.Count > 0 then
     Exit;
   M.Owner := TThreadID(0);
-  if InterlockedDecrement(M.State) <> 0 then
+  // one step from taken to free: once State is 0 another thread may take the lock, leave it and free its memory, so
+  // nothing of M is written after that (the parked goroutines are kept by the address of M in bpsched.inc)
+  if InterlockedExchange(M.State, 0) = 2 then
   begin
-    InterlockedExchange(M.State, 0);
     FutexWake(M.State, 1);
-    WakeMutexWaiter(M);    // and a parked goroutine, if one is there
+    WakeMutexWaiter(@M);
   end;
 end;
 

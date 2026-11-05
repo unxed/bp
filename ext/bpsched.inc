@@ -898,10 +898,32 @@ end;
 
 { ---------- critical sections ---------- }
 
-{ A goroutine takes a mutex that is taken: it marks it contended (State 2, as an OS waiter does) and parks in its list;
-  the carrier releases GLock after the switch, so MutexLeave, which takes GLock after it sees State 2, finds it. }
+{ The goroutines parked on a critical section wait in a table of the runtime, by the address of the lock, not in the
+  lock (as the semaphore table of Go): the leaver touches only the table after the lock is free, and the memory of the
+  lock may be freed by then. }
+const
+  MutexBuckets = 256;
+
+type
+  TMutexBucket = record
+    Lock: LongInt;
+    Head: PRawThread;      // in order of arrival, linked by WaitNext; WaitAddr is the lock
+  end;
+
+var
+  MutexWaits: array[0..MutexBuckets - 1] of TMutexBucket;
+
+function MutexBucket(M: Pointer): PtrUInt; inline;
+begin
+  Result := ((PtrUInt(M) shr 3) xor (PtrUInt(M) shr 11)) and (MutexBuckets - 1);
+end;
+
+{ A goroutine takes a mutex that is taken: under the lock of the bucket it marks the mutex contended (State 2, as an OS
+  waiter does) and parks there; the carrier releases the bucket after the switch. A leaver that saw State 2 takes the
+  bucket after that, so it finds the goroutine; the woken one marks the mutex contended again when it retries. }
 procedure GreenEnter(var M: TRawMutex; G: PRawThread);
 var
+  B: ^TMutexBucket;
   P: ^PRawThread;
 begin
   if M.Owner = TThreadID(G) then
@@ -910,39 +932,53 @@ begin
     Exit;
   end;
   if InterlockedCompareExchange(M.State, 1, 0) <> 0 then
+  begin
+    B := @MutexWaits[MutexBucket(@M)];
     repeat
-      SpinLock(M.GLock);
+      SpinLock(B^.Lock);
       if InterlockedExchange(M.State, 2) = 0 then
       begin
-        SpinUnlock(M.GLock);
+        SpinUnlock(B^.Lock);
         Break;
       end;
+      G^.WaitAddr := @M;
       G^.WaitNext := nil;
-      P := @M.GWaiters;
+      P := @B^.Head;
       while P^ <> nil do
         P := @P^^.WaitNext;
       P^ := G;
       G^.Deadline := 0;
       G^.After := AfterPark;
-      G^.AfterLock := @M.GLock;
+      G^.AfterLock := @B^.Lock;
       ToCarrier(G);
     until False;
+  end;
   M.Owner := TThreadID(G);
   M.Count := 1;
 end;
 
-procedure WakeMutexWaiter(var M: TRawMutex);
+procedure WakeMutexWaiter(M: Pointer);
 var
+  B: ^TMutexBucket;
+  P: ^PRawThread;
   W: PRawThread;
 begin
-  SpinLock(M.GLock);
-  W := M.GWaiters;
-  if W <> nil then
+  B := @MutexWaits[MutexBucket(M)];
+  W := nil;
+  SpinLock(B^.Lock);
+  P := @B^.Head;
+  while P^ <> nil do
   begin
-    M.GWaiters := W^.WaitNext;
-    W^.WaitNext := nil;
+    if P^^.WaitAddr = M then
+    begin
+      W := P^;
+      P^ := W^.WaitNext;
+      W^.WaitNext := nil;
+      Break;
+    end;
+    P := @P^^.WaitNext;
   end;
-  SpinUnlock(M.GLock);
+  SpinUnlock(B^.Lock);
   if W <> nil then
     Ready(W);
 end;
