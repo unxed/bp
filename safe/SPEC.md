@@ -58,7 +58,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (`BP_MN=1`), the `TComponent` owner (the typed `bpvet`, §21.4): **implemented**; `TArena` on the list: **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; doc tests exist (`tools/doctest.py`); the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
-| Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
+| Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured; one model of lifetimes (a root, its reach, its changes): **design, for the owner's review** (§24.9) | §24 |
 | An uninitialized local class reference, function result or `out` parameter (H19) | **checked:** `tools/bp build` adds `-Sew` (`tests/safe/compile/mf_uninit.pas`) and runs the typed `bpvet`: S26a proves the assignment on every path (also where FPC does not warn: a branch, an `out` parameter, a result), S26b keeps a class under 64 KiB so a nil dereference faults | §8, §22.9 |
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **checked** by the typed `bpvet` (`tools/bp build`): S11m, S11s, S19; `SAFE_DEBUG` R17 at `Send` | §8, §21.2 |
 | Class casts and untyped parameters (H17, H18): an unchecked downcast, `TBig(Buf)[N]` over a `var Buf`, `absolute` | **checked** by the typed `bpvet` (`tools/bp build`): S24 (`--fix` writes `as`), S25 | §8, §24.6 |
@@ -432,7 +432,7 @@ System.GetMem(Buf, Len);
 | A dangling `TSlice`, a dangling `TWeak` | impossible by construction | — |
 | `.Free` outside unsafe | compiler (error) | — |
 | raw pointers outside unsafe | compiler warning (named pointer types) + linter (plan) (`^T`, `@`, arithmetic) | H4 |
-| A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1 |
+| A borrow (parameter/local) does not outlive the owner | linter (plan) (S5) + programmer | H1, H20 |
 | No `TShared` cycles | programmer + linter `bpvet` (S15, heuristic) | H2 |
 | Arena objects are not used after `FreeAll` | through `TArenaRef<T>`: runtime in debug (R10); a plain `// borrow: arena` reference — programmer, `-gh` | H3 |
 | `TOwned` is unique: copied only through `.Move`, never by value | programmer + linter `bpvet` (S10); the runtime is safe in any case (§4) | H5 |
@@ -484,6 +484,7 @@ compensating check, and accepted risks are listed with a reason.
 | H17 | an unchecked class cast: `TB(O).Y[100]` on an object that is a `TA` reads past it (§24.6) | `bpvet` S24 (typed): a downcast is `O as TB`, `--fix` rewrites it; a cast between classes of different branches is an error; a cast from `Pointer` or an integer to a reference is S4 | — (done: the 2 downcasts of `safe/core.impl.inc` are `as`) | §24 step 3 |
 | H18 | an untyped parameter with a variable typecast, `TBig(Buf)[N] := 1`, writes anywhere (§24.6); `absolute` | `bpvet` S25 (typed): an untyped `var`/`const`/`out` parameter, a typecast of one and `absolute` are errors outside a `// UNSAFE:` mark | — (done: the 5 untyped parameters of the repository are in `ext/bpthreads.pas`, a `// UNSAFE-UNIT:`) | §24 step 3 |
 | H19 | an uninitialised local of a class type is a garbage pointer: `var F: TFoo; WriteLn(F.X)` | FPC: a warning | done: `bp build` adds `-Sew` (`mf_uninit.pas`; the region runtime had two results never set, fixed); S26a in the typed `bpvet`: definite assignment of a local, a function result and an `out` parameter of a class type; S26b: a class under 64 KiB (§22.9) | §24 step 2, §22 step 0 |
+| H20 | a nested routine frees the argument of its own `const` parameter: `Print(X)` where `Print` writes the local `X` of its parent, then reads `S` (FPC passes a local `String` or dynamic array to a `const` parameter without a count; measured: the freed block is taken by the next `String` of its size, §24.9) | nothing | the rule *change* of §24.9: a call of a nested routine, or of a nested procedure value, that writes a local passed as its `const` argument is an error of S17 | §24.9 step 2 |
 
 **H1. A borrow outlives its owner.**
 
@@ -1092,6 +1093,7 @@ or above the parameter suppresses its S14 finding.
 | v0.38 | §25.4 the memory manager of BP on by default (`BP_HEAP=rtl` for the RTL heap): runs grown in place, a freed run of 1 MiB or more back to the kernel but for the last one; peak memory below the RTL heap on the arena and region tiers, a buffer of 1–3 MB in a loop 15–18 times faster |
 | v0.39 | §25.2 unit `BPVec` (#197): `Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays in SSE2 on x86_64, the same loops in Pascal elsewhere; `Axpy` of `Double` 1.74 → 0.73 s on 2G elements (gcc -O3 0.77 s) |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
+| v0.41 (design) | §24.9 one model of lifetimes, for the owner's review: values, owners (roots) and borrows; one sentence (a borrow is used only while its root is alive and unchanged) and five rules (name, reach, change, signature, container) of which S5, S11, S17, S18, S27 and the approved S28 are instances; the string view as an instance; nested procedure values and CORBA interfaces as borrows; the lifetime marks sorted into fact and intent (`// borrow:` stays intent); the research table (Rust, Swift, Go, Goose, Zig, Vale, Hylo); H20 found and measured (a nested routine frees the argument of its own `const` parameter) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -2564,6 +2566,9 @@ table when the steps of §21 are done. `// borrow: <who owns it>` is the root wr
 boundary of a unit, the same shape as `// root:`; when S5 moves onto the engine of S17 (§20), the mark becomes
 `// root: <owner>` and `bp fix` rewrites the old one.
 
+§24.9 (design, for the owner's review) makes the sentence a model of three kinds of types and five rules, and keeps
+`// borrow:` as a mark of intent instead of renaming it.
+
 ### 24.2 Marks of fact are written by the machine, marks of intent by hand
 
 Every mark of Better Pascal is one of two kinds, and the kinds are treated differently:
@@ -2701,6 +2706,439 @@ One step is one PR from a fresh `main`, with a criterion of done.
    writes the directive. *Done:* lint tests; §0 item 5 rewritten.
 7. **`// raises:`** on the engine of §23, the two findings of §24.5. *Done:* lint tests; `bp explain` shows the set.
 8. **§0 rewritten** around §24.1 and §24.2, after the steps of §21.7 that change the decision tree; not before.
+
+### 24.9 One model of lifetimes: a root, where it reaches, what changes it (design, for the owner's review)
+
+Status: **design, for the owner's review**; nothing here is implemented, and no rule changes until the owner answers the
+questions at the end. One part is decided and is an input, not a proposal: the string view `TStrView` with the rule S28
+(the conservative rule 3, `TStrSlice` stays the type that keeps its text; approved by the owner on 2026-11-05, built on
+the branch `feat/strview`, §25.3 from v0.40). Here it is one instance of the general rule. The section answers four
+asks of unxed/bp#108: the borrowed string slice, the one sentence of §24.1 made into a model, the marks of fact
+(§24.2), and the same rule for closures that cannot escape and for interfaces as borrows (§24.4). Research first:
+Rust (`&str`, lifetimes, elision, non-lexical lifetimes), Swift (`Substring`, `~Escapable`, `Span`, SE-0446, SE-0447,
+lifetime dependence), Go (substrings, escape analysis, the collector), Goose (roots, regions), Zig (slices), Vale
+(generational references, region borrowing) and Hylo (mutable value semantics, second-class references, projections);
+the table of what each gives is in "Against the other languages" below.
+
+#### The model in a few sentences
+
+Every type of Better Pascal is one of three kinds. A **value** is complete in itself (an integer, a record of values,
+`String`, `TStrSlice`, `TArray<T>`): it is copied, or copied on write, and needs nothing. An **owner** ends the life of
+what it holds (`TOwned`, `TShared`, a COM interface, `TRegion`, a scope, `TArena`, a `TMap` for its slots, a `String`
+variable for its bytes, the frame of a routine for its locals, the GC heap of a goroutine): it is moved, counted or
+unique, and it is a **root**. A **borrow** points into something an owner holds (a class reference that is not an
+owner, a region object, a `TStrView`, the place of `M.Ref`, a nested procedure value, a CORBA interface): it has a
+root. The whole model is one sentence:
+
+> **A borrow is used only while its root is alive and unchanged.**
+
+- **Alive**: the scope of the root has not ended (the routine has not returned, the scope loop has not ended, the
+  goroutine has not ended).
+- **Unchanged**: no operation that can free or move what the root holds has run since the borrow was made. Each kind of
+  root has a short list of such operations, its *changes*: a write to a `String`, `Reset` or `Move` of a `TOwned`,
+  `Reset` or `Release` of a `TRegion`, any change of a `TMap`, `FreeAll` of an arena.
+
+Everything else follows. A borrow stored in a place that outlives its root would be used after the root ends, so a
+borrow goes only into places that end no later than its root (*reach*). A borrow used after a change of its root reads
+freed or moved memory, so a change of the root ends its borrows (*change*). `bpvet` can prove both only when it sees
+every write of the root, so a root is a name (*name*). Across routines the signature says which parameter a result is
+rooted in (*signature*), and a value that holds a borrow is a borrow (*container*). These five are the rules below; the
+S-codes of today are their instances.
+
+**Why the model needs no exclusivity.** Rust forbids two live borrows when one of them can write (`&mut` is unique),
+because any write through any alias of a `Vec` can move its buffer. Better Pascal does not need that rule: the memory
+that can be freed or moved is reached only through an owner, and every owner of the dialect is unique (`TOwned`, S10;
+`TRegion`, whose copy raises), copied on write (`String`: a write through another variable makes a new `String`), or
+used inside one expression (the place of `M.Ref`, S27, because a copy of a `TMap` refers to the same map). Class
+objects never move, and a `TGrowArray` never moves (§20). So a change of a root can only come through its name, and
+the rule *change* is a rule about names, not about aliases. Hylo reaches the same point from the other side: with no
+stored references there is nothing to alias.
+
+#### The three kinds of types
+
+| Kind | Types | Needs a root | Kept valid by |
+|---|---|---|---|
+| value | ordinals, records and arrays of values, `String`, `TStrSlice`, `TSlice<T>`, `TArray<T>` (shared by reference: S11m between goroutines), `TChan` (a handle shared on purpose) | no | a copy, a copy on write or a counter |
+| owner (a root) | `TOwned` (unique), `TShared` and a COM interface (counted), `TRegion` and `for S in Scope`, `TArena`, a `TMap` (owns its slots), a `String` variable (owns its bytes), the frame of a routine, the GC heap of a goroutine, a component owner (§21.4) | it is one | its scope, its counter, `Move` |
+| borrow, checked before the build | a local or a parameter of a class type, the result of `.Get`, the variable of `Hold`, a region object, a `TGrowArray` and `At`, a `TStrView` and a value that holds one, the place of `M.Ref`, a value of an `is nested` procedure type, a CORBA interface, a `TScopeRef`, a GC reference | yes | the sentence, checked by `bpvet` |
+| borrow, checked at each use | `TWeak` (`TryLock`), `TArenaRef` (a generation, R10), an index into a `TSlice`, a `TStrView` or a `TGrowArray` (R2), the walk `for P in M` of a map (R19) | the check stands for it | a check at run time, as the generational references of Vale |
+
+A GC reference is a borrow of the heap of its goroutine: the heap is alive until the goroutine ends, and it has no
+changes (a collection frees only what nobody can reach). Its reach is the places the collector sees. That is S18.
+
+#### Roots: how long each lives, what changes it
+
+| Root | Alive until | Its changes | Its borrows |
+|---|---|---|---|
+| the frame of a routine | the routine returns | none (each local is a root of its own) | class parameters passed down, nested procedure values |
+| a `String` local or `const` parameter | the routine returns | `S := …`, `S[I] := …`, `SetLength`, `UniqueString`, `Insert`, `Delete`, a `var`/`out` argument, a call of a nested routine that writes it | `TStrView`, a map or a record of views (S28) |
+| a `TOwned` (a local or a field) | its scope, its owner | `Reset`, `Move`, `:=` | `L := X.Get` (S5) |
+| a `TShared` variable | its scope | `Reset`, `:=` (it may drop the last count) | `L := X.Get` (S5) |
+| a `TRegion` | its scope | `Reset`, `Release`, a later `TRegion.Create` | region objects, `TGrowArray`, `At`, `Hold` (S17) |
+| `for S in Scope` | the end of the body | none | `S.Hold` variables, region objects (S17) |
+| a `TArena` | its scope | `FreeAll` | `// borrow: arena` references (S17d) |
+| a `TMap` | its scope | `Ref`, `Put`, `Delete`, `Clear`, `:=` | the place of `M.Ref` (S27); the walk `for P in M` (R19, at run time) |
+| an object (`Self`) | its owner ends it | its destruction | `@Self.Method`, a CORBA interface of it, `// root: Self` |
+| a component owner | it is destroyed | its destruction | the components it owns (§21.4) |
+| the GC heap of a goroutine | the goroutine ends | none | GC references (S18) |
+
+#### The five rules
+
+1. **Name.** A root is a name whose every write `bpvet` sees: a local, a `const` or by-value parameter, `Self`, a
+   local `TRegion`, a scope variable. A borrow of a temporary (`FieldViews(ReadText(F))`), of a field or of a global
+   has no root `bpvet` can follow, and is an error (S28 rule 1; the `with` hole of S17, §24.6). A `var` parameter is
+   not a root of a view: its caller may pass one variable twice. FPC itself counts a global or a field passed to a
+   `const String` parameter (measured on FPC 3.2.2: the count is 2 inside the routine; with a local it is 1), so a
+   `const` parameter is a root that does not change while its routine runs, with the one exception of the rule
+   *change* below.
+2. **Reach.** A borrow is stored only in a place that ends no later than its root:
+
+   | Place | Ends | Takes |
+   |---|---|---|
+   | an argument, a `const` parameter going down | the call | any borrow: going down never outlives the root |
+   | a local of the routine of the root, of a nested routine, a record local | the routine | borrows of this routine and of its caller |
+   | `Result`, a `var`/`out` parameter | in the caller | borrows rooted in the caller: a parameter or the caller's current region (rule *signature*) |
+   | a field of an object of region `R`, a field of `Self` under `// root: Self` | with `R`, with `Self` | borrows of `R`, of `Self` and of roots that outlive them |
+   | a published field of a GC object, a GC collection | with the goroutine | GC references (S18) |
+   | a field of an owned object (`TOwned`, `TShared`), a global, a threadvar | not known | values and owners only (S5), or a root written by hand: `// borrow: <who>` |
+   | a field of a task, a message of a `TChan`, the object of a `TShared` given to a task | another goroutine | values and moved owners only (S11, S11m, S11s) |
+
+   Every root belongs to one goroutine, so a borrow never reaches the last row. This is S5 (fields own), S11 (a task
+   field), S17 rules 1-2, S18 (between styles only values), S28 rule 2, the escapes of `Hold`, and the nested
+   procedure value that is never stored (§24.4), all one rule.
+3. **Change.** After a change of a root, no borrow of it made before the change is used. A call is a change of every
+   root that the callee may write: a `var`/`out` argument, and a local of the caller that a nested routine writes (S17
+   v2 already infers that set). This is S5 (`Owner.Reset` while `Local := Owner.Get` is used later), S17 rule 3, S27 (the
+   place of `Ref` is used in its own expression: a borrow whose life is one expression needs no flow at all), S28 rule
+   3, the reads of a `Hold` variable after its scope. How long a borrow lives is the one tunable part: S28 v1 takes the
+   rest of the routine (the whole body of a loop that makes a view), S5, S17 and `Hold` take the rest of the routine by
+   lines until the variable is assigned again; "until the last use of the borrow" (the non-lexical lifetimes of Rust)
+   is the open question 1.
+4. **Signature.** A routine is checked against the signatures of its callees, never their bodies (§20, modular). A
+   result that is a borrow is rooted by these rules, the first that applies: a method roots it in `Self`; a routine
+   with one parameter that can be a root roots it there; a routine without a region parameter roots a region value in
+   the caller's current region (S17); otherwise the body decides, a fixpoint over the module infers it, and on an
+   exported routine `bp fix` writes `// root: <parameter>` (S17 v2). The first two are the elision rules of Rust and
+   the defaults of the lifetime dependence of Swift (a method depends on `self`, a function of one parameter on that
+   parameter). A borrow passed as a `const` parameter needs no mark: the callee cannot keep it, by rule 2.
+5. **Container.** A value that holds a borrow is a borrow with the roots of all it holds: a record with a `TStrView`
+   field, an array of views, a `TMap<TStrView, V>`, a `TGrowArray` of region objects. A map that holds views of two
+   texts is alive while both are alive and unchanged. Swift says the same: an escapable type cannot hold a
+   non-escapable value.
+
+#### The rules of today, before and after
+
+The codes stay as the names of the findings (they are in tests, in `// UNSAFE:` reasons and in the logs of users); what
+merges is the engine and the explanation. `bp explain` prints the sentence, the root, the rule of the five and then the
+code.
+
+| Code | Today | After: the rule of the model | Merges |
+|---|---|---|---|
+| S5, fields | a field or a global of a class type needs `// borrow:` | *reach*: an owned place takes only owners and values; `// borrow: <who>` is a root written by hand (an intent, below) | stays the field rule |
+| S5, escapes | `Cache := Box.Get`, `Self.F := AParam`; `Owner.Reset` while `Local` is used | *reach* and *change* for the roots `TOwned`, `TShared` and the frame | moves onto the root engine of S17 (as §20 planned) |
+| S10 | `TOwned` copied only by `Move` | not a rule of the model but its premise: an owner is unique, so its changes come through one name | stays |
+| S11 | a field of a task with a class, interface or pointer type | *reach*: a place of another goroutine takes no borrow | with S18, one rule of goroutine places; S11m, S11s and S19 stay (who may write, not how long it lives) |
+| S15 | no `TShared` cycle | not a lifetime rule (a leak, not a dangling borrow) | stays |
+| S17 | the roots of the region style, `Hold`, components | the engine of all five rules; its root kinds grow by the rows of the table of roots | the engine |
+| S18 | style boundaries, where a GC reference lives | *reach*: a place of another root takes only values; the order of fields and the destructor of a GC class stay style findings of S18 | the boundary half joins *reach* |
+| S27 | `M.Ref(K, D)` dereferenced at once | *change* with a borrow of one expression | a root kind of the engine, the strict form stays |
+| S28 (approved) | a view: its `String` a local or a `const` parameter, no escape, no write after the first view | *name*, *reach*, *change* and *container* for the root `String` | a root kind of the engine; v1 as approved |
+| new | a call of a nested routine that writes a local passed as its `const` argument (H20, below) | *change* by a call | a finding of S17 |
+
+#### The string view as an instance of the model
+
+The view of §25.3 is decided; this is how the model reads it, and what follows for the questions of #108.
+
+```pascal plan
+TStrView = record                                  // a pointer and a length: 16 bytes, not managed
+  function Sub(AStart, ALen: SizeInt): TStrView;   // a part of the view, 1-based (R2)
+  function Len: SizeInt;
+  function ToString: String;                       // a copy of the bytes: the way to keep a word
+  function Equals(const S: String): Boolean;
+  property Items[I: SizeInt]: Char; default;       // 1-based (R2)
+  class operator =(const A, B: TStrView): Boolean;
+end;
+function StrView(const S: String): TStrView;          // all of S: a borrow rooted in S
+function FieldViews(const S: String): TViewFields;    // for W in FieldViews(S): each W rooted in S
+// TMap<TStrView, V>: MapHash(TStrView); an entry is 32 bytes (40 with TStrSlice)
+```
+
+- **Its root** is the `String` named in `StrView(S)`, `FieldViews(S)` or `V.Sub` of a view (the root of `V`). Its
+  changes are the writes of the table of roots.
+- **A key of a `TMap`.** `TMap<TStrView, V>` is a borrow (rule *container*) rooted in every text whose views went into
+  it. It lives in locals of the routine of the text and goes down as a `const` parameter; it is not returned. To keep
+  the counts past the text, the keys are copied out (`P.Key.ToString` into a `TMap<String, V>`, or `TStrSlice`
+  values), which is what Go's `strings.Clone` does for a small substring of a large string.
+- **A field.** A field of a record local, yes (a record that holds a view is a view). A field of a class, a region
+  object or a global, no: those are places that outlive the routine (rule *reach*). A word that must stay in an object
+  is a `String` (`ToString`) or a `TStrSlice`.
+- **A goroutine.** Never: a task field and a message are places of another goroutine. A word goes as a `String` or a
+  `TStrSlice` (a value; S11m does not apply to strings, they are copied on write).
+- **`SAFE_DEBUG`.** A view holds its `String` there (the layout of `TStrSlice`), so a case that `bpvet` missed reads
+  the old bytes with the semantics of Go, not freed memory; R2 checks every index and `Sub` in every build. It is the
+  same kind of net as R12 for regions (below, the table of what runs at run time).
+- **The migration of `TStrSlice`.** Nothing is forced. `TStrSlice` and `Fields` stay as they are: the type for a word
+  that outlives its text or travels. A loop that reads the text of a local and keeps nothing changes two names
+  (`TStrSlice` → `TStrView`, `Fields` → `FieldViews`); when S28 rejects the result, the code goes back to the slice or
+  copies with `ToString`. The decision tree of §0 gets one line: a word used while its text lives is a view, a word
+  kept is a `String` or a slice. `bp explain S28` shows the two ways out.
+- **The speed.** The approved measurement: the word count at 1.8–1.9x of C with slices, about 1.28x with views and the
+  exact tail of the hash (16 bytes per view, 32 per entry, no `fpc_copy` in `for-in`). The model costs nothing at run
+  time; in `bpvet` the engine of S17 takes 2-5% of the typed run today, and one engine for all root kinds replaces the
+  separate passes of S5, S27 and `Hold` rather than adding to them.
+- **One case the model adds to S28.** A call of a nested routine that writes the text while a view of it lives is a
+  change of the root (rule *change*), also when the routine is passed as a nested procedure value. A check by the
+  order of lines does not see it, because the body of a nested routine stands before the body of its parent. Measured
+  without any view, the same shape is a use after free today (H20, below), so it belongs to the engine, not to views.
+
+#### Closures that cannot escape and interfaces as borrows
+
+- **A nested procedure value** (`{$modeswitch nestedprocvars}`, `type TVisit = procedure(X: Integer) is nested`) is a
+  borrow whose root is the frame of the routine that encloses the nested routine. *Reach*: it goes down as an
+  argument, never into a field, a global, a result or a task (S17, `s17_callback_bad.pas`; S11 gains the field of a
+  nested procedure type). *Change*: the frame has none of its own, but calling the value is a write of every local of
+  the parent that the nested routine writes, so passing `@Reload` while a view of a local it writes lives is a change
+  of that local. This is the non-escaping closure of Swift (its default) and the `FnMut` borrow of Rust, with no
+  annotation: the procedure type says `is nested`.
+- **A method value** (`procedure of object`, `@Obj.Method`) is a borrow rooted in its object. The events of the LCL
+  (`Button.OnClick := @Form.Click`) store one in a field of a component; when the component and the object have the same
+  owner (§21.4) the field ends no later than the root. Whether the model covers these now is the open question 7.
+- **A CORBA interface** (`{$interfaces corba}`, no counter) is a borrow rooted where the object it was taken from is
+  rooted: `W := C.Get` roots `W` in `C`. *Reach*: a local, a `const` parameter going down; a field of an interface type
+  is an owned place and needs a root by hand, as a class field does (S5); a task field never (S11). *Change*: those of
+  its root (`C.Reset`). A COM interface is not a borrow but an owner (counted, like `TShared`); `bpvet` tells the two by
+  the directive in force where the interface type is declared, as FPC does.
+
+#### Examples
+
+Good: no mark, no `// UNSAFE:`; the text, the map and the views end together.
+
+```pascal plan
+type
+  TCounts = specialize TMap<TStrView, Int64>;
+
+procedure PrintTop(const Counts: TCounts; N: Integer);   // a map of views goes down: the callee cannot keep it
+begin
+  ...
+end;
+
+procedure CountWords(const Path: String);
+var
+  Text: String;
+  Counts: TCounts;          // holds views: a borrow rooted in Text (container)
+  W: TStrView;
+begin
+  Text := ReadFileText(Path);   // the root: a local, written before its first view
+  for W in FieldViews(Text) do
+    Inc(Counts.Ref(W, 0)^);     // the place of Ref: a borrow of one expression (S27)
+  PrintTop(Counts, 10);
+end;
+
+function LongestWord(const Text: String): String;   // a String leaves; the view does not
+var
+  W, Best: TStrView;
+begin
+  Best := StrView(Text).Sub(1, 0);
+  for W in FieldViews(Text) do
+    if W.Len > Best.Len then
+      Best := W;                // a local of the routine of the root
+  Result := Best.ToString;      // a copy
+end;
+
+function FirstWord(const S: String): TStrView;   // root: S  (one parameter: inferred; bp fix writes it when exported)
+```
+
+```pascal plan
+{$modeswitch nestedprocvars}
+{$interfaces corba}
+type
+  TVisit = procedure(const W: TStrView) is nested;
+  IWriter = interface
+    procedure Put(const S: String);
+  end;
+
+procedure EachWord(const Text: String; const Visit: TVisit);
+var
+  W: TStrView;
+begin
+  for W in FieldViews(Text) do
+    Visit(W);                   // the view goes down as a const parameter
+end;
+
+procedure CountLong(const Text: String; const Dest: IWriter);  // a CORBA interface: a borrow, down
+var
+  N: Integer;
+
+  procedure Visit(const W: TStrView);
+  begin
+    if W.Len > 7 then
+      Inc(N);                   // a local of the parent: the frame is the root
+  end;
+
+begin
+  N := 0;
+  EachWord(Text, @Visit);       // a nested procedure value goes down
+  Dest.Put(IntToStr(N));
+end;
+```
+
+Bad: each line is the finding of the rule in its comment.
+
+```pascal sketch
+type
+  TIndex = class
+    FWords: TCounts;                    // S28 reach: a map of views in a field of a class
+    FOnWord: TVisit;                    // S17 reach: a nested procedure value in a field
+    FOut: IWriter;                      // S5 reach: a CORBA interface field without a root
+  end;
+
+function Words(const Path: String): TCounts;
+var
+  Text: String;
+  W: TStrView;
+begin
+  Text := ReadFileText(Path);
+  for W in FieldViews(Text) do
+    Inc(Result.Ref(W, 0)^);             // S28 reach: the result outlives Text
+end;
+
+procedure Edit(const Path: String; Box: TBox; G: TGroup);
+var
+  Text: String;
+  W: TStrView;
+  Item: TItem;
+
+  procedure Reload;
+  begin
+    Text := ReadFileText(Path);         // writes the root of W
+  end;
+
+begin
+  Text := ReadFileText(Path);
+  W := StrView(Text);
+  Reload;                               // S28 change: a call that writes Text while W lives
+  Text := Text + '!';                   // S28 change: a write of the root
+  W := StrView(ReadFileText(Path));     // S28 name: the root is a temporary
+  W := StrView(Box.Name);               // S28 name: a field may be written behind an alias
+  G.Go(TCountTask.Create(W));           // S28 reach: a task is another goroutine
+  Item := Box.Items.Get;                // a borrow rooted in the TOwned field Items
+  Box.Items.Reset;                      // S5 change: the root changes while Item is used below
+  WriteLn(Item.Name, W.Len);
+end;
+```
+
+The hole the model finds without any view (H20): a nested routine frees the argument of its own `const` parameter.
+
+```pascal sketch
+procedure Show;
+var
+  X: String;
+
+  procedure Print(const S: String);    // S is a borrow of X: FPC passes a local without a count
+  begin
+    X := '';                           // frees the bytes S names
+    WriteLn(S);                        // reads freed memory
+  end;
+
+begin
+  X := StringOfChar('c', 40);
+  Print(X);                            // S17 change (new): Print writes X, the root of its const argument
+end;
+```
+
+Measured on FPC 3.2.2 (`-Cr -Co`): inside `Print` the count of `S` is 1, and a new `String` of the same size takes the
+freed block, so `S` prints its bytes; the same with an open array parameter (`const A: array of Int64`) and a dynamic
+array of the parent set to `nil`. FPC counts a global, a field and a `var` parameter passed the same way (the count is
+2), so the hole is exactly the one the model names: a call that writes a root while a borrow of it lives.
+
+#### Marks of fact and marks of intent under the model
+
+The rule of §24.2 holds, and the model sorts the lifetime marks by it:
+
+| Mark | Kind | Why |
+|---|---|---|
+| `// root: <parameter>` on an exported routine (S17c, a function that returns a view) | **fact** | the body decides it; inside a module it is inferred and not written at all; `bp fix` writes it on the interface |
+| `// root: Self, A` (a routine that keeps borrows in objects it is given) | **fact** | the same fixpoint (S17 v2) |
+| the root of a result by the first two rules of *signature* | **fact, not written** | elided, as in Rust and Swift |
+| `// borrow: arena` (S17d) | **fact, not written** | an object of an arena pointing to an object of the same arena has the root of both, as a region object does |
+| `// borrow: <who>` on a field or a global | **intent** | the root of a field is a claim `bpvet` cannot prove (the object may be moved to another owner); it counts in the unsafe audit (§15) with `// UNSAFE:` |
+| `// sync: <how>`, `// UNSAFE:`, `// UNSAFE-UNIT:`, `// keeps:`, `// BP-STYLES:` | **intent** | as in §24.2 |
+| `{$modeswitch nestedprocvars}`, `{$modeswitch autoderef}` | **fact** | `bp fix` writes them when the module uses the feature |
+| `{$interfaces corba}` | **default of `bp new`** | it changes the meaning of the interfaces of the module, so it is not inferred |
+
+This changes one line of §24.1: `// borrow:` does not become `// root:`. A `// root:` is always a fact that `bpvet`
+checks against the code; a `// borrow:` is always a claim of the author. Two spellings for two kinds keep a fact from
+looking like a promise.
+
+#### What `bpvet` infers, what runs at run time
+
+`bpvet` infers, per routine of a module, with no annotation: the kind of each type (the table of kinds); the roots of
+each borrow (the bit set of S17, grown by the kinds of root); the changes of each root on each path (branches joined,
+loops walked twice, as S17 does); which locals of a parent each nested routine writes (S17 v2); the root of each
+result and of each store into `Self` or a parameter (a fixpoint, written as `// root:` only on exported routines).
+Nothing is read across units but the signatures and their marks.
+
+| Borrow | Before the build | At run time, every build | `SAFE_DEBUG`, the second net |
+|---|---|---|---|
+| a class local from `.Get`, a class parameter | S5 (reach, change) | the owner itself is never freed twice (§4) | `-gh`; a quarantine of freed objects is the open question 4 |
+| a region object, `TGrowArray`, `At`, a `Hold` variable | S17 | R2, R14, R15, R16 | R12: released pages lose all access |
+| a `TStrView` and a map of views | S28 | R2 | the view holds its `String` |
+| the place of `M.Ref` | S27 | — | — |
+| the walk `for P in M` | — | R19 | — |
+| a nested procedure value, a CORBA interface | S17, S5, S11 | — | as the class it borrows |
+| a GC reference | S18 | — | R13; swept pages lose access |
+| `TWeak`, `TArenaRef` | — | `TryLock`, R10 | — |
+
+#### Against the other languages
+
+| Language | What it does | What Better Pascal takes | What it does not take, and why |
+|---|---|---|---|
+| Rust | `&str` is a borrow; lifetimes are parameters of types; the elision rules fill them in signatures (one input lifetime goes to the output; `&self` goes to the output); non-lexical lifetimes (RFC 2094) end a borrow at its last use, and an access that conflicts with a live loan is an error | the loan and its conflicts as *change*; the elision rules as *signature*; the last use as the open question 1 | lifetime parameters in the syntax (a fact the machine writes, `// root:`); `&mut` exclusivity (not needed: owners are unique or copied on write) |
+| Swift | `Substring` holds its base string (= `TStrSlice`); `~Escapable` (SE-0446, Swift 6.2) marks a type that cannot leave its context: not into a global, an escaping closure or a `Task`, and an escapable type cannot hold one; `Span` (SE-0447) is two words, non-escapable, bounds checked always, a borrow of its container, which cannot be changed while it lives; lifetime dependence defaults to `self` or to the one parameter | a kind of type that cannot escape, with the rule of containers; the defaults of dependence; the always-on bounds check (R2) | `@lifetime` written by the user; the experimental parts that wait for its syntax |
+| Go | a substring shares the bytes, the collector keeps them; `strings.Clone` copies a small part of a large string so the rest can go; escape analysis moves a value to the heap when it leaves its frame | `TStrSlice` as the substring of Go; `ToString` as `strings.Clone` | moving a value to the heap when it escapes: `bpvet` rejects the escape instead (where Go decides the place from where a value goes, `bpvet` decides where it may go from the place it lives) |
+| Goose | every reference and slice has a root, the variable that bounds its target; a reference does not outlive its root; no annotations, the compiler specializes functions by roots; a dictionary keyed by slices of a buffer; no aliasing or exclusivity rules, since growth never moves memory and memory is freed only at the end of a scope | the root as the one concept; the error that names the root and the destination; keys of a map that are slices of a text | the specialization by roots (FPC compiles once; the signature names the root instead); a `String` of FPC can be reassigned, so a root has changes, which Goose does not need |
+| Zig | a slice is a pointer and a length, bounds checked in the safe build modes; its lifetime is not checked, a dangling slice is illegal behaviour | nothing for lifetimes: this is the "view with no check" row that S28 replaces | the unchecked view |
+| Vale | generational references: a check of a generation at each use; region borrowing: a `pure` function sees its arguments as an immutable region and drops every check in it | the generational reference as the borrow checked at each use (`TWeak`, `TArenaRef`, R10); the immutable region as the reason a `const` parameter needs no check of its own | a check at each dereference of every reference (the cost Better Pascal avoids by proving roots) |
+| Hylo | mutable value semantics; references are second class: made only at the boundary of a call, never stored in a variable or a field; `let`, `inout`, `sink`, `set` parameters; a subscript projects a part of a value with `yield` for the length of an access | the borrow parameter as second class (it goes down, it is not stored: rule *reach*); `const`, `var`, `TOwned.Move` and `out` as `let`, `inout`, `sink` and `set`; the place of `M.Ref` as a projection of one expression | the whole of mutable value semantics: classes of Pascal are references, and the dialect keeps them |
+
+#### Migration and steps (after the owner's answer)
+
+Nothing moves for the user: the codes, the marks and the API stay, and S28 v1 lands as approved. The steps, one PR each:
+
+1. **S28 v1** (`feat/strview`, approved), with the call of a nested routine that writes the root as a change (above).
+2. **H20 closed**: S17 reports a call of a nested routine, or of a nested procedure value, that writes a local passed
+   as its `const` argument. *Done:* the program of H20 is a lint test `s17_constarg_bad.pas`.
+3. **One engine:** the escapes of S5 and the checks of S27 and `Hold` move onto the root engine of S17; the findings
+   keep their codes; `bp explain` prints the sentence, the root and the rule. *Done:* `tests/lint.sh` unchanged, the
+   typed run no slower.
+4. **Nested procedure values and CORBA interfaces** as kinds of borrows (§24.8 steps 4 and 6).
+5. **Liveness** for every *change* (the open question 1), if the owner says yes.
+6. **§0 rewritten**: the REFERENCES block becomes the sentence, the three kinds and the five rules (§24.8 step 8).
+
+#### Open questions for the owner
+
+1. **Until the last use.** S28 v1 forbids a write of the text from the first view to the end of the routine; S5 and
+   `Hold` go by lines. Should every *change* rule move to one liveness ("until the last use of the borrow", the
+   non-lexical lifetimes of Rust) after S28 v1 has run on real code (the word count, `examples/httpd`, the editor of
+   `dn`)? Recommended: yes, as one step for all root kinds, not for views alone.
+2. **The codes.** Keep S5, S17, S27 and S28 as the names of the findings over one engine (recommended), or renumber
+   them as kinds of S17?
+3. **`// borrow:` stays intent.** Withdraw the plan of §24.1 to rename it `// root:`, and count it in the unsafe audit
+   with `// UNSAFE:` (recommended)?
+4. **The inside of a class.** `It := List.Find(K)` is a borrow rooted in `List` (rule *signature*: a method roots in
+   `Self`), but a method of `List` that frees the item (`List.Clear`) is not a change `bpvet` sees. Options: (a) in
+   `SAFE_DEBUG` a freed object is not reused and its VMT points to a class whose methods raise, a new R20 (the net
+   that R12 is for regions; recommended first); (b) infer the methods that may free (the `&mut self` of Rust) by a
+   fixpoint like the frozen classes of S11s, and treat their call as a change of `Self`.
+5. **`// root: S` of S28 by hand.** Under §24.2 it is a fact: inferred inside a module, written by `bp fix` on an
+   exported routine. Make it so in S28 v2?
+6. **H20 first.** H20 is a use after free in code that `bpvet` passes today, so by the rule of §25 (bugs first) step 2
+   goes ahead of the rest of the plan, before S28 v2 and the engine. Agreed?
+7. **Method values.** Treat `procedure of object` as a borrow rooted in its object, with the component tree (§21.4) as
+   the root that makes the events of the LCL need no mark? Now with step 4, or later?
+8. **The place of `M.Ref` stays one expression.** A `TMap` is copied by reference, so two names can be one root; a named
+   place would need a pointer type (S4). No change proposed; confirm.
+
 ## §25. The order of the work and the goal of speed (plan, 2026-11-05)
 
 The plans of §21.7, §22.8, §23.7 and §24.8 were written one concept at a time; this section puts them in one order. A step
