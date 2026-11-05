@@ -233,27 +233,52 @@ if [ "$cmd" = fix ]; then
 fi
 
 # the check and the build; for `run`, into the directory $1
+# what a build of fpc writes for the program: the binary (the path of its "Linking" line, else the one -o, -FE or the
+# source directory gives) and the object file of the program (-FU, else -FE, else the source directory)
+outbins() {
+  local o= fe= fu= a d
+  printf '%s\n' "$1" | sed -n 's/^Linking //p'
+  for a in ${opts[@]+"${opts[@]}"}; do case "$a" in -o*) o=${a:2} ;; -FE*) fe=${a:3} ;; -FU*) fu=${a:3} ;; esac; done
+  d=$(dirname "$srcfile")
+  if [ -n "$o" ]; then echo "$o"; [ -z "$fe" ] || echo "$fe/$o"; else echo "${fe:-$d}/$name"; fi
+  echo "${fu:-${fe:-$d}}/$name.o"
+}
 build() {
   local t0 extra=() quiet=() rc=0; t0=$(now)
   refresh_script; make_stubs
   # a passed check is kept by the hash of what it read (bpvet, the stubs, the options, every source of the targets), with
-  # its output; the same text again is not checked again
-  local vk vout vrc=0
+  # its output; the same text again is not checked again. Otherwise the check runs while fpc builds, and when it fails
+  # the binary that fpc wrote is removed: nothing unchecked is handed out
+  local vk vrc=0 vpid= vtmp= fout mark b
   vk=$( { echo "$bpvet $stubs ${lib[*]} ${vet[*]-}"
           find "${targets[@]}" -type f \( -name '*.pas' -o -name '*.pp' -o -name '*.inc' -o -name '*.lpr' \) -print0 \
             2>/dev/null | sort -z | xargs -0 cat 2>/dev/null; } | sha256sum | cut -c1-16)
-  if [ -f "$cache/vet/$vk" ]; then
+  mkdir -p "$cache/vet"
+  if [ ! -f "$cache/vet/$vk" ]; then
+    vtmp=$(mktemp "$cache/vet/run.XXXXXX"); mark=$(mktemp "$cache/vet/mark.XXXXXX")
+    shown "$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" ${vet[@]+"${vet[@]}"} "${targets[@]}" > "$vtmp" 2>&1 &
+    vpid=$!
+  fi
+  if [ "$cmd" = run ]; then rm -rf "$1.tmp"; mkdir -p "$1.tmp"; extra=(-FE"$1.tmp" -FU"$1.tmp"); quiet=(-l- -v0ew); fi
+  fout=$(shown "$fpc" ${quiet[@]+"${quiet[@]}"} ${checks[@]+"${checks[@]}"} "${always[@]}" "${lib[@]}" ${opts[@]+"${opts[@]}"} ${extra[@]+"${extra[@]}"} "$srcfile" 2>&1) || rc=$?
+  if [ -z "$vpid" ]; then
     cat "$cache/vet/$vk"
     echo "bp: checked (cached)"
   else
-    vout=$(shown "$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" ${vet[@]+"${vet[@]}"} "${targets[@]}" 2>&1) || vrc=$?
-    [ -z "$vout" ] || printf '%s\n' "$vout"
-    [ "$vrc" = 0 ] || { echo "bp: the check failed: nothing built"; return 1; }
-    mkdir -p "$cache/vet" && printf '%s' "${vout:+$vout$'\n'}" > "$cache/vet/$vk.tmp" && mv "$cache/vet/$vk.tmp" "$cache/vet/$vk"
-    echo "bp: checked in $(( ($(now) - t0) / 1000000 )) ms"
+    wait "$vpid" || vrc=$?
+    cat "$vtmp"
+    if [ "$vrc" != 0 ]; then
+      if [ "$cmd" = run ]; then rm -rf "$1.tmp"; else
+        while IFS= read -r b; do [ -n "$b" ] && [ "$b" -nt "$mark" ] && rm -f -- "$b"; done < <(outbins "$fout")
+      fi
+      rm -f "$vtmp" "$mark"
+      echo "bp: the check failed: nothing built"
+      return 1
+    fi
+    rm -f "$mark"; mv "$vtmp" "$cache/vet/$vk"
+    echo "bp: checked in $(( ($(now) - t0) / 1000000 )) ms (with the build)"
   fi
-  if [ "$cmd" = run ]; then rm -rf "$1.tmp"; mkdir -p "$1.tmp"; extra=(-FE"$1.tmp" -FU"$1.tmp"); quiet=(-l- -v0ew); fi
-  shown "$fpc" ${quiet[@]+"${quiet[@]}"} ${checks[@]+"${checks[@]}"} "${always[@]}" "${lib[@]}" ${opts[@]+"${opts[@]}"} ${extra[@]+"${extra[@]}"} "$srcfile" || rc=$?
+  [ -z "$fout" ] || printf '%s\n' "$fout"
   [ "$rc" = 0 ] || return 1
   if [ "$cmd" = run ]; then rm -rf "$1"; mv "$1.tmp" "$1"; fi
 }
