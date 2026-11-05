@@ -34,7 +34,7 @@ begin
   Check(Pos('ве', S) = 7, 'Pos in bytes: 7');
   Check(Copy(S, Pos('ве', S), MaxInt) = 'вет', 'Copy from the Pos position');
 
-  U := S;
+  U := UnicodeString(S);
   Check(Length(U) = 6, 'string -> UnicodeString without loss');
   Check(string(U) = S, 'UnicodeString -> string without loss');
 

@@ -133,9 +133,7 @@ program watch;
 {$mode objfpc}{$H+}
 
 uses
-  // UNSAFE: the program sleeps (SysUtils) and frees nothing
-  BP,
-  SysUtils;
+  SysUtils, BP;
 
 begin
   WriteLn('up');
