@@ -57,7 +57,10 @@ begin
   B := System.PByte(P);
   V := Byte(PtrUInt(P) shr 4) or 1;
   for I := 0 to Size - 1 do
-    B[I] := V;
+  begin
+    B^ := V;
+    Inc(B);
+  end;
 end;
 
 function Intact(P: System.Pointer; Size: PtrUInt): Boolean;
@@ -102,6 +105,7 @@ end;
 
 procedure TMaker.Run;
 var
+  W: System.PPtrUInt;
   I: Integer;
   Seed: Cardinal;
   S: PtrUInt;
@@ -113,7 +117,8 @@ begin
     S := SizeFor(Seed) + SizeOf(PtrUInt);
     P := System.GetMem(S);
     Fill(P, S);
-    System.PPtrUInt(P)^ := S;
+    W := System.PPtrUInt(P);
+    W^ := S;
     FOut.Send(PtrUInt(P));
   end;
 end;
@@ -126,13 +131,15 @@ end;
 
 procedure TFreer.Run;
 var
+  W: System.PPtrUInt;
   A: PtrUInt;
   S: PtrUInt;
 begin
   while FIn.Recv(A) do
   begin
     S := System.PPtrUInt(A)^;
-    System.PPtrUInt(A)^ := 0;
+    W := System.PPtrUInt(A);
+    W^ := 0;
     Fill(System.Pointer(A), SizeOf(PtrUInt));          // restore the first word to the pattern
     if not Intact(System.Pointer(A), S) then
       InterlockedIncrement(AcrossBad);
@@ -176,14 +183,19 @@ end;
 
 procedure Realloc;
 var
+  B: System.PByte;
   P: System.Pointer;
   S, I: PtrUInt;
   Ok: Boolean;
 begin
   Ok := True;
   P := System.GetMem(8);
+  B := System.PByte(P);
   for I := 0 to 7 do
-    System.PByte(P)[I] := I + 1;
+  begin
+    B^ := I + 1;
+    Inc(B);
+  end;
   S := 8;
   while S < 3000000 do
   begin

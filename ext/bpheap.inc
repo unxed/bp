@@ -83,6 +83,11 @@ type
     Used: array[0..(HeapResSegs + 63) div 64 - 1] of QWord; // bit I: segment I is taken
   end;
 
+type
+  THeapGetMemFunc = function(Size: PtrUInt): Pointer;
+  THeapSizeFunc = function(P: Pointer): PtrUInt;
+  THeapStatusFunc = function: TFPCHeapStatus;
+
 var
   HeapOn: Boolean = False;
   HeapOld: TMemoryManager;
@@ -441,6 +446,15 @@ begin
   Pg^.Prev := nil;
 end;
 
+{ The first word of a free block is the next block of its list. }
+procedure HeapSetNext(P, Next: Pointer); inline;
+var
+  Q: PPointer;
+begin
+  Q := PPointer(P);
+  Q^ := Next;
+end;
+
 { The blocks other threads freed into Pg join its free list; the number of them. }
 function HeapCollect(Pg: PHeapPage): SizeInt;
 var
@@ -459,7 +473,7 @@ begin
     Last := PPointer(Last)^;
     Inc(Result);
   end;
-  PPointer(Last)^ := Pg^.Free;
+  HeapSetNext(Last, Pg^.Free);
   Pg^.Free := L;
   Dec(Pg^.Used, Result);
 end;
@@ -572,6 +586,40 @@ begin
   Result := HeapPop(Pg);
 end;
 
+{ The routines of the manager that was installed before (blocks outside the reservations), through variables of
+  named types (the field is copied, so the check of bpvet reads it as well as fpc). }
+function HeapOldGetMem(Size: PtrUInt): Pointer;
+var
+  F: THeapGetMemFunc;
+begin
+  System.Move(HeapOld.GetMem, F, SizeOf(F));
+  Result := F(Size);
+end;
+
+function HeapOldFreeMem(P: Pointer): PtrUInt;
+var
+  F: THeapSizeFunc;
+begin
+  System.Move(HeapOld.FreeMem, F, SizeOf(F));
+  Result := F(P);
+end;
+
+function HeapOldMemSize(P: Pointer): PtrUInt;
+var
+  F: THeapSizeFunc;
+begin
+  System.Move(HeapOld.MemSize, F, SizeOf(F));
+  Result := F(P);
+end;
+
+function HeapOldStatus: TFPCHeapStatus;
+var
+  F: THeapStatusFunc;
+begin
+  System.Move(HeapOld.GetFPCHeapStatus, F, SizeOf(F));
+  Result := F();
+end;
+
 { ---------- large and huge blocks ---------- }
 
 function HeapGetLarge(C: PHeapCache; Size: PtrUInt): Pointer;
@@ -582,7 +630,7 @@ var
 begin
   if Size > PtrUInt(HeapResSegs - 1) * HeapSegSize then
     // more than a reservation holds (64 MiB on i386): the heap of the RTL maps it on its own
-    Exit(HeapOld.GetMem(Size));
+    Exit(HeapOldGetMem(Size));
   N := (Size + HeapPageSize - 1) shr HeapPageLog2;
   if N < HeapPagesPerSeg then
   begin
@@ -669,7 +717,7 @@ begin
   if P = nil then
     Exit(0);
   if not HeapOurs(PtrUInt(P)) then
-    Exit(HeapOld.FreeMem(P));
+    Exit(HeapOldFreeMem(P));
   Pg := HeapPageOf(PtrUInt(P));
   C := HeapCache;
   Result := Pg^.BlockSize;
@@ -682,7 +730,7 @@ begin
   O := Pg^.Owner;
   if O = C then
   begin
-    PPointer(P)^ := Pg^.Free;
+    HeapSetNext(P, Pg^.Free);
     Pg^.Free := P;
     Dec(Pg^.Used);
     case Pg^.State of
@@ -705,7 +753,7 @@ begin
   Cls := Pg^.Cls;
   repeat
     Old := Pg^.RemoteFree;
-    PPointer(P)^ := Old;
+    HeapSetNext(P, Old);
   until InterlockedCompareExchange(Pg^.RemoteFree, P, Old) = Old;
   // the push is a full barrier; the owner publishes PsFull before it reads RemoteFree (HeapSlowGet)
   if Pg^.State = PsFull then
@@ -720,7 +768,7 @@ end;
 function HeapMemSize(P: Pointer): PtrUInt;
 begin
   if not HeapOurs(PtrUInt(P)) then
-    Exit(HeapOld.MemSize(P));
+    Exit(HeapOldMemSize(P));
   Result := HeapPageOf(PtrUInt(P))^.BlockSize;
 end;
 
@@ -779,7 +827,7 @@ end;
 
 function HeapFPCStatus: TFPCHeapStatus;
 begin
-  Result := HeapOld.GetFPCHeapStatus();
+  Result := HeapOldStatus;
   Inc(Result.CurrHeapUsed, HeapUsedNow);
   Inc(Result.CurrHeapSize, PtrUInt(HeapUsedSegs) * HeapSegSize);
   if Result.CurrHeapSize > Result.CurrHeapUsed then
