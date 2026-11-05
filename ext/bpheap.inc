@@ -809,16 +809,16 @@ procedure HeapInstall;
 var
   M: TMemoryManager;
   V: PChar;
-  On: Boolean;
+  Enabled: Boolean;
 begin
-  On := {$ifdef BP_HEAP}True{$else}False{$endif};
+  Enabled := {$ifdef BP_HEAP}True{$else}False{$endif};
   V := EnvValue('BP_HEAP');
   if V <> nil then
-    On := (V[0] = 'b') and (V[1] = 'p');
+    Enabled := (V[0] = 'b') and (V[1] = 'p');
   {$ifdef BP_RTLHEAP}
-  On := False;
+  Enabled := False;
   {$endif}
-  if not On or IsMemoryManagerSet then
+  if not Enabled or IsMemoryManagerSet then
     Exit;
   HeapInitClasses;
   GetMemoryManager(HeapOld);
