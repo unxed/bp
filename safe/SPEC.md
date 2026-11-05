@@ -1095,6 +1095,7 @@ or above the parameter suppresses its S14 finding.
 | v0.39 | §25.2 unit `BPVec` (#197): `Axpy`, `Scale`, `Add`, `Mul`, `Dot`, `Sum` over arrays in SSE2 on x86_64, the same loops in Pascal elsewhere; `Axpy` of `Double` 1.74 → 0.73 s on 2G elements (gcc -O3 0.77 s) |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.41 (design) | §24.9 one model of lifetimes, for the owner's review: values, owners (roots) and borrows; one sentence (a borrow is used only while its root is alive and unchanged) and five rules (name, reach, change, signature, container) of which S5, S11, S17, S18, S27 and the approved S28 are instances; the string view as an instance; nested procedure values and CORBA interfaces as borrows; the lifetime marks sorted into fact and intent (`// borrow:` stays intent); the research table (Rust, Swift, Go, Goose, Zig, Vale, Hylo); H20 found and measured (a nested routine frees the argument of its own `const` parameter) |
+| v0.41.1 | §24.9 decided by the owner: the liveness until the last use for every *change* rule now, the codes kept, `// borrow:` stays intent, the quarantine R20 and the inferred freeing methods both, `// root:` a fact, H20 first (#207), `procedure of object` with the LCL, `M.Ref` one expression |
 | v0.43 | §24.5 `// raises:` (step 7 of §24.8): the typed `bpvet` infers the exception classes a routine may raise and checks the mark, S30 (`bpvetraise.pas`); `--fix` writes it; the policy for callees it cannot see (§24.5); the typed run of 228 files stays 1.1–1.2 s (the nodes that raise are collected once, the sets of the callees outside the module are kept) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
@@ -2723,10 +2724,10 @@ One step is one PR from a fresh `main`, with a criterion of done.
    `bp explain` are open.
 8. **§0 rewritten** around §24.1 and §24.2, after the steps of §21.7 that change the decision tree; not before.
 
-### 24.9 One model of lifetimes: a root, where it reaches, what changes it (design, for the owner's review)
+### 24.9 One model of lifetimes: a root, where it reaches, what changes it (design, decided 2026-11-05)
 
-Status: **design, for the owner's review**; nothing here is implemented, and no rule changes until the owner answers the
-questions at the end. One part is decided and is an input, not a proposal: the string view `TStrView` with the rule S28
+Status: **design, decided by the owner on 2026-11-05** (the answers are under "Decisions of the owner" at the end);
+the implementation follows the order there. One part is decided and is an input, not a proposal: the string view `TStrView` with the rule S28
 (the conservative rule 3, `TStrSlice` stays the type that keeps its text; approved by the owner on 2026-11-05, built on
 the branch `feat/strview`, §25.3 from v0.40). Here it is one instance of the general rule. The section answers four
 asks of unxed/bp#108: the borrowed string slice, the one sentence of §24.1 made into a model, the marks of fact
@@ -3131,7 +3132,24 @@ Nothing moves for the user: the codes, the marks and the API stay, and S28 v1 la
 5. **Liveness** for every *change* (the open question 1), if the owner says yes.
 6. **§0 rewritten**: the REFERENCES block becomes the sentence, the three kinds and the five rules (§24.8 step 8).
 
-#### Open questions for the owner
+#### Decisions of the owner (2026-11-05)
+
+| # | question | decision |
+|---|---|---|
+| 1 | until the last use | **yes, now**: every *change* rule moves to one liveness, until the last use of the borrow (the non-lexical lifetimes of Rust), for all root kinds, S28 included from its first version (it is built so on `feat/strview`) |
+| 2 | the codes | **kept**: S5, S17, S27 and S28 stay the names of the findings over one engine |
+| 3 | `// borrow:` | **intent**: the rename to `// root:` of §24.1 is withdrawn; it is counted in the unsafe audit with `// UNSAFE:`; `// borrow: arena` goes (the root of a region object) |
+| 4 | the inside of a class | **both at once**: (a) the `SAFE_DEBUG` quarantine (R20: a freed object is not reused and its VMT points to a class whose methods raise) and (b) the inferred methods that may free, whose call is a change of `Self` |
+| 5 | `// root: S` | **a fact**: inferred inside a module, elided with one candidate (`Self`, one `String` parameter), written by `bp fix` on an exported routine |
+| 6 | H20 | **first**: the S17 finding of a call that changes a root while a borrow of it lives (unxed/bp#207) goes ahead of the rest |
+| 7 | `procedure of object` | **later, with the LCL**: in the model, built with the Lazarus package (the tails of the order) |
+| 8 | the place of `M.Ref` | **one expression**, S27 as it is |
+
+The order of the implementation: H20 (#207); S28 with the liveness of decision 1 (`feat/strview`); the engine (S5,
+S17, S27, S28 on one root engine, decisions 1, 2, 5); the inside of a class (decision 4); S17 and S18 of the plan; the
+GC style.
+
+#### The questions as they were asked
 
 1. **Until the last use.** S28 v1 forbids a write of the text from the first view to the end of the routine; S5 and
    `Hold` go by lines. Should every *change* rule move to one liveness ("until the last use of the borrow", the
