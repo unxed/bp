@@ -183,8 +183,8 @@ FFI                                    (§13; like cgo)
 Take the best of Go (memory safety, code that is simple to write and for a model to generate, build speed,
 performance, goroutines, light dependencies) and replace the unpredictability of a collector with the determinism of
 owners and regions, in a way that needs no lifetime annotations written by hand: everything is to be inferred.
-Whether the reliability of Rust can be reached this way is an open question, and the project is a study of its
-feasibility. The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
+Whether the reliability of Rust can be reached this way is an open question, and the study of its feasibility is one
+of the goals of the project. The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
 
 FPC already has almost everything: reference-counted strings with an encoding, dynamic arrays, records
 with automatic finalization, interfaces with an atomic counter, range checks,
