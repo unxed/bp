@@ -48,9 +48,6 @@ type
     procedure Run; override;
   end;
 
-const
-  EndOfHead: String = #13#10#13#10;    // typed: the resolver of bpvet takes an untyped one for a Char too
-
 var
   Listener: TSocket;                   // for the signal handler; written before the first task starts
   Requests, BytesSent: Int64;          // requests and bytes of response bodies: the workers touch them only through Interlocked* (S19)
@@ -197,10 +194,10 @@ var
   Conn: String;
 begin
   Result := False;
-  while Pos(EndOfHead, Buf) = 0 do
+  while Pos(#13#10#13#10, Buf) = 0 do
     if (Length(Buf) > 65536) or not Fill(Sock, Buf) then
       Exit;
-  P := Pos(EndOfHead, Buf);
+  P := Pos(#13#10#13#10, Buf);
   Len := 0;
   Result := TryParse(Copy(Buf, 1, P - 1), Req) and (Req.Header('transfer-encoding') = '');
   if Result and (Req.Header('content-length') <> '') then
@@ -253,14 +250,11 @@ begin
   until False;
 end;
 
-{ SIGTERM, SIGINT: shutting the listening socket down wakes the acceptor (accept fails), which tells the main thread.
-  cdecl is set by the directive: the RTL stubs of bpvet give signalhandler_t no calling convention. }
-{$calling cdecl}
-procedure OnSignal(Sig: LongInt);
+{ SIGTERM, SIGINT: shutting the listening socket down wakes the acceptor (accept fails), which tells the main thread. }
+procedure OnSignal(Sig: LongInt); cdecl;
 begin
   fpShutdown(Listener, SHUT_RDWR);
 end;
-{$calling default}
 
 procedure Main(const Port, Workers: Integer);
 var

@@ -280,15 +280,10 @@ begin
       Exit(I);
 end;
 
-{ Runs a program and returns whether it exited with 0; Output gets its standard output and error. The arguments are
-  AnsiString as RunCommand declares them (String is AnsiString under $H+, but the typed check matches an open array
-  and an out parameter exactly). }
-function Run(const Exe: String; const Args: array of AnsiString; out Output: String): Boolean;
-var
-  S: AnsiString;
+{ Runs a program and returns whether it exited with 0; Output gets its standard output and error. }
+function Run(const Exe: String; const Args: array of String; out Output: String): Boolean;
 begin
-  Result := RunCommand(Exe, Args, S, [poStderrToOutPut]);
-  Output := S;
+  Result := RunCommand(Exe, Args, Output, [poStderrToOutPut]);
 end;
 
 { Runs a program that must succeed. }
