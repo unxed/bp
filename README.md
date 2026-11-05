@@ -22,7 +22,9 @@
 | Standard library | larger: the FCL of FPC ships HTTP, JSON, XML, regular expressions, SQL, zip; Rust leaves them to crates | on par: the Go standard library is as broad | larger | larger: the Zig std is small and C libraries fill the gap | unknown |
 | For a model | better: `safe/SPEC.md` §0 fits one screen, the marks are written by `bp fix` (§24.2), every finding names its fix; no lifetimes to write | on par: Go is as simple to write and has a far larger recent corpus | better: Goose has almost no corpus | better: Zig changes between releases | unknown |
 
-The Lazarus LCL is not yet tested with `bp build`. The plan of concept v3 (one scope object, Send and Sync inferred,
+The Lazarus LCL is not yet tested with `bp build`; the `TComponent` tree is an owner in the typed `bpvet`
+(`TFoo.Create(AOwner)` and the published component fields of a form need no marks, `safe/SPEC.md` §21.4), checked on a
+form-like unit with a stub of the hierarchy. The plan of concept v3 (one scope object, Send and Sync inferred,
 goroutines M:N, the `TComponent` tree as an owner) and what is reused from which language: `safe/SPEC.md` §21.
 What the tools still lack against `go`, `cargo` and `zig` (`bp run` and scripts, `--watch`, cross targets, tests with a leak
 check, `// derive:`, a profiler, an editor server, a page in the browser): `safe/SPEC.md` §22.

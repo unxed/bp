@@ -13,6 +13,21 @@
          is that of the lines of the source: a read on an earlier line that runs later (in the next round of an outer
          loop) is not seen. A Hold through a TScopeRef local that is not the variable of an enclosing loop for S in
          Scope is a finding too.
+  The same pass checks the owners of the tree of TComponent (safe/SPEC.md §21.4). A component class is a class that
+  descends from Classes.TComponent, or from a class named TComponent declared in the checked module (a stub, so that a
+  test needs no LCL). An owned call is TFoo.Create(AOwner, ...) of a component class whose constructor takes a
+  component class first and whose first argument is a class instance (not nil):
+    S6   an owned call gives the new object to its owner, so the untyped S6 finding of its line is dropped when every
+         constructor call of the line is an owned call or goes at once into Own, Share, Adopt, Go, Hold or raise;
+         TFoo.Create(nil) stays a finding;
+    S5   a published field of a component class whose type is a component class (Button1: TButton, written by the
+         form designer; the default section of a class compiled with M+ is published) is filled by the streaming system
+         with the form as the owner, so the untyped S5 finding of its line is dropped; other fields keep S5;
+    S17  the result of an owned call is a borrow rooted in the owner: an owned call or a variable that holds one (a
+         local or a field assigned from an owned call in the routine, from that line until it is assigned something
+         else, and a published component field of a component class) is not destroyed by .Free or FreeAndNil (.Destroy
+         is S3) and not given to Own, Share or Adopt, and an owned call is not the object of a Hold: the object would
+         have two owners. Storing it in a field is allowed.
   A finding with // UNSAFE: <why> on its line (or in a comment block right above) is not reported; a // UNSAFE-UNIT:
   module is not checked. }
 unit BpvetHold;
@@ -44,6 +59,9 @@ type
     FNodes: TListBox;         // what Collect gathers
     FBody: TListBox;          // the elements of the body of the routine being checked
     FProc: TPasProcedure;     // borrow: the routine being checked
+    FModule: TPasModule;      // borrow: the checked module, alive during the check
+    FDrop: TLinesBox;         // 'S5 file row' and 'S6 file row': untyped findings that the component tree answers
+    FFields: TListBox;        // the published component fields of the component classes of the module
     procedure Collect(El: TPasElement; Arg: Pointer);
     function Ref(const E: TPasElement): TPasElement;
     function TypeOf(const E: TPasElement): TPasType;
@@ -65,10 +83,23 @@ type
     function Assigns(const E: TPasElement; const V: TPasElement): Boolean;
     procedure ReadsAfter(const V: TPasElement; const Kill: Integer; const Why: String);
     procedure After(const Call: TParamsExpr; const Recv: TPasExpr; const V: TPasElement);
+    function IsComponent(const C: TPasType): Boolean;
+    function OwnedCall(const E: TPasExpr): Boolean;
+    function Callee(const P: TParamsExpr): TPasElement;
+    function IsOwnerCall(const P: TParamsExpr): Boolean;
+    function OwnedByShape(const E: TPasElement): Boolean;
+    function Named(const E: TPasExpr): TPasElement;
+    function OwnedVar(const D: TPasElement; const Row: Integer): Boolean;
+    function Key(const Rule: String; const El: TPasElement): String;
+    procedure Destroyed(const At: TPasElement; const D: TPasElement; const How: String);
+    procedure Twice(const At: TPasExpr; const Owner: String);
   public
-    constructor Create(const ASrc: TVetSource; const AResolver: TPasResolver);
+    constructor Create(const ASrc: TVetSource; const AResolver: TPasResolver; const AModule: TPasModule);
     procedure CheckProc(const P: TPasProcedure);
     procedure CheckDecls(const Decls: TPasDeclarations);
+    procedure CollectFields(const L: TFPList);
+    procedure CheckComponents(const Body: TPasElement);
+    procedure CheckComponentDecls(const Decls: TPasDeclarations);
     procedure Flush(var Report: TVetReport);
   end;
 
@@ -86,12 +117,18 @@ begin
     Result := El.Name;
 end;
 
-constructor THold.Create(const ASrc: TVetSource; const AResolver: TPasResolver);
+constructor THold.Create(const ASrc: TVetSource; const AResolver: TPasResolver; const AModule: TPasModule);
 begin
   inherited Create;
   FSrc := ASrc;
   // borrow: the resolver outlives the check (VetResolve)
   FResolver := AResolver;
+  // borrow: the module outlives the check (VetResolve)
+  FModule := AModule;
+  FDrop := TLinesBox.Own(TStringList.Create);
+  FDrop.Get.Sorted := True;
+  FDrop.Get.Duplicates := dupIgnore;
+  FFields := TListBox.Own(TFPList.Create);
   FLines := TLinesBox.Own(TStringList.Create);
   FLines.Get.OwnsObjects := True;
   FSeen := TLinesBox.Own(TStringList.Create);
@@ -565,6 +602,275 @@ begin
   end;
 end;
 
+{ ---------- the tree of TComponent (safe/SPEC.md §21.4) ---------- }
+
+{ C is a component class: it or an ancestor is Classes.TComponent or a class TComponent of the checked module. }
+function THold.IsComponent(const C: TPasType): Boolean;
+var
+  X: TPasType;
+  M: TPasModule;
+  Depth: Integer;
+begin
+  X := C;
+  Depth := 0;
+  while (X is TPasClassType) and (TPasClassType(X).ObjKind = okClass) and (Depth < 64) do
+  begin
+    if SameText(X.Name, 'TComponent') then
+    begin
+      M := X.GetModule;
+      if (M = FModule) or ((M <> nil) and SameText(M.Name, 'Classes')) then
+        Exit(True);
+    end;
+    if TPasClassType(X).AncestorType = nil then
+      Break;
+    X := TypeOf(TPasClassType(X).AncestorType);
+    Inc(Depth);
+  end;
+  Result := False;
+end;
+
+{ E is an owned call: TFoo.Create(AOwner, ...) of a component class whose constructor takes a component first, and
+  AOwner is a class instance (not nil, not a class). }
+function THold.OwnedCall(const E: TPasExpr): Boolean;
+var
+  V: TPasExpr;
+  At: TPasExpr;
+  C: TPasElement;
+  P: TPasProcedureType;
+begin
+  Result := False;
+  if not ((E is TParamsExpr) and (TParamsExpr(E).Kind = pekFuncParams) and (Length(TParamsExpr(E).Params) > 0)) then
+    Exit;
+  if not IsComponent(ConstructorClass(E, At)) then
+    Exit;
+  V := TParamsExpr(E).Value;
+  C := Ref(TBinaryExpr(V).right);
+  P := TPasProcedure(C).ProcType;
+  if (P = nil) or (P.Args.Count = 0) or not IsComponent(TypeOf(TPasArgument(P.Args[0]).ArgType)) then
+    Exit;
+  V := TParamsExpr(E).Params[0];
+  if (V is TNilExpr) or (Ref(V) is TPasType) then
+    Exit;
+  Result := IsComponent(TypeOf(V));
+end;
+
+{ The routine that the call P calls, or nil. }
+function THold.Callee(const P: TParamsExpr): TPasElement;
+begin
+  if (P.Value is TBinaryExpr) and (TBinaryExpr(P.Value).OpCode = eopSubIdent) then
+    Result := Ref(TBinaryExpr(P.Value).right)
+  else
+    Result := Ref(P.Value);
+end;
+
+{ P calls Own of a TOwned, Share of a TShared or Adopt of a TArena or a TArenaRef. }
+function THold.IsOwnerCall(const P: TParamsExpr): Boolean;
+var
+  D: TPasElement;
+  N: String;
+begin
+  Result := False;
+  if P.Kind <> pekFuncParams then
+    Exit;
+  D := Callee(P);
+  if not (D is TPasProcedure) or (D.Parent = nil) then
+    Exit;
+  N := LowerCase(D.Name);
+  Result := ((N = 'own') and SameText(Copy(D.Parent.Name, 1, 6), 'TOwned'))
+    or ((N = 'share') and SameText(Copy(D.Parent.Name, 1, 7), 'TShared'))
+    or ((N = 'adopt') and SameText(Copy(D.Parent.Name, 1, 6), 'TArena'));
+end;
+
+{ The constructor call E goes at once into an owner: an argument of Own, Share, Adopt, Go or Hold, or raised. }
+function THold.OwnedByShape(const E: TPasElement): Boolean;
+var
+  P: TPasElement;
+  D: TPasElement;
+  Recv: TPasExpr;
+begin
+  P := E.Parent;
+  if P is TPasImplRaise then
+    Exit(True);
+  if not ((P is TParamsExpr) and (TParamsExpr(P).Kind = pekFuncParams) and (TParamsExpr(P).Value <> E)) then
+    Exit(False);
+  D := Callee(TParamsExpr(P));
+  Result := IsOwnerCall(TParamsExpr(P)) or IsHold(TParamsExpr(P), Recv)
+    or ((D is TPasProcedure) and SameText(D.Name, 'Go'));
+end;
+
+{ The variable that E names (X, Self.X, Obj.X, without casts), or nil. }
+function THold.Named(const E: TPasExpr): TPasElement;
+var
+  X: TPasExpr;
+begin
+  X := Strip(E);
+  if (X is TBinaryExpr) and (TBinaryExpr(X).OpCode = eopSubIdent) then
+    X := TBinaryExpr(X).right;
+  Result := nil;
+  if X is TPrimitiveExpr then
+    Result := Ref(X);
+  if not (Result is TPasVariable) or (Result is TPasConst) or (Result is TPasProperty) then
+    Result := nil;
+end;
+
+{ D holds a component owned by its owner on the line Row: a published component field, or the last assignment of D in
+  the body on Row or before stores an owned call. }
+function THold.OwnedVar(const D: TPasElement; const Row: Integer): Boolean;
+var
+  I, Last: Integer;
+  N: TPasElement;
+begin
+  Result := False;
+  if D = nil then
+    Exit;
+  if FFields.Get.IndexOf(D) >= 0 then
+    Exit(True);
+  Last := 0;
+  for I := 0 to FBody.Get.Count - 1 do
+  begin
+    N := TPasElement(FBody.Get[I]);
+    if (N is TPasImplAssign) and (TPasImplAssign(N).Kind = akDefault) and (N.SourceLinenumber <= Row)
+      and (N.SourceLinenumber >= Last) and (Named(TPasImplAssign(N).left) = D) then
+    begin
+      Last := N.SourceLinenumber;
+      Result := OwnedCall(Strip(TPasImplAssign(N).right));
+    end;
+  end;
+end;
+
+function THold.Key(const Rule: String; const El: TPasElement): String;
+begin
+  Result := Format('%s %s %d', [Rule, ExpandFileName(El.SourceFilename), El.SourceLinenumber]);
+end;
+
+procedure THold.Destroyed(const At: TPasElement; const D: TPasElement; const How: String);
+begin
+  Add(At, 'S17', Format('%s: %s refers to a component that its Owner destroys (TFoo.Create(AOwner), or a published '
+    + 'component field); the owner and the fields of the form still refer to it: leave it to the owner, or create it '
+    + 'with Create(nil) and own it with TOwned (safe/SPEC.md section 21.4)', [How, D.Name]));
+end;
+
+procedure THold.Twice(const At: TPasExpr; const Owner: String);
+begin
+  Add(At, 'S17', Format('%s: the component already has an owner (its Owner, the argument of TFoo.Create(AOwner)), '
+    + 'and both would destroy it: create it with Create(nil) for %s, or leave it to the owner (safe/SPEC.md section '
+    + '21.4)', [Owner, Owner]));
+end;
+
+{ The published component fields of the component classes in L (and in the classes nested in them): no S5 there. }
+procedure THold.CollectFields(const L: TFPList);
+var
+  I, J: Integer;
+  E, M: TPasElement;
+begin
+  if L = nil then
+    Exit;
+  for I := 0 to L.Count - 1 do
+  begin
+    E := TPasElement(L[I]);
+    if not (E is TPasClassType) then
+      Continue;
+    CollectFields(TPasClassType(E).Members);
+    if (TPasClassType(E).ObjKind <> okClass) or not IsComponent(TPasClassType(E)) then
+      Continue;
+    for J := 0 to TPasClassType(E).Members.Count - 1 do
+    begin
+      M := TPasElement(TPasClassType(E).Members[J]);
+      if (M.ClassType = TPasVariable) and (M.Visibility = visPublished) and IsComponent(TypeOf(M)) then
+      begin
+        FFields.Get.Add(M);
+        FDrop.Get.Add(Key('S5', M));
+      end;
+    end;
+  end;
+end;
+
+{ S6 and S17 of the component tree in the statements of Body. }
+procedure THold.CheckComponents(const Body: TPasElement);
+var
+  I, J: Integer;
+  N, D: TPasElement;
+  P: TParamsExpr;
+  Recv, At: TPasExpr;
+  Mixed: TLinesBox;
+  Owned: TLinesBox;
+begin
+  if Body = nil then
+    Exit;
+  FNodes.Get.Clear;
+  Body.ForEachCall(@Collect, nil);
+  FBody.Get.Assign(FNodes.Get);
+  Mixed := TLinesBox.Own(TStringList.Create);
+  Mixed.Get.Sorted := True;
+  Mixed.Get.Duplicates := dupIgnore;
+  Owned := TLinesBox.Own(TStringList.Create);
+  Owned.Get.Sorted := True;
+  Owned.Get.Duplicates := dupIgnore;
+  for I := 0 to FBody.Get.Count - 1 do
+  begin
+    N := TPasElement(FBody.Get[I]);
+    // a constructor call, with or without parentheses (not the TFoo.Create part of TFoo.Create(...))
+    if ((N is TParamsExpr) or ((N is TBinaryExpr) and not ((N.Parent is TParamsExpr)
+      and (TParamsExpr(N.Parent).Value = N)))) and (ConstructorClass(TPasExpr(N), At) <> nil) then
+    begin
+      if OwnedCall(TPasExpr(N)) then
+        Owned.Get.Add(Key('S6', N))
+      else if not OwnedByShape(N) then
+        Mixed.Get.Add(Key('S6', N));
+    end;
+    if (N is TBinaryExpr) and (TBinaryExpr(N).OpCode = eopSubIdent) and SameText(NameOf(TBinaryExpr(N).right), 'Free')
+      then
+    begin
+      D := Named(TBinaryExpr(N).left);
+      if OwnedVar(D, N.SourceLinenumber) then
+        Destroyed(TBinaryExpr(N).right, D, Format('%s.Free', [D.Name]))
+      else if OwnedCall(Strip(TBinaryExpr(N).left)) then
+        Twice(TBinaryExpr(N).right, '.Free');
+    end;
+    if not ((N is TParamsExpr) and (TParamsExpr(N).Kind = pekFuncParams)) then
+      Continue;
+    P := TParamsExpr(N);
+    D := Callee(P);
+    if (D is TPasProcedure) and SameText(D.Name, 'FreeAndNil') and (Length(P.Params) = 1) then
+    begin
+      D := Named(P.Params[0]);
+      if OwnedVar(D, P.SourceLinenumber) then
+        Destroyed(P.Value, D, Format('FreeAndNil(%s)', [D.Name]));
+    end
+    else if IsOwnerCall(P) then
+    begin
+      for J := 0 to High(P.Params) do
+        if OwnedCall(Strip(P.Params[J])) then
+          Twice(P.Params[J], NameOf(P.Value))
+        else if OwnedVar(Named(P.Params[J]), P.SourceLinenumber) then
+          Twice(P.Params[J], Format('%s(%s)', [NameOf(P.Value), Named(P.Params[J]).Name]));
+    end
+    else if IsHold(P, Recv) and (Length(P.Params) = 2) and OwnedCall(Strip(P.Params[1])) then
+      Twice(P.Params[1], 'Hold');
+  end;
+  for I := 0 to Owned.Get.Count - 1 do
+    if Mixed.Get.IndexOf(Owned.Get[I]) < 0 then
+      FDrop.Get.Add(Owned.Get[I]);
+end;
+
+procedure THold.CheckComponentDecls(const Decls: TPasDeclarations);
+var
+  I: Integer;
+  D: TPasElement;
+begin
+  if Decls = nil then
+    Exit;
+  for I := 0 to Decls.Declarations.Count - 1 do
+  begin
+    D := TPasElement(Decls.Declarations[I]);
+    if (D is TPasProcedure) and (TPasProcedure(D).Body <> nil) then
+    begin
+      CheckComponents(TPasProcedure(D).Body.Body);
+      CheckComponentDecls(TPasProcedure(D).Body);
+    end;
+  end;
+end;
+
 procedure THold.CheckProc(const P: TPasProcedure);
 var
   I: Integer;
@@ -615,7 +921,8 @@ begin
   end;
 end;
 
-{ Adds the findings to Report and drops the untyped S6 findings on the rows of the constructor calls of valid Holds. }
+{ Adds the findings to Report and drops the untyped S6 findings on the rows of the constructor calls of valid Holds,
+  and the S5 and S6 findings that the component tree answers. }
 procedure THold.Flush(var Report: TVetReport);
 var
   I, N: Integer;
@@ -623,7 +930,8 @@ begin
   N := 0;
   for I := 0 to High(Report.Findings) do
     with Report.Findings[I] do
-      if not ((Rule = 'S6') and (FOwned.Get.IndexOf(Format('%s %d', [ExpandFileName(FileName), Row])) >= 0)) then
+      if not (((Rule = 'S6') and (FOwned.Get.IndexOf(Format('%s %d', [ExpandFileName(FileName), Row])) >= 0))
+        or (FDrop.Get.IndexOf(Format('%s %s %d', [Rule, ExpandFileName(FileName), Row])) >= 0)) then
       begin
         Report.Findings[N] := Report.Findings[I];
         Inc(N);
@@ -643,11 +951,23 @@ begin
   for I := 0 to High(Src.Lines) do
     if Pos('// UNSAFE-UNIT:', Src.Lines[I]) = 1 then
       Exit;
-  H := THoldBox.Own(THold.Create(Src, Resolver));
+  H := THoldBox.Own(THold.Create(Src, Resolver, Module));
   H.Get.CheckDecls(Module.InterfaceSection);
   H.Get.CheckDecls(Module.ImplementationSection);
   if Module is TPasProgram then
     H.Get.CheckDecls(TPasProgram(Module).ProgramSection);
+  if Module.InterfaceSection <> nil then
+    H.Get.CollectFields(Module.InterfaceSection.Declarations);
+  if Module.ImplementationSection <> nil then
+    H.Get.CollectFields(Module.ImplementationSection.Declarations);
+  if Module is TPasProgram then
+    H.Get.CollectFields(TPasProgram(Module).ProgramSection.Declarations);
+  H.Get.CheckComponentDecls(Module.InterfaceSection);
+  H.Get.CheckComponentDecls(Module.ImplementationSection);
+  if Module is TPasProgram then
+    H.Get.CheckComponentDecls(TPasProgram(Module).ProgramSection);
+  H.Get.CheckComponents(Module.InitializationSection);
+  H.Get.CheckComponents(Module.FinalizationSection);
   H.Get.Flush(Report);
 end;
 

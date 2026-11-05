@@ -49,10 +49,10 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Support for `object` (Turbo Pascal) | **plan** | §19 |
 | Memory styles: several safe styles in one program, the decision tree, style boundaries (S18), the `// BP-STYLES:` allow-list | **design (plan)** | §20 |
 | Region style (an idea from Goose): `TRegion`, `TRegionObject`, `TGrowArray<T>`, zero cost in a release build | **runtime implemented, tests, CI** (`safe/region.*.inc` in units Safe and BP, `test_region`; R2, R14–R16, R12 in `SAFE_DEBUG` on unix); S17 in the typed `bpvet` | §20 |
-| The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list and the `TComponent` owner: **plan** | §21.1 |
+| The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
-| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (`BP_MN=1`): **implemented**; `TArena` on the list, the `TComponent` owner: **design (plan)** | §21 |
+| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (`BP_MN=1`), the `TComponent` owner (the typed `bpvet`, §21.4): **implemented**; `TArena` on the list: **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; doc tests exist (`tools/doctest.py`); the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
@@ -366,8 +366,8 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S2 | `Move/FillChar` | **compiler**: the same, `SAFE-S2` |
 | S3 | `.Free`, `FreeAndNil`, `.Destroy` | `FreeAndNil` and `.Free` are a compiler error. `.Free` is closed off by a `TObject` helper with the method `Free(const X: SAFE_S3_NoFree_UseTOwnedReset_or_UnsafeDestroy)`: without an argument the call does not compile, and the type name in the "Found declaration" message explains the rule. `.Destroy` — linter |
 | S4 | `Pointer, PByte, PChar, PAnsiChar, PWideChar`, `^T`, `@`, pointer arithmetic | the types — warning `SAFE-S4`; `^T`, `@`, pointer arithmetic — `bpvet` S4 |
-| S5 | a field/global variable of a class type without `// borrow:` | `bpvet` S5: an error on a global or a field of a class/object/record whose type is a class declared in the module or a common RTL class (`TObject`, `Exception`, `TStringList`, `TList`, `TStream`, `TThread`, …), unless the line ends with or follows `// borrow: <who owns it>`; a module marked `// UNSAFE-UNIT:` is not checked; an assignment `Name := X.Get` / `Self.Name := X.Get` into a global of the module or a field of its class without `// borrow:`, and `Name := AParam` / `Self.Name := AParam` where `AParam` is a parameter of such a class type (a one-line routine header); `Owner.Reset`/`Owner.Move` after `Local := Owner.Get` while `Local` is still used later in the same routine (before a new `Local := …`), unless `// UNSAFE: <why>` stands on the line above or at its end; task fields are covered by the field rule; closures are not checked: FPC 3.2.2 does not compile anonymous procedures or `reference to` types (fcl-passrc 3.2.2 parses them for pas2js); a class of another unit counts when that unit's file lies next to the checked file (`name.pas` in the same directory; classes declared in its interface, read as text); or in a directory given with `bpvet -FuDIR` (CI: `-Fusafe -Fuext` for tests/) |
-| S6 | `TFoo.Create` not immediately into `Own/Share/Adopt`/`Hold`/an interface/`raise` | linter; partly at runtime (R3); `S.Hold(V, TFoo.Create)` is an owner (the text before the class name ends with `,` inside a call of `Hold`), and the typed `bpvet` checks its shape: `V` a plain local of a class type, the second argument a constructor call of that class or of a descendant (`tools/bpvet/bpvethold.pas`; `tests/lint/s06_hold_ok.pas`, `hold_class_bad.pas`, `hold_field_bad.pas`, `hold_expr_bad.pas`) |
+| S5 | a field/global variable of a class type without `// borrow:` | `bpvet` S5: an error on a global or a field of a class/object/record whose type is a class declared in the module or a common RTL class (`TObject`, `Exception`, `TStringList`, `TList`, `TStream`, `TThread`, …), unless the line ends with or follows `// borrow: <who owns it>`; a module marked `// UNSAFE-UNIT:` is not checked; an assignment `Name := X.Get` / `Self.Name := X.Get` into a global of the module or a field of its class without `// borrow:`, and `Name := AParam` / `Self.Name := AParam` where `AParam` is a parameter of such a class type (a one-line routine header); `Owner.Reset`/`Owner.Move` after `Local := Owner.Get` while `Local` is still used later in the same routine (before a new `Local := …`), unless `// UNSAFE: <why>` stands on the line above or at its end; task fields are covered by the field rule; closures are not checked: FPC 3.2.2 does not compile anonymous procedures or `reference to` types (fcl-passrc 3.2.2 parses them for pas2js); a class of another unit counts when that unit's file lies next to the checked file (`name.pas` in the same directory; classes declared in its interface, read as text); or in a directory given with `bpvet -FuDIR` (CI: `-Fusafe -Fuext` for tests/); a `published` field of a component class whose type is a component class (a descendant of `Classes.TComponent`) needs no mark: the typed `bpvet` drops the finding (§21.4, `tools/bpvet/bpvethold.pas`; `tests/lint/component_ok.pas`, `component_field_bad.pas`) |
+| S6 | `TFoo.Create` not immediately into `Own/Share/Adopt`/`Hold`/an interface/`raise` | linter; partly at runtime (R3); `S.Hold(V, TFoo.Create)` is an owner (the text before the class name ends with `,` inside a call of `Hold`), and the typed `bpvet` checks its shape: `V` a plain local of a class type, the second argument a constructor call of that class or of a descendant (`tools/bpvet/bpvethold.pas`; `tests/lint/s06_hold_ok.pas`, `hold_class_bad.pas`, `hold_field_bad.pas`, `hold_expr_bad.pas`); `TFoo.Create(AOwner)` of a component class with an owner that is a class instance is owned by the owner: the typed `bpvet` drops the finding, `TFoo.Create(nil)` stays one (§21.4; `tests/lint/component_ok.pas`, `component_nil_bad.pas`, `component_mixed_bad.pas`) |
 | S7 | `Safe` is not last in `uses` | `bpvet`: an error when a unit follows `Safe`/`BP` in its `uses`; a warning when the implementation `uses` come after `Safe`/`BP` of the interface, and when units follow `BP` that is first in a program (§14); a warning is not reported when the uses are marked `// UNSAFE: <why>` (§7), an error has no mark. Otherwise `FreeAndNil` from SysUtils is not shadowed and the helper may be overridden |
 | S8 | unsafe code without `// UNSAFE:` / a module without `uses Safe` and without `// UNSAFE-UNIT:` | linter |
 | S9 | `UnicodeString/WideString/ShortString` outside unsafe | `bpvet` S9: an error on the type name or a sized `String[N]` (a `ShortString`) without a `// UNSAFE: <why>` mark on the line above or at the end of the line (§7); a `// UNSAFE-UNIT:` module is not checked |
@@ -1068,6 +1068,7 @@ or above the parameter suppresses its S14 finding.
 | v0.19 | §25.2: the Goose column of the suite (the four programs in Goose v2026.3, `goose build -O2`; the release is installed and cached by the CI job) and its numbers in the baseline |
 | v0.20 | §20 the region runtime (step 4 of #108): `safe/region.*.inc` in units Safe and BP, `test_region`, R2, R12 (`SAFE_DEBUG`), R14, R15, R16 at `Own`/`Share`/`Adopt`; `Reset` keeps the largest block, chunks in the region of the header, `Create` moves into a variable passed by reference |
 | v0.21 | §21.1 the scope (step 3 of §21.7): `Hold` and `Defer` of `TScopeRef` (`for S in Scope`, was an `Integer`) and of `TRegion` on the finalizer list of the region, newest first, failures counted in `SafeDeferFailures`; S6 accepts `Hold`; the typed `bpvet` checks every `Hold` (`bpvethold.pas`: S6 for the shape, S17 for escapes and reads after the scope); R15, R16 and R3 at `Hold` |
+| v0.22 | §21.4 the `TComponent` owner (step 4 of §21.7): the typed `bpvet` drops S6 of `TFoo.Create(AOwner)` of a component class with an owner that is not `nil` and S5 of a `published` component field of a component class; S17 for `.Free`, `FreeAndNil`, `Own`, `Share`, `Adopt` and `Hold` of a component that its owner destroys (`bpvethold.pas`, `tests/lint/component_*.pas`) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1624,7 +1625,7 @@ by trial deletion, as in CPython). It needs no stack scan and frees acyclic garb
 
 | Code | Meaning |
 |---|---|
-| S17 | root analysis of the region style: S17a no destructor in a region class, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena`; the variable of a `Hold` (§21.1) does not escape and is not read after its scope |
+| S17 | root analysis of the region style: S17a no destructor in a region class, S17b inside a routine, S17c across routines by signature (`// root:`), S17d `// borrow: arena`; the variable of a `Hold` (§21.1) does not escape and is not read after its scope; a component created with an owner (§21.4) is not destroyed (`.Free`, `FreeAndNil`) and not given to `Own`, `Share`, `Adopt` or `Hold` |
 | S18 | style boundaries: rooted values and GC references stay in their style and goroutine; where a GC reference may live; reference fields first in a GC class (`--fix` reorders); a destructor in a GC class; `TWeak` or any other observer of the life of a GC object; the `// BP-STYLES:` allow-list |
 | R11 | not used (it was a growth past a fixed reservation; regions and `TGrowArray` have no reservation, spike 2) |
 | R12 | `SAFE_DEBUG`: access to a released region (its pages lose access: `EAccessViolation`) |
@@ -1976,6 +1977,29 @@ destroys it. Better Pascal takes it as it is:
 The README says the LCL is not yet tested with `bp build`; this rule is what lets the code of a Lazarus form pass without
 marks. Cost: one exception of S6 and one root kind of S17.
 
+Status: **implemented** in the typed `bpvet` (step 4 of §21.7, v0.22): `tools/bpvet/bpvethold.pas`, the tests
+`tests/lint/component_*.pas` (a form-like unit with a stub `TComponent`, `TControl`, `TButton`, `TForm`, and one unit over
+`Classes.TComponent`). A component class is a class that descends from `Classes.TComponent`, or from a class `TComponent`
+declared in the checked module (a stub, so that a test needs no LCL). What is checked:
+
+- An owned call is `TFoo.Create(AOwner, ...)`: a constructor of a component class whose first parameter is of a component
+  class, called with a first argument that is a class instance (not `nil`, not a class). The untyped S6 finding of its
+  line is dropped when every constructor call of the line is an owned call or goes at once into an owner (`Own`, `Share`,
+  `Adopt`, `Go`, `Hold`, `raise`); `TFoo.Create(nil)` stays an S6 finding.
+- A `published` field of a component class whose type is a component class: the S5 finding of its line is dropped. The
+  default section of a class compiled with `{$M+}` (every descendant of `TPersistent`) is published, as in FPC. Other
+  fields keep S5 (`// borrow:`).
+- S17: an owned call, a variable assigned from one in the routine (from that line until it is assigned something else)
+  and a published component field are not destroyed by `.Free` or `FreeAndNil` (`.Destroy` is S3, with no second
+  finding) and not given to `TOwned.Own`, `TShared.Share` or `Adopt`; an owned call is not the object of a `Hold`. Storing
+  it in a field is allowed. Under `Safe`, `.Free` and `FreeAndNil` do not compile anyway (S3); the finding names the rule
+  before the build.
+
+Not checked: an owner that is `nil` at run time (only the literal `nil` is seen); a component used after its owner is
+destroyed (the owner is not a root that S17 follows across routines); `.Free` through a variable that the routine did not
+assign from an owned call (a parameter, a field of another class). A form created by `Application.CreateForm` is not a
+`TFoo.Create` call and needs nothing.
+
 ### 21.5 The decision tree after §21
 
 1. A value: `record`, `String`, `TArray<T>`.
@@ -2036,7 +2060,8 @@ data.
    destructor; lint tests. *Status:* **done** for `Hold`, `Defer` and `TScopeRef` (§21.1, v0.21); `TArena` on the list is
    left for later.
 4. **The `TComponent` owner** (S6 and a root kind of S17). *Done:* lint tests on a form-like unit (a stub `TComponent` is
-   enough).
+   enough). *Status:* **done** (§21.4, v0.22): S5, S6 and S17 of the component tree in the typed `bpvet`
+   (`tools/bpvet/bpvethold.pas`, `tests/lint/component_*.pas`).
 5. **The M:N runtime** after step 2: the scheduler behind the hooks, the monitor, deadlock detection, `BP_SCHED_SEED`.
    *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test. *Status:* **done** (§21.3, step 5
    result): on with `BP_MN=1`; the default flips after the `runnext` lever of §25.1 step 6.
@@ -2611,7 +2636,7 @@ a bug found by a program built with `bp build` goes ahead of the plan.
 | 2 | — (the cheap holes of §8: done) | | |
 | 3 | **The benchmark suite against C, Rust, Go and Goose** (§25.2): measured, report only (done for four programs and five languages, v0.16 and v0.19: the baseline is in §25.2; channels and `httpd` follow) | §25.2 | the runtime steps below change the speed: they are measured against a baseline taken before them |
 | 4 | **The M:N runtime** (guard areas by default, the list of changes in the spike 4 result), then the atomic `Select` with send cases (done: the runtime is on with `BP_MN=1`, §21.3, step 5 result; the atomic `Select`, §14) | §21.7 steps 5–6 | spike 4 says worth it; `Select` with a timeout needs the timers of step 5 |
-| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.20; `Hold` and `Defer`: done, v0.21), then the `TComponent` owner (next) | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
+| 5 | **The scope** (`Hold`, `Defer`) on the region runtime (the runtime: done, v0.20; `Hold` and `Defer`: done, v0.21), then the `TComponent` owner (done, v0.22) | §21.7 steps 3–4 | the memory styles that the editor of `dn` (step 12 of #108) and fpide need |
 | 6 | **The speed work** that the numbers of step 3 point to (§25.2) | §25.2 | after the runtime: it changes what is measured |
 | 7 | **The tools,** cheapest first: `bp explain`, S20 and `Fmt`, `bp test`, `--target`, `// derive:`, the profiler, `bp lsp`, the browser, S26c, hot reload | §22.8 steps 2–11 | each stands alone; the ones users ask for first go first |
 | 8 | **The language from FPC 3.2:** nested procedure values, the `String` helper, CORBA interfaces, `// raises:` | §24.8 steps 4–7 | after the runtime and S17, which they extend |
