@@ -260,7 +260,7 @@ begin
   SafeCellEnter(Self);
   try
     // Life is valid here: its destructor clears it under the same lock before the memory is freed
-    if (Life <> nil) and TSafeLife(Life).TryAddRef then
+    if (Life <> nil) and (Life as TSafeLife).TryAddRef then
       Result := Life;
   finally
     SafeCellLeave(Self);
@@ -436,7 +436,7 @@ begin
   C := W.CellObj;
   L := nil;
   if C <> nil then
-    L := TSafeLife(C.AcquireLife); // thread-safe against the last Reset in another thread (H6)
+    L := C.AcquireLife as TSafeLife; // thread-safe against the last Reset in another thread (H6)
   Result := L <> nil;
   if Result then
   begin
