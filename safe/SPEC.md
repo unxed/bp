@@ -1075,6 +1075,7 @@ or above the parameter suppresses its S14 finding.
 | v0.24 | §25.2 step 6, the region allocator: `TRegionObject.Create` without the frame of a failed constructor, `NewInstance` bumps in place, caches per class, and writes the VMT and zeroed fields itself for a class without managed fields or interfaces: `TNode.Create` 36 ns → 13 ns, binary trees 0.656 s → 0.255 s (0.57x of C); the suite uses the region of unit `BP` |
 | v0.25 | §25.3 strings and maps: `TStrSlice` (a part of a `String` that holds it), `Fields`, `TMap<K, V>` (open addressing, `Ref(K, D)^` for one lookup, Go semantics of a copy) in units Safe and BP (`safe/map.*.inc`, `test_map`), R18, R19, S27; the word count of the suite over them: 0.56 s → 0.46 s (`while F.Next(W)`: 0.37 s) |
 | v0.26 | §25.2 step 6, n-body: FPC computes the address of an array element again after every store into the array; the pull of a pair as a routine with two `var` parameters takes it once: 0.832 s (1.91x of C) → 0.667 s (1.36x); `-O3`, `-O4` and the target CPU give nothing |
+| v0.27 | §21.3, §25.2 step 6: an idle carrier of the M:N scheduler spins a little before it sleeps (at most half of them; a goroutine made ready meanwhile wakes no sleeping carrier) and takes the place "next" of a busy carrier: the start of a goroutine 28 us → 17 us, a fan-out over a channel 400 → 320 ms |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1973,6 +1974,15 @@ and `test_threads` passed 20 times each under `BP_PROCS` 1, 2, 3 and 8 and under
   goroutines that wake each other do not starve it), and the monitor moves the place into the queue when its carrier did
   not switch for a tick (a long loop). The seed mode is unchanged. The round trip between two goroutines on 4 carriers:
   12 us → 0.8 us (2 carriers 0.7 us, one 0.7-1.0 us), 13 times faster than 1:1; the start of a goroutine is unchanged.
+- **An idle carrier spins (2026-11-05, §25.2 step 6).** A carrier with nothing to run looks for work 2000 times (a
+  few microseconds) before it sleeps, and at most half of the carriers spin at once; while one spins, a goroutine made
+  ready wakes no sleeping carrier (no futex), and the carrier that finds work wakes one more if work is left. A spinning
+  carrier also takes the place "next" of a busy carrier when the same goroutine waits there at two looks in a row (a
+  waker that does not block soon, such as a producer before its buffer is full, kept it there until the monitor moved
+  it, up to a tick). A full barrier orders the store of the work and the read of `Spinning` (x86 has it in the lock).
+  Measured on 4 carriers (medians, the machine shared with other work): the start and the end of a goroutine 28 us →
+  17 us; one producer and three workers over a buffered `TChan`, 200,000 items: 400-430 ms → 300-340 ms; the round
+  trip between two goroutines is unchanged (0.7-0.9 us). 200 and 20,000 rounds gave no more than 2000.
 - **The default stays 1:1** until CI has run under `MNMODES` for a while; then it flips (`-dSAFE_LIBC` stays 1:1).
 
 ### 21.4 The tree of `TComponent` is an owner
@@ -2769,10 +2779,14 @@ the same algorithm in C, Rust, Go and Goose. Today this is a goal, not a measure
     address is taken once per pair: 0.832 s (1.91x of C) → 0.667 s (1.36x; gcc 0.487 s, Goose 0.479 s in the same run).
     The style of the dialect for a hot loop over the elements of an array: a `var` parameter or a routine per element,
     not the element written out in every expression. A compiler fork would fix it in FPC; that is out (§0);
+  - fannkuch (2026-11-05): no lever found in the source or the options. Four fifths of the time is the flips of a copy
+    of the permutation, a loop of swaps that FPC compiles to 12 instructions per swap against fewer in gcc; `-O3`, `-O4`,
+    `-OoLOOPUNROLL`, `-CpCOREI` and indices of `SizeInt` stay at 1.3-1.4x of C. The gap is the code generator;
   - the code generator: FPC's own against the LLVM back end of FPC main, where it builds the dialect;
   - the M:N scheduler (§21.3, step 5 result): the woken goroutine runs next on the carrier of the waker (`runnext`:
-    done, 12 us → 0.8 us per round trip on 4 carriers), an idle carrier spins a little before it sleeps, per-carrier run
-    queues, a smaller first heap chunk of a goroutine.
+    done, 12 us → 0.8 us per round trip on 4 carriers), an idle carrier spins a little before it sleeps (done: the start of
+    a goroutine 28 us → 17 us, a fan-out over a channel a quarter faster, §21.3), per-carrier run queues, a smaller first
+    heap chunk of a goroutine.
 
   A lever that needs a compiler fork is out (§0: `bp` works over the stock `fpc`).
 
