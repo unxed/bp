@@ -16,9 +16,10 @@
 #   RUN          run prefix (qemu-aarch64, wine)           OUT      where to put binaries (otherwise mktemp)
 #   EXE          suffix of the binaries (.exe for -Twin64, which writes name.exe)
 #   SKIP         tests to skip ("test_ffi fpc-utf8")                NO_COMPILE_CHECKS=1 — without compile/*.pas
-#   MNMODES      the ext tests run again in each mode: "mn" (BP_MN=1, goroutines M:N), "seedN" (BP_SCHED_SEED=N:
+#   MNMODES      the ext tests run again in each mode (goroutines run M:N by default): "1to1" (BP_MN=0, one OS thread
+#                per task), "mn" (BP_MN=1, the default said explicitly), "seedN" (BP_SCHED_SEED=N:
 #                one carrier, a seeded order), "rtlheap" (BP_HEAP=rtl: the heap of the RTL instead of the memory manager of BP,
-#                SPEC §25.4), "mnrtlheap" (both); e.g. "mn seed1 seed2 seed3" (SPEC §21.3)
+#                SPEC §25.4), "mnrtlheap" (M:N and the heap of the RTL), "1to1rtlheap"; e.g. "1to1 seed1 seed2" (SPEC §21.3)
 set -u
 FPC=${FPC:-fpc}
 FPCOPTS=${FPCOPTS:-}
@@ -67,6 +68,8 @@ run_layer() {
           echo "== run $t ($name, $m)"
           case "$m" in
             mn) BP_MN=1 timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
+            1to1) BP_MN=0 timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
+            1to1rtlheap) BP_MN=0 BP_HEAP=rtl timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
             seed*) BP_SCHED_SEED=${m#seed} timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
             rtlheap) BP_HEAP=rtl timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;
             mnrtlheap) BP_MN=1 BP_HEAP=rtl timeout 300 $RUN "./$t$EXE" || { echo "FAIL $t under $m"; fail=1; } ;;

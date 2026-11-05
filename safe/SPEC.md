@@ -55,7 +55,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | The scope (§21.1): `S.Hold(V, TFoo.Create)` and `S.Defer(@X.Done)` of `for S in Scope` and of a `TRegion`, on the finalizer list of the region | **implemented, tests, CI** (`test_region`); the shape of `Hold` (S6) and its escapes and reads after the scope (S17) in the typed `bpvet` (`bpvethold.pas`, `tests/lint/hold_*.pas`); `TArena` on the list: **plan**; the `TComponent` owner: §21.4 | §21.1 |
 | Root analysis in `bpvet` (S17): rooted references are checked statically, no runtime cost | **design (plan)**; needs a typed `bpvet` (`fcl-passrc` `PasResolver`) | §20 |
 | GC style: `TGcObject` classes (`N.Next.X`, as in Go), a heap per goroutine, mark and sweep, edges from published fields, roots from the stack of the goroutine | **design (plan)**; was "deliberately not adopted" until 2026-11-04 (§18) | §20 |
-| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (`BP_MN=1`), the `TComponent` owner (the typed `bpvet`, §21.4): **implemented**; `TArena` on the list: **design (plan)** | §21 |
+| Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (the default since v0.44, `BP_MN=0` for 1:1), the `TComponent` owner (the typed `bpvet`, §21.4): **implemented**; `TArena` on the list: **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; doc tests exist (`tools/doctest.py`); the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured; one model of lifetimes (a root, its reach, its changes): **design, decided 2026-11-05** (§24.9); extension methods are the exception, see the next row | §24 |
@@ -178,6 +178,12 @@ FFI                                    (§13; like cgo)
 ---
 
 ## §1. The idea in one paragraph
+
+**The philosophy of Better Pascal:** the simplicity of development of Go with the performance and reliability of Rust.
+Take the best of Go (memory safety, code that is simple to write and for a model to generate, build speed,
+performance, goroutines, light dependencies) and replace the unpredictability of a collector with the determinism of
+owners and regions, checked before the build with no annotations to write: the tools infer the marks and write them.
+The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
 
 FPC already has almost everything: reference-counted strings with an encoding, dynamic arrays, records
 with automatic finalization, interfaces with an atomic counter, range checks,
@@ -838,6 +844,11 @@ calls stay inside a `// UNSAFE-UNIT:` module when a program needs them.
 
 ## §14. Goroutines: like Go, better in places
 
+**Goroutine** is the term of Better Pascal for a task started by `G.Go` (`TTask`), in respect of the language that
+inspired it: the documents, the messages of the tools and the code say goroutine, not coroutine or green thread. Since
+v0.44 goroutines run M:N on a few carrier threads by default (§21.3); `BP_MN=0` in the environment, or `-dBP_1TO1` in the
+build, gives one OS thread per goroutine, and `-dSAFE_LIBC` stays one OS thread per goroutine.
+
 The Go principle — "share memory by communicating" — maps onto the Safe Pascal ownership model: ownership
 passes into the task (fields, `Move`), and values come back through a channel.
 
@@ -851,7 +862,7 @@ passes into the task (fields, `Move`), and values come back through a channel.
 | a panic in a goroutine kills the process | error → group cancellation → `Wait` raises R7 with the original text | **better** |
 | `context.Context` | `G.Cancel`, `Done` (a closed channel) in `Select`, `Cancelled` | the same in meaning, without an extra parameter |
 | races are caught by `-race` | races are prevented by S11, S11m, S11s and S19: only values, moved arrays, channels, `TShared` of frozen or `// sync:` classes, `Move` go into a task, and globals are written in `initialization` | different: a prohibition instead of a detector (§21.2), with the `SAFE_DEBUG` net R17 at `Send` |
-| M:N scheduler, millions of goroutines | one task = one OS thread by default; M:N with `BP_MN=1` (§21.3) | worse: thousands, not millions (about 23 thousand goroutines per GiB under M:N, 44 KiB each); a round trip between goroutines 0.8 us under M:N against 11 us under 1:1; the default flips after a period of CI under M:N |
+| M:N scheduler, millions of goroutines | M:N on a few carriers by default since v0.44 (§21.3); `BP_MN=0` for one OS thread per goroutine | worse: thousands, not millions (about 23 thousand goroutines per GiB, 44 KiB each); a round trip between goroutines 0.8 us under M:N against 11 us under 1:1; a `Sleep` or a blocking system call holds its carrier (no netpoller yet) |
 
 Design (we reuse the RTL, minimal custom code): a thread is `BeginThread`; a lock is `TRTLCriticalSection`;
 waiting is an `RTLEvent` (a binary semaphore). A channel has a buffer and two queues of waiting cases (`sudog` of the Go
@@ -1107,6 +1118,7 @@ or above the parameter suppresses its S14 finding.
 | v0.41 (design) | §24.9 one model of lifetimes, for the owner's review: values, owners (roots) and borrows; one sentence (a borrow is used only while its root is alive and unchanged) and five rules (name, reach, change, signature, container) of which S5, S11, S17, S18, S27 and the approved S28 are instances; the string view as an instance; nested procedure values and CORBA interfaces as borrows; the lifetime marks sorted into fact and intent (`// borrow:` stays intent); the research table (Rust, Swift, Go, Goose, Zig, Vale, Hylo); H20 found and measured (a nested routine frees the argument of its own `const` parameter) |
 | v0.41.1 | §24.9 decided by the owner: the liveness until the last use for every *change* rule now, the codes kept, `// borrow:` stays intent, the quarantine R20 and the inferred freeing methods both, `// root:` a fact, H20 first (#207), `procedure of object` with the LCL, `M.Ref` one expression |
 | v0.42 | §24.4 extension methods (`typehelpers`): the dialect writes the modeswitch in the module; every rule of §6 checks the body of a helper method (`tests/lint/helper_*.pas`); S29: a helper for `TObject` must inherit `TSafeObjectHelper`, else `.Free` compiles again; a helper that reads a private member of the type it extends does not resolve in the typed mode; the rule card (§0) gets a block; the status rows of S13 (implemented) and of the speed (measured, §25.2, unxed/bp#181, #108) are corrected |
+| v0.44 | the philosophy of Better Pascal (§1, README): the simplicity of development of Go with the performance and reliability of Rust, the determinism of owners and regions instead of a collector; goroutine is the term of the project (§14); goroutines run M:N by default (`BP_MN=0`, `-dBP_1TO1` for 1:1), CI runs the 1:1 mode as the extra one |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -1964,8 +1976,8 @@ how it is closed:
   thread without blocking must yield (`ThreadSwitch`), as with one carrier in Go before 1.14.
 - **The main thread stays an OS thread** (not a goroutine): its waits are futex waits, and in the seed mode it is the
   carrier.
-- **The switch to M:N** is `BP_MN=1` at run time (or `-dBP_MN` as the default of a build) until the benchmark of
-  §25.1 step 3 and the tests under M:N and under seeds prove it; then the default flips. `-dSAFE_LIBC` stays 1:1.
+- **The switch to M:N** was `BP_MN=1` at run time until the benchmark of §25.1 step 3 and the tests under M:N and under
+  seeds proved it; since v0.44 M:N is the default (`BP_MN=0` or `-dBP_1TO1` for 1:1). `-dSAFE_LIBC` stays 1:1.
 - **Left for later, measured first:** a start without the system calls of `InitThread` (40-50 us), a smaller first heap
   chunk (`growheapsizesmall`; done, see the start of a goroutine below), per-carrier run queues, a netpoller, `Sleep` that parks (FPC has no hook for it: a
   `Sleep` in a goroutine pins its carrier, and the monitor adds one), the stacks of the parked goroutines in the
@@ -2161,7 +2173,7 @@ data.
    (`tools/bpvet/bpvethold.pas`, `tests/lint/component_*.pas`).
 5. **The M:N runtime** after step 2: the scheduler behind the hooks, the monitor, deadlock detection, `BP_SCHED_SEED`.
    *Done:* `test_go` and `test_threads` pass under M:N and under a seed; a deadlock test. *Status:* **done** (§21.3, step 5
-   result): on with `BP_MN=1`; `runnext` is in (§21.3); the default flips after a period of CI under M:N.
+   result): the default since v0.44, after a period of CI under M:N (`BP_MN=0` for 1:1); `runnext` is in (§21.3).
 6. **Atomic `Select` with send cases.** *Done:* `test_go` covers a send case and a race between two ready cases.
    *Status:* **done** (§14): `TChan.RecvCase`, `TChan.SendCase`, `TSafeChan.RecvCase`; the channels hand values over
    through queues of waiting cases; `test_go` (`AtomicSelect`) runs under 1:1, M:N and the seeds.

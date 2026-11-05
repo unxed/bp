@@ -26,8 +26,8 @@
   - the main thread is recognised by the range [MainLow, MainHigh): argv above, the stack
     limit below; a region that falls into the range is dropped (this happens under qemu-user).
 
-  M:N (bpsched.inc, SPEC §21.3 "Step 5 design"): with BP_MN=1 in the environment (or -dBP_MN as the default) a
-  BeginThread starts a goroutine: a region of the same layout, run by carrier threads (one per CPU, BP_PROCS=N) with
+  M:N (bpsched.inc, SPEC §21.3 "Step 5 design"), the default since v0.44 (BP_MN=0 in the environment, or -dBP_1TO1
+  in the build, for one OS thread per task): a BeginThread starts a goroutine: a region of the same layout, run by carrier threads (one per CPU, BP_PROCS=N) with
   a switch of the stack pointer. A wait of a goroutine parks it and runs the next one. BP_SCHED_SEED=N runs every
   goroutine on the main thread in an order drawn from the seed. }
 unit BPThreads;

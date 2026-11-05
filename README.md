@@ -1,5 +1,11 @@
 # Better Pascal (bp)
 
+**The philosophy of Better Pascal:** the simplicity of development of Go with the performance and reliability of Rust.
+Take the best of Go (memory safety, code that is simple to write and for a model to generate, build speed,
+performance, goroutines, light dependencies) and replace the unpredictability of a collector with the determinism of
+owners and regions, checked before the build with no annotations to write: the tools infer the marks and write them.
+The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
+
 > **Build with `tools/bp build`, not with `fpc` directly.** `bp build [--release] [fpc options] FILE.pas` checks the
 > program (`bpvet --strict --typed`: ownership, regions, borrows) and calls `fpc` only when the check passes, so
 > unsafe code is built only where it is declared (`// UNSAFE:`, `// borrow:`, `// root:`). The guarantees of Better
@@ -28,8 +34,8 @@
   - the run time: the gap to C is not in the language (typed, compiled, no collector, the class of C) but in the
     optimizer of FPC (tickets upstream, #185; Bp stays on the releases of FPC and its usual back end) and the map and
     strings of BP; §25.2 splits it;
-  - the memory manager of BP is on by default (`BP_HEAP=rtl` for the heap of the RTL); goroutines: M:N with
-    `BP_MN=1`, off by default for now.
+  - the memory manager of BP is on by default (`BP_HEAP=rtl` for the heap of the RTL); goroutines run M:N on a few
+    carriers by default (`BP_MN=0` for one OS thread per task).
 - **Accepted as the niche:** a dynamic binary over glibc is smaller, but runs only where that glibc is.
 
 **How it compares** (built with `bp build`; measured 2026-11-04, details in unxed/bp#108 and `safe/SPEC.md` §20):
@@ -42,7 +48,7 @@
 | Array iteration | on par (`for C in A.Chunks` is as fast as a plain array) | on par | on par | on par | on par |
 | Ecosystem | comparable: every FPC package and Lazarus can be used as is, as unchecked units (like C libraries in Rust or Zig), and moved to the bp dialect step by step | comparable | larger | larger | larger |
 | Data races | behind for now: Rust checks `Send`/`Sync` in the compiler; `bp build` checks task fields (S11), but a dynamic array, a `TShared` object or a global shared by goroutines is not checked yet (`safe/SPEC.md` §21.2 closes it) | better in kind: a prohibition before the build, not a detector at run time (`-race`), with the same open cases | behind until §21.2: Goose passes only flat values | better: Zig does not check races | unknown |
-| Goroutines | behind in scale by default: one task is one OS thread; with `BP_MN=1` goroutines run M:N on a few carriers (§21.3), not yet the default | behind in scale, better in structure: a group waits for its tasks, the error of a task reaches `Wait` | unknown | unknown | unknown |
+| Goroutines | behind in scale: goroutines run M:N on a few carriers by default (§21.3), thousands per GiB rather than millions (44 KiB each); a switch between goroutines 0.8 us | behind in scale, better in structure: a group waits for its tasks, the error of a task reaches `Wait` | unknown | unknown | unknown |
 | Deploy | better: one static file without libc by default runs on any distribution (Rust links the glibc of the build machine unless a musl target is chosen) | on par: Go is static by default too | unknown | on par | unknown |
 | C and the host | behind until `safe/SPEC.md` §23: today `-dSAFE_LIBC` ties the binary to the build glibc, as Rust does; the plan binds host libraries at run time by name, with no versioned import | better in kind: no C toolchain in the build (cgo needs one); behind in breadth until §23 | unknown | behind: Zig ships libc headers for many versions and `zig cc` | unknown |
 | Standard library | larger: the FCL of FPC ships HTTP, JSON, XML, regular expressions, SQL, zip; Rust leaves them to crates | on par: the Go standard library is as broad | larger | larger: the Zig std is small and C libraries fill the gap | unknown |
