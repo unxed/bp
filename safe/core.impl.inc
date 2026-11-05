@@ -182,7 +182,7 @@ begin
   if P = nil then
     Exit(0);
   // UNSAFE: the header of a dynamic array in the FPC RTL, the reference count and the high bound before the data
-  Result := PSizeInt(PByte(P) - 2 * SizeOf(SizeInt))^;
+  Result := PSizeInt(System.PByte(P) - 2 * SizeOf(SizeInt))^;
 end;
 
 function SafeNewLife(AObj: TObject; const Who: string): TSafeLife;

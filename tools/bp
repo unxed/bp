@@ -14,8 +14,9 @@
 #                                over git tags vX.Y.Z and writes DIR/deps.lock, one "path version commit" per module
 #        tools/bp vendor [DIR]   copies the modules of DIR/deps.lock into DIR/vendor/<path>/, for an offline build
 #   Checked: FILE and the other sources of its directory (not its vendor/). The fpc options are passed on; -Fu, -Fi, -d
-#   and -Fa are also given to bpvet; safe/, ext/ and the BP unit are on the unit path. A debug build adds -Cr -Co (SPEC
-#   §6). When the directory has a deps.lock (SPEC §15), the unit directories of its modules (vendor/<path>/, else the
+#   and -Fa are also given to bpvet; safe/, ext/ and the BP unit are on the unit path. Every build adds -FaBPThreads,
+#   so BP goes last in the uses of a program too (SPEC §24.3), and -Sew (a warning of fpc fails the build, §24.6); a
+#   debug build adds -Cr -Co (SPEC §6). When the directory has a deps.lock (SPEC §15), the unit directories of its modules (vendor/<path>/, else the
 #   cache, fetched when missing) are added as -Fu and -Fi for bpvet and fpc.
 #   A script: a file whose first line is `#!/usr/bin/env -S tools/bp run` (fpc does not take a #! line) is checked and
 #   built from a copy in the cache with that line blank, so the line numbers stay; its directory is searched for units.
@@ -76,10 +77,7 @@ program $name;
 {\$mode objfpc}{\$H+}
 
 uses
-  // UNSAFE: BP goes first in a program (the thread manager); SysUtils after it shadows it, and the program does not
-  // free objects by hand (no FreeAndNil)
-  BP,
-  SysUtils;
+  SysUtils, BP;
 
 begin
   writeln('Hello from ', '$name');
@@ -93,10 +91,7 @@ program test_$name;
 {\$mode objfpc}{\$H+}
 
 uses
-  // UNSAFE: BP goes first in a program (the thread manager); SysUtils after it shadows it, and the program does not
-  // free objects by hand (no FreeAndNil)
-  BP,
-  SysUtils;
+  SysUtils, BP;
 
 var
   Failed: Integer = 0;
@@ -126,6 +121,9 @@ PAS
 fi
 
 lib=(-Fu"$root" -Fu"$root/safe" -Fu"$root/ext" -Fi"$root/safe" -Fi"$root/ext")
+# the thread manager first in a program, whatever the order of its uses (SPEC §24.3); warnings are errors (-Sew): an
+# uninitialised local, a function result never set, a poisoned routine of BP (SPEC §24.6, H19)
+always=(-FaBPThreads -Sew)
 file= checks=(-Cr -Co) opts=() vet=() dirs=("$root/safe" "$root/ext") watch=0 pargs=() userfe=0
 while [ $# -gt 0 ]; do
   a=$1; shift
@@ -236,14 +234,14 @@ build() {
     echo "bp: the check failed: nothing built"; return 1; }
   echo "bp: checked in $(( ($(now) - t0) / 1000000 )) ms"
   if [ "$cmd" = run ]; then rm -rf "$1.tmp"; mkdir -p "$1.tmp"; extra=(-FE"$1.tmp" -FU"$1.tmp"); quiet=(-l- -v0ew); fi
-  shown "$fpc" ${quiet[@]+"${quiet[@]}"} ${checks[@]+"${checks[@]}"} "${lib[@]}" ${opts[@]+"${opts[@]}"} ${extra[@]+"${extra[@]}"} "$srcfile" || rc=$?
+  shown "$fpc" ${quiet[@]+"${quiet[@]}"} ${checks[@]+"${checks[@]}"} "${always[@]}" "${lib[@]}" ${opts[@]+"${opts[@]}"} ${extra[@]+"${extra[@]}"} "$srcfile" || rc=$?
   [ "$rc" = 0 ] || return 1
   if [ "$cmd" = run ]; then rm -rf "$1"; mv "$1.tmp" "$1"; fi
 }
 # build: checks and builds; run: the binary (bin) from the cache or built; the messages go to stderr
 prepare() {
   [ "$cmd" = run ] || { build; return; }
-  local rh; rh=$( { sources; echo "$bpvet ${checks[*]-} ${opts[*]-} $base"; } | sha256sum | cut -c1-16)
+  local rh; rh=$( { sources; echo "$bpvet ${checks[*]-} ${always[*]} ${opts[*]-} $base"; } | sha256sum | cut -c1-16)
   bin=$cache/run/$rh/$name
   if [ -x "$bin" ]; then say "bp: cached"; return 0; fi
   mkdir -p "$cache/run"

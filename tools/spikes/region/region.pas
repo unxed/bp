@@ -391,6 +391,7 @@ end;
 
 function Scope: TScopes;
 begin
+  Result := Default(TScopes);
 end;
 
 function CurrentRegionUsed: SizeUInt;
@@ -406,6 +407,7 @@ function Each(const Lines: array of String): TEachString;
 var
   K: SizeInt;
 begin
+  Result := Default(TEachString);
   SetLength(Result.Items, Length(Lines));
   for K := 0 to High(Lines) do
     Result.Items[K] := Lines[K];

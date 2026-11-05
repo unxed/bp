@@ -1,8 +1,9 @@
 # Better Pascal — specification v0.6
 
 Safe-by-default Free Pascal. Not a fork, not a new syntax: **one unit `BP` and one line in every module**:
-`uses BP, ...;` first in the program file, `uses ..., BP;` last in every other unit.
-Works on stock FPC 3.2+ with no compiler options.
+`uses ..., BP;` last in every module, the program file included. Works on stock FPC 3.2+: `tools/bp build` adds
+`-FaBPThreads`, which installs the thread manager first (§24.3); with a bare `fpc`, add that switch or put `BP` first
+in the program file.
 
 `BP` (`bp.pas`) is made of two layers: the safe layer (`safe/*.inc`: ownership, slices, arena, defer, FFI, the poisoned
 primitives) and the ext layer (`ext/*.inc` and `ext/bpthreads.pas`: UTF-8 by default, goroutines, the thread manager).
@@ -54,7 +55,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; doc tests exist (`tools/doctest.py`); the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
 | Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured | §24 |
-| An uninitialized local class reference, function result or `out` parameter (H19) | **open**: FPC warns, `bp build` does not fail on it | §8, §22.9 |
+| An uninitialized local class reference, function result or `out` parameter (H19) | **partly closed:** `tools/bp build` adds `-Sew`, so the warning of FPC on an uninitialised local or a result never set fails the build (`tests/safe/compile/mf_uninit.pas`); open: S26a (definite assignment in the typed `bpvet`, for what FPC does not warn about) | §8, §22.9 |
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **checked** by the typed `bpvet` (`tools/bp build`): S11m, S11s, S19; `SAFE_DEBUG` R17 at `Send` | §8, §21.2 |
 | Class casts and untyped parameters (H17, H18): an unchecked downcast, `TBig(Buf)[N]` over a `var Buf`, `absolute` | **checked** by the typed `bpvet` (`tools/bp build`): S24 (`--fix` writes `as`), S25 | §8, §24.6 |
 | Speed competitive with C, Rust, Go and Goose on the same algorithm | **goal**, not measured yet; the order of the work: §25 | §25.2 |
@@ -144,8 +145,9 @@ GOROUTINES                             (§14; "do not communicate by sharing mem
   Channels: Ch := specialize TChan<T>.Create(Cap); Send / Recv(out V): Boolean / TryRecv / Close; for V in Ch.
   select: case Select([A.Sel, B.Sel, Done], TimeoutMs) of ... — then TryRecv; -1 = timeout.
   Cancellation: G.Cancel → Done is closed; in a task — Cancelled or Done in Select. A task error → G.Wait raises R7.
-  IN THE PROGRAM FILE, as the first unit  uses BP, ...  (it installs the thread manager: on Linux threads without libc, §18;
-  with -dSAFE_LIBC and on other Unixes — cthreads). BP not first → the first Go stops the program (code 211).
+  The thread manager (on Linux threads without libc, §18; with -dSAFE_LIBC and on other Unixes — cthreads) is installed
+  by -FaBPThreads, which tools/bp build adds: BP stays last in the program file too (§24.3). A bare fpc without the
+  switch and with BP not first → the first Go stops the program (code 211).
 
 FFI                                    (§13; like cgo)
   external declarations — only in a binding module (// UNSAFE-UNIT:), a safe facade outward.
@@ -427,7 +429,7 @@ System.GetMem(Buf, Len);
 | A dynamic array, a `TShared` object or a global is not changed by two goroutines at once | the typed `bpvet`: S11m (Send = move), S11s (Sync = frozen or `// sync:`), S19 (`static mut`) (§21.2) | H14–H16 |
 | `.Destroy` outside unsafe | linter (S3) | H7 |
 | Owner-or-nothing for `TFoo.Create`, no legacy string types | linter `bpvet` (S6, S9); R3 only for `TInterfacedObject` | H8 |
-| `Safe` is last in `uses` | linter `bpvet` S7; in a program with `BP` first only a warning (§14) | H9 |
+| `Safe` is last in `uses` | linter `bpvet` S7, an error in a program too (`tools/bp build` adds `-FaBPThreads`, §24.3) | H9 |
 | Unsafe code is marked, `external` only in unsafe modules | linter (plan) (S8, S12) | H10 |
 | Exhaustive `case`, `const` parameters | `bpvet` S13; S14 errors on copy-heavy by-value parameters and warns on other by-value parameters not changed by the body and unused `var` parameters | H11 |
 | Range and overflow checks are not switched off in safe code | programmer | H12 |
@@ -459,7 +461,7 @@ compensating check, and accepted risks are listed with a reason.
 | H6 | shared task fields; `TryLock` race | `bpvet` S11: a class, interface or named pointer field of a task is an error | `bpvet` S11 + lock in the cell, stress test | 10 |
 | H7 | `.Destroy` | nothing | `bpvet` S3 | 4 |
 | H8 | `TFoo.Create` not owned; `ShortString` | R3 partly | `bpvet` S6, S9 | 5 |
-| H9 | `Safe` not last in `uses` | `bpvet` S7; a program with `BP` first: a warning | `bp build` adds `-FaBPThreads`, so `BP` is last in the program file too and S7 is an error there (§24.3) | 2, 2b; §24 step 1 |
+| H9 | `Safe` not last in `uses` | `bpvet` S7, an error in every module; `tools/bp build` adds `-FaBPThreads`, so `BP` is last in the program file too (§24.3) | — (done) | 2, 2b; §24 step 1 |
 | H10 | unmarked unsafe code, stray `external` | nothing | `bpvet` S8, S12 | 3 |
 | H11 | non-exhaustive `case`, missing `const` | `bpvet` S13; S14 errors on copy-heavy parameters and warns when other by-value parameters are not changed | `bpvet` S13, S14 | 11 |
 | H12 | `{$R-}` in safe code | the debug-build recommendation (§6) | rule `{$R+}{$Q+}` + `bpvet` warning | 12 |
@@ -469,7 +471,7 @@ compensating check, and accepted risks are listed with a reason.
 | H16 | a global written while goroutines run | `bpvet` S19 (typed): a global of a unit is written only in `initialization`/`finalization`, atomically (`Interlocked*`) or under `// UNSAFE: <the lock>` | — (done: S19 also on the globals of a program named by a routine a task reaches) | §21 step 1 |
 | H17 | an unchecked class cast: `TB(O).Y[100]` on an object that is a `TA` reads past it (§24.6) | `bpvet` S24 (typed): a downcast is `O as TB`, `--fix` rewrites it; a cast between classes of different branches is an error; a cast from `Pointer` or an integer to a reference is S4 | — (done: the 2 downcasts of `safe/core.impl.inc` are `as`) | §24 step 3 |
 | H18 | an untyped parameter with a variable typecast, `TBig(Buf)[N] := 1`, writes anywhere (§24.6); `absolute` | `bpvet` S25 (typed): an untyped `var`/`const`/`out` parameter, a typecast of one and `absolute` are errors outside a `// UNSAFE:` mark | — (done: the 5 untyped parameters of the repository are in `ext/bpthreads.pas`, a `// UNSAFE-UNIT:`) | §24 step 3 |
-| H19 | an uninitialised local of a class type is a garbage pointer: `var F: TFoo; WriteLn(F.X)` | FPC: a warning | `bp build` adds `-Sew` (0 warnings on the tests today, §24.6); S26a: definite assignment in the typed `bpvet`, also of a function result and an `out` parameter (§22.9) | §24 step 2, §22 step 0 |
+| H19 | an uninitialised local of a class type is a garbage pointer: `var F: TFoo; WriteLn(F.X)` | FPC: a warning | done: `bp build` adds `-Sew` (`mf_uninit.pas`; the region runtime had two results never set, fixed); next: S26a: definite assignment in the typed `bpvet`, also of a function result and an `out` parameter (§22.9) | §24 step 2, §22 step 0 |
 
 **H1. A borrow outlives its owner.**
 
@@ -645,12 +647,10 @@ end.
 
 Now: `bpvet` S7 reports it as an error (step 2). It also warns when the implementation `uses` come after `Safe` of
 the interface (they shadow it there, `tests/safe/compile/mf_s07_impl_shadow.pas`) and when units follow `BP` that is
-first in a program: `BP` goes first there for the thread manager (§14), so SysUtils after it shadows `FreeAndNil` in
-the program file (`tests/ext/compile/mf_s07_bp_first.pas`). Until that is closed, keep the program file thin; where
-it does need SysUtils (the test programs), mark the uses `// UNSAFE: <why>` on the line above or at the end of the
-line of the unit, and the warning goes (an error of S7 has no mark: the unit can always move). Target
-of step 2b: a program header that installs the thread manager first and still ends with `BP` (for example
-`uses BPThreads, SysUtils, ..., BP;`), verified in CI in every mode; then the warning becomes an error.
+first in a program. **Step 2b is done (§24.3):** `tools/bp build` adds `-FaBPThreads`, which installs the thread
+manager first, so `BP` is last in the program file too, and S7 reports a unit after `BP` there as an error, as in a
+unit (`tests/lint/s07_program_bp.pas`; `tests/ext/compile/mf_bp_last.pas` runs a goroutine with `uses SysUtils, BP`).
+The test programs lost their `// UNSAFE:` on `uses`; `tests/run.sh` builds them with the same switch.
 
 **H10. Unmarked unsafe code, `external` in a safe module.**
 
@@ -1047,13 +1047,14 @@ or above the parameter suppresses its S14 finding.
 | v0.10 (design) | §24 concept v4: one sentence for all lifetimes; marks of fact written by the machine, marks of intent by hand; `BP` last everywhere (`-FaBPThreads`, measured); what FPC 3.2 ships and the dialect had not used (nested procedure variables, type helpers, CORBA interfaces, all measured); `// raises:` inferred; the holes of §8 the table missed (an unchecked class cast, an untyped parameter, an uninitialised variable: H17–H19, S24, S25, `-Sew`); README rows for deploy, C, the standard library and models |
 | v0.11 | §21 step 1: S11m (Send = move), S11s (Sync = frozen or `// sync:`) and S19 (`static mut`) in the typed `bpvet`; S17 counts only the values whose type can hold one of a region; R17 at `Send` in `SAFE_DEBUG`; S19 on the globals of a program reached by a task |
 | v0.12 (plan) | §25: one order for the plans of §21–§24 (bugs first, then the holes of §8, then what the next steps stand on); the goal of speed against C, Rust, Go and Goose; H17 used twice (the uninitialised variable is H19), S21a-c renumbered S26a-c (S21 is the header), §22.9 and §22.10 moved back into §22 |
-| v0.13 | §24 step 3: S24 (a class downcast is `as`, `--fix` writes it) and S25 (an untyped parameter, a typecast of one, `absolute`) in the typed `bpvet`; H17 and H18 checked; the claims row of H19 said H17 |
+| v0.13 | §24.8 steps 1–2: `tools/bp build` adds `-FaBPThreads` and `-Sew`; `BP` is last in the program file too (S7 an error there); CI builds the tests with `-Cr -Co -Sew` |
+| v0.14 | §24 step 3: S24 (a class downcast is `as`, `--fix` writes it) and S25 (an untyped parameter, a typecast of one, `absolute`) in the typed `bpvet`; H17 and H18 checked; the claims row of H19 said H17 |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
 
 - **The default on Linux is a static binary without libc**: strings — `fpwidestring` + `unicodeducet` (Unicode in Pascal, case and sorting work even with `LANG=C`), threads — `ext/bpthreads.pas` (an FPC thread manager on `clone` + `futex` + `mmap`, like the Go runtime). One file works on any distribution: verified on an Ubuntu host (glibc) and in an Alpine 3.20 chroot (musl); a libc build does not run on Alpine at all.
-- **A program with goroutines**: `uses BP, ...` — FIRST in the program file (instead of `cthreads`) on all targets.
+- **A program with goroutines**: `uses ..., BP;` last, as in every unit; `tools/bp build` adds `-FaBPThreads` (instead of `cthreads`) on all targets (§24.3).
 - **`-dSAFE_LIBC`** (an analogue of cgo): `cwstring` + `cthreads`; needed only for FFI with C libraries. If libc is loaded and the switch is absent, the first `BeginThread` stops the program with an explanation (code 232) rather than giving a silent race (`tests/ext/compile/mf_libc_guard.pas`).
 - Verified (FPC 3.2.2, cross-compilers built from the official sources): x86_64 natively and in Alpine; i386 natively and under qemu-i386; aarch64 under qemu-aarch64 — `test_safe`, `test_go`, `test_threads` (1500 tasks: heap, strings, exceptions, recursive locks, `TThread`, events) — 0 failures, 10 repeats without crashes.
 - Design: the current thread is found by the stack pointer (the stack region is aligned to its own size, at its start is the thread record with the threadvar block; the main thread is the range `[stack limit, argv)`), without assembler TLS; assembler only for `clone` (≈20 lines per architecture).
@@ -2373,17 +2374,21 @@ One step is one PR from a fresh `main`, with a criterion of done.
 
 1. **`-FaBPThreads` in `tools/bp`;** S7 reports a unit after `BP` in a program as an error; the test programs lose their
    `// UNSAFE:` on `uses`. *Done:* `tests/ext/compile/mf_s07_bp_first.pas` becomes an ok test; CI green in every mode.
+   *Status:* **done** (`mf_bp_last.pas`, `s07_program_bp.pas` an error; httpd, bpget and the template of `bp new` end
+   their uses with `BP`).
 2. **`-Sew` in `tools/bp build`.** *Done:* a compile test `mf_uninit.pas` with an uninitialised local does not build;
    the suite builds.
-3. **S24 and S25** in the typed `bpvet`, with `--fix` writing `as`. *Done:* ok/bad lint tests; H17 and H18 leave §8. *Status:* **done (2026-11-05)**
-   (`tools/bpvet/bpvetcast.pas`, after S19 in `VetResolve`; the rows of §6). Decisions: S24 reads the static type of the
+   *Status:* **done.** CI builds every layer with `-Cr -Co -Sew`. `-Sew` found a warning in every build of `BP` (the
+   poisoned `PByte` in `SafeDynArrayRefs`, written `System.PByte` now) and two results never set in the region runtime.
+3. **S24 and S25** in the typed `bpvet`, with `--fix` writing `as`. *Done:* ok/bad lint tests; H17 and H18 leave §8. *Status:*
+   **done (2026-11-05)** (`tools/bpvet/bpvetcast.pas`, after S19 in `VetResolve`; the rows of §6). Decisions: S24 reads the static type of the
    operand, so `TButton(Sender)` and `TSquare(S)` are errors and an upcast is free; a cast between classes of different
    branches is an error as well (no fix: `as` would not compile); S25 takes a typecast of an untyped parameter to any
    type (not only an array or a record: `Byte(Buf)` reads the same memory), and the mark on the parameter does not excuse
    its casts. `--fix` writes the downcast in place and leaves a line where the text and the tree do not match to the
    finding. What it found in the repository: 2 downcasts in `safe/core.impl.inc` (`TSafeLife(Life)` and
-   `TSafeLife(C.AcquireLife)`, both from `TObject`; now `as`: a walk up the chain of ancestors); the 5 untyped parameters of the repository (`RawInitCS` and its siblings) are in
-   `ext/bpthreads.pas`, a `// UNSAFE-UNIT:`. The typed run of `tests/typed.sh` stays 0.9 s (173 files).
+   `TSafeLife(C.AcquireLife)`, both from `TObject`; now `as`: a walk up the chain of ancestors); the 5 untyped
+   parameters of the repository (`RawInitCS` and its siblings) are in `ext/bpthreads.pas`, a `// UNSAFE-UNIT:`. The typed run of `tests/typed.sh` stays 0.9 s (173 files).
 4. **Nested procedure values:** S17 roots one in its frame; `bp fix` writes the modeswitch; `tests/` gets a `ForEach` and
    a `Sort` with a nested comparator. *Done:* lint tests, the example builds with `bp build`.
 5. **The `String` helper of `BP`** (`CPLength`, `CodePoints`); `bp fix` writes `typehelpers`. *Done:* `test_utf8`.

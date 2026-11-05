@@ -47,7 +47,7 @@ No FPC fork and no compiler options: a single unit `BP` gives all of it.
 
 ```pascal
 program Hello;
-uses BP;   // BP goes FIRST in the program (it installs the thread manager before any other unit)
+uses BP;   // BP goes last in every uses; tools/bp build adds -FaBPThreads (the thread manager first)
 begin
   WriteLn('Hello, world 😀', CPLength('aё😀'));
 end.

@@ -6,7 +6,9 @@
 #   ext/fpc-utf8/           the UTF-8-only variant without BP: built with @utf8.cfg (-Fa), run under C.UTF-8
 #   layout                  bp.pas includes every file that unit Safe includes (BP gives all of Safe)
 #   compile/mf_*.pas        first line "// EXPECT: fail|warn SAFE-Sx", "clean", "run" (clean + exit code 0)
-#                           or "exit N" (builds, terminates with exit code N)
+#                           or "exit N" (builds, terminates with exit code N); an optional second line
+#                           "// FPCOPTS: <options>" (bare fpc otherwise, as a user)
+#   test programs with BP   built with -FaBPThreads, as tools/bp build does (BP is last in every uses, SPEC §24.3)
 # usage: tests/run.sh [safe|ext|fpc-utf8|all]      (default: all)
 # Environment variables (for CI; by default — bare fpc on the host):
 #   FPC          compiler (cross: ppcrossa64 ...)          FPCOPTS  its options (-dSAFE_LIBC, -Tlinux -XP...)
@@ -39,13 +41,10 @@ run_layer() {
   cp "$src"/compile/*.pas "$dir/compile/" 2>/dev/null
   if [ "$mode" = bp ]; then
     sed -i -E 's/\bSafe\b/BP/g' "$dir"/*.pas "$dir"/compile/*.pas 2>/dev/null
-    # BP must be FIRST in the uses of a program (the thread manager, see bp.pas); the compile checks keep it last
-    local f
-    for f in "$dir"/test_*.pas; do
-      [ -e "$f" ] || continue
-      perl -0pi -e 's/,\s*BP\s*;/;/; s/\buses\b(\s*)/uses BP,$1/' "$f"
-    done
   fi
+  # BP is last in every uses; -FaBPThreads puts the thread manager first in a program, as tools/bp build does (SPEC §24.3)
+  local fa=
+  [ "$mode" = safe ] || fa=-FaBPThreads
   cd "$dir" || return 1
   local t
   for t in test_*.pas; do
@@ -53,7 +52,7 @@ run_layer() {
     t=${t%.pas}
     case " $SKIP " in *" $t "*) echo "== skip $t ($name)"; continue ;; esac
     echo "== build $t ($name)"
-    if $FPC $FPCOPTS $LIBOPTS -FU"$dir" "$t.pas" > build.log 2>&1; then
+    if $FPC $FPCOPTS $fa $LIBOPTS -FU"$dir" "$t.pas" > build.log 2>&1; then
       grep -E 'Warning|Note|Hint' build.log | grep -v "$t.pas" || true
       echo "== run $t ($name)"
       timeout 300 $RUN "./$t$EXE" || fail=1
@@ -69,7 +68,9 @@ run_layer() {
   for f in mf_*.pas; do
     [ -e "$f" ] || continue
     read -r _ _ kind rule < "$f"
-    if $FPC $FPCOPTS $LIBOPTS -FU"$dir/compile" "$f" > log 2>&1; then built=yes; else built=no; fi
+    # an optional second line "// FPCOPTS: <options>" adds options for this check (bare fpc otherwise, as a user)
+    local more; more=$(sed -n '2s#^// FPCOPTS: ##p' "$f")
+    if $FPC $FPCOPTS $more $LIBOPTS -FU"$dir/compile" "$f" > log 2>&1; then built=yes; else built=no; fi
     case "$kind" in
       fail)  ok=$([ $built = no ] && grep -q "$rule" log && echo 1) ;;
       warn)  ok=$([ $built = yes ] && grep -q "$rule" log && echo 1) ;;

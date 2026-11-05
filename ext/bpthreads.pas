@@ -3,7 +3,7 @@
 { BPThreads: one line for threads on all targets (SPEC §14).
 
     program P;
-    uses BP, SysUtils, ...;   // BP (which pulls in BPThreads) goes FIRST in the program uses; in the other units BP goes last
+    uses SysUtils, ..., BP;   // BP goes last in every uses; tools/bp build adds -FaBPThreads, which puts BPThreads first
 
   - Linux (x86_64, i386, aarch64) by default: a thread manager on clone + futex
     + mmap, no libc needed; a static binary runs on any distribution
@@ -747,7 +747,7 @@ begin
   if ThreadingAlreadyUsed then
   begin
     WriteLn('BPThreads: threading was used before BPThreads was initialized.');
-    WriteLn('In the program put BP (or BPThreads) FIRST in the uses clause: uses BP, SysUtils, ...');
+    WriteLn('Build with tools/bp build or fpc -FaBPThreads, or put BP (or BPThreads) FIRST in the uses of the program.');
     RunError(211);
   end;
   {$if SizeOf(TRTLCriticalSection) < SizeOf(TRawMutex)}
