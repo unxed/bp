@@ -29,17 +29,22 @@ set -eu
 cmd=${1:-}
 case "$cmd" in build|fix|run|new|get|vendor) ;; *) sed -n '/^set -eu/q;2,$s/^# \{0,1\}//p' "$0"; exit 2 ;; esac
 shift
-root=$(cd "$(dirname "$0")/.." && pwd)
+# a rebuild starts as few processes as it can (SPEC §25.5): the paths come from cd and the expansions of bash, not from
+# dirname, basename and pwd
+here=$PWD
+case "$0" in */*) cd "${0%/*}/.." ;; *) cd .. ;; esac
+root=$PWD
+cd "$here"
 cache=${BP_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/bp}
 fpc=${FPC:-fpc}
-mkdir -p "$cache"
+[ -d "$cache" ] || mkdir -p "$cache"
 export GIT_TERMINAL_PROMPT=0
 
 say() { echo "$@" >&2; }
+# the time in ns, into $now (no process with bash 5)
 now() {
-  local t; t=$(date +%s%N)
-  case "$t" in *N) t=$(python3 -c 'import time; print(int(time.time() * 1e9))') ;; esac
-  echo "$t"
+  if [ -n "${EPOCHREALTIME-}" ]; then now=${EPOCHREALTIME//[.,]/}000; else now=$(date +%s%N); fi
+  case "$now" in *N) now=$(python3 -c 'import time; print(int(time.time() * 1e9))') ;; esac
 }
 
 # bpget (tools/bpget/bpget.pas): the dependencies. It is built by bp build itself, so the tool passes the check it gives.
@@ -139,9 +144,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$file" ] || { say "bp: no source file"; exit 2; }
-src=$(dirname "$file")
-absdir=$(cd "$src" && pwd)
-base=$(basename "$file")
+case "$file" in */*) src=${file%/*}; [ -n "$src" ] || src=/ ;; *) src=. ;; esac
+cd "$src"; absdir=$PWD; cd "$here"
+base=${file##*/}
 name=${base%.*}
 
 # The modules of deps.lock; vendor/ is a copy of them, not a part of the program, so it is not checked.
@@ -195,12 +200,21 @@ shown() {
   return $rc
 }
 
-h=$(cat "$root"/tools/bpvet/*.pas "$root"/tools/bpvet/build.sh "$root"/tools/bpvet/resolver/* | sha256sum | cut -c1-16)
+# bpvet by the hash of its sources; the hash is kept with the name, size and time of the sources, so a rebuild reads
+# them only after one of them changes
+bsrc=("$root"/tools/bpvet/*.pas "$root"/tools/bpvet/build.sh "$root"/tools/bpvet/resolver/*)
+bst=$(stat -c '%n %s %Y' "${bsrc[@]}" 2>/dev/null || stat -f '%N %z %m' "${bsrc[@]}")
+h= old=
+if [ -f "$cache/bpvet.stamp" ]; then { IFS= read -r h; IFS= read -r -d '' old || true; } < "$cache/bpvet.stamp"; fi
+if [ "$old" != "$bst" ] || [ ! -x "$cache/bpvet-$h" ]; then
+  h=$(cat "${bsrc[@]}" | sha256sum | cut -c1-16)
+fi
 bpvet=$cache/bpvet-$h
 if [ ! -x "$bpvet" ]; then
   "$root/tools/bpvet/build.sh" "$bpvet.tmp" > "$cache/bpvet-build.log" 2>&1 || { cat "$cache/bpvet-build.log"; exit 1; }
   mv "$bpvet.tmp" "$bpvet"
 fi
+[ "$old" = "$bst" ] || printf '%s\n%s' "$h" "$bst" > "$cache/bpvet.stamp"
 
 # the text of everything a build depends on: the fpc version, the BP unit, the sources of the directory and of the
 # unit path
@@ -210,13 +224,13 @@ sources() {
 }
 make_stubs() {
   local sh stubtargets=("${targets[@]}")
-  # the key: the identifiers and uses of the program (bpvet --stubkey; an edit that adds none keeps the stubs), and the
-  # name, size and time of genstubs.py and of every file of the unit path (they change rarely, and a stat is cheaper
-  # than a read)
-  sh=$( { "$fpc" -iV; "$bpvet" --stubkey "${stubtargets[@]}"
-          stat -c '%n %s %Y' "$root/tools/bpvet/resolver/genstubs.py"
-          for d in "$root" "${dirs[@]}"; do stat -c '%n %s %Y' "$d"/*.pas "$d"/*.pp "$d"/*.inc 2>/dev/null || true; done
-        } | sha256sum | cut -c1-16)
+  # the keys, from one run of bpvet --buildkey: of the stubs, the identifiers and uses of the program (an edit that adds
+  # none keeps the stubs) and the name, size and time of genstubs.py and of every file of the unit path (they change
+  # rarely, and a stat is cheaper than a read); of the check (vk, used by build), also the text of every source
+  [ -n "${fpcv-}" ] || fpcv=$("$fpc" -iV)
+  read -r sh vk < <("$bpvet" --buildkey "$fpcv|$bpvet|${lib[*]}|${vet[*]-}" "${stubtargets[@]}" -- \
+    "$root/tools/bpvet/resolver/genstubs.py" "$root" "${dirs[@]}")
+  [ -n "$vk" ] || { say "bp: bpvet --buildkey failed"; exit 1; }
   stubs=$cache/stubs-$sh
   if [ ! -d "$stubs" ]; then
     rm -rf "$stubs.tmp"
@@ -246,18 +260,15 @@ outbins() {
   echo "${fu:-${fe:-$d}}/$name.o"
 }
 build() {
-  local t0 extra=() quiet=() rc=0; t0=$(now)
+  local t0 extra=() quiet=() rc=0 now; now; t0=$now
   refresh_script; make_stubs
   # a passed check is kept by the hash of what it read (bpvet, the stubs, the options, every source of the targets), with
   # its output; the same text again is not checked again. Otherwise the check runs while fpc builds, and when it fails
   # the binary that fpc wrote is removed: nothing unchecked is handed out
-  local vk vrc=0 vpid= vtmp= fout mark b
-  vk=$( { echo "$bpvet $stubs ${lib[*]} ${vet[*]-}"
-          find "${targets[@]}" -type f \( -name '*.pas' -o -name '*.pp' -o -name '*.inc' -o -name '*.lpr' \) -print0 \
-            2>/dev/null | sort -z | xargs -0 cat 2>/dev/null; } | sha256sum | cut -c1-16)
-  mkdir -p "$cache/vet"
+  local vrc=0 vpid= vtmp= fout mark b
+  [ -d "$cache/vet" ] || mkdir -p "$cache/vet"
   if [ ! -f "$cache/vet/$vk" ]; then
-    vtmp=$(mktemp "$cache/vet/run.XXXXXX"); mark=$(mktemp "$cache/vet/mark.XXXXXX")
+    vtmp=$cache/vet/run.$$; mark=$cache/vet/mark.$$; : > "$vtmp"; : > "$mark"
     shown "$bpvet" --strict --typed --rtl "$stubs" "${lib[@]}" ${vet[@]+"${vet[@]}"} "${targets[@]}" > "$vtmp" 2>&1 &
     vpid=$!
   fi
@@ -278,7 +289,7 @@ build() {
       return 1
     fi
     rm -f "$mark"; mv "$vtmp" "$cache/vet/$vk"
-    echo "bp: checked in $(( ($(now) - t0) / 1000000 )) ms (with the build)"
+    now; echo "bp: checked in $(( (now - t0) / 1000000 )) ms (with the build)"
   fi
   [ -z "$fout" ] || printf '%s\n' "$fout"
   [ "$rc" = 0 ] || return 1
@@ -321,7 +332,7 @@ trap stop EXIT
 # one round: build, and for `run` start the program; $1 is the time of the change (empty at the start)
 cycle() {
   prepare || return 0
-  [ -z "$1" ] || say "bp: rebuilt in $(( ($(now) - $1) / 1000000 )) ms"
+  if [ -n "$1" ]; then now; say "bp: rebuilt in $(( (now - $1) / 1000000 )) ms"; fi
   if [ "$cmd" = run ]; then "$bin" ${pargs[@]+"${pargs[@]}"} <&0 & pid=$!; fi
 }
 last=$(sig)
@@ -335,7 +346,7 @@ while :; do
   cur=$(sig)
   [ "$cur" != "$last" ] || continue
   last=$cur
-  t0=$(now)
+  now; t0=$now
   stop
   cycle "$t0"
 done

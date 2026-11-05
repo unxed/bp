@@ -1083,12 +1083,13 @@ or above the parameter suppresses its S14 finding.
 | v0.30 (design) | §25.4 a memory manager of BP: a cache per carrier, pages of one size class with a local free list and one for other threads, abandoned pages adopted, the start of a goroutine without `InitThread`; the spike: a tree of 8191 goroutines 286 ms → 32 ms on one carrier |
 | v0.31 | §25.4 step 1: the memory manager of BP (`ext/bpheap.inc`, `BP_HEAP=bp`): segments of 4 MiB, pages of 64 KiB, 72 size classes, a cache per carrier and per thread, frees from other threads by an atomic list, a pool of the caches of ended threads; 2M live blocks 444 → 145 ns per block, a tree of 8191 goroutines 404 → 80 ms on 4 carriers |
 | v0.32 (report) | §25.5 competitive on every dimension, step 1 (#181): `tests/bench/size.sh` (hello world in Bp, C, Rust, Go and Goose: build, rebuild, size, RSS, start); verdicts: size — reach (smart linking 1171 → 697 KiB, the collation table on request); memory — ahead (0.3 MiB); start — ahead of all but static C; build — reach (a rebuild 171 ms, target under 100 ms) |
+| v0.33 | §25.5 size and build: `BP` no longer uses `unicodeducet` (strings compare by code point unless the program uses it; hello world 1199 → 781 KiB, with `-XX` 697 → 288 KiB); `bpvet --buildkey` gives both keys of `tools/bp` in one run, and `tools/bp` starts fewer processes: a rebuild after an edit 176 → 144 ms |
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
 
-- **The default on Linux is a static binary without libc**: strings — `fpwidestring` + `unicodeducet` (Unicode in Pascal, case and sorting work even with `LANG=C`), threads — `ext/bpthreads.pas` (an FPC thread manager on `clone` + `futex` + `mmap`, like the Go runtime). One file works on any distribution: verified on an Ubuntu host (glibc) and in an Alpine 3.20 chroot (musl); a libc build does not run on Alpine at all.
+- **The default on Linux is a static binary without libc**: strings — `fpwidestring` (Unicode in Pascal; the letter case works even with `LANG=C`, and strings compare by code point, as in C, Go and Rust; a program that wants the order of the Unicode collation in `AnsiCompareStr` and its kin puts `unicodeducet` before `BP` in its uses, about 410 KiB more, §25.5), threads — `ext/bpthreads.pas` (an FPC thread manager on `clone` + `futex` + `mmap`, like the Go runtime). One file works on any distribution: verified on an Ubuntu host (glibc) and in an Alpine 3.20 chroot (musl); a libc build does not run on Alpine at all.
 - **A program with goroutines**: `uses ..., BP;` last, as in every unit; `tools/bp build` adds `-FaBPThreads` (instead of `cthreads`) on all targets (§24.3).
 - **`-dSAFE_LIBC`** (an analogue of cgo): `cwstring` + `cthreads`; needed only for FFI with C libraries. If libc is loaded and the switch is absent, the first `BeginThread` stops the program with an explanation (code 232) rather than giving a silent race (`tests/ext/compile/mf_libc_guard.pas`).
 - Verified (FPC 3.2.2, cross-compilers built from the official sources): x86_64 natively and in Alpine; i386 natively and under qemu-i386; aarch64 under qemu-aarch64 — `test_safe`, `test_go`, `test_threads` (1500 tasks: heap, strings, exceptions, recursive locks, `TThread`, events) — 0 failures, 10 repeats without crashes.
@@ -3173,6 +3174,7 @@ The verdicts:
   2. The collation table only in a program that asks for it. Without a collation, `fpwidestring` compares strings by
      code point (it falls back to the old string manager), so only the order of `AnsiCompareStr` and its kin changes.
      The link map gives about 270 KiB for hello world: below static C (690 KiB) and Go (1203 KiB).
+     Done in v0.33: `BP` no longer uses `unicodeducet`; hello world 1199 → 781 KiB, with `-XX` 697 → 288 KiB.
 
   A dynamic binary over glibc (C 14 KiB, Goose 54 KiB, Rust 310–354 KiB) is smaller, but only runs where that glibc is.
   A static binary without libc that runs on any Linux is the niche (§18), and it is **accepted**.
@@ -3202,6 +3204,19 @@ The verdicts:
   - Still to do, toward the target of under 100 ms and the level of C: the key without a run of Python, the link
     (`ld` takes about 50 ms; gold, lld and `-Xi` are to be measured on a quiet machine), and the units of BP that a
     program does not use.
+- **The rebuild, v0.33 (a quiet machine, hello world with an edit, median of 11).** 176 → 144 ms.
+  - `tools/bp` before `fpc`: 48 → 17 ms. Both keys (of the stubs and of the check) come from one run of
+    `bpvet --buildkey` (2 ms) instead of the chains of `stat`, `find`, `cat` and `sha256sum`; the hash of the sources of
+    `bpvet` is kept with a `stat` of them; the paths and the time come from bash, not from `dirname`, `basename`,
+    `mktemp` and `date`. After `fpc`: 10 → 7 ms.
+  - `fpc` takes 118 ms: 72 ms of compile (loading 21 units, about 60 ms) and 46 ms of `ld` on 3.8 MB of objects.
+  - The linkers: FPC on Linux runs `ld.bfd` (a `-XP` prefix or `-FD` with `-Xd` gives it another one). gold does not
+    take the linker script of FPC (`link.res`); lld takes it with `-b elf64-x86-64` removed, but starts in 19 ms
+    against 2.5 ms of `ld.bfd`, so it is slower on hello world (60 against 48 ms); `-Xi` still runs `ld.bfd` on
+    x86_64-linux. `--gc-sections` (with `-XX -CX`) takes `ld` from 46 to 37 ms. The link stays with `ld.bfd`.
+  - What remains: the loading of the units (fewer units for a program that does not use them) and the link of the
+    whole of `System` and `SysUtils`; on another machine FPC main compiles a hello world without `BP` in 36 ms and
+    links it in 23 ms.
 - **What a build needs: level, ahead of Rust.**
   - FPC with all its units is 282 MiB, and a build needs binutils (`ld`), not a C compiler or libc headers.
   - Go is 97 MiB. Rust is 1.2 GiB and links with a C compiler. Goose is 28 MiB and compiles through gcc.

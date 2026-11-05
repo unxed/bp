@@ -11,16 +11,17 @@
 
 | | Bp | C (gcc) | Rust | Go | Goose |
 |---|---|---|---|---|---|
-| Hello world, size | 1171 KiB; 697 KiB with smart linking (`-XX`); static, no libc | 14 KiB dynamic, 690 KiB static | 354 KiB stripped, dynamic | 1203 KiB | 54 KiB, dynamic |
+| Hello world, size | 781 KiB; **288 KiB** with smart linking (`-XX`); static, no libc | 14 KiB dynamic, 690 KiB static | 354 KiB stripped, dynamic | 1203 KiB | 54 KiB, dynamic |
 | Hello world, peak memory | **0.3 MiB** (with `-XX`), 0.7 MiB | 1.2 MiB dynamic, 0.6 MiB static | 1.8 MiB | 1.6 MiB | 1.5 MiB |
 | Hello world, start | **587 us** (with `-XX`) | 732 us dynamic, 445 us static | 1019 us | 1496 us | 904 us |
-| Rebuild of a program | 171 ms (the check and `fpc`) | 55 ms | 237 ms | 67 ms | 110 ms |
+| Rebuild of a program | 144 ms after an edit (the check and `fpc`) | 55 ms | 237 ms | 67 ms | 110 ms |
 | Run time, 4 programs in like-for-like tiers (2026-11-05; §25.2) | 1.3–2.2x of C (the region of objects: 3.3x) | 1x | 1.07–1.97x | 1.10–2.14x | 0.90–1.28x |
 | Toolchain | 282 MiB with all units; no C compiler | | 1.2 GiB, needs a C linker | 97 MiB | 28 MiB, compiles through gcc |
 
-- **Ahead:** the memory of a program, the start (all but static C), one static file that runs on any Linux.
+- **Ahead:** the memory of a program, the start (all but static C), the size among static binaries (with `-XX`), one
+  static file that runs on any Linux.
 - **Reaching:**
-  - the size: smart linking by default, and the Unicode collation table only on request, about 270 KiB for hello world;
+  - the size: smart linking by default;
   - the rebuild: under 100 ms;
   - the run time: the levers of §25.2;
   - goroutines: M:N with `BP_MN=1`, and the memory manager of BP with `BP_HEAP=bp`, both off by default for now.

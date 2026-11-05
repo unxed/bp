@@ -5,7 +5,9 @@
   the stubs. The scan is the one of scan_sources in genstubs.py: comments and string literals are blanked, then every
   identifier is taken in lower case, and every uses clause (up to its semicolon) gives its unit names without an
   "in 'file'" part. The output is the sorted identifiers, one per line, a line "|", and the sorted unit names, one per
-  line. A directory is walked for *.pas, *.pp, *.inc, *.lpr and *.dpr. }
+  line. A directory is walked for *.pas, *.pp, *.inc, *.lpr and *.dpr.
+  bpvet --buildkey SALT TARGET... -- STAT...: both keys of a build of tools/bp in one run, so that a rebuild starts no
+  chain of stat, find, cat and sha256sum. }
 unit BpvetKey;
 
 {$mode objfpc}{$H+}
@@ -18,10 +20,16 @@ type
 { Writes the key text of Paths to the standard output. }
 procedure PrintStubKey(const Paths: TKeyPaths);
 
+{ Writes the two keys of a build to the standard output, on one line: the key of the RTL stubs and the key of the check.
+  Salt is what both depend on besides the files (the version of fpc, the options of the check). The key of the stubs
+  takes the key text of Targets and the name, size and time of every file of Stats (of a directory: its *.pas, *.pp
+  and *.inc); the key of the check takes the key of the stubs and the paths and texts of the sources of Targets. }
+procedure PrintBuildKeys(const Salt: String; const Targets, Stats: TKeyPaths);
+
 implementation
 
 uses
-  SysUtils, Classes, Safe;
+  SysUtils, Classes, md5, Safe;
 
 type
   TListBox = specialize TOwned<TStringList>;
@@ -187,16 +195,8 @@ begin
   Result := (Ext = '.pas') or (Ext = '.pp') or (Ext = '.inc') or (Ext = '.lpr') or (Ext = '.dpr');
 end;
 
-procedure ScanFile(const Name: String; Idents, Units: TStringList);
-var
-  Text: TListBox;
-begin
-  Text := TListBox.Own(TStringList.Create);
-  Text.Get.LoadFromFile(Name);
-  ScanText(Text.Get.Text, Idents, Units);
-end;
-
-procedure ScanPath(const Path: String; Idents, Units: TStringList);
+{ The sources under Path, in Names: Path itself when it is a source file, else every source of the directory tree. }
+procedure ListSources(const Path: String; Names: TStringList);
 var
   R: TSearchRec;
   Dir: String;
@@ -204,7 +204,7 @@ begin
   if not DirectoryExists(Path) then
   begin
     if FileExists(Path) and IsKeySource(Path) then
-      ScanFile(Path, Idents, Units);
+      Names.Add(Path);
     Exit;
   end;
   Dir := IncludeTrailingPathDelimiter(Path);
@@ -214,35 +214,113 @@ begin
       if (R.Name = '.') or (R.Name = '..') then
         Continue;
       if (R.Attr and faDirectory) <> 0 then
-        ScanPath(Dir + R.Name, Idents, Units)
+        ListSources(Dir + R.Name, Names)
       else if IsKeySource(R.Name) then
-        ScanFile(Dir + R.Name, Idents, Units);
+        Names.Add(Dir + R.Name);
     until FindNext(R) <> 0;
   finally
     FindClose(R);
   end;
 end;
 
-procedure PrintStubKey(const Paths: TKeyPaths);
+{ An empty list that keeps its lines sorted, each once. }
+function SortedBox: TListBox;
+begin
+  Result := TListBox.Own(TStringList.Create);
+  Result.Get.Sorted := True;
+  Result.Get.Duplicates := dupIgnore;
+  Result.Get.CaseSensitive := True;
+end;
+
+{ The key text of the sources of Paths; with Texts, also the paths and texts of the sources, in the order of their
+  paths. }
+function KeyText(const Paths: TKeyPaths; const Texts: TStringList): String;
 var
-  Idents, Units: TListBox;
+  Names, Idents, Units, Text: TListBox;
   I: Integer;
 begin
-  Idents := TListBox.Own(TStringList.Create);
-  Units := TListBox.Own(TStringList.Create);
-  Idents.Get.Sorted := True;
-  Idents.Get.Duplicates := dupIgnore;
-  Idents.Get.CaseSensitive := True;
-  Units.Get.Sorted := True;
-  Units.Get.Duplicates := dupIgnore;
-  Units.Get.CaseSensitive := True;
+  Names := SortedBox;
+  Idents := SortedBox;
+  Units := SortedBox;
+  Text := TListBox.Own(TStringList.Create);
   for I := 0 to High(Paths) do
-    ScanPath(Paths[I], Idents.Get, Units.Get);
+    ListSources(Paths[I], Names.Get);
+  for I := 0 to Names.Get.Count - 1 do
+  begin
+    Text.Get.LoadFromFile(Names.Get[I]);
+    ScanText(Text.Get.Text, Idents.Get, Units.Get);
+    if Texts <> nil then
+    begin
+      Texts.Add(Names.Get[I]);
+      Texts.Add(Text.Get.Text);
+    end;
+  end;
+  Result := '';
   for I := 0 to Idents.Get.Count - 1 do
-    WriteLn(Idents.Get[I]);
-  WriteLn('|');
+    Result := Result + Idents.Get[I] + LineEnding;
+  Result := Result + '|' + LineEnding;
   for I := 0 to Units.Get.Count - 1 do
-    WriteLn(Units.Get[I]);
+    Result := Result + Units.Get[I] + LineEnding;
+end;
+
+{ The name, size and time of a file, one line. }
+function StatLine(const Name: String; const R: TSearchRec): String;
+begin
+  Result := Name + ' ' + IntToStr(R.Size) + ' ' + IntToStr(R.Time) + LineEnding;
+end;
+
+{ The name, size and time of every file of Paths (of a directory: its *.pas, *.pp and *.inc), sorted. }
+function StatText(const Paths: TKeyPaths): String;
+var
+  Lines: TListBox;
+  R: TSearchRec;
+  Dir, Ext: String;
+  I: Integer;
+begin
+  Lines := SortedBox;
+  for I := 0 to High(Paths) do
+    if DirectoryExists(Paths[I]) then
+    begin
+      Dir := IncludeTrailingPathDelimiter(Paths[I]);
+      if FindFirst(Dir + '*', faAnyFile, R) = 0 then
+      try
+        repeat
+          Ext := LowerCase(ExtractFileExt(R.Name));
+          if (Ext = '.pas') or (Ext = '.pp') or (Ext = '.inc') then
+            Lines.Get.Add(StatLine(Dir + R.Name, R));
+        until FindNext(R) <> 0;
+      finally
+        FindClose(R);
+      end;
+    end
+    else if FindFirst(Paths[I], faAnyFile, R) = 0 then
+    try
+      Lines.Get.Add(StatLine(Paths[I], R));
+    finally
+      FindClose(R);
+    end;
+  Result := '';
+  for I := 0 to Lines.Get.Count - 1 do
+    Result := Result + Lines.Get[I];
+end;
+
+procedure PrintStubKey(const Paths: TKeyPaths);
+begin
+  Write(KeyText(Paths, nil));
+end;
+
+procedure PrintBuildKeys(const Salt: String; const Targets, Stats: TKeyPaths);
+var
+  Texts: TListBox;
+  StubKey, Check: String;
+  I: Integer;
+begin
+  Texts := TListBox.Own(TStringList.Create);
+  StubKey := MD5Print(MD5String(Salt + #0 + KeyText(Targets, Texts.Get) + #0 + StatText(Stats)));
+  Check := Salt + #0 + StubKey;
+  for I := 0 to Texts.Get.Count - 1 do
+    Check := Check + #0 + Texts.Get[I];
+  WriteLn(StubKey, ' ', MD5Print(MD5String(Check)));
 end;
 
 end.
