@@ -7,6 +7,19 @@ owners and regions, in a way that needs no lifetime annotations written by hand:
 Whether the reliability of Rust can be reached this way is an open question, and the study of its feasibility is one
 of the goals of the project. The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
 
+**Research questions.** Better Pascal is also research in programming languages. It tests these hypotheses:
+1. **Memory safety without changing the compiler:** how far a library and a check before the build over the stock
+   compiler can go.
+2. **The reliability of Rust without lifetime annotations:** whether everything can be inferred without rejecting too
+   many correct programs.
+3. **The speed of C without annotations and without a collector:** whether there is a way besides the regions and root
+   analysis of Goose: the choice of algorithm and memory in the library (the memory manager, vector kernels, string views).
+4. **Several safe memory models in one language** (owners, regions, arenas, a collector): whether the choice helps a
+   model pick the approach that fits a task, or harms, and one or two main styles should stay.
+
+Each hypothesis is tested by measurements and tests: the table of guarantees (§8), the benchmarks (§25.2), findings
+such as H20. A "no" is a result too.
+
 > **Build with `tools/bp build`, not with `fpc` directly.** `bp build [--release] [fpc options] FILE.pas` checks the
 > program (`bpvet --strict --typed`: ownership, regions, borrows) and calls `fpc` only when the check passes, so
 > unsafe code is built only where it is declared (`// UNSAFE:`, `// borrow:`, `// root:`). The guarantees of Better

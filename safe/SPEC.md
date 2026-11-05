@@ -186,6 +186,19 @@ owners and regions, in a way that needs no lifetime annotations written by hand:
 Whether the reliability of Rust can be reached this way is an open question, and the study of its feasibility is one
 of the goals of the project. The performance and the reliability of Rust are the goal the work moves towards, measured as it goes.
 
+**Research questions.** Better Pascal is also research in programming languages. It tests these hypotheses:
+1. **Memory safety without changing the compiler:** how far a library and a check before the build over the stock
+   compiler can go.
+2. **The reliability of Rust without lifetime annotations:** whether everything can be inferred without rejecting too
+   many correct programs.
+3. **The speed of C without annotations and without a collector:** whether there is a way besides the regions and root
+   analysis of Goose: the choice of algorithm and memory in the library (the memory manager, vector kernels, string views).
+4. **Several safe memory models in one language** (owners, regions, arenas, a collector): whether the choice helps a
+   model pick the approach that fits a task, or harms, and one or two main styles should stay.
+
+Each hypothesis is tested by measurements and tests: the table of guarantees (§8), the benchmarks (§25.2), findings
+such as H20. A "no" is a result too.
+
 FPC already has almost everything: reference-counted strings with an encoding, dynamic arrays, records
 with automatic finalization, interfaces with an atomic counter, range checks,
 exceptions with guaranteed finalization. Three things are missing: **(1)** the right defaults
@@ -1123,6 +1136,7 @@ or above the parameter suppresses its S14 finding.
 | v0.42 | §24.4 extension methods (`typehelpers`): the dialect writes the modeswitch in the module; every rule of §6 checks the body of a helper method (`tests/lint/helper_*.pas`); S29: a helper for `TObject` must inherit `TSafeObjectHelper`, else `.Free` compiles again; a helper that reads a private member of the type it extends does not resolve in the typed mode; the rule card (§0) gets a block; the status rows of S13 (implemented) and of the speed (measured, §25.2, unxed/bp#181, #108) are corrected |
 | v0.44 | the philosophy of Better Pascal (§1, README): the simplicity of development of Go with the performance and reliability of Rust, the determinism of owners and regions instead of a collector; goroutine is the term of the project (§14); goroutines run M:N by default (`BP_MN=0`, `-dBP_1TO1` for 1:1), CI runs the 1:1 mode as the extra one |
 | v0.44.1 | the philosophy (§1, README): whether the reliability of Rust can be reached without lifetime annotations is an open question, and the project is a study of its feasibility; §24.9: the audit of `// UNSAFE:` matters most for generated code |
+| v0.44.2 | §1, README: the research questions of the project (memory safety without changing the compiler, the reliability of Rust without lifetime annotations, the speed of C without annotations and a collector, several safe memory models in one language), each tested by measurements and tests |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
