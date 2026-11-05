@@ -7,12 +7,12 @@ Reads the jobs of the latest run for the head commit of PR (not the check summar
 leaves "in progress" after every job has finished) and prints a line whenever their state changes.
 - Every job succeeded: exit 0; with --merge the PR is merged (gh pr merge --merge --delete-branch) first.
 - A job failed in its own steps (a build or a test): exit 1 at once, with the end of the failed log.
-- A job failed on the runner (cancelled, timed out, or failed in an install step), waits for a runner longer than
-  QUEUE minutes (3 times QUEUE while another job of the run runs: the runners are busy with other PRs, a restart
-  only puts the job at the end of the queue), or hangs in a step: the run is cancelled at once and its failed jobs
-  started again, up to RERUNS times; one more such failure is exit 1. A step hangs when it runs longer than 3 times the same step of the last
-  successful run of the workflow plus 2 minutes; an install step (a name that starts with "Install", where a slow apt
-  mirror stalls: 15 s as a rule, 3 minutes on a slow mirror, 13 and 20 minutes when it stalled) after STALL minutes.
+- A job failed on the runner (cancelled, timed out, or failed in an install step), waits for a runner longer than QUEUE
+  minutes (3 times QUEUE while another job of the run runs: the runners are busy with other PRs, a restart only puts the
+  job at the end of the queue), or hangs in a step: the run is cancelled at once and its failed jobs started again, up
+  to RERUNS times; one more such failure is exit 1. A step hangs when it runs longer than 3 times the same step of the
+  last successful run of the workflow plus 2 minutes; an install step (a name that starts with "Install", where a slow
+  apt mirror stalls: 15 s as a rule, 3 minutes on a slow mirror, 13 and 20 minutes when it stalled) after STALL minutes.
 - A PR that conflicts with its base is exit 3 at once (merge the base in and push): GitHub starts no run for it, and
   an older run cannot be merged.
 - No run for the head commit: a new head commit (a push during the wait) is followed; no run after a minute
