@@ -30,7 +30,7 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | FFI: `TCResource`, the `ffi_libc` binding | **implemented, test** (needs libc, `-dSAFE_LIBC`) | §13 |
 | Goroutines: `TGroup/TTask/TChan/Select`, R6–R8 (ext layer, unit `BP`) | **implemented, tests** | §14, `test_go` |
 | Threads without libc (`ext/bpthreads.pas`: `clone`+`futex`+`mmap`), Linux without libc by default | **implemented, tests** (`test_threads`; x86_64, i386, aarch64, Alpine) | §18 |
-| Sum types: example and test; **S13 checks (`case` exhaustiveness, tag)** | example and test exist; **checks (linter) — plan** | §16, `test_sumtype` |
+| Sum types: example and test; **S13 checks (`case` exhaustiveness, tag)** | example and test (`test_sumtype`); **S13 is implemented in `bpvet`**: a `case` over an enumeration of the module lists every value and has no `else` (`s13_ok`, `s13_bad`, `s13_else_bad`), a variant field is read only in the branch of its tag (a read outside every `case` over its tag is an error, a write is allowed: `s13_variant_ok`, `s13_variant_bad`, `s13_read_ok`, `s13_read_bad`); **implemented, lint tests, CI**. Not checked yet: an enumeration of another unit, labels that are ranges or constants, and that a variant record is made only by its constructor function (a convention) | §16, §6, `test_sumtype`, `tests/lint/s13_*.pas` |
 | Go-style package manager: `deps.txt`, `deps.lock`, MVS, `vendor`, mirrors, Software Heritage, unsafe audit | `deps.txt`, `deps.lock`, MVS, the module cache, `vendor`, mirrors: **implemented, test, CI** (`tools/bp get`, `tools/bp vendor`, `tests/deps.sh`); Software Heritage, the unsafe audit: **plan** | §15 |
 | The `sp` tool (`build/test/vet/fmt/doc/get/vendor/unsafe/embed/fuzz`) | **plan only** | §16 |
 | Linter `bpvet` (`tools/bpvet`, on `fcl-passrc`): the frame and rule S7 | **implemented, lint tests, CI** | §6 |
@@ -58,11 +58,12 @@ Versions and what was verified on which targets: §2 (table) and §17 (history).
 | Concept v3: one scope object (`S.Hold`, `S.Defer`; `TArena` and a local `TOwned` fold into the region), Send and Sync inferred, goroutines M:N on the stacks of `BPThreads`, the `TComponent` tree as an owner | `Hold` and `Defer`, Send and Sync, M:N (`BP_MN=1`), the `TComponent` owner (the typed `bpvet`, §21.4): **implemented**; `TArena` on the list: **design (plan)** | §21 |
 | Final touches: `bp run` and scripts, `--watch`, `bp new` (these three exist, `tools/bp`, `tests/bp.sh`), the `fpc` line and `--target`, readable findings and `bp explain`, the format check (S20), `bp test` with a leak check after each test, `// derive:`, a profiler, `bp lsp`, a page in the browser | **`bp run`, `--watch`, `bp new` implemented, tests**; doc tests exist (`tools/doctest.py`); the rest design (plan) | §22 |
 | Systems programming and C without versions: profiles S/U/H/F, `CLib.Bind` (a table of names bound at run time), profile U (no `PT_INTERP`, no `DT_NEEDED`, the host libc through its loader), Layer 1 C code linked freestanding, `bp bind`, a freestanding kernel, `TMmio<T>`, inferred contexts (S23) | **design (plan)**; the facts of §23.3 are measured | §23 |
-| Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured; one model of lifetimes (a root, its reach, its changes): **design, for the owner's review** (§24.9) | §24 |
+| Concept v4: one sentence for all lifetimes, marks of fact written by the machine, `BP` last in the program file too (`-FaBPThreads`), closures that cannot escape (`nestedprocvars`), extension methods (`typehelpers`), interfaces as borrows (`{$interfaces corba}`), `// raises:` inferred, the casts and the uninitialised variables the table of §8 missed (S24, S25, `-Sew`) | **design (plan)**; the facts of §24 are measured; one model of lifetimes (a root, its reach, its changes): **design, decided 2026-11-05** (§24.9); extension methods are the exception, see the next row | §24 |
+| Extension methods (concept v4): `type helper for Integer`, `record helper for TPoint`, `class helper for TNode`, written by the author with the modeswitch in the module (class helpers need none) | **checked, lint tests, CI**: every rule of §6 applies to the body of a helper method as to any method (`tests/lint/helper_*_bad.pas`), the resolver of the typed mode refuses a helper that reads a private member of the type it extends (`tests/lint/compile/mf_helper_private.pas`), **S29** refuses a helper for `TObject` that would lift the poison of `.Free` (`s29_*.pas`; compile tests `mf_helper_*.pas`); `bp fix` writing the modeswitch is **plan** (§24.8 step 5) | §24.4, §6 (S29) |
 | An uninitialized local class reference, function result or `out` parameter (H19) | **checked:** `tools/bp build` adds `-Sew` (`tests/safe/compile/mf_uninit.pas`) and runs the typed `bpvet`: S26a proves the assignment on every path (also where FPC does not warn: a branch, an `out` parameter, a result), S26b keeps a class under 64 KiB so a nil dereference faults | §8, §22.9 |
 | Data races through a dynamic array, a `TShared` object or a global shared by goroutines (H14–H16) | **checked** by the typed `bpvet` (`tools/bp build`): S11m, S11s, S19; `SAFE_DEBUG` R17 at `Send` | §8, §21.2 |
 | Class casts and untyped parameters (H17, H18): an unchecked downcast, `TBig(Buf)[N]` over a `var Buf`, `absolute` | **checked** by the typed `bpvet` (`tools/bp build`): S24 (`--fix` writes `as`), S25 | §8, §24.6 |
-| Speed competitive with C, Rust, Go and Goose on the same algorithm | **goal**, not measured yet; the order of the work: §25 | §25.2 |
+| Speed competitive with C, Rust, Go and Goose on the same algorithm | **measured** (`tests/bench/compare.sh`, CI report): the tables of every tier and the verdict on the run time are in §25.2 (about 1.0–1.3x of C is within reach without a compiler fork; gcc stays ahead in plain scalar loops); the before/after table of the steps of #181 is in unxed/bp#181 and #108; the levers still open: §25.2 | §25.2 |
 | Competitive size, memory, start and build time (#181) | **measured** (`tests/bench/size.sh`), verdicts and levers in §25.5 | §25.5 |
 
 ---
@@ -121,6 +122,15 @@ SUM TYPES AND PARAMETERS               (§16; enum and match from Rust without a
   inside case S.Kind of; a case over an enumeration lists ALL values and has no else (S13).
   String and other managed types go in the common part of the record (FPC does not allow them in the variant part).
   Parameters are const by default; var/out only when the caller must see the change (S14).
+
+EXTENSION METHODS                      (§24.4; the extension functions of Kotlin and Swift, shipped by FPC)
+  A helper adds methods to a type that is not yours: TIntHelper = type helper for Integer; TNodeHelper = class helper
+  for TNode; TPointHelper = record helper for TPoint. The line stays in the module, as for every modeswitch:
+  {$modeswitch typehelpers} for a type helper, {$modeswitch advancedrecords} as well for a record helper; a class
+  helper needs none. A helper method is a method: S3–S6, S9, S14, S19, S24–S26 check its body as any other.
+  A helper for TObject inherits TSafeObjectHelper (class helper(TSafeObjectHelper) for TObject), else S29; a helper
+  uses no private member of the type it extends (the typed bpvet stops there). One helper is in effect per type, the
+  last declared: to keep the methods of SysUtils write type helper(TStringHelper) for String.
 
 CLEANUP AND TESTS                      (§5; an idea from Zig)
   Non-memory (a handle, terminal mode, a lock): D := TDefer.Call(@Self.Close) — called on leaving the scope
@@ -390,6 +400,7 @@ holder of the strong reference; the first `Weak` of one object from two threads 
 | S26a | definite assignment (H19): a class reference that FPC does not zero, read or returned before it is assigned | `bpvet` S26a (typed, `tools/bpvet/bpvetnil.pas`): an error on the first read of a local of a class or class-of type that is not assigned on every path before it, and on the end of a routine (or an `Exit`) where its result or an `out` parameter of such a type is not assigned on every path; branches are joined, a `while` or `for` body may not run (a `for` with constant bounds in its direction runs), a handler of `try...except` and a `finally` block start from the state before `try`; a `var` argument, `@F`, a name used by a nested routine and `asm` count as assignments; what `-Sew` already catches is reported too (`tests/lint/s26a_bad.pas`, `s26a_out_bad.pas`, `s26a_result_bad.pas`, `s26a_finally_bad.pas`, `s26a_ok.pas`); `// UNSAFE: <why>` on the line or above |
 | S26b | a class whose instance is larger than 64 KiB: a field of a nil reference past the unmapped first pages would not fault | `bpvet` S26b (typed): an error on a class of the module whose fields with those of its ancestors, counted from below (no alignment, no variant parts), exceed 65536 bytes; a large buffer goes into a dynamic array (`s26b_bad.pas`, `s26b_ok.pas`) |
 | S27 | the place of a value of a `TMap` kept: `P := M.Ref(K, D)` points into the slots of the map, which the next change of the map moves | `bpvet` S27 (typed, `bpvethold.pas`): an error on a call of `Ref` of a specialization of `TMap` that is not dereferenced at once (`Inc(M.Ref(K, 0)^)` is the form); `// UNSAFE: <why>` on the line or above (`tests/lint/s27_bad.pas`, `s27_ok.pas`) |
+| S29 | a helper for `TObject` that does not inherit `TSafeObjectHelper` (extension methods, §24.4): FPC puts one helper in effect per type, the last one declared, so a second helper for `TObject` takes the place of the one that makes `.Free` a compile error, and `Obj.Free` compiles again (measured on FPC 3.2.2: `class helper for TObject` after `Safe` and `N.Free` builds) | `bpvet` S29 (`bpvetrules.pas`): an error on a class helper whose extended type is `TObject`, `System.TObject` or a name of the module that is `TObject` (`T = TObject`, also through another alias), unless it inherits `TSafeObjectHelper` (`class helper(TSafeObjectHelper) for TObject` keeps the poison and adds methods: `mf_helper_inherit.pas`); `// UNSAFE: <why>` on the line above or at the end of the line drops it; `TSafeObjectHelper` itself is not reported; a `// UNSAFE-UNIT:` module is not checked (`tests/lint/s29_bad.pas`, `s29_alias_bad.pas`, `s29_qualified_bad.pas`, `s29_ok.pas`). A helper for any other type has no rule of its own: the rules above check its body as the body of any method (`tests/lint/helper_destroy_bad.pas`, `helper_address_bad.pas`, `helper_create_bad.pas`, `helper_param_bad.pas`, `helper_cast_bad.pas`, `helper_nil_bad.pas`, `helper_global_bad.pas`, `helper_untyped_bad.pas`; S3, S4, S6, S14, S24, S26a, S19, S25), and a helper that reads a private member of the type it extends (`FObj` of a `TOwned`: FPC allows it, also from another unit, and it skips the check of `Get`) does not resolve in the typed mode, which `tools/bp build` runs (`tests/lint/compile/mf_helper_private.pas`). `Self.Free` in a helper and `N.Free` after a helper that inherits the poison do not compile (`tests/safe/compile/mf_helper_free.pas`, `mf_helper_inherit.pas`) |
 | S21 | a file without a `program`/`unit`/`library`/`package` header, or a header whose name is not the name of the file (two sources of one name) | `bpvet` S21 (`bpvetstyle.pas`, over the text before the parse): an error; the name is compared without letter case (`unit Region` in `region.pas`); a file without a header is a `unit` when it has `interface`, else a `program`; `bpvet --fix` / `tools/bp fix` inserts the header before the first token or writes the name of the file into it; a file whose name is not an identifier (dots allowed) is reported without a fix (`tests/lint/s21_none_bad.pas`, `s21_name_bad.pas`, `s21_ok.pas`) |
 | S22 | a reserved word with an upper-case letter (`Begin`, `END`): the style of Better Pascal is lower case, upper case is the style of the 1980s and stands out in the text | `bpvet` S22: a warning (an error with `--strict`, so in `tools/bp build`); `--fix` lowers the word; comments, strings, `&escaped` identifiers and the bodies of `asm` blocks are skipped; `string` is not checked, it is written as the type it names (`String`); directives (`override`, `virtual`) are not reserved words and are not checked (`tests/lint/s22_bad.pas`) |
 
@@ -1095,6 +1106,7 @@ or above the parameter suppresses its S14 finding.
 | v0.30.1 | the atomic routines on aarch64: the `Interlocked` routines of FPC 3.2.2 there have no barrier, so a lock built on them ordered nothing; `safe/atomic.inc` puts a full barrier on both sides (units Safe, BP, BPThreads; `-dBP_ATOMIC_BARRIERS` builds them on any CPU) |
 | v0.41 (design) | §24.9 one model of lifetimes, for the owner's review: values, owners (roots) and borrows; one sentence (a borrow is used only while its root is alive and unchanged) and five rules (name, reach, change, signature, container) of which S5, S11, S17, S18, S27 and the approved S28 are instances; the string view as an instance; nested procedure values and CORBA interfaces as borrows; the lifetime marks sorted into fact and intent (`// borrow:` stays intent); the research table (Rust, Swift, Go, Goose, Zig, Vale, Hylo); H20 found and measured (a nested routine frees the argument of its own `const` parameter) |
 | v0.41.1 | §24.9 decided by the owner: the liveness until the last use for every *change* rule now, the codes kept, `// borrow:` stays intent, the quarantine R20 and the inferred freeing methods both, `// root:` a fact, H20 first (#207), `procedure of object` with the LCL, `M.Ref` one expression |
+| v0.42 | §24.4 extension methods (`typehelpers`): the dialect writes the modeswitch in the module; every rule of §6 checks the body of a helper method (`tests/lint/helper_*.pas`); S29: a helper for `TObject` must inherit `TSafeObjectHelper`, else `.Free` compiles again; a helper that reads a private member of the type it extends does not resolve in the typed mode; the rule card (§0) gets a block; the status rows of S13 (implemented) and of the speed (measured, §25.2, unxed/bp#181, #108) are corrected |
 | v0.4 (plan) | §15 dependencies like Go without a proxy (a git hash instead of a checksum database, mirrors, `vendor/`, unsafe audit); §16 the `sp` tool, fuzzing, sum types (S13), parameter immutability (S14) |
 
 ## §18. Portability like Go: Linux without libc by default (v0.5)
@@ -2618,9 +2630,34 @@ run on 2026-11-04.
   class, as Kotlin extension functions and Swift extensions do. `SysUtils` already ships `TStringHelper`:
   `S.Trim`, `S.Split([','])`, `S.StartsWith('a')`, `(42).ToString` work on the UTF-8 `String` of §3 with byte lengths
   (measured: `S.Trim.Length` and `Length(S.Trim)` are both 20 for a Cyrillic text of 11 code points). `BP` adds one
-  helper with the code point view (`S.CPLength`, `for Ch in S.CodePoints`). Caveats: `Chars[I]` and `IndexOf` of
+  helper with the code point view (`S.CPLength`, `for Ch in S.CodePoints`; step 5 of §24.8, today `CPLength(S)` and
+  `CodePoints(S)` are functions). Caveats: `Chars[I]` and `IndexOf` of
   `TStringHelper` are byte based, as `S[I]` is (§3), and `ToUpper` of a non-ASCII text goes through the §3 limitation. This
-  is the same mechanism that poisons `.Free` (§6): a helper on `TObject`.
+  is the same mechanism that poisons `.Free` (§6): a helper on `TObject`. What the dialect says about it
+  (measured on FPC 3.2.2, 2026-11-05):
+  - **The modeswitch is written in the module, by the author.** FPC has no command line option for a modeswitch, so
+    `tools/bp build` could only add it by editing a copy of the source; the other modeswitches of the dialect
+    (`autoderef`, `nestedprocvars`) stand in the file too. A `type helper` needs `typehelpers`, a `record helper` needs
+    `advancedrecords` as well, a `class helper` needs none, and the helpers that SysUtils ships (`S.Trim`) work
+    in a module without the line: it is for declaring a helper, not for using one. Without the line both `fpc` and `bpvet` stop at the declaration (`Identifier not found
+    "helper"`, `cannot parse this file`), so it cannot be forgotten silently; the line is a mark of fact (§24.2), and
+    `bp fix` writing it with the first helper is step 5 of §24.8, not done yet.
+  - **A helper method is a method.** `bpvet` walks its body like any other: `Self.Destroy` is S3, `@Self` is S4,
+    `TNode.Create` without an owner is S6, a `String` by value is S14, `TSquare(Self)` is S24, a local class reference
+    read before it is assigned is S26a, a write to a global is S19, an untyped parameter is S25 (the lint tests
+    `helper_*_bad.pas`). `Self.Free` does not compile in a helper of a class: the poison reaches it.
+  - **One helper is in effect per type, the last one declared.** A second `type helper for String` hides
+    `TStringHelper` (`S.Trim` becomes `Illegal qualifier`); `type helper(TStringHelper) for String` inherits it and both
+    work. The same holds for `TObject`, and there it is a hole: `class helper for TObject` declared after `Safe`
+    takes the place of `TSafeObjectHelper` and `N.Free` compiles. **S29** closes it (§6): a helper for `TObject` inherits
+    `TSafeObjectHelper`, and then `N.Free` still does not compile.
+  - **A helper reads the private members of the type it extends,** also of a type of another unit: a record helper for
+    `specialize TOwned<TNode>` compiled with `Result := FObj`, which skips the check of `Get`, or could clear `FLife`
+    and end the ownership. The resolver of `bpvet` refuses it (`Can't access private member FObj`, a Fatal), so
+    `tools/bp build` does not compile such a module; the lint test `mf_helper_private.pas` holds the message.
+  - **Not closed:** a helper method that returns `Get` under another name (`function Raw: TNode`) hides the call from the
+    text rule S5 (`Local := Box.Raw; Box.Reset; Local.X`), as any function that wraps `Get` does; the typed `bpvet`
+    does not follow the result of a wrapper either (measured). It is the same open point as the roots of §24.1.
 - **Interfaces as borrows: `{$interfaces corba}`.** A CORBA interface is a plain reference with no counter: any class
   implements it (`TConsole = class(TObject, IWriter)`, no `TInterfacedObject`), and passing it is a borrow (measured:
   `Emit(C)` with `W: IWriter`, then `still alive`, then `destroyed` at the owner's `Free`). This is the interface of Go,
@@ -2671,7 +2708,7 @@ the three holes until the steps close them.
 | Loved in | Was in Better Pascal | After §24 |
 |---|---|---|
 | Swift non-escaping closures, Kotlin lambdas | "no closures in FPC 3.2" (§14, §22.7) | `nestedprocvars`: the non-escaping kind, today |
-| Kotlin and Swift extensions, Rust `impl` on a foreign type | not used | `typehelpers`, shipped by FPC |
+| Kotlin and Swift extensions, Rust `impl` on a foreign type | not used | `typehelpers`, shipped by FPC; a helper method is checked as any method, S29 keeps `.Free` poisoned (§24.4) |
 | Go interfaces | COM interfaces with ownership | `{$interfaces corba}`: an interface is a borrow |
 | Zig error sets, Rust `Result` in the signature | hidden exceptions | `// raises:` inferred and written |
 | Rust: no unchecked downcast, no `transmute` outside `unsafe`; Zig: no silent cast | not listed in §8 | S24, S25 |
@@ -2703,6 +2740,8 @@ One step is one PR from a fresh `main`, with a criterion of done.
 4. **Nested procedure values:** S17 roots one in its frame; `bp fix` writes the modeswitch; `tests/` gets a `ForEach` and
    a `Sort` with a nested comparator. *Done:* lint tests, the example builds with `bp build`.
 5. **The `String` helper of `BP`** (`CPLength`, `CodePoints`); `bp fix` writes `typehelpers`. *Done:* `test_utf8`.
+   *Status:* the rules for helpers are **done** (v0.42: S29, the lint tests of the bodies of helper methods, the compile
+   tests, §24.4); the helper of `BP` and `bp fix` writing the modeswitch are not.
 6. **CORBA interfaces:** S5 treats an interface local as a borrow and an interface field as a class field; `bp new`
    writes the directive. *Done:* lint tests; §0 item 5 rewritten.
 7. **`// raises:`** on the engine of §23, the two findings of §24.5. *Done:* lint tests; `bp explain` shows the set.
