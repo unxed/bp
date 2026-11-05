@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* Benchmark suite (tests/bench/compare.sh): binary trees, the C version (malloc and free, one call per node). */
+/* Benchmark suite (tests/bench/compare.sh): binary trees, the tier with one heap block per node, the C version (malloc and free, one call per node). */
 #include <stdio.h>
 #include <stdlib.h>
 

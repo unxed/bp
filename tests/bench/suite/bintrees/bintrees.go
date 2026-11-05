@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Benchmark suite (tests/bench/compare.sh): binary trees, the Go version (the garbage collector frees the trees).
+// Benchmark suite (tests/bench/compare.sh): binary trees, the tier with one heap block per node, the Go version (the garbage collector frees the trees).
 package main
 
 import "fmt"

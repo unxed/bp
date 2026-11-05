@@ -75,7 +75,7 @@ end;
 
 procedure Advance;
 var
-  I, J: Integer;
+  I, J: SizeInt;
 begin
   for I := 0 to Count - 2 do
     for J := I + 1 to Count - 1 do
@@ -86,7 +86,7 @@ end;
 
 function Energy: Double;
 var
-  I, J: Integer;
+  I, J: SizeInt;
   DX, DY, DZ: Double;
 begin
   Result := 0;

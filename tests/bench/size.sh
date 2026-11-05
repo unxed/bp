@@ -4,11 +4,18 @@
 # (tests/bench/suite/hello/hello.{pas,c,rs,go,goose}); hello_sysutils.pas adds SysUtils and Format.
 # Variants:  bp: tools/bp build --release -O2         bp-sysutils: the same, hello_sysutils.pas
 #            bp-xx: the same as bp with -XX -CX (smart linking)
+#            bp-libc: the same as bp with -dSAFE_LIBC (dynamic, glibc: the mode of an FFI to C, SPEC §18)
 #            gcc: gcc -O2 (dynamic, glibc)            gcc-static: gcc -O2 -static
-#            rust: rustc -O                           rust-small: rustc -C opt-level=z -C panic=abort -C lto
+#            rust: rustc -O (dynamic, glibc)          rust-static: rustc -O -C target-feature=+crt-static (static glibc)
+#            rust-musl: rustc -O --target x86_64-unknown-linux-musl (n/a when the target is not installed)
+#                                                     rust-small: rustc -C opt-level=z -C panic=abort -C lto
 #                                                       -C codegen-units=1 -C strip=symbols
-#            go: go build                             go-small: go build -ldflags="-s -w"
-#            goose: goose build -O2 (over gcc)
+#            go: go build (static)                    go-small: go build -ldflags="-s -w"
+#            go-dyn: CGO_ENABLED=1 go build -ldflags=-linkmode=external (dynamic, glibc)
+#            goose: goose build -O2 (over gcc; dynamic, glibc)
+#            goose-static: the same with gcc -static (a wrapper given as GOOSE_CC)
+# Like for like (SPEC §25.5): static is compared with static (bp, gcc-static, rust-static, go, goose-static) and dynamic
+# with dynamic (bp-libc, gcc, rust, go-dyn, goose).
 # Columns: the build time (a clean build, the median of 3; the build caches of Go and Rust stay, as a user has them), a
 # rebuild after an edit (a comment line added to the source) with the object directory kept (the units of BP built,
 # as for the next build of a program; median of 3),
@@ -22,13 +29,16 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 out=${1:-$(mktemp -d)}
 N=${N:-1000}
-VARIANTS=${VARIANTS:-"bp bp-xx bp-sysutils gcc gcc-static rust rust-small go go-small goose"}
+VARIANTS=${VARIANTS:-"bp bp-xx bp-sysutils bp-libc gcc gcc-static rust rust-static rust-musl rust-small go go-dyn go-small goose goose-static"}
 FPC=${FPC:-fpc}
 if [ -z "${GOOSE:-}" ]; then
   if command -v goose > /dev/null 2>&1; then GOOSE=goose; else GOOSE=$HOME/.local/opt/goose-v2026.3/goose; fi
 fi
 mkdir -p "$out"
 failed=0
+# the C compiler of goose-static: gcc with -static (an absolute path, as goose runs it from another directory)
+gccstatic=$(cd "$out" && pwd)/wrap-gcc-static.sh
+printf '#!/bin/sh\nexec gcc "$@" -static\n' > "$gccstatic" && chmod +x "$gccstatic"
 # a copy of the sources: a rebuild edits it
 src=$out/src
 rm -rf "${src:?}" && cp -r "$here/suite/hello" "$src"
@@ -37,11 +47,13 @@ have() { command -v "$1" > /dev/null 2>&1; }
 
 avail() {
   case $1 in
-    bp | bp-xx | bp-sysutils) have "$FPC" && have python3 ;;
+    bp | bp-xx | bp-sysutils | bp-libc) have "$FPC" && have python3 ;;
     gcc | gcc-static) have gcc ;;
-    rust | rust-small) have rustc ;;
+    rust | rust-static | rust-small) have rustc ;;
+    rust-musl) have rustc && [ -d "$(rustc --print target-libdir --target x86_64-unknown-linux-musl 2> /dev/null)" ] ;;
     go | go-small) have go ;;
-    goose) have "$GOOSE" && have gcc ;;
+    go-dyn) have go && have gcc ;;
+    goose | goose-static) have "$GOOSE" && have gcc ;;
     *) return 1 ;;
   esac
 }
@@ -53,15 +65,20 @@ build() {
   case $v in
     bp) "$root/tools/bp" build --release -O2 -FU"$o" -FE"$o" "$src/hello.pas" && mv "$o/hello" "$b" ;;
     bp-xx) "$root/tools/bp" build --release -O2 -XX -CX -FU"$o" -FE"$o" "$src/hello.pas" && mv "$o/hello" "$b" ;;
+    bp-libc) "$root/tools/bp" build --release -O2 -dSAFE_LIBC -FU"$o" -FE"$o" "$src/hello.pas" && mv "$o/hello" "$b" ;;
     bp-sysutils) "$root/tools/bp" build --release -O2 -FU"$o" -FE"$o" "$src/hello_sysutils.pas" \
       && mv "$o/hello_sysutils" "$b" ;;
     gcc) gcc -O2 -o "$b" "$src/hello.c" ;;
     gcc-static) gcc -O2 -static -o "$b" "$src/hello.c" ;;
     rust) rustc -O -o "$b" "$src/hello.rs" ;;
+    rust-static) rustc -O -C target-feature=+crt-static -o "$b" "$src/hello.rs" ;;
+    rust-musl) rustc -O --target x86_64-unknown-linux-musl -o "$b" "$src/hello.rs" ;;
     rust-small) rustc -C opt-level=z -C panic=abort -C lto -C codegen-units=1 -C strip=symbols -o "$b" "$src/hello.rs" ;;
     go) (cd "$o" && go build -o "$b" "$src/hello.go") ;;
+    go-dyn) (cd "$o" && CGO_ENABLED=1 go build -ldflags=-linkmode=external -o "$b" "$src/hello.go") ;;
     go-small) (cd "$o" && go build -ldflags="-s -w" -o "$b" "$src/hello.go") ;;
     goose) GOOSE_CC=gcc "$GOOSE" build -O2 -o "$b" "$src/hello.goose" ;;
+    goose-static) GOOSE_CC="$gccstatic" "$GOOSE" build -O2 -o "$b" "$src/hello.goose" ;;
   esac
 }
 

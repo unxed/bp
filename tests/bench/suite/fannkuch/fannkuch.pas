@@ -3,6 +3,7 @@
   For every permutation P of 0..N-1, in lexicographic order: copy it, then while the first element K is not 0, reverse
   the first K+1 elements and count one flip. The program prints the sum of the flip counts, added for the even
   permutations (the first is number 0) and subtracted for the odd ones, and the largest count.
+  The elements and the counts are 32-bit, the indices 64-bit (SizeInt), as in the other languages.
   The other languages: fannkuch.c, fannkuch.rs, fannkuch.go (the same loops). }
 program fannkuch;
 
@@ -21,7 +22,8 @@ type
 function Flips(const P: TPerm): Integer;
 var
   Q: TPerm;
-  K, I, J, T: Integer;
+  K, T: Integer;
+  I, J: SizeInt;
 begin
   Q := P;
   Result := 0;
@@ -46,7 +48,8 @@ end;
 { the next permutation in lexicographic order; False after the last one }
 function Next(var P: TPerm): Boolean;
 var
-  I, J, T: Integer;
+  I, J: SizeInt;
+  T: Integer;
 begin
   I := N - 2;
   while (I >= 0) and (P[I] > P[I + 1]) do
