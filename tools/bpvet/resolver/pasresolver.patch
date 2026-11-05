@@ -24,6 +24,9 @@ in the FPC sources); see README.md.
     round): {$calling cdecl} is not read, and FPC itself checks the convention.
 13. A typecast of a value above the Int64 range (QWord($CBF29CE484222325)) is evaluated (EvalBaseTypeCast): QWord keeps
     it, Int64 takes its bits, other types are not folded; it used to stop with "not yet implemented".
+14. An element of a typed pointer is a variable (B[I] := X with B: PByte, PByte(P)[I] := X; pointer math of ObjFPC):
+    TPasResolver.CheckCanBeLHS took only P^ for a writable element without an identifier and stopped with "identifier
+    expected, but Byte found" (unxed/bp#203).
 
 --- a/packages/fcl-passrc/src/pasresolver.pp
 +++ b/packages/fcl-passrc/src/pasresolver.pp
@@ -302,7 +305,19 @@ in the FPC sources); see README.md.
  
    if ResolveAlias=prraSimple then
      begin
-@@ -25078,7 +25152,14 @@
+@@ -23772,6 +23846,11 @@
+       begin
+       // e.g. p^:=
+       end
++    else if (ResolvedEl.ExprEl is TParamsExpr)
++        and (TParamsExpr(ResolvedEl.ExprEl).Kind=pekArrayParams)
++        and (rrfWritable in ResolvedEl.Flags) then
++      // e.g. p[i]:= of a typed pointer: an element of the pointed type, no identifier
++      exit(true)
+     else
+       begin
+       if ErrorOnFalse then
+@@ -25078,7 +25157,14 @@
  begin
    Result:=false;
    if [rrfReadable,rrfWritable]*ResolvedEl.Flags<>[rrfReadable,rrfWritable] then
@@ -318,7 +333,7 @@ in the FPC sources); see README.md.
    if ResolvedEl.IdentEl=nil then
      exit(true);
  
-@@ -25662,6 +25743,10 @@
+@@ -25662,6 +25748,10 @@
        end;
      if (Param.ArgType=nil) then
        exit(cExact); // untyped argument
@@ -329,7 +344,7 @@ in the FPC sources); see README.md.
      if (ParamResolved.BaseType=ExprResolved.BaseType) then
        begin
        if msDelphi in CurrentParser.CurrentModeswitches then
-@@ -25688,6 +25773,11 @@
+@@ -25688,6 +25778,11 @@
        end;
      if IsGenericTemplType(ParamResolved) then
        exit(cGenericExact);
@@ -341,7 +356,7 @@ in the FPC sources); see README.md.
  
      //writeln('TPasResolver.CheckParamCompatibility NeedVar ParamResolved=',GetResolverResultDbg(ParamResolved),' ExprResolved=',GetResolverResultDbg(ExprResolved));
      if RaiseOnError then
-@@ -27823,6 +27913,24 @@
+@@ -27823,6 +27918,24 @@
    Result:=-1;
  end;
  
@@ -366,7 +381,7 @@ in the FPC sources); see README.md.
  procedure TPasResolver.CheckUseAsType(aType: TPasElement; id: TMaxPrecInt;
    ErrorEl: TPasElement);
  begin
-@@ -27839,7 +27947,7 @@
+@@ -27839,7 +27952,7 @@
        begin
        // ref to generic type without specialization
        if not (msDelphi in CurrentParser.CurrentModeswitches)
