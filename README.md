@@ -15,7 +15,7 @@
 | Hello world, peak memory | **0.3 MiB** (with `-XX`), 0.7 MiB | 1.2 MiB dynamic, 0.6 MiB static | 1.8 MiB | 1.6 MiB | 1.5 MiB |
 | Hello world, start | **587 us** (with `-XX`) | 732 us dynamic, 445 us static | 1019 us | 1496 us | 904 us |
 | Rebuild of a program | 171 ms (the check and `fpc`) | 55 ms | 237 ms | 67 ms | 110 ms |
-| Run time, 4 programs (2026-11-05 baseline) | 1.4–2.6x of C | 1x | 1.05–1.75x | 1.13–2.07x | 0.16–1.24x |
+| Run time, 4 programs in like-for-like tiers (2026-11-05; §25.2) | 1.3–3.3x of C (worst: binary trees in an arena) | 1x | 1.07–1.97x | 1.10–2.14x | 0.90–1.28x |
 | Toolchain | 282 MiB with all units; no C compiler | | 1.2 GiB, needs a C linker | 97 MiB | 28 MiB, compiles through gcc |
 
 - **Ahead:** the memory of a program, the start (all but static C), one static file that runs on any Linux.
