@@ -1,5 +1,7 @@
 x86_64: LongInt array index is copied to a scratch register before every use (swap loop: 12 instructions instead of 8)
 
+Filed 2026-11-05 as https://gitlab.com/freepascal.org/fpc/source/-/issues/42041 (here: #187, part of #185).
+
 ## Summary
 
 On x86_64, when an array is indexed by a `LongInt` variable that lives in a register, FPC copies the variable

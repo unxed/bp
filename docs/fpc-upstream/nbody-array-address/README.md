@@ -1,5 +1,7 @@
 x86_64: address of A[I] (array of records) recomputed for every field access; not kept in a register across statements
 
+Filed 2026-11-05 as https://gitlab.com/freepascal.org/fpc/source/-/issues/42040 (here: #186, part of #185).
+
 ## Summary
 
 In a loop that reads and writes several fields of `B[I]` and `B[J]` (a global
