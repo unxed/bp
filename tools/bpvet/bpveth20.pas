@@ -1,15 +1,11 @@
 { SPDX-License-Identifier: MIT }
-{ bpvet: H20 of S17 (unxed/bp#207), in the typed mode on a module that resolved (bpvettyped.pas). FPC passes a local
-  String, dynamic array or interface (or a record that holds one) to a const parameter without a reference, so its count
-  stays at 1. When the callee is a nested routine that writes that local of its parent, the write frees what the
-  parameter names, and the callee reads freed memory:
-    S17  a call of a nested routine that passes a variable of a routine around it (a local, a value parameter or the
-         result) of a managed type as a const (or constref) argument, when the nested routine writes that variable,
-         itself or through the nested routines it calls (bpvetnested.pas); and a call of a procedure value with such an
-         argument once a nested routine that writes the variable is used as a procedure value there.
-  A global, a field or a var parameter in the same place is counted by the caller, so it is not a finding. A finding
-  with // UNSAFE: <why> on its line (or in a comment block right above) is not reported; a // UNSAFE-UNIT: module is
-  not checked. }
+{ bpvet: H20 and the first H21 slice of S17 (unxed/bp#207 and #218), in typed mode on a resolved module
+  (bpvettyped.pas). FPC passes a managed const/constref argument without a reference from every place, so its count
+  stays at 1. H20 reports a nested routine that writes a local of its parent passed as const. The H21 slice reports a
+  managed place passed to const and also to var/out in one call. Writes to globals, fields and var parameters through
+  callees, and aliases beyond the same resolved declaration, remain outside this slice.
+  A finding with // UNSAFE: <why> on its line (or in a comment block right above) is not reported; a
+  // UNSAFE-UNIT: module is not checked. }
 unit BpvetH20;
 
 {$mode objfpc}{$H+}
@@ -41,6 +37,7 @@ type
     function Marked(const El: TPasElement): Boolean;
     procedure Add(const El: TPasElement; const Msg: String);
     function OwnVar(const O: TPasProcedure; const D: TPasElement): Boolean;
+    procedure CheckAliasing(const Body: TPasImplBlock);
     procedure CheckCalls(const O: TPasProcedure; const N: TVetNested; const Body: TPasImplBlock;
       const Escaped: TFPList);
   public
@@ -247,6 +244,70 @@ begin
   end;
 end;
 
+{ A managed const argument is uncounted even when the same place is also passed by var or out. }
+procedure TH20.CheckAliasing(const Body: TPasImplBlock);
+var
+  Nodes: TListBox;
+  I, J, K: Integer;
+  P: TParamsExpr;
+  C, D, Other: TPasElement;
+  PT: TPasProcedureType;
+  A: TPasArgument;
+  R: TPasResolverResult;
+begin
+  Nodes := TListBox.Own(TFPList.Create);
+  FNodes.Get.Clear;
+  Body.ForEachCall(@Collect, nil);
+  Nodes.Get.Assign(FNodes.Get);
+  for I := 0 to Nodes.Get.Count - 1 do
+  begin
+    if not ((TObject(Nodes.Get[I]) is TParamsExpr) and (TParamsExpr(Nodes.Get[I]).Kind = pekFuncParams)) then
+      Continue;
+    P := TParamsExpr(Nodes.Get[I]);
+    C := VetRefOf(P.Value);
+    PT := nil;
+    if C is TPasProcedure then
+      PT := TPasProcedure(C).ProcType
+    else if (C is TPasVariable) or (C is TPasArgument) then
+    begin
+      try
+        FResolver.ComputeElement(C, R, []);
+      except
+        on Exception do
+          Continue;
+      end;
+      if R.LoTypeEl is TPasProcedureType then
+        PT := TPasProcedureType(R.LoTypeEl);
+    end;
+    if PT = nil then
+      Continue;
+    for J := 0 to High(P.Params) do
+    begin
+      if (J >= PT.Args.Count) or not (P.Params[J] is TPrimitiveExpr) then
+        Continue;
+      A := TPasArgument(PT.Args[J]);
+      if not (A.Access in [argConst, argConstRef]) then
+        Continue;
+      D := VetRefOf(P.Params[J]);
+      if (D = nil) or not IsManagedDecl(D) then
+        Continue;
+      for K := 0 to High(P.Params) do
+      begin
+        if (K = J) or (K >= PT.Args.Count) or not (P.Params[K] is TPrimitiveExpr) then
+          Continue;
+        A := TPasArgument(PT.Args[K]);
+        if not (A.Access in [argVar, argOut]) then
+          Continue;
+        Other := VetRefOf(P.Params[K]);
+        if Other = D then
+          Add(P.Params[J], Format('H21 (unxed/bp#218): managed place %s is passed to a const parameter and the same '
+            + 'place is also passed to a var/out parameter in one call; the const argument is uncounted and the '
+            + 'write can free what it names; pass a local copy to the const parameter', [D.Name]));
+      end;
+    end;
+  end;
+end;
+
 procedure TH20.CheckRoutine(const O: TPasProcedure);
 var
   N: specialize TOwned<TVetNested>;
@@ -256,6 +317,7 @@ var
 begin
   if (O.Body = nil) or (O.Body.Body = nil) then
     Exit;
+  CheckAliasing(O.Body.Body);
   N := specialize TOwned<TVetNested>.Own(TVetNested.Create(O));
   if N.Get.Count = 0 then
     Exit;
