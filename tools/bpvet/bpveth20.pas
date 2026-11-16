@@ -37,11 +37,11 @@ type
     function Marked(const El: TPasElement): Boolean;
     procedure Add(const El: TPasElement; const Msg: String);
     function OwnVar(const O: TPasProcedure; const D: TPasElement): Boolean;
-    procedure CheckAliasing(const Body: TPasImplBlock);
     procedure CheckCalls(const O: TPasProcedure; const N: TVetNested; const Body: TPasImplBlock;
       const Escaped: TFPList);
   public
     constructor Create(const ASrc: TVetSource; const AResolver: TPasResolver);
+    procedure CheckAliasing(const Body: TPasImplBlock);
     procedure CheckRoutine(const O: TPasProcedure);
     procedure CheckDecls(const Decls: TPasDeclarations);
     procedure Flush(var Report: TVetReport);
@@ -190,6 +190,8 @@ var
   Via: String;
   R: TPasResolverResult;
 begin
+  if Body = nil then
+    Exit;
   Nodes := TListBox.Own(TFPList.Create);
   FNodes.Get.Clear;
   Body.ForEachCall(@Collect, nil);
@@ -387,6 +389,8 @@ begin
   H.Get.CheckDecls(Module.ImplementationSection);
   if Module is TPasProgram then
     H.Get.CheckDecls(TPasProgram(Module).ProgramSection);
+  H.Get.CheckAliasing(Module.InitializationSection);
+  H.Get.CheckAliasing(Module.FinalizationSection);
   H.Get.Flush(Report);
 end;
 
