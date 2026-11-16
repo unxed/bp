@@ -138,7 +138,7 @@ file= checks=(-Cr -Co) opts=() vet=() dirs=("$root/safe" "$root/ext") watch=0 pa
 while [ $# -gt 0 ]; do
   a=$1; shift
   case "$a" in
-    --release) checks=(-O2 -XX -CX) ;;
+    --release) checks=(-O2 -XX -CX -Cr) ;;
     --watch) watch=1 ;;
     -Fu*|-Fi*) opts+=("$a"); vet+=("$a"); dirs+=("${a:3}") ;;
     -d*|-Fa*) opts+=("$a"); vet+=("$a") ;;
