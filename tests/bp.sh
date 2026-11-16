@@ -27,7 +27,7 @@ if "$root/tools/bp" build -Fu"$root/tools/spikes/region" -FE"$tmp/ok" "$tmp/ok/c
 else
   echo "FAIL bp build of the calculator:"; cat "$tmp/ok.log"; fail=1
 fi
-# --release adds -O2 and drops -Cr -Co; a debug build is the other way round: FPC is a wrapper that logs its arguments
+# --release adds -O2, keeps -Cr and drops -Co; FPC is a wrapper that logs its arguments
 mkdir -p "$tmp/rel"
 cat > "$tmp/fpclog" <<'SH'
 #!/usr/bin/env bash
@@ -43,13 +43,14 @@ for mode in debug release; do
   line=$(grep 'calc\.pas$' "$tmp/fpc-$mode.log" | head -1)
   if [ "$mode" = release ]; then
     case " $line " in *" -O2 "*) ok=1 ;; *) ok= ;; esac
-    case " $line " in *" -Cr "*|*" -Co "*) ok= ;; esac
+    case " $line " in *" -Cr "*) ;; *) ok= ;; esac
+    case " $line " in *" -Co "*) ok= ;; esac
   else
     case " $line " in *" -Cr -Co "*) ok=1 ;; *) ok= ;; esac
     case " $line " in *" -O"*) ok= ;; esac
   fi
   if [ -n "$ok" ]; then
-    echo "ok   bp build${flag:+ $flag}: fpc gets $([ "$mode" = release ] && echo -O2 || echo '-Cr -Co, no -O')"
+    echo "ok   bp build${flag:+ $flag}: fpc gets $([ "$mode" = release ] && echo '-O2 -Cr, no -Co' || echo '-Cr -Co, no -O')"
   else
     echo "FAIL bp build${flag:+ $flag}: the options of fpc are wrong:"; echo "$line"; cat "$tmp/rel-$mode.out"; fail=1
   fi
