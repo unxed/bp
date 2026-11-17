@@ -257,6 +257,8 @@ var
   A: TPasArgument;
   R: TPasResolverResult;
 begin
+  if Body = nil then
+    Exit;
   Nodes := TListBox.Own(TFPList.Create);
   FNodes.Get.Clear;
   Body.ForEachCall(@Collect, nil);
