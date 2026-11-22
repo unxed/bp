@@ -168,11 +168,12 @@ begin
   VetAdd(FReport, FSrc.FileName, Row, VetWordColumn(VetLine(FSrc, Row), Name), vsError, 'S17', Msg);
 end;
 
-{ D is a variable of O that a const parameter does not count: a local, a value parameter or the result. }
+{ D is a variable of O that a const parameter does not count: a local, a value/var/out parameter or the result. }
 function TH20.OwnVar(const O: TPasProcedure; const D: TPasElement): Boolean;
 begin
   Result := ((D is TPasVariable) and not (D is TPasConst) and not (D is TPasProperty) and (D.Parent = O.Body))
-    or ((D is TPasArgument) and (D.Parent = O.ProcType) and (TPasArgument(D).Access = argDefault))
+    or ((D is TPasArgument) and (D.Parent = O.ProcType)
+    and (TPasArgument(D).Access in [argDefault, argVar, argOut]))
     or ((D is TPasResultElement) and (O.ProcType is TPasFunctionType)
     and (D = TPasFunctionType(O.ProcType).ResultEl));
 end;
@@ -238,10 +239,17 @@ begin
       if (D = nil) or not OwnVar(O, D) or not IsManagedDecl(D) then
         Continue;
       if ((K >= 0) and (N.Writes(K).IndexOf(D) >= 0)) or ((K < 0) and (Escaped.IndexOf(D) >= 0)) then
-        Add(P.Params[J], Format('H20 (unxed/bp#207): %s is passed to the const parameter %s of %s, which (or a nested '
-          + 'routine it calls) writes %s: FPC passes a local String, dynamic array or interface to a const parameter '
-          + 'without a reference, so the write frees what %s names and it reads freed memory; make %s a value '
-          + 'parameter, or pass a copy', [D.Name, A.Name, Via, D.Name, A.Name, A.Name]));
+      begin
+        if (D is TPasArgument) and (TPasArgument(D).Access in [argVar, argOut]) then
+          Add(P.Params[J], Format('H21 (unxed/bp#218): %s is a var/out parameter written by %s (or a nested '
+            + 'routine it calls) and is also passed to its const parameter %s; FPC does not count the const argument, '
+            + 'so the write frees what it names; pass a local copy to the const parameter', [D.Name, Via, A.Name]))
+        else
+          Add(P.Params[J], Format('H20 (unxed/bp#207): %s is passed to the const parameter %s of %s, which (or a nested '
+            + 'routine it calls) writes %s: FPC passes a local String, dynamic array or interface to a const parameter '
+            + 'without a reference, so the write frees what %s names and it reads freed memory; make %s a value '
+            + 'parameter, or pass a copy', [D.Name, A.Name, Via, D.Name, A.Name, A.Name]));
+      end;
     end;
   end;
 end;
