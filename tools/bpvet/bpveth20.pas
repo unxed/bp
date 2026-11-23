@@ -236,7 +236,8 @@ begin
       if not (A.Access in [argConst, argConstRef]) or not (P.Params[J] is TPrimitiveExpr) then
         Continue;
       D := VetRefOf(P.Params[J]);
-      if (D = nil) or not OwnVar(O, D) or not IsManagedDecl(D) then
+      if (D = nil) or not (OwnVar(O, D) or ((D is TPasVariable) and (D.Parent <> O.Body)))
+        or not IsManagedDecl(D) then
         Continue;
       if ((K >= 0) and (N.Writes(K).IndexOf(D) >= 0)) or ((K < 0) and (Escaped.IndexOf(D) >= 0)) then
       begin
