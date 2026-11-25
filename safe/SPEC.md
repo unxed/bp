@@ -803,7 +803,7 @@ end;                                    // the list is destroyed here, also on a
 ## §11. Next iterations (what does not exist yet)
 
 - **Linter** `bpvet` on `fcl-passrc` (the Pascal parser shipped with FPC; §6): S3, S4, S5 (fields and globals), S6, S7, S8, S9, S10 (static part), S11 (class, interface and pointer fields of a task), S12 and S15 are done, the borrow-escape part of S5,
-  rules S13–S14 are next (unxed/bp#56); output in the format of FPC messages so that the IDE shows them as compiler errors.
+  rules S13–S14 are implemented with lint tests and CI (unxed/bp#56, step 11); the borrow-escape part of S5 remains open. Output is in the format of FPC messages so that the IDE shows them as compiler errors.
 - **Lazarus package** `safepascal.lpk` in OPM: one-click installation.
 - **Memory styles** (§20): the region style from Goose with the root analysis S17 in `bpvet`, and the GC style (`TGcObject`).
   The earlier sketch "a tracing arena with `procedure Trace(V: TVisitor)`" is replaced by §20: there the edges are the
