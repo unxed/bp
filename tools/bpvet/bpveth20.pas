@@ -247,6 +247,36 @@ begin
 end;
 
 { A managed const argument is uncounted even when the same place is also passed by var or out. }
+function IsPlaceExpr(const E: TPasElement): Boolean;
+begin
+  Result := E is TPrimitiveExpr;
+  if (E is TBinaryExpr) and (TBinaryExpr(E).OpCode = eopSubIdent) then
+    Result := IsPlaceExpr(TBinaryExpr(E).left) and IsPlaceExpr(TBinaryExpr(E).right);
+end;
+
+function PlaceDecl(const E: TPasElement): TPasElement;
+begin
+  if (E is TBinaryExpr) and (TBinaryExpr(E).OpCode = eopSubIdent) then
+    Result := VetRefOf(TBinaryExpr(E).right)
+  else
+    Result := VetRefOf(E);
+end;
+
+function SamePlace(const A, B: TPasElement): Boolean;
+var
+  DA, DB: TPasElement;
+begin
+  if (A is TBinaryExpr) and (B is TBinaryExpr)
+    and (TBinaryExpr(A).OpCode = eopSubIdent) and (TBinaryExpr(B).OpCode = eopSubIdent) then
+    Exit(SamePlace(TBinaryExpr(A).left, TBinaryExpr(B).left)
+      and SamePlace(TBinaryExpr(A).right, TBinaryExpr(B).right));
+  if not ((A is TPrimitiveExpr) and (B is TPrimitiveExpr)) then
+    Exit(False);
+  DA := VetRefOf(A);
+  DB := VetRefOf(B);
+  Result := (DA <> nil) and (DA = DB);
+end;
+
 procedure TH20.CheckAliasing(const Body: TPasImplBlock);
 var
   Nodes: TListBox;
@@ -287,23 +317,23 @@ begin
       Continue;
     for J := 0 to High(P.Params) do
     begin
-      if (J >= PT.Args.Count) or not (P.Params[J] is TPrimitiveExpr) then
+      if (J >= PT.Args.Count) or not IsPlaceExpr(P.Params[J]) then
         Continue;
       A := TPasArgument(PT.Args[J]);
       if not (A.Access in [argConst, argConstRef]) then
         Continue;
-      D := VetRefOf(P.Params[J]);
+      D := PlaceDecl(P.Params[J]);
       if (D = nil) or not IsManagedDecl(D) then
         Continue;
       for K := 0 to High(P.Params) do
       begin
-        if (K = J) or (K >= PT.Args.Count) or not (P.Params[K] is TPrimitiveExpr) then
+        if (K = J) or (K >= PT.Args.Count) or not IsPlaceExpr(P.Params[K]) then
           Continue;
         A := TPasArgument(PT.Args[K]);
         if not (A.Access in [argVar, argOut]) then
           Continue;
-        Other := VetRefOf(P.Params[K]);
-        if Other = D then
+        Other := PlaceDecl(P.Params[K]);
+        if (Other = D) and SamePlace(P.Params[J], P.Params[K]) then
           Add(P.Params[J], Format('H21 (unxed/bp#218): managed place %s is passed to a const parameter and the same '
             + 'place is also passed to a var/out parameter in one call; the const argument is uncounted and the '
             + 'write can free what it names; pass a local copy to the const parameter', [D.Name]));
