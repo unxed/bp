@@ -9,8 +9,12 @@ uses
   SysUtils, BP;
 
 type
-  TBox = record
+  TInner = record
     Value: String;
+  end;
+
+  TBox = record
+    Inner: TInner;
   end;
 
 procedure WriteAlias(var A: String; const S: String);
@@ -25,9 +29,11 @@ begin
 end;
 
 var
-  Box: TBox;
+  Box, OtherBox: TBox;
 
 begin
-  Box.Value := StringOfChar('a', 20) + IntToStr(Random(9));
-  WriteAlias(Box.Value, Box.Value);
+  Box.Inner.Value := StringOfChar('a', 20) + IntToStr(Random(9));
+  OtherBox.Inner.Value := StringOfChar('b', 20) + IntToStr(Random(9));
+  WriteAlias(Box.Inner.Value, Box.Inner.Value);
+  WriteAlias(Box.Inner.Value, OtherBox.Inner.Value);
 end.

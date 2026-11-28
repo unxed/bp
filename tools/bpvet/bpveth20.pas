@@ -2,8 +2,8 @@
 { bpvet: H20 and the first H21 slice of S17 (unxed/bp#207 and #218), in typed mode on a resolved module
   (bpvettyped.pas). FPC passes a managed const/constref argument without a reference from every place, so its count
   stays at 1. H20 reports a nested routine that writes a local of its parent passed as const. The H21 slice reports a
-  managed place passed to const and also to var/out in one call. Writes to globals, fields and var parameters through
-  callees, and aliases beyond the same resolved declaration, remain outside this slice.
+  managed place passed to const and also to var/out in one call, including identical resolved field paths. Writes to
+  globals, fields and var parameters through callees remain outside this slice.
   A finding with // UNSAFE: <why> on its line (or in a comment block right above) is not reported; a
   // UNSAFE-UNIT: module is not checked. }
 unit BpvetH20;
@@ -246,13 +246,57 @@ begin
   end;
 end;
 
+{ A primitive variable or a field path, excluding properties and computed expressions. }
+function IsPlace(const E: TPasElement): Boolean;
+var
+  B: TBinaryExpr;
+  D: TPasElement;
+begin
+  if E is TPrimitiveExpr then
+  begin
+    D := VetRefOf(E);
+    Exit((D is TPasVariable) or (D is TPasArgument));
+  end;
+  if not ((E is TBinaryExpr) and (TBinaryExpr(E).OpCode = eopSubIdent)) then
+    Exit(False);
+  B := TBinaryExpr(E);
+  D := VetRefOf(B.right);
+  Result := IsPlace(B.left) and (D is TPasVariable) and not (D is TPasProperty);
+end;
+
+function PlaceDecl(const E: TPasElement): TPasElement;
+begin
+  if (E is TBinaryExpr) and (TBinaryExpr(E).OpCode = eopSubIdent) then
+    Result := VetRefOf(TBinaryExpr(E).right)
+  else
+    Result := VetRefOf(E);
+end;
+
+{ Compare storage paths, not just field declarations: two records share the same field declaration. }
+function SamePlace(const A, B: TPasElement): Boolean;
+var
+  X, Y: TBinaryExpr;
+begin
+  if not IsPlace(A) or not IsPlace(B) then
+    Exit(False);
+  if (A is TBinaryExpr) and (B is TBinaryExpr) then
+  begin
+    X := TBinaryExpr(A);
+    Y := TBinaryExpr(B);
+    Exit((VetRefOf(X.right) = VetRefOf(Y.right)) and SamePlace(X.left, Y.left));
+  end;
+  if (A is TPrimitiveExpr) and (B is TPrimitiveExpr) then
+    Exit(VetRefOf(A) = VetRefOf(B));
+  Result := False;
+end;
+
 { A managed const argument is uncounted even when the same place is also passed by var or out. }
 procedure TH20.CheckAliasing(const Body: TPasImplBlock);
 var
   Nodes: TListBox;
   I, J, K: Integer;
   P: TParamsExpr;
-  C, D, Other: TPasElement;
+  C, D: TPasElement;
   PT: TPasProcedureType;
   A: TPasArgument;
   R: TPasResolverResult;
@@ -287,23 +331,22 @@ begin
       Continue;
     for J := 0 to High(P.Params) do
     begin
-      if (J >= PT.Args.Count) or not (P.Params[J] is TPrimitiveExpr) then
+      if (J >= PT.Args.Count) or not IsPlace(P.Params[J]) then
         Continue;
       A := TPasArgument(PT.Args[J]);
       if not (A.Access in [argConst, argConstRef]) then
         Continue;
-      D := VetRefOf(P.Params[J]);
+      D := PlaceDecl(P.Params[J]);
       if (D = nil) or not IsManagedDecl(D) then
         Continue;
       for K := 0 to High(P.Params) do
       begin
-        if (K = J) or (K >= PT.Args.Count) or not (P.Params[K] is TPrimitiveExpr) then
+        if (K = J) or (K >= PT.Args.Count) or not IsPlace(P.Params[K]) then
           Continue;
         A := TPasArgument(PT.Args[K]);
         if not (A.Access in [argVar, argOut]) then
           Continue;
-        Other := VetRefOf(P.Params[K]);
-        if Other = D then
+        if SamePlace(P.Params[J], P.Params[K]) then
           Add(P.Params[J], Format('H21 (unxed/bp#218): managed place %s is passed to a const parameter and the same '
             + 'place is also passed to a var/out parameter in one call; the const argument is uncounted and the '
             + 'write can free what it names; pass a local copy to the const parameter', [D.Name]));
